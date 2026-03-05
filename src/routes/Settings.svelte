@@ -609,7 +609,7 @@
     cursor: pointer;
   }
 
-  [data-theme="dark"] .select-input {
+  :global([data-theme="dark"]) .select-input {
     background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23FCFAF6' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
   }
 

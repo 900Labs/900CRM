@@ -29,7 +29,7 @@
   // ── State ──────────────────────────────────────────────────────────────────
 
   let inputValue = $state('');
-  let inputEl: HTMLInputElement | undefined;
+  let inputEl = $state<HTMLInputElement | undefined>(undefined);
   let showSuggestions = $state(false);
 
   // ── Derived ────────────────────────────────────────────────────────────────

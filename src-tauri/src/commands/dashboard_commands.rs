@@ -7,7 +7,7 @@ use tauri::State;
 use serde::{Deserialize, Serialize};
 
 use crate::crm_engine::{activities as activity_engine, deals as deal_engine};
-use crate::storage::{activities, contacts, deals};
+use crate::storage::deals;
 use crate::AppState;
 
 // ─────────────────────────────────────────────────────────────────────────────
