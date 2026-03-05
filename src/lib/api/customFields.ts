@@ -37,6 +37,13 @@ export interface EntityCustomFieldValue {
   updated_at: string;
 }
 
+export interface EntityTypeCustomFieldValue {
+  entity_id: string;
+  field_def_id: string;
+  value: string;
+  updated_at: string;
+}
+
 export async function listCustomFieldDefinitions(
   entityType?: CustomFieldEntityType,
 ): Promise<CustomFieldDefinition[]> {
@@ -100,5 +107,13 @@ export async function listCustomFieldValues(
   return invoke<EntityCustomFieldValue[]>('list_custom_field_values', {
     entity_type: entityType,
     entity_id: entityId,
+  });
+}
+
+export async function listCustomFieldValuesForEntityType(
+  entityType: CustomFieldEntityType,
+): Promise<EntityTypeCustomFieldValue[]> {
+  return invoke<EntityTypeCustomFieldValue[]>('list_custom_field_values_for_type', {
+    entity_type: entityType,
   });
 }

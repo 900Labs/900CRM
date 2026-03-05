@@ -15,6 +15,10 @@
   import type { Column } from '$lib/components/DataTable.svelte';
   import { formatFullName, formatDate } from '$lib/utils/formatters';
   import { settingsStore } from '$lib/stores/settings';
+  import {
+    listCustomFieldDefinitions,
+    type CustomFieldDefinition,
+  } from '$lib/api/customFields';
   import DataTable from '$lib/components/DataTable.svelte';
   import ImportExport from '$lib/components/ImportExport.svelte';
 
@@ -25,6 +29,11 @@
   let showImportExport = $state(false);
   let selectedContact = $state<Contact | null>(null);
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  let customFieldFilterTimer: ReturnType<typeof setTimeout> | undefined;
+  let customFieldDefinitions = $state<CustomFieldDefinition[]>([]);
+  let selectedCustomFieldDefId = $state('');
+  let customFieldQuery = $state('');
+  let customFieldsLoading = $state(true);
 
   // ── Column definitions ─────────────────────────────────────────────────────
 
@@ -68,7 +77,10 @@
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
   onMount(async () => {
-    await contactStore.loadContacts();
+    await Promise.all([
+      contactStore.loadContacts(),
+      loadCustomFieldDefinitions(),
+    ]);
   });
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -77,13 +89,24 @@
     searchQuery = (e.target as HTMLInputElement).value;
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-      contactStore.setFilters({ search: searchQuery, page: 1 });
+      contactStore.setFilters({
+        search: searchQuery,
+        type: typeFilter || undefined,
+        customFieldDefId: selectedCustomFieldDefId || undefined,
+        customFieldQuery: customFieldQuery.trim() || undefined,
+        page: 1,
+      });
     }, 300);
   }
 
   async function handleTypeFilter(type: '' | 'person' | 'org') {
     typeFilter = type;
-    await contactStore.setFilters({ type: type || undefined, page: 1 });
+    await contactStore.setFilters({
+      type: type || undefined,
+      customFieldDefId: selectedCustomFieldDefId || undefined,
+      customFieldQuery: customFieldQuery.trim() || undefined,
+      page: 1,
+    });
   }
 
   function handleRowClick(row: unknown) {
@@ -98,7 +121,47 @@
     await contactStore.setFilters({
       sortBy: key as 'name' | 'createdAt' | 'updatedAt',
       sortDir: dir,
+      customFieldDefId: selectedCustomFieldDefId || undefined,
+      customFieldQuery: customFieldQuery.trim() || undefined,
     });
+  }
+
+  async function loadCustomFieldDefinitions() {
+    customFieldsLoading = true;
+    try {
+      customFieldDefinitions = await listCustomFieldDefinitions('contact');
+    } finally {
+      customFieldsLoading = false;
+    }
+  }
+
+  async function applyCustomFieldFilter() {
+    await contactStore.setFilters({
+      search: searchQuery,
+      type: typeFilter || undefined,
+      customFieldDefId: selectedCustomFieldDefId || undefined,
+      customFieldQuery: customFieldQuery.trim() || undefined,
+      page: 1,
+    });
+  }
+
+  function handleCustomFieldDefinitionChange(event: Event) {
+    selectedCustomFieldDefId = (event.target as HTMLSelectElement).value;
+    void applyCustomFieldFilter();
+  }
+
+  function handleCustomFieldQueryInput(event: Event) {
+    customFieldQuery = (event.target as HTMLInputElement).value;
+    clearTimeout(customFieldFilterTimer);
+    customFieldFilterTimer = setTimeout(() => {
+      void applyCustomFieldFilter();
+    }, 250);
+  }
+
+  async function clearCustomFieldFilter() {
+    selectedCustomFieldDefId = '';
+    customFieldQuery = '';
+    await applyCustomFieldFilter();
   }
 </script>
 
@@ -158,6 +221,39 @@
           {option.label}
         </button>
       {/each}
+    </div>
+
+    <div class="custom-field-filter" role="group" aria-label={t('common.customFieldFilter')}>
+      <select
+        class="input custom-field-select"
+        value={selectedCustomFieldDefId}
+        onchange={handleCustomFieldDefinitionChange}
+        aria-label={t('common.customField')}
+      >
+        <option value="">
+          {customFieldsLoading ? t('common.loading') : t('common.selectCustomField')}
+        </option>
+        {#each customFieldDefinitions as definition (definition.id)}
+          <option value={definition.id}>{definition.field_name}</option>
+        {/each}
+      </select>
+      <input
+        class="input custom-field-input selectable"
+        type="search"
+        value={customFieldQuery}
+        oninput={handleCustomFieldQueryInput}
+        placeholder={t('common.filterValue')}
+        aria-label={t('common.filterValue')}
+        disabled={!selectedCustomFieldDefId}
+      />
+      <button
+        class="btn btn-ghost btn-sm"
+        type="button"
+        onclick={clearCustomFieldFilter}
+        disabled={!selectedCustomFieldDefId && !customFieldQuery}
+      >
+        {t('common.clear')}
+      </button>
     </div>
   </div>
 
@@ -234,6 +330,24 @@
   .type-filters {
     display: flex;
     gap: var(--space-2);
+  }
+
+  .custom-field-filter {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .custom-field-select {
+    min-width: 180px;
+    height: 34px;
+  }
+
+  .custom-field-input {
+    min-width: 200px;
+    max-width: 320px;
+    height: 34px;
   }
 
   .filter-chip {

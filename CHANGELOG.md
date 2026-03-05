@@ -27,6 +27,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Pipeline conversion and activity funnel cards on the dashboard.
   - Lightweight stage/type bar visualization with localized labels.
   - Graceful partial-failure fallback so core dashboard stats still load if reports are unavailable.
+- Added custom-field filter UX for primary operational views:
+  - Contacts list supports backend-filtered custom-field searching (pagination-safe).
+  - Pipeline and Activities support lightweight custom-field filtering via local value indexes.
+  - Added bulk custom-field value command for per-entity-type filter lookups.
 - Added schema migration v2 analytics indexes to keep report queries efficient on constrained hardware.
 - Added a lightweight open-source and low-resource guardrail checklist and wired it into the PR template/workflow.
 
@@ -43,7 +47,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Fixed contact-detail save/cancel consistency by including custom field state in dirty/reset/save handling.
 
 ### In Progress
-- Custom field filter UX for list/pipeline/activity views — planned for v1.1.0
 - Desktop notifications and reminders for upcoming activities — planned for v1.1.0
 - Portuguese (Brazilian) and Vietnamese translations — planned for v1.1.0
 

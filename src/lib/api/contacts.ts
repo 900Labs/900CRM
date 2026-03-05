@@ -30,6 +30,8 @@ export interface ListContactsParams {
   search?: string;
   type?: ContactType;
   tags?: string[];
+  customFieldDefId?: string;
+  customFieldQuery?: string;
   sortBy?: 'name' | 'createdAt' | 'updatedAt';
   sortDir?: 'asc' | 'desc';
   page?: number;
@@ -150,6 +152,8 @@ export async function listContacts(params: ListContactsParams = {}): Promise<Con
       sort_dir: params.sortDir ?? 'asc',
       filter_type: toBackendContactType(params.type),
       search_query: params.search?.trim() ? params.search.trim() : undefined,
+      custom_field_def_id: params.customFieldDefId?.trim() || undefined,
+      custom_field_query: params.customFieldQuery?.trim() || undefined,
     },
   });
 

@@ -4,6 +4,7 @@ use tauri::State;
 
 use crate::storage::custom_fields::{
     self, CustomFieldDefinition, CustomFieldValue, EntityCustomFieldValue,
+    EntityTypeCustomFieldValue,
 };
 use crate::storage::sync;
 use crate::AppState;
@@ -148,5 +149,15 @@ pub async fn list_custom_field_values(
 ) -> Result<Vec<EntityCustomFieldValue>, String> {
     let db = state.db.lock().map_err(|e| format!("Lock error: {}", e))?;
     custom_fields::list_values_for_entity(&db.conn, &entity_type, &entity_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_custom_field_values_for_type(
+    state: State<'_, AppState>,
+    entity_type: String,
+) -> Result<Vec<EntityTypeCustomFieldValue>, String> {
+    let db = state.db.lock().map_err(|e| format!("Lock error: {}", e))?;
+    custom_fields::list_values_for_entity_type(&db.conn, &entity_type)
         .map_err(|e| e.to_string())
 }
