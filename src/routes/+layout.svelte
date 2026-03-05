@@ -18,6 +18,7 @@
   import { settingsStore } from '$lib/stores/settings';
   import Toast from '$lib/components/Toast.svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
+  import GlobalModalHost from '$lib/components/GlobalModalHost.svelte';
 
   // ── Child route ──────────────────────────────────────────────────────────────
 
@@ -204,6 +205,7 @@
 </div>
 
 <!-- Toast overlay (outside app-shell so it always floats above everything) -->
+<GlobalModalHost />
 <Toast />
 
 <style>
