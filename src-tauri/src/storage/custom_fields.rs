@@ -49,6 +49,14 @@ pub struct EntityCustomFieldValue {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityTypeCustomFieldValue {
+    pub entity_id: String,
+    pub field_def_id: String,
+    pub value: String,
+    pub updated_at: String,
+}
+
 pub fn list_definitions(
     conn: &Connection,
     entity_type: Option<&str>,
@@ -312,6 +320,39 @@ pub fn list_values_for_entity(
             sort_order: row.get(5)?,
             value: row.get(6)?,
             updated_at: row.get(7)?,
+        })
+    })?;
+
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+pub fn list_values_for_entity_type(
+    conn: &Connection,
+    entity_type: &str,
+) -> CrmResult<Vec<EntityTypeCustomFieldValue>> {
+    validate_entity_type(entity_type)?;
+
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT
+            v.entity_id,
+            v.field_def_id,
+            v.value,
+            v.updated_at
+        FROM custom_field_values v
+        INNER JOIN custom_field_defs d ON d.id = v.field_def_id
+        WHERE d.entity_type = ?1
+          AND trim(v.value) <> ''
+        ORDER BY v.updated_at DESC
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![entity_type], |row| {
+        Ok(EntityTypeCustomFieldValue {
+            entity_id: row.get(0)?,
+            field_def_id: row.get(1)?,
+            value: row.get(2)?,
+            updated_at: row.get(3)?,
         })
     })?;
 

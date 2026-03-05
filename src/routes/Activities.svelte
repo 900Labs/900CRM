@@ -16,6 +16,12 @@
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
   import type { ActivityType, ActivityStatus, CreateActivityPayload } from '$lib/api/activities';
+  import {
+    listCustomFieldDefinitions,
+    listCustomFieldValuesForEntityType,
+    type CustomFieldDefinition,
+    type EntityTypeCustomFieldValue,
+  } from '$lib/api/customFields';
   import { formatDate, formatRelativeTime } from '$lib/utils/formatters';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
@@ -23,6 +29,13 @@
 
   let typeFilter   = $state<ActivityType | ''>('');
   let statusFilter = $state<ActivityStatus | ''>('');
+  let customFieldDefinitions = $state<CustomFieldDefinition[]>([]);
+  let selectedCustomFieldDefId = $state('');
+  let customFieldQuery = $state('');
+  let customFieldsLoading = $state(true);
+  let customFieldValuesLoading = $state(false);
+  let customFieldFilterError = $state<string | null>(null);
+  let customFieldValueIndex = $state<Record<string, Record<string, string>>>({});
 
   // Quick-add form
   let showQuickAdd  = $state(false);
@@ -34,7 +47,10 @@
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
   onMount(async () => {
-    await activityStore.loadActivities();
+    await Promise.all([
+      activityStore.loadActivities(),
+      loadCustomFieldDefinitions(),
+    ]);
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -53,6 +69,61 @@
       type: typeFilter || undefined,
       status: status || undefined,
     });
+  }
+
+  async function loadCustomFieldDefinitions() {
+    customFieldsLoading = true;
+    try {
+      customFieldDefinitions = await listCustomFieldDefinitions('activity');
+    } finally {
+      customFieldsLoading = false;
+    }
+  }
+
+  async function ensureCustomFieldValueIndex() {
+    if (Object.keys(customFieldValueIndex).length > 0) return;
+
+    customFieldValuesLoading = true;
+    customFieldFilterError = null;
+    try {
+      const values = await listCustomFieldValuesForEntityType('activity');
+      customFieldValueIndex = indexCustomFieldValues(values);
+    } catch (err) {
+      customFieldFilterError = t('common.filterLoadFailed');
+      console.error('[Activities] Failed to load custom-field filter values:', err);
+    } finally {
+      customFieldValuesLoading = false;
+    }
+  }
+
+  function indexCustomFieldValues(values: EntityTypeCustomFieldValue[]): Record<string, Record<string, string>> {
+    const index: Record<string, Record<string, string>> = {};
+    for (const value of values) {
+      if (!index[value.field_def_id]) {
+        index[value.field_def_id] = {};
+      }
+      index[value.field_def_id][value.entity_id] = value.value;
+    }
+    return index;
+  }
+
+  async function handleCustomFieldDefinitionChange(event: Event) {
+    selectedCustomFieldDefId = (event.target as HTMLSelectElement).value;
+    if (selectedCustomFieldDefId && customFieldQuery.trim()) {
+      await ensureCustomFieldValueIndex();
+    }
+  }
+
+  async function handleCustomFieldQueryInput(event: Event) {
+    customFieldQuery = (event.target as HTMLInputElement).value;
+    if (selectedCustomFieldDefId && customFieldQuery.trim()) {
+      await ensureCustomFieldValueIndex();
+    }
+  }
+
+  function clearCustomFieldFilter() {
+    selectedCustomFieldDefId = '';
+    customFieldQuery = '';
   }
 
   async function handleToggleComplete(activity: { id: string; status: ActivityStatus }) {
@@ -117,6 +188,23 @@
       default:          return 'status-pending';
     }
   }
+
+  function matchesCustomField(activityId: string): boolean {
+    const query = customFieldQuery.trim().toLowerCase();
+    if (!selectedCustomFieldDefId || !query) {
+      return true;
+    }
+    if (customFieldValuesLoading || customFieldFilterError) {
+      return true;
+    }
+
+    const rawValue = customFieldValueIndex[selectedCustomFieldDefId]?.[activityId] ?? '';
+    return rawValue.toLowerCase().includes(query);
+  }
+
+  const filteredActivities = $derived(
+    activityStore.activities.filter((activity) => matchesCustomField(activity.id))
+  );
 </script>
 
 <div class="page-content activities-page">
@@ -256,6 +344,47 @@
         </button>
       {/each}
     </div>
+
+    <div class="filter-group" role="group" aria-label={t('common.customFieldFilter')}>
+      <span class="filter-group-label">{t('common.customField')}:</span>
+      <select
+        class="input filter-select"
+        value={selectedCustomFieldDefId}
+        onchange={handleCustomFieldDefinitionChange}
+        aria-label={t('common.customField')}
+      >
+        <option value="">
+          {customFieldsLoading ? t('common.loading') : t('common.selectCustomField')}
+        </option>
+        {#each customFieldDefinitions as definition (definition.id)}
+          <option value={definition.id}>{definition.field_name}</option>
+        {/each}
+      </select>
+      <input
+        class="input filter-value-input selectable"
+        type="search"
+        value={customFieldQuery}
+        oninput={handleCustomFieldQueryInput}
+        placeholder={t('common.filterValue')}
+        aria-label={t('common.filterValue')}
+        disabled={!selectedCustomFieldDefId}
+      />
+      <button
+        class="btn btn-ghost btn-sm"
+        type="button"
+        onclick={clearCustomFieldFilter}
+        disabled={!selectedCustomFieldDefId && !customFieldQuery}
+      >
+        {t('common.clear')}
+      </button>
+      {#if customFieldValuesLoading}
+        <span class="filter-group-label">{t('common.loading')}</span>
+      {/if}
+    </div>
+
+    {#if customFieldFilterError}
+      <div class="filter-error" role="status">{customFieldFilterError}</div>
+    {/if}
   </div>
 
   <!-- Activity list -->
@@ -274,7 +403,7 @@
         {/each}
       </ul>
 
-    {:else if activityStore.activities.length === 0}
+    {:else if filteredActivities.length === 0}
       <EmptyState
         icon="activities"
         title={t('activities.noActivities')}
@@ -285,7 +414,7 @@
 
     {:else}
       <ul class="activities-list" role="list">
-        {#each activityStore.activities as activity (activity.id)}
+        {#each filteredActivities as activity (activity.id)}
           <li class="activity-row" class:activity-row--completed={activity.status === 'completed'}>
             <!-- Type icon -->
             <div class="activity-icon-wrap activity-type-{activity.type}" aria-hidden="true">
@@ -451,6 +580,21 @@
     background-color: var(--surface-active);
     color: var(--text-accent);
     border-color: var(--color-primary-200);
+  }
+
+  .filter-select {
+    min-width: 180px;
+    height: 32px;
+  }
+
+  .filter-value-input {
+    min-width: 180px;
+    height: 32px;
+  }
+
+  .filter-error {
+    font-size: var(--text-xs);
+    color: var(--text-danger);
   }
 
   /* ── Activity list card ──────────────────────────────────────────────────── */

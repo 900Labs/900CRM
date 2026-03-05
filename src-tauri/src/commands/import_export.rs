@@ -152,6 +152,8 @@ pub async fn export_contacts_csv(
         sort_dir: "asc".to_string(),
         filter_type: None,
         search_query: None,
+        custom_field_def_id: None,
+        custom_field_query: None,
     };
 
     let result = contacts::list_contacts(&db.conn, &params).map_err(|e| e.to_string())?;

@@ -105,6 +105,12 @@ pub struct ContactListParams {
 
     /// Optional full-text search query.
     pub search_query: Option<String>,
+
+    /// Optional custom field definition ID for value filtering.
+    pub custom_field_def_id: Option<String>,
+
+    /// Optional case-insensitive custom field value substring match.
+    pub custom_field_query: Option<String>,
 }
 
 impl Default for ContactListParams {
@@ -117,6 +123,8 @@ impl Default for ContactListParams {
             sort_dir: "asc".to_string(),
             filter_type: None,
             search_query: None,
+            custom_field_def_id: None,
+            custom_field_query: None,
         }
     }
 }
@@ -263,58 +271,93 @@ pub fn list_contacts(
         }
     }
 
-    // Build optional type filter.
-    let type_clause = if params.filter_type.is_some() {
-        "AND c.contact_type = ?3"
-    } else {
-        ""
-    };
+    let apply_type_filter = params.filter_type.is_some();
+    let apply_custom_filter = params
+        .custom_field_def_id
+        .as_ref()
+        .map(|v| !v.trim().is_empty())
+        .unwrap_or(false)
+        && params
+            .custom_field_query
+            .as_ref()
+            .map(|v| !v.trim().is_empty())
+            .unwrap_or(false);
 
-    let sql_count = format!(
-        "SELECT COUNT(*) FROM contacts c WHERE c.deleted_at IS NULL {}",
-        type_clause
-    );
+    let sql_count = r#"
+        SELECT COUNT(*)
+        FROM contacts c
+        WHERE c.deleted_at IS NULL
+          AND (?1 = 0 OR c.contact_type = ?2)
+          AND (
+            ?3 = 0 OR EXISTS (
+              SELECT 1
+              FROM custom_field_values cfv
+              WHERE cfv.entity_id = c.id
+                AND cfv.field_def_id = ?4
+                AND LOWER(cfv.value) LIKE LOWER(?5)
+            )
+          )
+    "#;
+
     let sql_list = format!(
         r#"
         SELECT id, contact_type, first_name, last_name, org_name, email, phone,
                address, city, country, org_id, notes, created_at, updated_at,
                deleted_at, device_id
         FROM contacts c
-        WHERE c.deleted_at IS NULL {}
+        WHERE c.deleted_at IS NULL
+          AND (?1 = 0 OR c.contact_type = ?2)
+          AND (
+            ?3 = 0 OR EXISTS (
+              SELECT 1
+              FROM custom_field_values cfv
+              WHERE cfv.entity_id = c.id
+                AND cfv.field_def_id = ?4
+                AND LOWER(cfv.value) LIKE LOWER(?5)
+            )
+          )
         ORDER BY c.{} {}
-        LIMIT ?1 OFFSET ?2
+        LIMIT ?6 OFFSET ?7
         "#,
-        type_clause, safe_sort_by, safe_sort_dir
+        safe_sort_by, safe_sort_dir
     );
 
-    let (total, contacts) = match &params.filter_type {
-        Some(ft) => {
-            let total: u32 = conn
-                .query_row(&sql_count, params![ft], |row| row.get(0))
-                .unwrap_or(0);
-            let mut stmt = conn.prepare(&sql_list)?;
-            let rows = stmt.query_map(params![limit, offset, ft], |row| {
-                row_to_contact(row)
-            })?;
-            let contacts: Vec<Contact> = rows
-                .filter_map(|r| r.ok())
-                .collect();
-            (total, contacts)
-        }
-        None => {
-            let total: u32 = conn
-                .query_row(&sql_count, [], |row| row.get(0))
-                .unwrap_or(0);
-            let mut stmt = conn.prepare(&sql_list)?;
-            let rows = stmt.query_map(params![limit, offset], |row| {
-                row_to_contact(row)
-            })?;
-            let contacts: Vec<Contact> = rows
-                .filter_map(|r| r.ok())
-                .collect();
-            (total, contacts)
-        }
-    };
+    let filter_type = params.filter_type.as_deref().unwrap_or("");
+    let custom_field_def_id = params.custom_field_def_id.as_deref().unwrap_or("");
+    let custom_field_query = params
+        .custom_field_query
+        .as_ref()
+        .map(|q| format!("%{}%", q.trim()))
+        .unwrap_or_else(|| "%%".to_string());
+
+    let total: u32 = conn
+        .query_row(
+            sql_count,
+            params![
+                if apply_type_filter { 1 } else { 0 },
+                filter_type,
+                if apply_custom_filter { 1 } else { 0 },
+                custom_field_def_id,
+                custom_field_query,
+            ],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    let mut stmt = conn.prepare(&sql_list)?;
+    let rows = stmt.query_map(
+        params![
+            if apply_type_filter { 1 } else { 0 },
+            filter_type,
+            if apply_custom_filter { 1 } else { 0 },
+            custom_field_def_id,
+            custom_field_query,
+            limit,
+            offset
+        ],
+        row_to_contact,
+    )?;
+    let contacts: Vec<Contact> = rows.filter_map(|r| r.ok()).collect();
 
     log::debug!(
         "list_contacts: page={}, per_page={}, total={}",
@@ -525,6 +568,24 @@ fn search_contacts_paged(
     let fts_query = format!("{}*", query.trim());
     let offset = ((params.page.max(1) - 1) * params.per_page) as i64;
     let limit = params.per_page as i64;
+    let apply_type_filter = params.filter_type.is_some();
+    let apply_custom_filter = params
+        .custom_field_def_id
+        .as_ref()
+        .map(|v| !v.trim().is_empty())
+        .unwrap_or(false)
+        && params
+            .custom_field_query
+            .as_ref()
+            .map(|v| !v.trim().is_empty())
+            .unwrap_or(false);
+    let filter_type = params.filter_type.as_deref().unwrap_or("");
+    let custom_field_def_id = params.custom_field_def_id.as_deref().unwrap_or("");
+    let custom_field_query = params
+        .custom_field_query
+        .as_ref()
+        .map(|q| format!("%{}%", q.trim()))
+        .unwrap_or_else(|| "%%".to_string());
 
     let total: u32 = conn
         .query_row(
@@ -532,9 +593,27 @@ fn search_contacts_paged(
             SELECT COUNT(*)
             FROM contacts c
             INNER JOIN contacts_fts fts ON c.rowid = fts.rowid
-            WHERE contacts_fts MATCH ?1 AND c.deleted_at IS NULL
+            WHERE contacts_fts MATCH ?1
+              AND c.deleted_at IS NULL
+              AND (?2 = 0 OR c.contact_type = ?3)
+              AND (
+                ?4 = 0 OR EXISTS (
+                  SELECT 1
+                  FROM custom_field_values cfv
+                  WHERE cfv.entity_id = c.id
+                    AND cfv.field_def_id = ?5
+                    AND LOWER(cfv.value) LIKE LOWER(?6)
+                )
+              )
             "#,
-            params![fts_query],
+            params![
+                fts_query,
+                if apply_type_filter { 1 } else { 0 },
+                filter_type,
+                if apply_custom_filter { 1 } else { 0 },
+                custom_field_def_id,
+                custom_field_query
+            ],
             |row| row.get(0),
         )
         .unwrap_or(0);
@@ -546,15 +625,36 @@ fn search_contacts_paged(
                c.notes, c.created_at, c.updated_at, c.deleted_at, c.device_id
         FROM contacts c
         INNER JOIN contacts_fts fts ON c.rowid = fts.rowid
-        WHERE contacts_fts MATCH ?1 AND c.deleted_at IS NULL
+        WHERE contacts_fts MATCH ?1
+          AND c.deleted_at IS NULL
+          AND (?2 = 0 OR c.contact_type = ?3)
+          AND (
+            ?4 = 0 OR EXISTS (
+              SELECT 1
+              FROM custom_field_values cfv
+              WHERE cfv.entity_id = c.id
+                AND cfv.field_def_id = ?5
+                AND LOWER(cfv.value) LIKE LOWER(?6)
+            )
+          )
         ORDER BY rank
-        LIMIT ?2 OFFSET ?3
+        LIMIT ?7 OFFSET ?8
         "#,
     )?;
 
-    let rows = stmt.query_map(params![fts_query, limit, offset], |row| {
-        row_to_contact(row)
-    })?;
+    let rows = stmt.query_map(
+        params![
+            fts_query,
+            if apply_type_filter { 1 } else { 0 },
+            filter_type,
+            if apply_custom_filter { 1 } else { 0 },
+            custom_field_def_id,
+            custom_field_query,
+            limit,
+            offset
+        ],
+        row_to_contact,
+    )?;
     let contacts: Vec<Contact> = rows
         .filter_map(|r| r.ok())
         .collect();
