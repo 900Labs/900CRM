@@ -281,6 +281,7 @@ pub fn run() {
             commands::custom_field_commands::delete_custom_field_def,
             commands::custom_field_commands::set_custom_field_value,
             commands::custom_field_commands::list_custom_field_values,
+            commands::custom_field_commands::list_custom_field_values_for_type,
             // ── Reporting commands ───────────────────────────────────────────
             commands::report_commands::get_pipeline_conversion_report,
             commands::report_commands::get_activity_funnel_report,

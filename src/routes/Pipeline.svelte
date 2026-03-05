@@ -17,20 +17,15 @@
   import { settingsStore } from '$lib/stores/settings';
   import type { DealStage, Deal } from '$lib/api/deals';
   import { DEAL_STAGES } from '$lib/api/deals';
+  import {
+    listCustomFieldDefinitions,
+    listCustomFieldValuesForEntityType,
+    type CustomFieldDefinition,
+    type EntityTypeCustomFieldValue,
+  } from '$lib/api/customFields';
   import { formatCurrency } from '$lib/utils/formatters';
   import DealCard from '$lib/components/DealCard.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
-
-  // ── Derived ─────────────────────────────────────────────────────────────────
-
-  /** Column metadata derived from dealsByStage. */
-  const columns = $derived(
-    DEAL_STAGES.map((stage) => {
-      const deals = dealStore.dealsByStage[stage] ?? [];
-      const totalValue = deals.reduce((sum, d) => sum + (d.value ?? 0), 0);
-      return { stage, deals, totalValue };
-    })
-  );
 
   // ── State ────────────────────────────────────────────────────────────────────
 
@@ -39,11 +34,21 @@
 
   /** Stage column currently being dragged over. */
   let dragOverStage = $state<DealStage | null>(null);
+  let customFieldDefinitions = $state<CustomFieldDefinition[]>([]);
+  let selectedCustomFieldDefId = $state('');
+  let customFieldQuery = $state('');
+  let customFieldsLoading = $state(true);
+  let customFieldValuesLoading = $state(false);
+  let customFieldFilterError = $state<string | null>(null);
+  let customFieldValueIndex = $state<Record<string, Record<string, string>>>({});
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
   onMount(async () => {
-    await dealStore.loadPipelineBoard();
+    await Promise.all([
+      dealStore.loadPipelineBoard(),
+      loadCustomFieldDefinitions(),
+    ]);
   });
 
   // ── Drag & drop handlers ────────────────────────────────────────────────────
@@ -86,6 +91,85 @@
     uiStore.openModal('addDeal', { stage });
   }
 
+  async function loadCustomFieldDefinitions() {
+    customFieldsLoading = true;
+    try {
+      customFieldDefinitions = await listCustomFieldDefinitions('deal');
+    } finally {
+      customFieldsLoading = false;
+    }
+  }
+
+  async function ensureCustomFieldValueIndex() {
+    if (Object.keys(customFieldValueIndex).length > 0) return;
+
+    customFieldValuesLoading = true;
+    customFieldFilterError = null;
+    try {
+      const values = await listCustomFieldValuesForEntityType('deal');
+      customFieldValueIndex = indexCustomFieldValues(values);
+    } catch (err) {
+      customFieldFilterError = t('common.filterLoadFailed');
+      console.error('[Pipeline] Failed to load custom-field filter values:', err);
+    } finally {
+      customFieldValuesLoading = false;
+    }
+  }
+
+  function indexCustomFieldValues(values: EntityTypeCustomFieldValue[]): Record<string, Record<string, string>> {
+    const index: Record<string, Record<string, string>> = {};
+    for (const value of values) {
+      if (!index[value.field_def_id]) {
+        index[value.field_def_id] = {};
+      }
+      index[value.field_def_id][value.entity_id] = value.value;
+    }
+    return index;
+  }
+
+  async function handleCustomFieldDefinitionChange(event: Event) {
+    selectedCustomFieldDefId = (event.target as HTMLSelectElement).value;
+    if (selectedCustomFieldDefId && customFieldQuery.trim()) {
+      await ensureCustomFieldValueIndex();
+    }
+  }
+
+  async function handleCustomFieldQueryInput(event: Event) {
+    customFieldQuery = (event.target as HTMLInputElement).value;
+    if (selectedCustomFieldDefId && customFieldQuery.trim()) {
+      await ensureCustomFieldValueIndex();
+    }
+  }
+
+  function clearCustomFieldFilter() {
+    selectedCustomFieldDefId = '';
+    customFieldQuery = '';
+  }
+
+  function matchesCustomField(dealId: string): boolean {
+    const query = customFieldQuery.trim().toLowerCase();
+    if (!selectedCustomFieldDefId || !query) {
+      return true;
+    }
+    if (customFieldValuesLoading || customFieldFilterError) {
+      return true;
+    }
+
+    const rawValue = customFieldValueIndex[selectedCustomFieldDefId]?.[dealId] ?? '';
+    return rawValue.toLowerCase().includes(query);
+  }
+
+  // ── Derived ─────────────────────────────────────────────────────────────────
+
+  /** Column metadata derived from dealsByStage. */
+  const columns = $derived(
+    DEAL_STAGES.map((stage) => {
+      const deals = (dealStore.dealsByStage[stage] ?? []).filter((deal) => matchesCustomField(deal.id));
+      const totalValue = deals.reduce((sum, d) => sum + (d.value ?? 0), 0);
+      return { stage, deals, totalValue };
+    })
+  );
+
   // ── Stage label colors ───────────────────────────────────────────────────────
 
   const stageColors: Record<DealStage, string> = {
@@ -117,6 +201,47 @@
   </div>
 
   <!-- Loading skeleton -->
+  <div class="pipeline-filters" role="group" aria-label={t('common.customFieldFilter')}>
+    <span class="pipeline-filters-label">{t('common.customField')}:</span>
+    <select
+      class="input pipeline-filter-select"
+      value={selectedCustomFieldDefId}
+      onchange={handleCustomFieldDefinitionChange}
+      aria-label={t('common.customField')}
+    >
+      <option value="">
+        {customFieldsLoading ? t('common.loading') : t('common.selectCustomField')}
+      </option>
+      {#each customFieldDefinitions as definition (definition.id)}
+        <option value={definition.id}>{definition.field_name}</option>
+      {/each}
+    </select>
+    <input
+      class="input pipeline-filter-input selectable"
+      type="search"
+      value={customFieldQuery}
+      oninput={handleCustomFieldQueryInput}
+      placeholder={t('common.filterValue')}
+      aria-label={t('common.filterValue')}
+      disabled={!selectedCustomFieldDefId}
+    />
+    <button
+      class="btn btn-ghost btn-sm"
+      type="button"
+      onclick={clearCustomFieldFilter}
+      disabled={!selectedCustomFieldDefId && !customFieldQuery}
+    >
+      {t('common.clear')}
+    </button>
+    {#if customFieldValuesLoading}
+      <span class="pipeline-filters-label">{t('common.loading')}</span>
+    {/if}
+  </div>
+
+  {#if customFieldFilterError}
+    <div class="filter-error" role="status">{customFieldFilterError}</div>
+  {/if}
+
   {#if dealStore.isLoading}
     <div class="kanban-loading" aria-label={t('common.loading')}>
       {#each DEAL_STAGES as stage (stage)}
@@ -216,6 +341,34 @@
     display: flex;
     gap: var(--space-3);
     align-items: center;
+  }
+
+  .pipeline-filters {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .pipeline-filters-label {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+  }
+
+  .pipeline-filter-select {
+    min-width: 180px;
+    height: 32px;
+  }
+
+  .pipeline-filter-input {
+    min-width: 180px;
+    height: 32px;
+  }
+
+  .filter-error {
+    font-size: var(--text-xs);
+    color: var(--text-danger);
   }
 
   /* ── Board ───────────────────────────────────────────────────────────────── */
