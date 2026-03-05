@@ -13,6 +13,7 @@
 //! | [`activity_commands`] | Activity CRUD, scheduling |
 //! | [`dashboard_commands`]| Aggregate statistics |
 //! | [`custom_field_commands`] | Custom field definitions and values |
+//! | [`report_commands`]   | Reporting metrics (pipeline + activity funnels) |
 //! | [`import_export`]     | CSV import/export via file dialog |
 //! | [`settings_commands`] | Application preferences |
 
@@ -22,5 +23,6 @@ pub mod custom_field_commands;
 pub mod dashboard_commands;
 pub mod deal_commands;
 pub mod import_export;
+pub mod report_commands;
 pub mod settings_commands;
 pub mod sync_commands;
