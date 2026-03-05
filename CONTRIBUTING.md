@@ -528,7 +528,7 @@ For small fixes (typos, obvious bugs), open a PR directly. For larger features o
 
 ### Translations
 
-Translating 900CRM into a new language is one of the most impactful contributions you can make. See the [Translation Guide](#translation-guide) below. Languages we especially need: Portuguese (Brazilian), Vietnamese, Hausa, Yoruba, Bengali, Tagalog, and Amharic.
+Translating 900CRM into a new language is one of the most impactful contributions you can make. See the [Translation Guide](#translation-guide) below. Languages we especially need: Hausa, Yoruba, Bengali, Tagalog, and Amharic.
 
 ### Documentation Improvements
 
@@ -546,7 +546,7 @@ We need more test coverage, particularly for:
 
 ## Translation Guide
 
-All user-facing strings live in JSON files under `src/lib/i18n/`. Adding a new language requires only four steps.
+All user-facing strings live in JSON files under `src/lib/i18n/`. Adding a new language requires only five steps.
 
 ### Adding a New Language
 
@@ -581,34 +581,33 @@ For example, in French:
 
 **Step 3 — Register the language**
 
-In `src/lib/i18n/index.ts`, add your language to the `SUPPORTED_LANGUAGES` object:
+In `src/lib/i18n/index.ts`, add your language metadata to `availableLocales`:
 
 ```typescript
-export const SUPPORTED_LANGUAGES = {
-  en: 'English',
-  fr: 'Français',
-  es: 'Español',
-  ar: 'العربية',
-  sw: 'Kiswahili',
-  hi: 'हिन्दी',
-  // Add your language:
-  pt: 'Português',
-};
+export const availableLocales: LocaleInfo[] = [
+  { code: 'en', name: 'English', nativeName: 'English', direction: 'ltr' },
+  // ...
+  { code: 'pt', name: 'Portuguese (Brazil)', nativeName: 'Português (Brasil)', direction: 'ltr' },
+];
 ```
 
-Import the new translation file:
+Then register lazy loading in the `loadLocale` switch:
 
 ```typescript
-import pt from './pt.json';
-export const translations = { en, fr, es, ar, sw, hi, pt };
+switch (code) {
+  // ...
+  case 'pt':
+    module = await import('./pt.json');
+    break;
+}
 ```
 
 **Step 4 — RTL languages (Arabic, Hebrew, Urdu, etc.)**
 
-Add your language code to the `RTL_LANGUAGES` array in `src/lib/i18n/index.ts`. The layout will automatically mirror:
+Set `direction: 'rtl'` in your locale metadata entry in `availableLocales`. The layout will automatically mirror:
 
 ```typescript
-export const RTL_LANGUAGES = ['ar', 'he', 'ur', 'fa'];
+{ code: 'ar', name: 'Arabic', nativeName: 'العربية', direction: 'rtl' }
 ```
 
 **Step 5 — Submit a pull request**
