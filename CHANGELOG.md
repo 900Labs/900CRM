@@ -8,6 +8,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added — 2026-03-05
+- Added a global modal host component that centralizes create flows for contacts, deals, and activities from any route.
+- Wired root layout rendering for global modal support so dashboard, pipeline, contacts, and detail-page quick actions execute consistently.
+- Added context-aware modal prefill for linked entity creation (`contactId`, `dealId`) and stage-aware deal creation.
+
 ### Fixed — 2026-03-05
 - Resolved Svelte/Tauri build blockers (invalid event attributes, modal snippet typing, SVG attribute typing, and Tauri config schema compatibility).
 - Unified frontend IPC wrappers with backend command contracts (snake_case argument names, response mapping, and stage/type/status normalization).
@@ -16,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Aligned import/export flows with implemented backend CSV commands (`import_*_csv`, `export_*_csv`) and file-path based operations.
 - Removed remaining Svelte/Tauri warning classes (a11y semantics, rune reactivity refs, dark-theme selector scoping, CSS media-token syntax, and Rust unused imports).
 - Verified clean warning baseline: `npm run check` now reports 0 errors and 0 warnings; `cargo check` is warning-free.
+- Corrected deal modal translation key usage from `deals.dealName` to existing locale key `deals.name`.
 
 ### In Progress
 - Custom fields on contacts, deals, and activities — planned for v1.1.0
