@@ -3,12 +3,17 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { normalizeCurrencyCode } from '$lib/utils/currency';
 
 export interface DashboardStats {
   totalContacts: number;
   activeDeals: number;
   pipelineValue: number;
-  currency: string;
+  pipelineValueByCurrency: {
+    currency: string;
+    totalValue: number;
+    dealCount: number;
+  }[];
   upcomingTasks: number;
   overdueActivities: number;
 }
@@ -18,27 +23,27 @@ interface BackendDashboardStats {
   total_organizations: number;
   active_deals: number;
   pipeline_value: number;
+  pipeline_value_by_currency: {
+    currency: string;
+    total_value: number;
+    deal_count: number;
+  }[];
   upcoming_activities: number;
   overdue_activities: number;
 }
 
-interface BackendSetting {
-  key: string;
-  value: string;
-  updated_at: string;
-}
-
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const [stats, currencySetting] = await Promise.all([
-    invoke<BackendDashboardStats>('get_dashboard_stats'),
-    invoke<BackendSetting | null>('get_setting', { key: 'currency' }),
-  ]);
+  const stats = await invoke<BackendDashboardStats>('get_dashboard_stats');
 
   return {
     totalContacts: (stats.total_contacts ?? 0) + (stats.total_organizations ?? 0),
     activeDeals: stats.active_deals ?? 0,
     pipelineValue: stats.pipeline_value ?? 0,
-    currency: currencySetting?.value || 'USD',
+    pipelineValueByCurrency: (stats.pipeline_value_by_currency ?? []).map((bucket) => ({
+      currency: normalizeCurrencyCode(bucket.currency),
+      totalValue: Number.isFinite(bucket.total_value) ? bucket.total_value : 0,
+      dealCount: bucket.deal_count ?? 0,
+    })),
     upcomingTasks: stats.upcoming_activities ?? 0,
     overdueActivities: stats.overdue_activities ?? 0,
   };

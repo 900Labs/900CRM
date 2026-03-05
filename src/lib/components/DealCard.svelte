@@ -28,7 +28,7 @@
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const formattedValue = $derived(
-    formatCurrency(deal.value, deal.currency, settingsStore.language + '-' + (deal.currency === 'USD' ? 'US' : ''))
+    formatCurrency(deal.value, deal.currency, settingsStore.language)
   );
   const formattedDate = $derived(
     deal.expectedCloseDate

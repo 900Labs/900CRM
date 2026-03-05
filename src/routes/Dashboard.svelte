@@ -46,9 +46,25 @@
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const pipelineFormatted = $derived(
-    stats
-      ? formatCurrency(stats.pipelineValue, stats.currency, settingsStore.language)
-      : '—'
+    (() => {
+      if (!stats) return '—';
+      const buckets = stats.pipelineValueByCurrency.filter((bucket) => bucket.totalValue !== 0);
+
+      if (buckets.length === 0) {
+        return formatCurrency(0, settingsStore.currency, settingsStore.language);
+      }
+
+      if (buckets.length === 1) {
+        return formatCurrency(buckets[0].totalValue, buckets[0].currency, settingsStore.language);
+      }
+
+      const preview = buckets
+        .slice(0, 2)
+        .map((bucket) => formatCurrency(bucket.totalValue, bucket.currency, settingsStore.language))
+        .join(' · ');
+
+      return buckets.length > 2 ? `${preview} +${buckets.length - 2}` : preview;
+    })()
   );
 
   const visibleStageMetrics = $derived(

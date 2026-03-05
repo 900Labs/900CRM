@@ -3,7 +3,7 @@
    * Settings.svelte — Application settings page for 900CRM.
    *
    * Sections:
-   *   1. Language — pick from 6 locales (shows nativeName)
+   *   1. Language — pick from available locales (shows nativeName)
    *   2. Currency — ISO 4217 selector
    *   3. Theme — light / dark / system
    *   4. Date format — 4 preset formats

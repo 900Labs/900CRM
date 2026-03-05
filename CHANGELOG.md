@@ -38,6 +38,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Added complete Portuguese (Brazilian) and Vietnamese locale support:
   - Added `src/lib/i18n/pt.json` and `src/lib/i18n/vi.json`.
   - Registered `pt` and `vi` in `availableLocales` and lazy locale loading.
+- Added multi-currency display support across dashboard and pipeline:
+  - Added grouped pipeline currency totals in dashboard stats (`pipeline_value_by_currency`).
+  - Updated dashboard KPI rendering to handle mixed-currency pipelines without forcing a single-currency format.
+  - Updated pipeline stage totals to show per-currency totals for mixed-currency columns.
+  - Added currency normalization helpers and stricter deal-currency input normalization.
 - Added schema migration v2 analytics indexes to keep report queries efficient on constrained hardware.
 - Added a lightweight open-source and low-resource guardrail checklist and wired it into the PR template/workflow.
 

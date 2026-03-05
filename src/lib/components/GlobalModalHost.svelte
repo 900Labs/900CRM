@@ -9,6 +9,7 @@
   import { DEAL_STAGES } from '$lib/api/deals';
   import type { DealStage } from '$lib/api/deals';
   import type { ActivityType } from '$lib/api/activities';
+  import { normalizeCurrencyCode } from '$lib/utils/currency';
   import {
     listCustomFieldDefinitions,
     setCustomFieldValue,
@@ -99,11 +100,16 @@
   function resetDealForm() {
     dealName = '';
     dealValue = 0;
-    dealCurrency = settingsStore.currency || 'USD';
+    dealCurrency = normalizeCurrencyCode(settingsStore.currency || 'USD');
     dealStage = normalizeStage(modalDataString('stage'));
     dealProbability = defaultProbability(dealStage);
     dealExpectedCloseDate = '';
     dealDescription = '';
+  }
+
+  function handleDealCurrencyInput(event: Event) {
+    const value = (event.target as HTMLInputElement).value;
+    dealCurrency = value.toUpperCase().slice(0, 3);
   }
 
   function resetActivityForm() {
@@ -261,7 +267,7 @@
       const deal = await dealStore.createDeal({
         name: dealName.trim(),
         value: Number.isFinite(dealValue) ? dealValue : 0,
-        currency: dealCurrency || settingsStore.currency || 'USD',
+        currency: normalizeCurrencyCode(dealCurrency || settingsStore.currency || 'USD'),
         stage: dealStage,
         probability: dealProbability,
         expectedCloseDate: dealExpectedCloseDate || null,
@@ -372,7 +378,15 @@
         </div>
         <div class="form-group">
           <label class="form-label" for="modal-deal-currency">{t('settings.currency')}</label>
-          <input id="modal-deal-currency" class="input" bind:value={dealCurrency} />
+          <input
+            id="modal-deal-currency"
+            class="input"
+            value={dealCurrency}
+            oninput={handleDealCurrencyInput}
+            maxlength="3"
+            autocapitalize="characters"
+            spellcheck="false"
+          />
         </div>
         <div class="form-group">
           <label class="form-label" for="modal-deal-stage">{t('deals.stage')}</label>
