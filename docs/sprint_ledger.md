@@ -7,3 +7,4 @@
 | 003 | 2026-03-05 | `sprint-003-global-modal-create-flows` | Global modal host for add-contact/add-deal/add-activity flows with context prefill and layout wiring | Completed |
 | 004 | 2026-03-05 | `sprint-004-custom-fields-foundation` | Custom field storage/IPC foundation, frontend API wrapper, and lightweight mission guardrail checklist | Completed |
 | 005 | 2026-03-05 | `sprint-005-custom-fields-ui` | Custom fields UI integration for contact/deal/activity create-edit flows using reusable dynamic input renderer | Completed |
+| 006 | 2026-03-05 | `sprint-006-reports-metrics-backend` | Reporting metrics backend for pipeline conversion/activity funnels, IPC endpoints, and analytics index migration hardening | Completed |

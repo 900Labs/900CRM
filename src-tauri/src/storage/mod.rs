@@ -14,6 +14,7 @@
 //! | [`tags`]     | Tag management and entity tagging |
 //! | [`settings`] | Key-value application settings |
 //! | [`sync`]     | Offline-first sync changelog |
+//! | [`reporting`]| Reporting aggregates for funnel/conversion analytics |
 //!
 //! All storage functions accept a `&rusqlite::Connection` reference (obtained
 //! from `db.conn`) so they can be composed without extra locking overhead.
@@ -24,6 +25,7 @@ pub mod custom_fields;
 pub mod db;
 pub mod deals;
 pub mod notes;
+pub mod reporting;
 pub mod settings;
 pub mod sync;
 pub mod tags;

@@ -41,7 +41,7 @@ use rusqlite::Connection;
 use crate::utils::errors::{CrmError, CrmResult};
 
 /// The current schema version. Increment whenever a new migration is added.
-const CURRENT_SCHEMA_VERSION: u32 = 1;
+const CURRENT_SCHEMA_VERSION: u32 = 2;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Database struct
@@ -163,8 +163,9 @@ impl Database {
             self.migrate_v1()?;
         }
 
-        // Future migrations:
-        // if current_version < 2 { self.migrate_v2()?; }
+        if current_version < 2 {
+            self.migrate_v2()?;
+        }
 
         self.conn.execute_batch(&format!(
             "PRAGMA user_version = {};",
@@ -411,6 +412,33 @@ impl Database {
         )?;
 
         log::info!("Migration v1 complete");
+        Ok(())
+    }
+
+    /// Schema v2 migration — reporting/perf indexes for analytics endpoints.
+    ///
+    /// Adds composite and time-oriented indexes used by reporting queries to
+    /// keep aggregation paths responsive on low-resource hardware.
+    fn migrate_v2(&mut self) -> CrmResult<()> {
+        log::info!("Running database migration v2");
+
+        self.conn.execute_batch(
+            r#"
+            CREATE INDEX IF NOT EXISTS idx_deals_created_at
+                ON deals (created_at);
+            CREATE INDEX IF NOT EXISTS idx_deals_deleted_stage
+                ON deals (deleted_at, stage);
+
+            CREATE INDEX IF NOT EXISTS idx_activities_created_at
+                ON activities (created_at);
+            CREATE INDEX IF NOT EXISTS idx_activities_type
+                ON activities (activity_type);
+            CREATE INDEX IF NOT EXISTS idx_activities_completed_due
+                ON activities (completed, due_date);
+            "#,
+        )?;
+
+        log::info!("Migration v2 complete");
         Ok(())
     }
 

@@ -20,6 +20,7 @@
 //! │   ├── activity_commands.rs
 //! │   ├── dashboard_commands.rs
 //! │   ├── custom_field_commands.rs
+//! │   ├── report_commands.rs
 //! │   ├── import_export.rs
 //! │   └── settings_commands.rs
 //! ├── storage/              — SQLite persistence (rusqlite)
@@ -28,6 +29,7 @@
 //! │   ├── deals.rs          — Deal CRUD + pipeline queries
 //! │   ├── activities.rs     — Activity CRUD + scheduling
 //! │   ├── custom_fields.rs  — Custom field definitions and values
+//! │   ├── reporting.rs      — Pipeline conversion and activity funnel aggregates
 //! │   ├── notes.rs          — Note CRUD
 //! │   ├── tags.rs           — Tag CRUD + entity tagging
 //! │   ├── settings.rs       — Key-value settings store
@@ -279,6 +281,9 @@ pub fn run() {
             commands::custom_field_commands::delete_custom_field_def,
             commands::custom_field_commands::set_custom_field_value,
             commands::custom_field_commands::list_custom_field_values,
+            // ── Reporting commands ───────────────────────────────────────────
+            commands::report_commands::get_pipeline_conversion_report,
+            commands::report_commands::get_activity_funnel_report,
             // ── Import / Export commands ──────────────────────────────────────
             commands::import_export::import_contacts_csv,
             commands::import_export::export_contacts_csv,
