@@ -31,7 +31,7 @@
 
   let editValue = $state(value);
   let isEditing = $state(false);
-  let textareaEl: HTMLTextAreaElement | undefined;
+  let textareaEl = $state<HTMLTextAreaElement | undefined>(undefined);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 

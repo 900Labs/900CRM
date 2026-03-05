@@ -423,7 +423,7 @@
 
               <!-- Type -->
               <div class="field-group">
-                <label class="field-label" id="type-label">{t('contacts.type')}</label>
+                <span class="field-label" id="type-label">{t('contacts.type')}</span>
                 <div class="radio-group" role="radiogroup" aria-labelledby="type-label">
                   <label class="radio-option">
                     <input

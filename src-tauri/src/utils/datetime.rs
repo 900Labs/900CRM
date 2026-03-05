@@ -11,7 +11,7 @@
 //! Using string timestamps (rather than Unix integers) makes the SQLite
 //! records human-readable and simplifies cross-platform sync comparison.
 
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 
 use crate::utils::errors::{CrmError, CrmResult};
 

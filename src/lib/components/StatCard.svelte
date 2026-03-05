@@ -95,7 +95,7 @@
     background-color: var(--color-primary-50);
   }
 
-  [data-theme="dark"] .stat-card.accent {
+  :global([data-theme="dark"]) .stat-card.accent {
     border-color: rgba(32, 128, 141, 0.3);
     background-color: rgba(32, 128, 141, 0.08);
   }
