@@ -43,6 +43,36 @@ class SettingsStore {
   /** Minutes before due time to trigger reminders. */
   reminderLeadMinutes = $state<number>(30);
 
+  /** Whether optional email integration settings are enabled. */
+  emailIntegrationEnabled = $state<boolean>(false);
+
+  /** SMTP host for optional outbound email integration. */
+  smtpHost = $state<string>('');
+
+  /** SMTP port for optional outbound email integration. */
+  smtpPort = $state<number>(587);
+
+  /** SMTP username for optional outbound email integration. */
+  smtpUsername = $state<string>('');
+
+  /** SMTP password for optional outbound email integration. */
+  smtpPassword = $state<string>('');
+
+  /** Default sender address for optional outbound email integration. */
+  smtpFrom = $state<string>('');
+
+  /** IMAP host for optional inbound email integration. */
+  imapHost = $state<string>('');
+
+  /** IMAP port for optional inbound email integration. */
+  imapPort = $state<number>(993);
+
+  /** IMAP username for optional inbound email integration. */
+  imapUsername = $state<string>('');
+
+  /** IMAP password for optional inbound email integration. */
+  imapPassword = $state<string>('');
+
   /** Whether settings have been loaded from the backend. */
   loaded = $state<boolean>(false);
 
@@ -63,6 +93,16 @@ class SettingsStore {
       this.syncUrl    = data.syncUrl;
       this.notificationsEnabled = data.notificationsEnabled;
       this.reminderLeadMinutes = data.reminderLeadMinutes;
+      this.emailIntegrationEnabled = data.emailIntegrationEnabled;
+      this.smtpHost = data.smtpHost;
+      this.smtpPort = data.smtpPort;
+      this.smtpUsername = data.smtpUsername;
+      this.smtpPassword = data.smtpPassword;
+      this.smtpFrom = data.smtpFrom;
+      this.imapHost = data.imapHost;
+      this.imapPort = data.imapPort;
+      this.imapUsername = data.imapUsername;
+      this.imapPassword = data.imapPassword;
       this.loaded     = true;
 
       // Apply immediately

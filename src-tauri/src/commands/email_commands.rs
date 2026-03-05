@@ -1,0 +1,180 @@
+//! Tauri IPC commands for optional email integration checks.
+//!
+//! The current implementation is intentionally lightweight and offline-friendly:
+//! it validates reachability to configured IMAP/SMTP endpoints via TCP without
+//! introducing always-on background sync or heavy protocol stacks.
+
+use std::io::{Read, Write};
+use std::net::{TcpStream, ToSocketAddrs};
+use std::time::{Duration, Instant};
+
+use serde::{Deserialize, Serialize};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Supported email protocols for connection checks.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EmailProtocol {
+    Smtp,
+    Imap,
+}
+
+/// Request payload for testing an email server endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmailConnectionTestRequest {
+    pub protocol: EmailProtocol,
+    pub host: String,
+    pub port: u16,
+    pub timeout_ms: Option<u64>,
+}
+
+/// Response payload for endpoint test results.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmailConnectionTestResult {
+    pub protocol: EmailProtocol,
+    pub host: String,
+    pub port: u16,
+    pub success: bool,
+    pub latency_ms: u128,
+    pub details: String,
+    pub banner: Option<String>,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Command
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Tests TCP reachability for an SMTP/IMAP endpoint.
+///
+/// This is intentionally a lightweight integration check:
+/// - verifies DNS resolution + TCP connect
+/// - attempts a best-effort protocol probe on plaintext ports
+/// - does not perform credential login or full TLS negotiation
+#[tauri::command]
+pub async fn test_email_server_connection(
+    request: EmailConnectionTestRequest,
+) -> Result<EmailConnectionTestResult, String> {
+    let host = request.host.trim().to_string();
+    if host.is_empty() {
+        return Err("Host is required".to_string());
+    }
+    if request.port == 0 {
+        return Err("Port must be greater than 0".to_string());
+    }
+
+    let timeout_ms = request.timeout_ms.unwrap_or(2_500).clamp(500, 10_000);
+    let protocol = request.protocol.clone();
+    let host_for_task = host.clone();
+    let port = request.port;
+
+    let result = tokio::task::spawn_blocking(move || {
+        let started = Instant::now();
+        let addr_string = format!("{}:{}", host_for_task, port);
+
+        let mut addrs = match addr_string.to_socket_addrs() {
+            Ok(it) => it,
+            Err(err) => {
+                return EmailConnectionTestResult {
+                    protocol,
+                    host: host_for_task,
+                    port,
+                    success: false,
+                    latency_ms: started.elapsed().as_millis(),
+                    details: format!("DNS resolution failed: {}", err),
+                    banner: None,
+                };
+            }
+        };
+
+        let addr = match addrs.next() {
+            Some(a) => a,
+            None => {
+                return EmailConnectionTestResult {
+                    protocol,
+                    host: host_for_task,
+                    port,
+                    success: false,
+                    latency_ms: started.elapsed().as_millis(),
+                    details: "No address resolved for host".to_string(),
+                    banner: None,
+                };
+            }
+        };
+
+        let timeout = Duration::from_millis(timeout_ms);
+        let mut stream = match TcpStream::connect_timeout(&addr, timeout) {
+            Ok(s) => s,
+            Err(err) => {
+                return EmailConnectionTestResult {
+                    protocol,
+                    host: host_for_task,
+                    port,
+                    success: false,
+                    latency_ms: started.elapsed().as_millis(),
+                    details: format!("Connection failed: {}", err),
+                    banner: None,
+                };
+            }
+        };
+
+        let _ = stream.set_read_timeout(Some(Duration::from_millis(700)));
+        let _ = stream.set_write_timeout(Some(Duration::from_millis(700)));
+
+        let banner = probe_banner(&mut stream, &protocol, port);
+        let details = match protocol {
+            EmailProtocol::Smtp => {
+                if port == 465 {
+                    "SMTP endpoint reachable (implicit TLS port; TCP probe only)".to_string()
+                } else {
+                    "SMTP endpoint reachable".to_string()
+                }
+            }
+            EmailProtocol::Imap => {
+                if port == 993 {
+                    "IMAP endpoint reachable (implicit TLS port; TCP probe only)".to_string()
+                } else {
+                    "IMAP endpoint reachable".to_string()
+                }
+            }
+        };
+
+        EmailConnectionTestResult {
+            protocol,
+            host: host_for_task,
+            port,
+            success: true,
+            latency_ms: started.elapsed().as_millis(),
+            details,
+            banner,
+        }
+    })
+    .await
+    .map_err(|err| format!("Email test task failed: {}", err))?;
+
+    Ok(result)
+}
+
+fn probe_banner(stream: &mut TcpStream, protocol: &EmailProtocol, port: u16) -> Option<String> {
+    if matches!(protocol, EmailProtocol::Smtp) && port != 465 {
+        let _ = stream.write_all(b"EHLO 900crm.local\r\nQUIT\r\n");
+    }
+    if matches!(protocol, EmailProtocol::Imap) && port != 993 {
+        let _ = stream.write_all(b"a1 CAPABILITY\r\na2 LOGOUT\r\n");
+    }
+
+    let mut buf = [0u8; 256];
+    match stream.read(&mut buf) {
+        Ok(n) if n > 0 => {
+            let raw = String::from_utf8_lossy(&buf[..n]).trim().to_string();
+            if raw.is_empty() {
+                None
+            } else {
+                Some(raw.chars().take(120).collect())
+            }
+        }
+        _ => None,
+    }
+}

@@ -13,6 +13,16 @@ export interface AppSettings {
   syncUrl: string;
   notificationsEnabled: boolean;
   reminderLeadMinutes: number;
+  emailIntegrationEnabled: boolean;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUsername: string;
+  smtpPassword: string;
+  smtpFrom: string;
+  imapHost: string;
+  imapPort: number;
+  imapUsername: string;
+  imapPassword: string;
 }
 
 export type SettingKey = keyof AppSettings;
@@ -37,6 +47,26 @@ function toBackendKey(key: SettingKey): string {
       return 'notifications_enabled';
     case 'reminderLeadMinutes':
       return 'reminder_lead_minutes';
+    case 'emailIntegrationEnabled':
+      return 'email_integration_enabled';
+    case 'smtpHost':
+      return 'smtp_host';
+    case 'smtpPort':
+      return 'smtp_port';
+    case 'smtpUsername':
+      return 'smtp_username';
+    case 'smtpPassword':
+      return 'smtp_password';
+    case 'smtpFrom':
+      return 'smtp_from';
+    case 'imapHost':
+      return 'imap_host';
+    case 'imapPort':
+      return 'imap_port';
+    case 'imapUsername':
+      return 'imap_username';
+    case 'imapPassword':
+      return 'imap_password';
     default:
       return key;
   }
@@ -64,6 +94,11 @@ function parseInteger(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function parsePort(value: string | undefined, fallback: number): number {
+  const parsed = parseInteger(value, fallback);
+  return Math.min(65535, Math.max(1, parsed));
+}
+
 function mapSettings(map: BackendSettingsMap): AppSettings {
   return {
     language: map.language || 'en',
@@ -74,15 +109,33 @@ function mapSettings(map: BackendSettingsMap): AppSettings {
     syncUrl: map.sync_url || '',
     notificationsEnabled: parseBoolean(map.notifications_enabled, true),
     reminderLeadMinutes: parseInteger(map.reminder_lead_minutes, 30),
+    emailIntegrationEnabled: parseBoolean(map.email_integration_enabled, false),
+    smtpHost: map.smtp_host || '',
+    smtpPort: parsePort(map.smtp_port, 587),
+    smtpUsername: map.smtp_username || '',
+    smtpPassword: map.smtp_password || '',
+    smtpFrom: map.smtp_from || '',
+    imapHost: map.imap_host || '',
+    imapPort: parsePort(map.imap_port, 993),
+    imapUsername: map.imap_username || '',
+    imapPassword: map.imap_password || '',
   };
 }
 
 function serializeValue<K extends SettingKey>(key: K, value: AppSettings[K]): string {
-  if (key === 'syncEnabled' || key === 'notificationsEnabled') {
+  if (key === 'syncEnabled' || key === 'notificationsEnabled' || key === 'emailIntegrationEnabled') {
     return value ? 'true' : 'false';
   }
   if (key === 'reminderLeadMinutes') {
     return String(Math.max(1, Number(value) || 30));
+  }
+  if (key === 'smtpPort') {
+    const parsed = Number.parseInt(String(value), 10);
+    return String(Math.min(65535, Math.max(1, Number.isFinite(parsed) ? parsed : 587)));
+  }
+  if (key === 'imapPort') {
+    const parsed = Number.parseInt(String(value), 10);
+    return String(Math.min(65535, Math.max(1, Number.isFinite(parsed) ? parsed : 993)));
   }
   return String(value ?? '');
 }
@@ -105,6 +158,26 @@ function parseSettingValue<K extends SettingKey>(key: K, value: string | undefin
       return parseBoolean(value, true) as AppSettings[K];
     case 'reminderLeadMinutes':
       return parseInteger(value, 30) as AppSettings[K];
+    case 'emailIntegrationEnabled':
+      return parseBoolean(value, false) as AppSettings[K];
+    case 'smtpHost':
+      return (value || '') as AppSettings[K];
+    case 'smtpPort':
+      return parsePort(value, 587) as AppSettings[K];
+    case 'smtpUsername':
+      return (value || '') as AppSettings[K];
+    case 'smtpPassword':
+      return (value || '') as AppSettings[K];
+    case 'smtpFrom':
+      return (value || '') as AppSettings[K];
+    case 'imapHost':
+      return (value || '') as AppSettings[K];
+    case 'imapPort':
+      return parsePort(value, 993) as AppSettings[K];
+    case 'imapUsername':
+      return (value || '') as AppSettings[K];
+    case 'imapPassword':
+      return (value || '') as AppSettings[K];
     default:
       return value as AppSettings[K];
   }
