@@ -61,6 +61,8 @@ export const availableLocales: LocaleInfo[] = [
   { code: 'hi', name: 'Hindi',    nativeName: 'हिन्दी',    direction: 'ltr' },
   { code: 'pt', name: 'Portuguese (Brazil)', nativeName: 'Português (Brasil)', direction: 'ltr' },
   { code: 'vi', name: 'Vietnamese', nativeName: 'Tiếng Việt', direction: 'ltr' },
+  { code: 'ha', name: 'Hausa', nativeName: 'Hausa', direction: 'ltr' },
+  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', direction: 'ltr' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,6 +93,8 @@ async function loadLocale(code: string): Promise<TranslationDict | null> {
       case 'hi': module = await import('./hi.json'); break;
       case 'pt': module = await import('./pt.json'); break;
       case 'vi': module = await import('./vi.json'); break;
+      case 'ha': module = await import('./ha.json'); break;
+      case 'bn': module = await import('./bn.json'); break;
       default:
         warnMissing(`Unknown locale "${code}". Falling back to English.`);
         return null;
