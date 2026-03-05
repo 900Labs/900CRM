@@ -140,20 +140,6 @@ impl Serialize for CrmError {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Into<tauri::InvokeError>
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Converts a [`CrmError`] into a [`tauri::InvokeError`].
-///
-/// This allows command handlers that return `Result<T, CrmError>` to work
-/// directly with Tauri's IPC dispatch without manual mapping.
-impl From<CrmError> for tauri::InvokeError {
-    fn from(err: CrmError) -> Self {
-        tauri::InvokeError::from(err.to_string())
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // From conversions for foreign error types
 // ─────────────────────────────────────────────────────────────────────────────
 

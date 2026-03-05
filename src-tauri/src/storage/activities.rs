@@ -299,6 +299,29 @@ pub fn mark_complete(conn: &Connection, id: &str) -> CrmResult<Activity> {
     get_activity(conn, id)
 }
 
+/// Marks an activity as incomplete.
+///
+/// Sets `completed = 0` and `updated_at` to now.
+///
+/// # Errors
+///
+/// - [`CrmError::NotFound`] — Activity not found or already deleted.
+/// - [`CrmError::Database`] — SQL failure.
+pub fn mark_incomplete(conn: &Connection, id: &str) -> CrmResult<Activity> {
+    let now = now_iso8601();
+    let changed = conn.execute(
+        "UPDATE activities SET completed = 0, updated_at = ?1 WHERE id = ?2 AND deleted_at IS NULL",
+        params![now, id],
+    )?;
+
+    if changed == 0 {
+        return Err(CrmError::NotFound(format!("Activity '{}' not found", id)));
+    }
+
+    log::info!("Marked activity id={} as incomplete", id);
+    get_activity(conn, id)
+}
+
 /// Updates an activity's fields.
 ///
 /// All `Option` parameters are applied only if `Some`.

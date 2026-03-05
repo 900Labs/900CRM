@@ -190,7 +190,7 @@
                   ondragend={handleDragEnd}
                   role="listitem"
                 >
-                  <DealCard {deal} currency={settingsStore.currency} locale={settingsStore.language} />
+                  <DealCard {deal} />
                 </div>
               {/each}
             {/if}
