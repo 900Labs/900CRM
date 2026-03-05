@@ -22,6 +22,12 @@
   import { settingsStore } from '$lib/stores/settings';
   import type { Contact, UpdateContactPayload } from '$lib/api/contacts';
   import type { Deal } from '$lib/api/deals';
+  import {
+    listCustomFieldDefinitions,
+    listCustomFieldValues,
+    setCustomFieldValue,
+    type CustomFieldDefinition,
+  } from '$lib/api/customFields';
   import { formatFullName, formatDate, formatRelativeTime, formatCurrency, formatInitials } from '$lib/utils/formatters';
   import { validateEmail, validateUrl } from '$lib/utils/validators';
   import NoteEditor from '$lib/components/NoteEditor.svelte';
@@ -29,6 +35,7 @@
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
   import Modal from '$lib/components/Modal.svelte';
+  import CustomFieldInputs from '$lib/components/CustomFieldInputs.svelte';
 
   // ── Props ───────────────────────────────────────────────────────────────────
 
@@ -63,6 +70,10 @@
   // Linked data
   let linkedDeals = $state<Deal[]>([]);
   let dealsLoading = $state(false);
+  let customFieldsLoading = $state(false);
+  let customFieldDefinitions = $state<CustomFieldDefinition[]>([]);
+  let customFieldValues = $state<Record<string, string>>({});
+  let originalCustomFieldValues = $state<Record<string, string>>({});
 
   // ── Derived ─────────────────────────────────────────────────────────────────
 
@@ -124,6 +135,7 @@
       await Promise.all([
         dealStore.loadDeals({ contactId }),
         activityStore.setFilters({ contactId }),
+        loadCustomFields(contactId),
       ]);
       linkedDeals = dealStore.deals.filter((d) => d.contactId === contactId);
     } catch (err) {
@@ -147,6 +159,64 @@
     notes        = c.notes ?? '';
     tags         = [...(c.tags ?? [])];
     isDirty      = false;
+  }
+
+  async function loadCustomFields(entityId: string) {
+    customFieldsLoading = true;
+    try {
+      const [definitions, values] = await Promise.all([
+        listCustomFieldDefinitions('contact'),
+        listCustomFieldValues('contact', entityId),
+      ]);
+
+      customFieldDefinitions = definitions;
+
+      const nextValues: Record<string, string> = Object.fromEntries(
+        definitions.map((definition) => [definition.id, ''])
+      );
+      for (const entry of values) {
+        nextValues[entry.field_def_id] = entry.value ?? '';
+      }
+
+      customFieldValues = nextValues;
+      originalCustomFieldValues = { ...nextValues };
+    } catch (err) {
+      console.error('[ContactDetail] Failed to load custom fields:', err);
+      uiStore.toastError('Failed to load custom fields.');
+      customFieldDefinitions = [];
+      customFieldValues = {};
+      originalCustomFieldValues = {};
+    } finally {
+      customFieldsLoading = false;
+    }
+  }
+
+  async function persistCustomFields(entityId: string) {
+    if (customFieldDefinitions.length === 0) {
+      return;
+    }
+
+    await Promise.all(
+      customFieldDefinitions.map((definition) =>
+        setCustomFieldValue({
+          fieldDefId: definition.id,
+          entityId,
+          value: customFieldValues[definition.id] ?? '',
+        })
+      )
+    );
+  }
+
+  function handleCustomFieldChange(fieldDefId: string, value: string) {
+    customFieldValues = {
+      ...customFieldValues,
+      [fieldDefId]: value,
+    };
+    isDirty = true;
+  }
+
+  function resetCustomFieldChanges() {
+    customFieldValues = { ...originalCustomFieldValues };
   }
 
   // ── Handlers ────────────────────────────────────────────────────────────────
@@ -189,7 +259,9 @@
         tags,
       };
       const updated = await contactStore.updateContact(contact.id, payload);
+      await persistCustomFields(contact.id);
       contact = updated;
+      originalCustomFieldValues = { ...customFieldValues };
       isDirty = false;
     } catch (err) {
       // error already toasted by store
@@ -288,7 +360,12 @@
           </button>
           <button
             class="btn btn-secondary btn-sm"
-            onclick={() => { if (contact) populateForm(contact); }}
+            onclick={() => {
+              if (contact) {
+                populateForm(contact);
+              }
+              resetCustomFieldChanges();
+            }}
             disabled={isSaving}
             type="button"
           >
@@ -460,6 +537,27 @@
                 {formatRelativeTime(contact.updatedAt)}
               </span>
             </div>
+          </div>
+        </section>
+
+        <!-- Custom fields card -->
+        <section class="card detail-custom-fields" aria-labelledby="custom-fields-heading">
+          <div class="card-header">
+            <h2 class="section-title" id="custom-fields-heading">Custom Fields</h2>
+          </div>
+          <div class="card-body">
+            {#if customFieldsLoading}
+              <p class="custom-fields-placeholder">{t('common.loading')}</p>
+            {:else if customFieldDefinitions.length === 0}
+              <p class="custom-fields-placeholder">No custom fields configured.</p>
+            {:else}
+              <CustomFieldInputs
+                definitions={customFieldDefinitions}
+                values={customFieldValues}
+                onchange={handleCustomFieldChange}
+                disabled={isSaving}
+              />
+            {/if}
           </div>
         </section>
 
@@ -750,6 +848,11 @@
     resize: vertical;
     min-height: 64px;
     font-family: inherit;
+  }
+
+  .custom-fields-placeholder {
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
   }
 
   .input-error {

@@ -16,6 +16,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Rust storage layer for custom field definitions and values.
   - Tauri IPC commands for listing/creating/updating/deleting definitions and setting/listing values.
   - Frontend API wrapper (`src/lib/api/customFields.ts`) for typed invoke integration.
+- Added reusable dynamic custom-field renderer component for create/edit forms (`src/lib/components/CustomFieldInputs.svelte`).
+- Added custom field UI integration for contact/deal/activity create flows in the global modal host.
+- Added custom field UI integration for contact detail edit flow, including value loading, editing, save, and cancel reset behavior.
 - Added a lightweight open-source and low-resource guardrail checklist and wired it into the PR template/workflow.
 
 ### Fixed — 2026-03-05
@@ -28,9 +31,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Verified clean warning baseline: `npm run check` now reports 0 errors and 0 warnings; `cargo check` is warning-free.
 - Corrected deal modal translation key usage from `deals.dealName` to existing locale key `deals.name`.
 - Fixed TypeScript nullability issues in contact-detail quick actions for add-deal/add-activity modal context opening.
+- Fixed contact-detail save/cancel consistency by including custom field state in dirty/reset/save handling.
 
 ### In Progress
-- Custom fields UI integration on contacts, deals, and activities (renderer/forms/filter UX) — planned for v1.1.0
+- Custom field filter UX for list/pipeline/activity views — planned for v1.1.0
 - Desktop notifications and reminders for upcoming activities — planned for v1.1.0
 - Pipeline conversion reports and activity funnel analytics — planned for v1.1.0
 - Portuguese (Brazilian) and Vietnamese translations — planned for v1.1.0
