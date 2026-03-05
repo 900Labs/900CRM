@@ -42,13 +42,13 @@
   }
 </script>
 
-<div
+<button
   class="contact-card"
   class:selected
   class:compact
   class:clickable={!!onclick}
-  role={onclick ? 'button' : undefined}
-  tabindex={onclick ? 0 : undefined}
+  disabled={!onclick}
+  type="button"
   onclick={() => onclick?.(contact)}
   onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onclick?.(contact); }}
 >
@@ -82,7 +82,7 @@
       {contact.type}
     </span>
   {/if}
-</div>
+</button>
 
 <style>
   .contact-card {
@@ -91,11 +91,22 @@
     gap: var(--space-4);
     padding: var(--space-4);
     border-radius: var(--border-radius-md);
+    border: none;
+    width: 100%;
+    text-align: start;
+    font: inherit;
+    color: inherit;
+    background: transparent;
     transition: background-color var(--duration-fast) var(--ease-out);
   }
 
   .contact-card.clickable {
     cursor: pointer;
+  }
+
+  .contact-card:disabled {
+    opacity: 1;
+    cursor: default;
   }
 
   .contact-card.clickable:hover,

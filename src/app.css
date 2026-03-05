@@ -168,7 +168,6 @@
    1b. DARK MODE TOKENS
    ───────────────────────────────────────────────────────────────────────────── */
 
-[data-theme="dark"],
 @media (prefers-color-scheme: dark) {
   [data-theme="system"] {
     --color-bg:           #1a1d22;

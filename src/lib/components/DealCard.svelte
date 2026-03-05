@@ -58,14 +58,12 @@
   }
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<div
+<button
   class="deal-card card"
   class:dragging={isDragging}
   class:clickable={!!onclick}
+  type="button"
   draggable={draggable ? 'true' : 'false'}
-  role={onclick ? 'button' : undefined}
-  tabindex={onclick ? 0 : undefined}
   ondragstart={handleDragStart}
   ondragend={handleDragEnd}
   onclick={() => onclick?.(deal)}
@@ -109,7 +107,7 @@
       <span class="probability-label">{formatPercent(deal.probability)}</span>
     </div>
   {/if}
-</div>
+</button>
 
 <style>
   .deal-card {
@@ -117,6 +115,10 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+    appearance: none;
+    text-align: start;
+    font: inherit;
+    color: inherit;
     cursor: grab;
     user-select: none;
     -webkit-user-select: none;
