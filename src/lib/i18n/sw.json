@@ -27,7 +27,21 @@
     "addContact": "Ongeza Anwani",
     "addDeal": "Ongeza Mkataba",
     "addActivity": "Ongeza Shughuli",
-    "noActivity": "Hakuna shughuli za hivi karibuni"
+    "noActivity": "Hakuna shughuli za hivi karibuni",
+    "reports": {
+      "title": "Ripoti za ubadilishaji na faneli",
+      "pipelineTitle": "Ubadilishaji wa pipeline",
+      "activityTitle": "Faneli ya shughuli",
+      "winRate": "Kiwango cha ushindi",
+      "closedWon": "Zilizofungwa na kushinda",
+      "openDeals": "Mikataba iliyo wazi",
+      "completionRate": "Kiwango cha ukamilishaji",
+      "pending": "Zinazosubiri",
+      "overdueRate": "Kiwango cha kuchelewa",
+      "noPipelineData": "Bado hakuna data ya pipeline",
+      "noActivityData": "Bado hakuna data ya shughuli",
+      "loadFailed": "Baadhi ya vipimo vya ripoti havipatikani kwa muda."
+    }
   },
   "contacts": {
     "title": "Anwani",
