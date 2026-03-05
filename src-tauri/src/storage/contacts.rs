@@ -1,0 +1,601 @@
+//! Contact CRUD operations and FTS5 search for 900CRM.
+//!
+//! This module provides all database operations for the `contacts` table,
+//! including full-text search via the `contacts_fts` FTS5 virtual table.
+//!
+//! # Soft Delete
+//!
+//! Contacts are never physically deleted. `soft_delete_contact` sets the
+//! `deleted_at` column to the current timestamp. All list and get operations
+//! exclude soft-deleted records by default. Use `restore_contact` to undo.
+//!
+//! # FTS5 Sync
+//!
+//! The `contacts_fts` virtual table is kept in sync manually:
+//! - Insert → insert a corresponding FTS row.
+//! - Update → delete old FTS row + insert new one.
+//! - Delete → delete FTS row.
+
+use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
+
+use crate::utils::{
+    datetime::now_iso8601,
+    errors::{CrmError, CrmResult},
+    uuid::new_uuid,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Domain structs
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A CRM contact representing a person or organization.
+///
+/// Contacts are the central entity of 900CRM. A contact with
+/// `contact_type = "organization"` can be linked to person contacts via
+/// `org_id`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Contact {
+    /// UUID v4 primary key.
+    pub id: String,
+
+    /// Contact type: `"person"` or `"organization"`.
+    pub contact_type: String,
+
+    /// Given name / first name.
+    pub first_name: String,
+
+    /// Family name / last name.
+    pub last_name: String,
+
+    /// Organization or company name.
+    pub org_name: String,
+
+    /// Primary email address.
+    pub email: String,
+
+    /// Primary phone number.
+    pub phone: String,
+
+    /// Street address.
+    pub address: String,
+
+    /// City or locality.
+    pub city: String,
+
+    /// Country.
+    pub country: String,
+
+    /// Optional parent organization contact ID.
+    pub org_id: Option<String>,
+
+    /// Freeform notes.
+    pub notes: String,
+
+    /// ISO 8601 creation timestamp.
+    pub created_at: String,
+
+    /// ISO 8601 last-update timestamp.
+    pub updated_at: String,
+
+    /// ISO 8601 soft-delete timestamp (`None` = not deleted).
+    pub deleted_at: Option<String>,
+
+    /// ID of the device that created or last modified this record.
+    pub device_id: String,
+}
+
+/// Parameters for listing contacts with pagination, sorting, and filtering.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactListParams {
+    /// Page number (1-based).
+    pub page: u32,
+
+    /// Number of records per page.
+    pub per_page: u32,
+
+    /// Column to sort by (e.g. `"first_name"`, `"created_at"`).
+    pub sort_by: String,
+
+    /// Sort direction: `"asc"` or `"desc"`.
+    pub sort_dir: String,
+
+    /// Optional filter by `contact_type`.
+    pub filter_type: Option<String>,
+
+    /// Optional full-text search query.
+    pub search_query: Option<String>,
+}
+
+impl Default for ContactListParams {
+    /// Default parameters: page 1, 25 per page, sorted by `first_name` ascending.
+    fn default() -> Self {
+        Self {
+            page: 1,
+            per_page: 25,
+            sort_by: "first_name".to_string(),
+            sort_dir: "asc".to_string(),
+            filter_type: None,
+            search_query: None,
+        }
+    }
+}
+
+/// A paginated result set for contact listing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactListResult {
+    /// The contacts on this page.
+    pub contacts: Vec<Contact>,
+
+    /// Total number of matching contacts (for pagination UI).
+    pub total: u32,
+
+    /// Current page number.
+    pub page: u32,
+
+    /// Records per page.
+    pub per_page: u32,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CRUD
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Creates a new contact record and inserts a matching FTS5 row.
+///
+/// Generates a new UUID for `id`, sets `created_at` and `updated_at` to now.
+///
+/// # Parameters
+///
+/// - `conn` — SQLite connection from the locked `Database`.
+/// - `contact_type` — `"person"` or `"organization"`.
+/// - `first_name`, `last_name`, `org_name`, `email`, `phone`, `address`,
+///   `city`, `country`, `org_id`, `notes` — Contact fields.
+/// - `device_id` — The originating device UUID.
+///
+/// # Errors
+///
+/// Returns [`CrmError::Database`] on SQL failure.
+#[allow(clippy::too_many_arguments)]
+pub fn create_contact(
+    conn: &Connection,
+    contact_type: &str,
+    first_name: &str,
+    last_name: &str,
+    org_name: &str,
+    email: &str,
+    phone: &str,
+    address: &str,
+    city: &str,
+    country: &str,
+    org_id: Option<&str>,
+    notes: &str,
+    device_id: &str,
+) -> CrmResult<Contact> {
+    let id = new_uuid();
+    let now = now_iso8601();
+
+    conn.execute(
+        r#"
+        INSERT INTO contacts
+            (id, contact_type, first_name, last_name, org_name, email, phone,
+             address, city, country, org_id, notes, created_at, updated_at, device_id)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+        "#,
+        params![
+            id, contact_type, first_name, last_name, org_name, email, phone,
+            address, city, country, org_id, notes, now, now, device_id
+        ],
+    )?;
+
+    // Keep FTS5 in sync.
+    conn.execute(
+        r#"
+        INSERT INTO contacts_fts (rowid, first_name, last_name, org_name, email, phone)
+        SELECT rowid, first_name, last_name, org_name, email, phone
+        FROM contacts WHERE id = ?1
+        "#,
+        params![id],
+    )?;
+
+    log::debug!("Created contact id={}", id);
+
+    get_contact(conn, &id)
+}
+
+/// Retrieves a single contact by its UUID.
+///
+/// Returns [`CrmError::NotFound`] if no contact with `id` exists (including
+/// soft-deleted ones — use `get_contact_including_deleted` if needed).
+///
+/// # Errors
+///
+/// - [`CrmError::NotFound`] — `id` does not match any active contact.
+/// - [`CrmError::Database`] — Query failure.
+pub fn get_contact(conn: &Connection, id: &str) -> CrmResult<Contact> {
+    let contact = conn.query_row(
+        r#"
+        SELECT id, contact_type, first_name, last_name, org_name, email, phone,
+               address, city, country, org_id, notes, created_at, updated_at,
+               deleted_at, device_id
+        FROM contacts
+        WHERE id = ?1 AND deleted_at IS NULL
+        "#,
+        params![id],
+        row_to_contact,
+    )
+    .map_err(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => {
+            CrmError::NotFound(format!("Contact '{}' not found", id))
+        }
+        other => CrmError::Database(other.to_string()),
+    })?;
+
+    Ok(contact)
+}
+
+/// Lists contacts with optional pagination, sorting, and filtering.
+///
+/// - Excludes soft-deleted contacts (`deleted_at IS NULL`).
+/// - Supports FTS5 search via `params.search_query`.
+/// - Sorts by any valid column; falls back to `first_name ASC` on unknown column.
+///
+/// # Errors
+///
+/// Returns [`CrmError::Database`] on SQL failure.
+pub fn list_contacts(
+    conn: &Connection,
+    params: &ContactListParams,
+) -> CrmResult<ContactListResult> {
+    let safe_sort_by = sanitize_sort_column(&params.sort_by, "first_name");
+    let safe_sort_dir = if params.sort_dir.to_lowercase() == "desc" {
+        "DESC"
+    } else {
+        "ASC"
+    };
+    let offset = ((params.page.max(1) - 1) * params.per_page) as i64;
+    let limit = params.per_page as i64;
+
+    // If there is a search query, use FTS5.
+    if let Some(ref query) = params.search_query {
+        if !query.trim().is_empty() {
+            return search_contacts_paged(conn, query, params);
+        }
+    }
+
+    // Build optional type filter.
+    let type_clause = if params.filter_type.is_some() {
+        "AND c.contact_type = ?3"
+    } else {
+        ""
+    };
+
+    let sql_count = format!(
+        "SELECT COUNT(*) FROM contacts c WHERE c.deleted_at IS NULL {}",
+        type_clause
+    );
+    let sql_list = format!(
+        r#"
+        SELECT id, contact_type, first_name, last_name, org_name, email, phone,
+               address, city, country, org_id, notes, created_at, updated_at,
+               deleted_at, device_id
+        FROM contacts c
+        WHERE c.deleted_at IS NULL {}
+        ORDER BY c.{} {}
+        LIMIT ?1 OFFSET ?2
+        "#,
+        type_clause, safe_sort_by, safe_sort_dir
+    );
+
+    let (total, contacts) = match &params.filter_type {
+        Some(ft) => {
+            let total: u32 = conn
+                .query_row(&sql_count, params![ft], |row| row.get(0))
+                .unwrap_or(0);
+            let mut stmt = conn.prepare(&sql_list)?;
+            let rows = stmt.query_map(params![limit, offset, ft], |row| {
+                row_to_contact(row)
+            })?;
+            let contacts: Vec<Contact> = rows
+                .filter_map(|r| r.ok())
+                .collect();
+            (total, contacts)
+        }
+        None => {
+            let total: u32 = conn
+                .query_row(&sql_count, [], |row| row.get(0))
+                .unwrap_or(0);
+            let mut stmt = conn.prepare(&sql_list)?;
+            let rows = stmt.query_map(params![limit, offset], |row| {
+                row_to_contact(row)
+            })?;
+            let contacts: Vec<Contact> = rows
+                .filter_map(|r| r.ok())
+                .collect();
+            (total, contacts)
+        }
+    };
+
+    log::debug!(
+        "list_contacts: page={}, per_page={}, total={}",
+        params.page,
+        params.per_page,
+        total
+    );
+
+    Ok(ContactListResult {
+        contacts,
+        total,
+        page: params.page,
+        per_page: params.per_page,
+    })
+}
+
+/// Updates an existing contact's fields.
+///
+/// Only updates the columns that are `Some`. Sets `updated_at` to now.
+/// Also refreshes the FTS5 index row.
+///
+/// # Errors
+///
+/// - [`CrmError::NotFound`] — Contact does not exist or is deleted.
+/// - [`CrmError::Database`] — SQL failure.
+#[allow(clippy::too_many_arguments)]
+pub fn update_contact(
+    conn: &Connection,
+    id: &str,
+    contact_type: Option<&str>,
+    first_name: Option<&str>,
+    last_name: Option<&str>,
+    org_name: Option<&str>,
+    email: Option<&str>,
+    phone: Option<&str>,
+    address: Option<&str>,
+    city: Option<&str>,
+    country: Option<&str>,
+    org_id: Option<Option<&str>>,
+    notes: Option<&str>,
+) -> CrmResult<Contact> {
+    // Fetch current to apply partial updates.
+    let current = get_contact(conn, id)?;
+    let now = now_iso8601();
+
+    conn.execute(
+        r#"
+        UPDATE contacts SET
+            contact_type = ?1,
+            first_name   = ?2,
+            last_name    = ?3,
+            org_name     = ?4,
+            email        = ?5,
+            phone        = ?6,
+            address      = ?7,
+            city         = ?8,
+            country      = ?9,
+            org_id       = ?10,
+            notes        = ?11,
+            updated_at   = ?12
+        WHERE id = ?13 AND deleted_at IS NULL
+        "#,
+        params![
+            contact_type.unwrap_or(&current.contact_type),
+            first_name.unwrap_or(&current.first_name),
+            last_name.unwrap_or(&current.last_name),
+            org_name.unwrap_or(&current.org_name),
+            email.unwrap_or(&current.email),
+            phone.unwrap_or(&current.phone),
+            address.unwrap_or(&current.address),
+            city.unwrap_or(&current.city),
+            country.unwrap_or(&current.country),
+            org_id.unwrap_or(current.org_id.as_deref()),
+            notes.unwrap_or(&current.notes),
+            now,
+            id
+        ],
+    )?;
+
+    // Refresh FTS5 row: delete old, insert new.
+    conn.execute(
+        "DELETE FROM contacts_fts WHERE rowid = (SELECT rowid FROM contacts WHERE id = ?1)",
+        params![id],
+    )?;
+    conn.execute(
+        r#"
+        INSERT INTO contacts_fts (rowid, first_name, last_name, org_name, email, phone)
+        SELECT rowid, first_name, last_name, org_name, email, phone
+        FROM contacts WHERE id = ?1
+        "#,
+        params![id],
+    )?;
+
+    log::debug!("Updated contact id={}", id);
+    get_contact(conn, id)
+}
+
+/// Soft-deletes a contact by setting `deleted_at` to the current timestamp.
+///
+/// The contact is excluded from all list/search operations after this call.
+/// Use [`restore_contact`] to undo.
+///
+/// # Errors
+///
+/// - [`CrmError::NotFound`] — Contact does not exist or is already deleted.
+/// - [`CrmError::Database`] — SQL failure.
+pub fn soft_delete_contact(conn: &Connection, id: &str) -> CrmResult<()> {
+    let now = now_iso8601();
+    let changed = conn.execute(
+        "UPDATE contacts SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2 AND deleted_at IS NULL",
+        params![now, id],
+    )?;
+
+    if changed == 0 {
+        return Err(CrmError::NotFound(format!(
+            "Contact '{}' not found or already deleted",
+            id
+        )));
+    }
+
+    // Remove from FTS.
+    conn.execute(
+        "DELETE FROM contacts_fts WHERE rowid = (SELECT rowid FROM contacts WHERE id = ?1)",
+        params![id],
+    )?;
+
+    log::info!("Soft-deleted contact id={}", id);
+    Ok(())
+}
+
+/// Restores a soft-deleted contact by clearing `deleted_at`.
+///
+/// # Errors
+///
+/// - [`CrmError::NotFound`] — No soft-deleted contact with this ID exists.
+/// - [`CrmError::Database`] — SQL failure.
+pub fn restore_contact(conn: &Connection, id: &str) -> CrmResult<Contact> {
+    let now = now_iso8601();
+    let changed = conn.execute(
+        "UPDATE contacts SET deleted_at = NULL, updated_at = ?1 WHERE id = ?2 AND deleted_at IS NOT NULL",
+        params![now, id],
+    )?;
+
+    if changed == 0 {
+        return Err(CrmError::NotFound(format!(
+            "No deleted contact '{}' found",
+            id
+        )));
+    }
+
+    // Re-add to FTS.
+    conn.execute(
+        r#"
+        INSERT INTO contacts_fts (rowid, first_name, last_name, org_name, email, phone)
+        SELECT rowid, first_name, last_name, org_name, email, phone
+        FROM contacts WHERE id = ?1
+        "#,
+        params![id],
+    )?;
+
+    log::info!("Restored contact id={}", id);
+    get_contact(conn, id)
+}
+
+/// Full-text search over contacts using the FTS5 virtual table.
+///
+/// The query is matched against `first_name`, `last_name`, `org_name`,
+/// `email`, and `phone`. Results are ordered by FTS5 rank (best match first).
+///
+/// # Errors
+///
+/// Returns [`CrmError::Database`] on SQL failure.
+pub fn search_contacts(conn: &Connection, query: &str) -> CrmResult<Vec<Contact>> {
+    let fts_query = format!("{}*", query.trim());
+
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT c.id, c.contact_type, c.first_name, c.last_name, c.org_name,
+               c.email, c.phone, c.address, c.city, c.country, c.org_id,
+               c.notes, c.created_at, c.updated_at, c.deleted_at, c.device_id
+        FROM contacts c
+        INNER JOIN contacts_fts fts ON c.rowid = fts.rowid
+        WHERE contacts_fts MATCH ?1 AND c.deleted_at IS NULL
+        ORDER BY rank
+        LIMIT 50
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![fts_query], |row| row_to_contact(row))?;
+    let contacts: Vec<Contact> = rows
+        .filter_map(|r| r.ok())
+        .collect();
+
+    log::debug!("search_contacts query='{}' results={}", query, contacts.len());
+    Ok(contacts)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Internal helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Performs a paginated FTS5 search over contacts.
+fn search_contacts_paged(
+    conn: &Connection,
+    query: &str,
+    params: &ContactListParams,
+) -> CrmResult<ContactListResult> {
+    let fts_query = format!("{}*", query.trim());
+    let offset = ((params.page.max(1) - 1) * params.per_page) as i64;
+    let limit = params.per_page as i64;
+
+    let total: u32 = conn
+        .query_row(
+            r#"
+            SELECT COUNT(*)
+            FROM contacts c
+            INNER JOIN contacts_fts fts ON c.rowid = fts.rowid
+            WHERE contacts_fts MATCH ?1 AND c.deleted_at IS NULL
+            "#,
+            params![fts_query],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT c.id, c.contact_type, c.first_name, c.last_name, c.org_name,
+               c.email, c.phone, c.address, c.city, c.country, c.org_id,
+               c.notes, c.created_at, c.updated_at, c.deleted_at, c.device_id
+        FROM contacts c
+        INNER JOIN contacts_fts fts ON c.rowid = fts.rowid
+        WHERE contacts_fts MATCH ?1 AND c.deleted_at IS NULL
+        ORDER BY rank
+        LIMIT ?2 OFFSET ?3
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![fts_query, limit, offset], |row| {
+        row_to_contact(row)
+    })?;
+    let contacts: Vec<Contact> = rows
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(ContactListResult {
+        contacts,
+        total,
+        page: params.page,
+        per_page: params.per_page,
+    })
+}
+
+/// Maps a `rusqlite::Row` to a [`Contact`].
+///
+/// Column order must match the SELECT in all queries above.
+fn row_to_contact(row: &rusqlite::Row<'_>) -> rusqlite::Result<Contact> {
+    Ok(Contact {
+        id: row.get(0)?,
+        contact_type: row.get(1)?,
+        first_name: row.get(2)?,
+        last_name: row.get(3)?,
+        org_name: row.get(4)?,
+        email: row.get(5)?,
+        phone: row.get(6)?,
+        address: row.get(7)?,
+        city: row.get(8)?,
+        country: row.get(9)?,
+        org_id: row.get(10)?,
+        notes: row.get(11)?,
+        created_at: row.get(12)?,
+        updated_at: row.get(13)?,
+        deleted_at: row.get(14)?,
+        device_id: row.get(15)?,
+    })
+}
+
+/// Returns an allowlisted column name for ORDER BY, preventing SQL injection.
+fn sanitize_sort_column<'a>(col: &'a str, default: &'a str) -> &'a str {
+    match col {
+        "first_name" | "last_name" | "org_name" | "email" | "phone"
+        | "city" | "country" | "created_at" | "updated_at" | "contact_type" => col,
+        _ => default,
+    }
+}
