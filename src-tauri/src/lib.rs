@@ -19,6 +19,7 @@
 //! │   ├── deal_commands.rs
 //! │   ├── activity_commands.rs
 //! │   ├── dashboard_commands.rs
+//! │   ├── custom_field_commands.rs
 //! │   ├── import_export.rs
 //! │   └── settings_commands.rs
 //! ├── storage/              — SQLite persistence (rusqlite)
@@ -26,6 +27,7 @@
 //! │   ├── contacts.rs       — Contact CRUD + FTS5 search
 //! │   ├── deals.rs          — Deal CRUD + pipeline queries
 //! │   ├── activities.rs     — Activity CRUD + scheduling
+//! │   ├── custom_fields.rs  — Custom field definitions and values
 //! │   ├── notes.rs          — Note CRUD
 //! │   ├── tags.rs           — Tag CRUD + entity tagging
 //! │   ├── settings.rs       — Key-value settings store
@@ -270,6 +272,13 @@ pub fn run() {
             commands::activity_commands::delete_activity,
             // ── Dashboard commands ────────────────────────────────────────────
             commands::dashboard_commands::get_dashboard_stats,
+            // ── Custom field commands ────────────────────────────────────────
+            commands::custom_field_commands::list_custom_field_defs,
+            commands::custom_field_commands::create_custom_field_def,
+            commands::custom_field_commands::update_custom_field_def,
+            commands::custom_field_commands::delete_custom_field_def,
+            commands::custom_field_commands::set_custom_field_value,
+            commands::custom_field_commands::list_custom_field_values,
             // ── Import / Export commands ──────────────────────────────────────
             commands::import_export::import_contacts_csv,
             commands::import_export::export_contacts_csv,

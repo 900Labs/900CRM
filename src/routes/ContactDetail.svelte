@@ -499,7 +499,7 @@
             <h2 class="section-title" id="deals-heading">{t('contacts.linkedDeals')}</h2>
             <button
               class="btn btn-secondary btn-xs"
-              onclick={() => uiStore.openModal('addDeal', { contactId: contact.id })}
+              onclick={() => contact && uiStore.openModal('addDeal', { contactId: contact.id })}
               type="button"
             >
               <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -548,7 +548,7 @@
             <h2 class="section-title" id="activity-heading">{t('contacts.activityTimeline')}</h2>
             <button
               class="btn btn-secondary btn-xs"
-              onclick={() => uiStore.openModal('addActivity', { contactId: contact.id })}
+              onclick={() => contact && uiStore.openModal('addActivity', { contactId: contact.id })}
               type="button"
             >
               <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">

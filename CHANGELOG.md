@@ -12,6 +12,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Added a global modal host component that centralizes create flows for contacts, deals, and activities from any route.
 - Wired root layout rendering for global modal support so dashboard, pipeline, contacts, and detail-page quick actions execute consistently.
 - Added context-aware modal prefill for linked entity creation (`contactId`, `dealId`) and stage-aware deal creation.
+- Added custom field foundation APIs:
+  - Rust storage layer for custom field definitions and values.
+  - Tauri IPC commands for listing/creating/updating/deleting definitions and setting/listing values.
+  - Frontend API wrapper (`src/lib/api/customFields.ts`) for typed invoke integration.
+- Added a lightweight open-source and low-resource guardrail checklist and wired it into the PR template/workflow.
 
 ### Fixed — 2026-03-05
 - Resolved Svelte/Tauri build blockers (invalid event attributes, modal snippet typing, SVG attribute typing, and Tauri config schema compatibility).
@@ -22,9 +27,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Removed remaining Svelte/Tauri warning classes (a11y semantics, rune reactivity refs, dark-theme selector scoping, CSS media-token syntax, and Rust unused imports).
 - Verified clean warning baseline: `npm run check` now reports 0 errors and 0 warnings; `cargo check` is warning-free.
 - Corrected deal modal translation key usage from `deals.dealName` to existing locale key `deals.name`.
+- Fixed TypeScript nullability issues in contact-detail quick actions for add-deal/add-activity modal context opening.
 
 ### In Progress
-- Custom fields on contacts, deals, and activities — planned for v1.1.0
+- Custom fields UI integration on contacts, deals, and activities (renderer/forms/filter UX) — planned for v1.1.0
 - Desktop notifications and reminders for upcoming activities — planned for v1.1.0
 - Pipeline conversion reports and activity funnel analytics — planned for v1.1.0
 - Portuguese (Brazilian) and Vietnamese translations — planned for v1.1.0
