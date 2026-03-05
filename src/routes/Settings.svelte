@@ -8,8 +8,9 @@
    *   3. Theme — light / dark / system
    *   4. Date format — 4 preset formats
    *   5. Sync — enable/disable toggle + server URL
-   *   6. About — 900 Labs mission statement
-   *   7. Data management — export all, import data
+   *   6. Notifications — desktop reminder preferences
+   *   7. About — 900 Labs mission statement
+   *   8. Data management — export all, import data
    *
    * Each setting auto-saves via settingsStore.updateSetting().
    * No separate Save button needed — changes apply immediately.
@@ -69,6 +70,8 @@
   /** URL field local state — only committed on blur or Enter. */
   let syncUrlLocal = $state('');
   let syncUrlDirty = $state(false);
+  let reminderLeadMinutesLocal = $state('30');
+  let reminderLeadDirty = $state(false);
 
   let showImportExport = $state(false);
 
@@ -76,6 +79,7 @@
 
   onMount(() => {
     syncUrlLocal = settingsStore.syncUrl;
+    reminderLeadMinutesLocal = String(settingsStore.reminderLeadMinutes);
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -131,6 +135,36 @@
     if (e.key === 'Enter') {
       (e.target as HTMLInputElement).blur();
       await handleSyncUrlCommit();
+    }
+  }
+
+  async function handleNotificationsToggle() {
+    await updateSetting('notificationsEnabled', !settingsStore.notificationsEnabled);
+  }
+
+  function normalizeLeadMinutes(raw: string): number {
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) return 30;
+    return Math.min(1440, Math.max(1, parsed));
+  }
+
+  function handleReminderLeadInput(e: Event) {
+    reminderLeadMinutesLocal = (e.target as HTMLInputElement).value;
+    reminderLeadDirty = true;
+  }
+
+  async function handleReminderLeadCommit() {
+    if (!reminderLeadDirty) return;
+    reminderLeadDirty = false;
+    const next = normalizeLeadMinutes(reminderLeadMinutesLocal);
+    reminderLeadMinutesLocal = String(next);
+    await updateSetting('reminderLeadMinutes', next);
+  }
+
+  async function handleReminderLeadKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur();
+      await handleReminderLeadCommit();
     }
   }
 
@@ -360,6 +394,65 @@
                   spellcheck={false}
                 />
               </div>
+            </div>
+          {/if}
+        </div>
+      </section>
+
+      <!-- Notification reminders -->
+      <section class="card settings-section" aria-labelledby="notifications-heading">
+        <div class="card-header">
+          <h2 class="section-title" id="notifications-heading">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 01-6 0"/>
+            </svg>
+            {t('settings.notifications')}
+          </h2>
+          {#if savingKey === 'notificationsEnabled' || savingKey === 'reminderLeadMinutes'}
+            <span class="saving-indicator" aria-live="polite">{t('common.loading')}</span>
+          {/if}
+        </div>
+        <div class="card-body sync-body">
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <span class="toggle-label">{t('settings.notificationsEnabled')}</span>
+              <span class="toggle-desc">
+                {settingsStore.notificationsEnabled
+                  ? t('common.success')
+                  : t('common.none')}
+              </span>
+            </div>
+            <button
+              class="toggle-switch"
+              class:toggle-switch--on={settingsStore.notificationsEnabled}
+              onclick={handleNotificationsToggle}
+              role="switch"
+              aria-checked={settingsStore.notificationsEnabled}
+              aria-label={t('settings.notificationsEnabled')}
+              type="button"
+            >
+              <span class="toggle-thumb"></span>
+            </button>
+          </div>
+
+          {#if settingsStore.notificationsEnabled}
+            <div class="field-row sync-url-row">
+              <label class="field-label" for="reminder-lead-minutes">{t('settings.reminderLeadMinutes')}</label>
+              <div class="sync-url-input-wrap">
+                <input
+                  id="reminder-lead-minutes"
+                  class="input"
+                  type="number"
+                  min="1"
+                  max="1440"
+                  step="1"
+                  value={reminderLeadMinutesLocal}
+                  oninput={handleReminderLeadInput}
+                  onblur={handleReminderLeadCommit}
+                  onkeydown={handleReminderLeadKeydown}
+                />
+              </div>
+              <span class="field-hint">{t('settings.reminderLeadHint')}</span>
             </div>
           {/if}
         </div>
@@ -764,6 +857,11 @@
 
   .sync-url-row {
     padding-block-start: var(--space-2);
+  }
+
+  .field-hint {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
   }
 
   .sync-url-input-wrap {

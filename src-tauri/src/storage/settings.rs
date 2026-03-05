@@ -16,6 +16,8 @@
 //! | `date_format`  | `"YYYY-MM-DD"` | Date display format |
 //! | `sync_enabled` | `"false"`      | Whether sync is active |
 //! | `sync_url`     | `""`           | Remote sync endpoint URL |
+//! | `notifications_enabled` | `"true"` | Whether desktop reminders are enabled |
+//! | `reminder_lead_minutes` | `"30"`   | Minutes before due time to trigger reminders |
 
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};

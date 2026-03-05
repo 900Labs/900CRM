@@ -31,6 +31,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Contacts list supports backend-filtered custom-field searching (pagination-safe).
   - Pipeline and Activities support lightweight custom-field filtering via local value indexes.
   - Added bulk custom-field value command for per-entity-type filter lookups.
+- Added desktop reminder notifications for upcoming activities:
+  - Added reminder polling service with at-most-once notifications per activity due timestamp.
+  - Added settings for desktop reminders (`notifications_enabled`, `reminder_lead_minutes`).
+  - Added schema migration v3 to backfill reminder setting defaults for existing installs.
 - Added schema migration v2 analytics indexes to keep report queries efficient on constrained hardware.
 - Added a lightweight open-source and low-resource guardrail checklist and wired it into the PR template/workflow.
 
@@ -47,7 +51,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Fixed contact-detail save/cancel consistency by including custom field state in dirty/reset/save handling.
 
 ### In Progress
-- Desktop notifications and reminders for upcoming activities — planned for v1.1.0
 - Portuguese (Brazilian) and Vietnamese translations — planned for v1.1.0
 
 ---

@@ -19,6 +19,7 @@
   import Toast from '$lib/components/Toast.svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import GlobalModalHost from '$lib/components/GlobalModalHost.svelte';
+  import { startActivityReminderService } from '$lib/services/activityReminders';
 
   // ── Child route ──────────────────────────────────────────────────────────────
 
@@ -85,18 +86,32 @@
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
-  onMount(async () => {
+  onMount(() => {
     // Detect current route from hash
     const hash = window.location.hash.replace('#', '') || '/';
     currentRoute = hash;
 
-    // Load settings (applies theme + locale)
-    await settingsStore.loadSettings();
-
     // Listen for hash changes
-    window.addEventListener('hashchange', () => {
+    const handleHashChange = () => {
       currentRoute = window.location.hash.replace('#', '') || '/';
-    });
+    };
+    window.addEventListener('hashchange', handleHashChange);
+
+    let isActive = true;
+    let stopReminderService = () => {};
+
+    void (async () => {
+      // Load settings (applies theme + locale)
+      await settingsStore.loadSettings();
+      if (!isActive) return;
+      stopReminderService = startActivityReminderService();
+    })();
+
+    return () => {
+      isActive = false;
+      window.removeEventListener('hashchange', handleHashChange);
+      stopReminderService();
+    };
   });
 </script>
 
