@@ -1,22 +1,13 @@
 <script lang="ts">
   /**
-   * ImportExport.svelte — Import/Export modal for 900CRM.
-   *
-   * Tabs:
-   *   - Import: file picker, CSV preview, column mapping, import button
-   *   - Export: entity selector, format selector, export button
-   *
-   * Uses Tauri dialog plugin for native file dialogs.
-   * Client-side CSV parsing for import preview.
+   * ImportExport.svelte — Import/Export modal for contacts and deals CSV.
    */
 
   import { t } from '$lib/i18n';
-  import { parseCSV, buildCSV, mapColumns } from '$lib/utils/csv';
-  import type { ParseCSVResult, ColumnMapping } from '$lib/utils/csv';
+  import { parseCSV } from '$lib/utils/csv';
+  import type { ParseCSVResult } from '$lib/utils/csv';
   import { uiStore } from '$lib/stores/ui';
   import { invoke } from '@tauri-apps/api/core';
-
-  // ── Props ──────────────────────────────────────────────────────────────────
 
   let {
     open = $bindable(false),
@@ -26,89 +17,77 @@
     onclose?: () => void;
   } = $props();
 
-  // ── State ──────────────────────────────────────────────────────────────────
-
   let activeTab = $state<'import' | 'export'>('import');
 
-  // Import state
   let csvText = $state('');
   let parseResult = $state<ParseCSVResult | null>(null);
-  let columnMapping = $state<ColumnMapping>({});
+  let selectedImportPath = $state<string | null>(null);
   let isImporting = $state(false);
-  let importEntity = $state('contacts');
+  let importEntity = $state<'contacts' | 'deals'>('contacts');
 
-  // Export state
-  let exportEntity = $state('contacts');
-  let exportFormat = $state('csv');
+  let exportEntity = $state<'contacts' | 'deals'>('contacts');
+  let exportFormat = $state<'csv' | 'json'>('csv');
   let isExporting = $state(false);
 
-  // ── CRM target fields per entity ──────────────────────────────────────────
-
-  const TARGET_FIELDS: Record<string, string[]> = {
-    contacts: ['firstName', 'lastName', 'email', 'phone', 'organization', 'type', 'notes'],
-    deals:    ['name', 'value', 'stage', 'probability', 'expectedCloseDate', 'description'],
-    activities: ['subject', 'type', 'dueDate', 'notes'],
-  };
-
-  // ── Derived ────────────────────────────────────────────────────────────────
-
   const previewRows = $derived(parseResult?.rows.slice(0, 5) ?? []);
-  const targetFields = $derived(TARGET_FIELDS[importEntity] ?? []);
-
-  // ── Handlers ───────────────────────────────────────────────────────────────
 
   async function handleFilePick() {
     try {
-      // Try Tauri dialog; fall back to hidden file input
       const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
-      const selected = await openDialog({ filters: [{ name: 'CSV', extensions: ['csv'] }] });
+      const selected = await openDialog({
+        filters: [{ name: 'CSV', extensions: ['csv'] }],
+        multiple: false,
+      });
 
-      if (typeof selected === 'string') {
-        const { readTextFile } = await import('@tauri-apps/plugin-fs');
-        csvText = await readTextFile(selected);
-        parseCsv();
+      if (typeof selected !== 'string') {
+        return;
       }
+
+      const { readTextFile } = await import('@tauri-apps/plugin-fs');
+      selectedImportPath = selected;
+      csvText = await readTextFile(selected);
+      parseResult = parseCSV(csvText);
     } catch {
-      // Fallback: trigger hidden file input
       document.getElementById('csv-file-input')?.click();
     }
   }
 
   function handleFileInputChange(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0];
-    if (!file) return;
+    if (!file) {
+      return;
+    }
+
+    selectedImportPath = file.name;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      csvText = ev.target?.result as string ?? '';
-      parseCsv();
+      csvText = (ev.target?.result as string) ?? '';
+      parseResult = parseCSV(csvText);
     };
     reader.readAsText(file);
   }
 
-  function parseCsv() {
-    if (!csvText.trim()) return;
-    const result = parseCSV(csvText);
-    parseResult = result;
-    columnMapping = mapColumns(result.headers, targetFields);
-  }
-
   async function handleImport() {
-    if (!parseResult || parseResult.count === 0) return;
+    if (!selectedImportPath) {
+      uiStore.toastError(t('import.chooseFile'));
+      return;
+    }
+
     isImporting = true;
     try {
-      // Apply mapping and send to backend
-      const rows = parseResult.rows.map((row) => {
-        const mapped: Record<string, string> = {};
-        for (const [src, tgt] of Object.entries(columnMapping)) {
-          if (tgt && src in row) mapped[tgt] = row[src];
-        }
-        return mapped;
+      const command = importEntity === 'contacts' ? 'import_contacts_csv' : 'import_deals_csv';
+      const result = await invoke<{ created: number; skipped: number; errors: string[] }>(command, {
+        file_path: selectedImportPath,
       });
 
-      await invoke(`import_${importEntity}`, { rows });
-      uiStore.toastSuccess(t('import.success'));
-      open = false;
-    } catch (err) {
+      if (result.skipped > 0) {
+        uiStore.toastWarning(`${t('import.success')} (${result.created} created, ${result.skipped} skipped)`);
+      } else {
+        uiStore.toastSuccess(`${t('import.success')} (${result.created})`);
+      }
+
+      close();
+    } catch {
       uiStore.toastError(t('import.failed'));
     } finally {
       isImporting = false;
@@ -116,22 +95,26 @@
   }
 
   async function handleExport() {
+    if (exportFormat !== 'csv') {
+      uiStore.toastWarning('JSON export is not available yet.');
+      return;
+    }
+
     isExporting = true;
     try {
-      const data = await invoke<unknown[]>(`export_${exportEntity}`);
-      const cols = TARGET_FIELDS[exportEntity] ?? [];
-      const csv = buildCSV(data as Record<string, unknown>[], cols);
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const savePath = await save({
+        defaultPath: `${exportEntity}-export.csv`,
+        filters: [{ name: 'CSV', extensions: ['csv'] }],
+      });
 
-      // Download file
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${exportEntity}-export.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      if (typeof savePath !== 'string') {
+        return;
+      }
 
-      uiStore.toastSuccess(t('export.success'));
+      const command = exportEntity === 'contacts' ? 'export_contacts_csv' : 'export_deals_csv';
+      const rows = await invoke<number>(command, { file_path: savePath });
+      uiStore.toastSuccess(`${t('export.success')} (${rows})`);
     } catch {
       uiStore.toastError(t('export.failed'));
     } finally {
@@ -146,11 +129,8 @@
 </script>
 
 {#if open}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if (e.target === e.currentTarget) close(); }}>
+  <div class="modal-backdrop" role="button" tabindex="0" onclick={(e) => { if (e.target === e.currentTarget) close(); }} onkeydown={(e) => { if (e.key === 'Escape') close(); }}>
     <div class="modal" style="width: 600px;">
-      <!-- Header -->
       <div class="modal-header">
         <span class="modal-title">{t('common.import')} / {t('common.export')}</span>
         <button class="icon-btn" onclick={close} type="button" aria-label={t('common.close')}>
@@ -160,7 +140,6 @@
         </button>
       </div>
 
-      <!-- Tabs -->
       <div class="tab-bar">
         <button
           class="tab"
@@ -180,31 +159,25 @@
         </button>
       </div>
 
-      <!-- Body -->
       <div class="modal-body">
         {#if activeTab === 'import'}
-          <!-- Import tab -->
           <div class="import-tab">
-            <!-- Entity selector -->
             <div class="form-group">
               <label class="form-label" for="import-entity">{t('common.type')}</label>
-              <select id="import-entity" class="select" bind:value={importEntity} onchange={() => { if (parseResult) columnMapping = mapColumns(parseResult.headers, targetFields); }}>
+              <select id="import-entity" class="select" bind:value={importEntity}>
                 <option value="contacts">{t('contacts.title')}</option>
                 <option value="deals">{t('deals.title')}</option>
-                <option value="activities">{t('activities.title')}</option>
               </select>
             </div>
 
-            <!-- File picker -->
             <div class="form-group">
-              <label class="form-label">{t('import.chooseFile')}</label>
-              <button class="btn btn-secondary" onclick={handleFilePick} type="button">
+              <label class="form-label" for="import-file-button">{t('import.chooseFile')}</label>
+              <button id="import-file-button" class="btn btn-secondary" onclick={handleFilePick} type="button">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
                 </svg>
                 {t('import.chooseFile')}
               </button>
-              <!-- Hidden fallback file input -->
               <input
                 id="csv-file-input"
                 type="file"
@@ -212,10 +185,12 @@
                 style="display: none;"
                 onchange={handleFileInputChange}
               />
+              {#if selectedImportPath}
+                <p class="import-stats">{selectedImportPath}</p>
+              {/if}
             </div>
 
             {#if parseResult}
-              <!-- Stats -->
               <p class="import-stats">
                 {t('import.rowCount', { count: parseResult.count })}
                 {#if parseResult.warnings.length > 0}
@@ -223,33 +198,6 @@
                 {/if}
               </p>
 
-              <!-- Column mapping -->
-              {#if parseResult.headers.length > 0}
-                <div class="form-group">
-                  <label class="form-label">{t('import.columnMapping')}</label>
-                  <div class="mapping-grid">
-                    {#each parseResult.headers as header (header)}
-                      <div class="mapping-row">
-                        <span class="mapping-source">{header}</span>
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                          <path d="M2 6h8M7 3l3 3-3 3"/>
-                        </svg>
-                        <select
-                          class="select mapping-target"
-                          bind:value={columnMapping[header]}
-                        >
-                          <option value={null}>{t('import.skip')}</option>
-                          {#each targetFields as field (field)}
-                            <option value={field}>{field}</option>
-                          {/each}
-                        </select>
-                      </div>
-                    {/each}
-                  </div>
-                </div>
-              {/if}
-
-              <!-- Preview -->
               {#if previewRows.length > 0}
                 <details class="preview-details">
                   <summary class="preview-summary">{t('import.preview')}</summary>
@@ -278,14 +226,12 @@
             {/if}
           </div>
         {:else}
-          <!-- Export tab -->
           <div class="export-tab">
             <div class="form-group">
               <label class="form-label" for="export-entity">{t('export.entity')}</label>
               <select id="export-entity" class="select" bind:value={exportEntity}>
                 <option value="contacts">{t('contacts.title')}</option>
                 <option value="deals">{t('deals.title')}</option>
-                <option value="activities">{t('activities.title')}</option>
               </select>
             </div>
 
@@ -293,14 +239,13 @@
               <label class="form-label" for="export-format">{t('export.format')}</label>
               <select id="export-format" class="select" bind:value={exportFormat}>
                 <option value="csv">CSV</option>
-                <option value="json">JSON</option>
+                <option value="json">JSON (soon)</option>
               </select>
             </div>
           </div>
         {/if}
       </div>
 
-      <!-- Footer -->
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick={close} type="button">
           {t('common.cancel')}
@@ -309,7 +254,7 @@
           <button
             class="btn btn-primary"
             onclick={handleImport}
-            disabled={!parseResult || parseResult.count === 0 || isImporting}
+            disabled={!selectedImportPath || isImporting}
             type="button"
           >
             {isImporting ? t('import.importing') : t('import.importButton')}
@@ -344,32 +289,6 @@
 
   .import-warnings {
     color: var(--text-warning);
-  }
-
-  .mapping-grid {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-
-  .mapping-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-  }
-
-  .mapping-source {
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    min-width: 140px;
-    flex-shrink: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .mapping-target {
-    flex: 1;
   }
 
   .preview-details {

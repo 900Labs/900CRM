@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed — 2026-03-05
+- Resolved Svelte/Tauri build blockers (invalid event attributes, modal snippet typing, SVG attribute typing, and Tauri config schema compatibility).
+- Unified frontend IPC wrappers with backend command contracts (snake_case argument names, response mapping, and stage/type/status normalization).
+- Added missing sync IPC commands (`get_sync_status`, `trigger_sync`) and activity revert command (`mark_activity_incomplete`).
+- Aligned hash-route rendering so `/contacts`, `/contacts/:id`, `/pipeline`, `/activities`, and `/settings` render correctly from the root page.
+- Aligned import/export flows with implemented backend CSV commands (`import_*_csv`, `export_*_csv`) and file-path based operations.
+
 ### In Progress
 - Custom fields on contacts, deals, and activities — planned for v1.1.0
 - Desktop notifications and reminders for upcoming activities — planned for v1.1.0

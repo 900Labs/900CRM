@@ -140,7 +140,7 @@
             stroke-linecap="round"
             stroke-linejoin="round"
             aria-hidden="true"
-            flex-shrink="0"
+            style="flex-shrink: 0;"
           >
             <path d={item.icon} />
           </svg>

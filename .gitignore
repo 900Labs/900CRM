@@ -1,0 +1,8 @@
+/pdf/
+node_modules/
+.svelte-kit/
+dist/
+build/
+src-tauri/target/
+src-tauri/gen/
+.DS_Store

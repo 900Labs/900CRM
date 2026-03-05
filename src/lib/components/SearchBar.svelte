@@ -65,6 +65,11 @@
     if (inputEl) inputEl.value = '';
   }
 
+  function handleResultMouseDown(e: MouseEvent, result: SearchResult) {
+    e.preventDefault();
+    handleSelect(result);
+  }
+
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       uiStore.closeSearch();
@@ -130,7 +135,7 @@
           class="search-result-item"
           role="option"
           aria-selected="false"
-          onmousedown|preventDefault={() => handleSelect(result)}
+          onmousedown={(e) => handleResultMouseDown(e, result)}
         >
           <div class="search-result-text">
             <span class="search-result-title">{result.title}</span>

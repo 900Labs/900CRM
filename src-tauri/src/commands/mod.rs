@@ -21,3 +21,4 @@ pub mod dashboard_commands;
 pub mod deal_commands;
 pub mod import_export;
 pub mod settings_commands;
+pub mod sync_commands;

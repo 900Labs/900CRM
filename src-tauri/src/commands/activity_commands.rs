@@ -11,6 +11,7 @@
 //! | `list_activities_for_deal`   | Lists activities for a deal |
 //! | `list_upcoming_activities`   | Lists upcoming (future) activities |
 //! | `mark_activity_complete`     | Marks an activity as done |
+//! | `mark_activity_incomplete`   | Marks an activity as not done |
 //! | `update_activity`            | Updates activity fields |
 //! | `delete_activity`            | Soft-deletes an activity |
 
@@ -174,6 +175,36 @@ pub async fn mark_activity_complete(
     .map_err(|e| e.to_string())?;
 
     log::info!("Command: mark_activity_complete id={}", id);
+    Ok(activity)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// mark_activity_incomplete
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Marks an activity as incomplete.
+#[tauri::command]
+pub async fn mark_activity_incomplete(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<Activity, String> {
+    let db = state.db.lock().map_err(|e| format!("Lock error: {}", e))?;
+    let device_id = state.device_id.clone();
+
+    let activity = activities::mark_incomplete(&db.conn, &id).map_err(|e| e.to_string())?;
+
+    sync::record_change(
+        &db.conn,
+        "activity",
+        &id,
+        "completed",
+        Some("1"),
+        Some("0"),
+        &device_id,
+    )
+    .map_err(|e| e.to_string())?;
+
+    log::info!("Command: mark_activity_incomplete id={}", id);
     Ok(activity)
 }
 
