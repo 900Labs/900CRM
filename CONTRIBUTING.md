@@ -528,7 +528,7 @@ For small fixes (typos, obvious bugs), open a PR directly. For larger features o
 
 ### Translations
 
-Translating 900CRM into a new language is one of the most impactful contributions you can make. See the [Translation Guide](#translation-guide) below. Languages we especially need: Hausa, Yoruba, Bengali, Tagalog, and Amharic.
+Translating 900CRM into a new language is one of the most impactful contributions you can make. See the [Translation Guide](#translation-guide) below. Languages we especially need: Yoruba, Tagalog, and Amharic.
 
 ### Documentation Improvements
 
