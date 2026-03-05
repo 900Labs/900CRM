@@ -1,22 +1,12 @@
 /**
- * src/lib/api/activities.ts — Tauri IPC wrappers for the activities backend.
- *
- * @module api/activities
+ * src/lib/api/activities.ts — Tauri IPC wrappers for activity commands.
  */
 
 import { invoke } from '@tauri-apps/api/core';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Activity type. */
 export type ActivityType = 'task' | 'call' | 'meeting' | 'email';
-
-/** Activity status. */
 export type ActivityStatus = 'pending' | 'completed' | 'overdue';
 
-/** A CRM activity record. */
 export interface Activity {
   id: string;
   type: ActivityType;
@@ -33,16 +23,13 @@ export interface Activity {
   updatedAt: string;
 }
 
-/** Payload for creating an activity. */
 export type CreateActivityPayload = Omit<
   Activity,
   'id' | 'status' | 'completedAt' | 'contactName' | 'dealName' | 'createdAt' | 'updatedAt'
 >;
 
-/** Payload for updating an activity. */
 export type UpdateActivityPayload = Partial<CreateActivityPayload>;
 
-/** Parameters for listing activities. */
 export interface ListActivitiesParams {
   type?: ActivityType;
   status?: ActivityStatus;
@@ -54,66 +41,160 @@ export interface ListActivitiesParams {
   pageSize?: number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// API functions
-// ─────────────────────────────────────────────────────────────────────────────
+interface BackendActivity {
+  id: string;
+  activity_type: string;
+  title: string;
+  description: string;
+  due_date: string | null;
+  completed: boolean;
+  contact_id: string | null;
+  deal_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
-/**
- * Create a new activity.
- */
+function toActivityType(value: string): ActivityType {
+  if (value === 'call' || value === 'meeting' || value === 'email') {
+    return value;
+  }
+  return 'task';
+}
+
+function toActivityStatus(completed: boolean, dueDate: string | null): ActivityStatus {
+  if (completed) {
+    return 'completed';
+  }
+
+  if (dueDate) {
+    const dueTs = Date.parse(dueDate);
+    if (!Number.isNaN(dueTs) && dueTs < Date.now()) {
+      return 'overdue';
+    }
+  }
+
+  return 'pending';
+}
+
+function mapActivity(activity: BackendActivity): Activity {
+  const status = toActivityStatus(activity.completed, activity.due_date);
+
+  return {
+    id: activity.id,
+    type: toActivityType(activity.activity_type),
+    subject: activity.title,
+    notes: activity.description?.trim() ? activity.description : null,
+    dueDate: activity.due_date,
+    completedAt: activity.completed ? activity.updated_at : null,
+    status,
+    contactId: activity.contact_id,
+    contactName: null,
+    dealId: activity.deal_id,
+    dealName: null,
+    createdAt: activity.created_at,
+    updatedAt: activity.updated_at,
+  };
+}
+
+function sortActivities(items: Activity[], params: ListActivitiesParams): Activity[] {
+  const sorted = [...items];
+  const direction = params.sortDir === 'desc' ? -1 : 1;
+
+  if (!params.sortBy) {
+    return sorted;
+  }
+
+  sorted.sort((a, b) => {
+    switch (params.sortBy) {
+      case 'createdAt':
+        return ((Date.parse(a.createdAt) || 0) - (Date.parse(b.createdAt) || 0)) * direction;
+      case 'subject':
+        return a.subject.localeCompare(b.subject) * direction;
+      case 'dueDate':
+      default:
+        return ((Date.parse(a.dueDate ?? '') || 0) - (Date.parse(b.dueDate ?? '') || 0)) * direction;
+    }
+  });
+
+  return sorted;
+}
+
 export async function createActivity(data: CreateActivityPayload): Promise<Activity> {
-  return invoke<Activity>('create_activity', { data });
+  const activity = await invoke<BackendActivity>('create_activity', {
+    activity_type: data.type,
+    title: data.subject,
+    description: data.notes ?? '',
+    due_date: data.dueDate,
+    contact_id: data.contactId,
+    deal_id: data.dealId,
+  });
+
+  return mapActivity(activity);
 }
 
-/**
- * Fetch a single activity by ID.
- */
 export async function getActivity(id: string): Promise<Activity> {
-  return invoke<Activity>('get_activity', { id });
+  const activity = await invoke<BackendActivity>('get_activity', { id });
+  return mapActivity(activity);
 }
 
-/**
- * List activities with optional filtering.
- */
 export async function listActivities(params: ListActivitiesParams = {}): Promise<Activity[]> {
-  return invoke<Activity[]>('list_activities', { params });
+  const activities = await invoke<BackendActivity[]>('list_activities');
+
+  let mapped = activities.map(mapActivity);
+
+  if (params.type) {
+    mapped = mapped.filter((activity) => activity.type === params.type);
+  }
+
+  if (params.status) {
+    mapped = mapped.filter((activity) => activity.status === params.status);
+  }
+
+  if (params.contactId) {
+    mapped = mapped.filter((activity) => activity.contactId === params.contactId);
+  }
+
+  if (params.dealId) {
+    mapped = mapped.filter((activity) => activity.dealId === params.dealId);
+  }
+
+  mapped = sortActivities(mapped, params);
+
+  return mapped;
 }
 
-/**
- * List upcoming (pending, not overdue) activities sorted by due date.
- */
 export async function listUpcoming(): Promise<Activity[]> {
-  return invoke<Activity[]>('list_upcoming_activities');
+  const activities = await invoke<BackendActivity[]>('list_upcoming_activities', {
+    limit: 10,
+  });
+
+  return activities.map(mapActivity);
 }
 
-/**
- * Mark an activity as complete.
- *
- * @param id  Activity UUID
- */
 export async function markComplete(id: string): Promise<Activity> {
-  return invoke<Activity>('mark_activity_complete', { id });
+  const activity = await invoke<BackendActivity>('mark_activity_complete', { id });
+  return mapActivity(activity);
 }
 
-/**
- * Mark an activity as incomplete (revert completion).
- *
- * @param id  Activity UUID
- */
 export async function markIncomplete(id: string): Promise<Activity> {
-  return invoke<Activity>('mark_activity_incomplete', { id });
+  const activity = await invoke<BackendActivity>('mark_activity_incomplete', { id });
+  return mapActivity(activity);
 }
 
-/**
- * Update an activity by ID.
- */
 export async function updateActivity(id: string, data: UpdateActivityPayload): Promise<Activity> {
-  return invoke<Activity>('update_activity', { id, data });
+  const activity = await invoke<BackendActivity>('update_activity', {
+    id,
+    activity_type: data.type,
+    title: data.subject,
+    description: data.notes,
+    due_date: data.dueDate,
+    contact_id: data.contactId,
+    deal_id: data.dealId,
+  });
+
+  return mapActivity(activity);
 }
 
-/**
- * Delete an activity by ID.
- */
 export async function deleteActivity(id: string): Promise<void> {
-  return invoke<void>('delete_activity', { id });
+  await invoke<void>('delete_activity', { id });
 }

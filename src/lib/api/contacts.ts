@@ -1,22 +1,11 @@
 /**
- * src/lib/api/contacts.ts — Tauri IPC wrappers for the contacts backend.
- *
- * All functions use invoke() from @tauri-apps/api/core. They are fully typed
- * and throw on error (caller wraps in try/catch + toast).
- *
- * @module api/contacts
+ * src/lib/api/contacts.ts — Tauri IPC wrappers for contact commands.
  */
 
 import { invoke } from '@tauri-apps/api/core';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Contact type discriminant. */
 export type ContactType = 'person' | 'org';
 
-/** A CRM contact record. */
 export interface Contact {
   id: string;
   firstName: string;
@@ -34,13 +23,9 @@ export interface Contact {
   deletedAt: string | null;
 }
 
-/** Payload for creating a new contact. */
 export type CreateContactPayload = Omit<Contact, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>;
-
-/** Payload for updating a contact (all fields optional). */
 export type UpdateContactPayload = Partial<CreateContactPayload>;
 
-/** Parameters for listing contacts. */
 export interface ListContactsParams {
   search?: string;
   type?: ContactType;
@@ -51,7 +36,6 @@ export interface ListContactsParams {
   pageSize?: number;
 }
 
-/** Paginated list response. */
 export interface ContactListResponse {
   contacts: Contact[];
   total: number;
@@ -59,78 +43,155 @@ export interface ContactListResponse {
   pageSize: number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// API functions
-// ─────────────────────────────────────────────────────────────────────────────
+interface BackendContact {
+  id: string;
+  contact_type: 'person' | 'organization' | string;
+  first_name: string;
+  last_name: string;
+  org_name: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  country: string;
+  org_id: string | null;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
 
-/**
- * Create a new contact.
- *
- * @param data  Contact creation payload
- * @returns     The created Contact
- */
+interface BackendContactListResponse {
+  contacts: BackendContact[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
+function toNullable(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function mapContact(contact: BackendContact): Contact {
+  const addressParts = [contact.address, contact.city, contact.country]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part));
+
+  return {
+    id: contact.id,
+    firstName: contact.first_name,
+    lastName: contact.last_name,
+    email: toNullable(contact.email),
+    phone: toNullable(contact.phone),
+    organization: toNullable(contact.org_name),
+    type: contact.contact_type === 'organization' ? 'org' : 'person',
+    tags: [],
+    notes: toNullable(contact.notes),
+    website: null,
+    address: addressParts.length > 0 ? addressParts.join(', ') : null,
+    createdAt: contact.created_at,
+    updatedAt: contact.updated_at,
+    deletedAt: contact.deleted_at,
+  };
+}
+
+function toBackendSortKey(sortBy: ListContactsParams['sortBy']): string {
+  switch (sortBy) {
+    case 'createdAt':
+      return 'created_at';
+    case 'updatedAt':
+      return 'updated_at';
+    case 'name':
+    default:
+      return 'first_name';
+  }
+}
+
+function toBackendContactType(type: ContactType | undefined): string | undefined {
+  if (!type) {
+    return undefined;
+  }
+  return type === 'org' ? 'organization' : 'person';
+}
+
 export async function createContact(data: CreateContactPayload): Promise<Contact> {
-  return invoke<Contact>('create_contact', { data });
+  const contact = await invoke<BackendContact>('create_contact', {
+    contact_type: data.type === 'org' ? 'organization' : 'person',
+    first_name: data.firstName ?? '',
+    last_name: data.lastName ?? '',
+    org_name: data.organization ?? '',
+    email: data.email ?? '',
+    phone: data.phone ?? '',
+    address: data.address ?? '',
+    city: '',
+    country: '',
+    org_id: null,
+    notes: data.notes ?? '',
+  });
+
+  return mapContact(contact);
 }
 
-/**
- * Fetch a single contact by ID.
- *
- * @param id  Contact UUID
- * @returns   Contact or throws if not found
- */
 export async function getContact(id: string): Promise<Contact> {
-  return invoke<Contact>('get_contact', { id });
+  const contact = await invoke<BackendContact>('get_contact', { id });
+  return mapContact(contact);
 }
 
-/**
- * List contacts with optional filtering, sorting, and pagination.
- *
- * @param params  Query parameters
- * @returns       Paginated ContactListResponse
- */
 export async function listContacts(params: ListContactsParams = {}): Promise<ContactListResponse> {
-  return invoke<ContactListResponse>('list_contacts', { params });
+  const result = await invoke<BackendContactListResponse>('list_contacts', {
+    params: {
+      page: params.page ?? 1,
+      per_page: params.pageSize ?? 50,
+      sort_by: toBackendSortKey(params.sortBy),
+      sort_dir: params.sortDir ?? 'asc',
+      filter_type: toBackendContactType(params.type),
+      search_query: params.search?.trim() ? params.search.trim() : undefined,
+    },
+  });
+
+  return {
+    contacts: result.contacts.map(mapContact),
+    total: result.total,
+    page: result.page,
+    pageSize: result.per_page,
+  };
 }
 
-/**
- * Update a contact by ID.
- *
- * @param id    Contact UUID
- * @param data  Fields to update
- * @returns     Updated Contact
- */
 export async function updateContact(id: string, data: UpdateContactPayload): Promise<Contact> {
-  return invoke<Contact>('update_contact', { id, data });
+  const contact = await invoke<BackendContact>('update_contact', {
+    id,
+    contact_type: data.type ? (data.type === 'org' ? 'organization' : 'person') : undefined,
+    first_name: data.firstName,
+    last_name: data.lastName,
+    org_name: data.organization,
+    email: data.email ?? undefined,
+    phone: data.phone ?? undefined,
+    address: data.address ?? undefined,
+    city: undefined,
+    country: undefined,
+    notes: data.notes ?? undefined,
+  });
+
+  return mapContact(contact);
 }
 
-/**
- * Soft-delete a contact by ID.
- *
- * @param id  Contact UUID
- */
 export async function deleteContact(id: string): Promise<void> {
-  return invoke<void>('delete_contact', { id });
+  await invoke<void>('delete_contact', { id });
 }
 
-/**
- * Full-text search across contact fields.
- *
- * @param query  Search string
- * @returns      Array of matching contacts (up to 20)
- */
 export async function searchContacts(query: string): Promise<Contact[]> {
-  return invoke<Contact[]>('search_contacts', { query });
+  const contacts = await invoke<BackendContact[]>('search_contacts', { query });
+  return contacts.map(mapContact);
 }
 
-/**
- * Merge two contacts: moves all linked deals/activities from sourceId to
- * targetId, then soft-deletes sourceId.
- *
- * @param sourceId  The contact to merge from (will be deleted)
- * @param targetId  The contact to merge into (will be kept)
- * @returns         The updated target Contact
- */
 export async function mergeContacts(sourceId: string, targetId: string): Promise<Contact> {
-  return invoke<Contact>('merge_contacts', { sourceId, targetId });
+  const contact = await invoke<BackendContact>('merge_contacts', {
+    target_id: targetId,
+    source_id: sourceId,
+  });
+  return mapContact(contact);
 }

@@ -59,6 +59,11 @@
     onchange?.(next);
   }
 
+  function handleSuggestionMouseDown(e: MouseEvent, suggestion: string) {
+    e.preventDefault();
+    addTag(suggestion);
+  }
+
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
@@ -141,7 +146,7 @@
                 class="tag-suggestion"
                 role="option"
                 aria-selected="false"
-                onmousedown|preventDefault={() => addTag(suggestion)}
+                onmousedown={(e) => handleSuggestionMouseDown(e, suggestion)}
               >
                 {suggestion}
               </li>

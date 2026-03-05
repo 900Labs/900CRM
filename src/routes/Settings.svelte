@@ -21,6 +21,7 @@
   import { availableLocales } from '$lib/i18n';
   import { uiStore } from '$lib/stores/ui';
   import type { AppSettings } from '$lib/api/settings';
+  import ImportExport from '$lib/components/ImportExport.svelte';
 
   // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@
   let syncUrlLocal = $state('');
   let syncUrlDirty = $state(false);
 
-  let exportLoading = $state(false);
+  let showImportExport = $state(false);
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -136,21 +137,11 @@
   // ── Data management ──────────────────────────────────────────────────────────
 
   async function handleExportAll() {
-    exportLoading = true;
-    try {
-      // Trigger export via Tauri (backend handles file dialog)
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('export_all_data');
-      uiStore.toastSuccess(t('export.success'));
-    } catch {
-      uiStore.toastError(t('export.failed'));
-    } finally {
-      exportLoading = false;
-    }
+    showImportExport = true;
   }
 
   function handleImportData() {
-    uiStore.openModal('importExport');
+    showImportExport = true;
   }
 </script>
 
@@ -446,17 +437,12 @@
             <button
               class="btn btn-secondary btn-sm"
               onclick={handleExportAll}
-              disabled={exportLoading}
               type="button"
             >
-              {#if exportLoading}
-                {t('export.exporting')}
-              {:else}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                </svg>
-                {t('settings.exportAll')}
-              {/if}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+              </svg>
+              {t('settings.exportAll')}
             </button>
           </div>
 
@@ -481,6 +467,8 @@
     </div>
   </div>
 </div>
+
+<ImportExport bind:open={showImportExport} />
 
 <style>
   /* ── Page ─────────────────────────────────────────────────────────────────── */

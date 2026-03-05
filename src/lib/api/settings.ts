@@ -1,16 +1,9 @@
 /**
- * src/lib/api/settings.ts — Tauri IPC wrappers for application settings.
- *
- * @module api/settings
+ * src/lib/api/settings.ts — Tauri IPC wrappers for app settings.
  */
 
 import { invoke } from '@tauri-apps/api/core';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** All persisted application settings. */
 export interface AppSettings {
   language: string;
   currency: string;
@@ -20,41 +13,99 @@ export interface AppSettings {
   syncUrl: string;
 }
 
-/** Key-value pair for a single setting. */
 export type SettingKey = keyof AppSettings;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// API functions
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Fetch all settings.
- *
- * @returns Full AppSettings object
- */
-export async function getSettings(): Promise<AppSettings> {
-  return invoke<AppSettings>('get_settings');
+interface BackendSetting {
+  key: string;
+  value: string;
+  updated_at: string;
 }
 
-/**
- * Update a single setting by key.
- *
- * @param key    The setting key
- * @param value  The new value
- */
+type BackendSettingsMap = Record<string, string>;
+
+function toBackendKey(key: SettingKey): string {
+  switch (key) {
+    case 'dateFormat':
+      return 'date_format';
+    case 'syncEnabled':
+      return 'sync_enabled';
+    case 'syncUrl':
+      return 'sync_url';
+    default:
+      return key;
+  }
+}
+
+function parseBoolean(value: string | undefined, fallback = false): boolean {
+  if (value == null) {
+    return fallback;
+  }
+  return value === 'true' || value === '1';
+}
+
+function parseTheme(value: string | undefined): AppSettings['theme'] {
+  if (value === 'light' || value === 'dark' || value === 'system') {
+    return value;
+  }
+  return 'system';
+}
+
+function mapSettings(map: BackendSettingsMap): AppSettings {
+  return {
+    language: map.language || 'en',
+    currency: map.currency || 'USD',
+    theme: parseTheme(map.theme),
+    dateFormat: map.date_format || 'MMM D, YYYY',
+    syncEnabled: parseBoolean(map.sync_enabled, false),
+    syncUrl: map.sync_url || '',
+  };
+}
+
+function serializeValue<K extends SettingKey>(key: K, value: AppSettings[K]): string {
+  if (key === 'syncEnabled') {
+    return value ? 'true' : 'false';
+  }
+  return String(value ?? '');
+}
+
+function parseSettingValue<K extends SettingKey>(key: K, value: string | undefined): AppSettings[K] {
+  switch (key) {
+    case 'syncEnabled':
+      return parseBoolean(value, false) as AppSettings[K];
+    case 'theme':
+      return parseTheme(value) as AppSettings[K];
+    case 'dateFormat':
+      return (value || 'MMM D, YYYY') as AppSettings[K];
+    case 'currency':
+      return (value || 'USD') as AppSettings[K];
+    case 'language':
+      return (value || 'en') as AppSettings[K];
+    case 'syncUrl':
+      return (value || '') as AppSettings[K];
+    default:
+      return value as AppSettings[K];
+  }
+}
+
+export async function getSettings(): Promise<AppSettings> {
+  const settings = await invoke<BackendSettingsMap>('get_settings');
+  return mapSettings(settings);
+}
+
 export async function updateSetting<K extends SettingKey>(
   key: K,
   value: AppSettings[K]
 ): Promise<void> {
-  return invoke<void>('update_setting', { key, value });
+  await invoke<BackendSetting>('update_setting', {
+    key: toBackendKey(key),
+    value: serializeValue(key, value),
+  });
 }
 
-/**
- * Fetch a single setting by key.
- *
- * @param key  The setting key
- * @returns    The current value for that key
- */
 export async function getSetting<K extends SettingKey>(key: K): Promise<AppSettings[K]> {
-  return invoke<AppSettings[K]>('get_setting', { key });
+  const setting = await invoke<BackendSetting | null>('get_setting', {
+    key: toBackendKey(key),
+  });
+
+  return parseSettingValue(key, setting?.value);
 }

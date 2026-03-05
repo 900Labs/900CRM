@@ -265,6 +265,7 @@ pub fn run() {
             commands::activity_commands::list_activities_for_deal,
             commands::activity_commands::list_upcoming_activities,
             commands::activity_commands::mark_activity_complete,
+            commands::activity_commands::mark_activity_incomplete,
             commands::activity_commands::update_activity,
             commands::activity_commands::delete_activity,
             // ── Dashboard commands ────────────────────────────────────────────
@@ -278,6 +279,9 @@ pub fn run() {
             commands::settings_commands::get_settings,
             commands::settings_commands::get_setting,
             commands::settings_commands::update_setting,
+            // ── Sync status commands ────────────────────────────────────────
+            commands::sync_commands::get_sync_status,
+            commands::sync_commands::trigger_sync,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running 900CRM application");
