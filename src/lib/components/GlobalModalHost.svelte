@@ -9,6 +9,13 @@
   import { DEAL_STAGES } from '$lib/api/deals';
   import type { DealStage } from '$lib/api/deals';
   import type { ActivityType } from '$lib/api/activities';
+  import {
+    listCustomFieldDefinitions,
+    setCustomFieldValue,
+    type CustomFieldDefinition,
+    type CustomFieldEntityType,
+  } from '$lib/api/customFields';
+  import CustomFieldInputs from '$lib/components/CustomFieldInputs.svelte';
 
   let isSavingContact = $state(false);
   let contactFirstName = $state('');
@@ -32,6 +39,18 @@
   let activityType = $state<ActivityType>('task');
   let activityDueDate = $state('');
   let activityNotes = $state('');
+
+  let contactCustomFieldDefs = $state<CustomFieldDefinition[]>([]);
+  let contactCustomFieldValues = $state<Record<string, string>>({});
+  let loadingContactCustomFields = $state(false);
+
+  let dealCustomFieldDefs = $state<CustomFieldDefinition[]>([]);
+  let dealCustomFieldValues = $state<Record<string, string>>({});
+  let loadingDealCustomFields = $state(false);
+
+  let activityCustomFieldDefs = $state<CustomFieldDefinition[]>([]);
+  let activityCustomFieldValues = $state<Record<string, string>>({});
+  let loadingActivityCustomFields = $state(false);
 
   let lastModal = $state<string | null>(null);
 
@@ -94,6 +113,89 @@
     activityNotes = '';
   }
 
+  function updateCustomFieldValue(
+    entityType: CustomFieldEntityType,
+    fieldDefId: string,
+    value: string,
+  ) {
+    if (entityType === 'contact') {
+      contactCustomFieldValues = { ...contactCustomFieldValues, [fieldDefId]: value };
+      return;
+    }
+
+    if (entityType === 'deal') {
+      dealCustomFieldValues = { ...dealCustomFieldValues, [fieldDefId]: value };
+      return;
+    }
+
+    activityCustomFieldValues = { ...activityCustomFieldValues, [fieldDefId]: value };
+  }
+
+  async function loadCustomFieldDefinitions(entityType: CustomFieldEntityType): Promise<CustomFieldDefinition[]> {
+    try {
+      return await listCustomFieldDefinitions(entityType);
+    } catch (err) {
+      console.error(`[GlobalModalHost] Failed to load custom fields for ${entityType}:`, err);
+      uiStore.toastError('Failed to load custom fields.');
+      return [];
+    }
+  }
+
+  function blankCustomFieldValues(definitions: CustomFieldDefinition[]): Record<string, string> {
+    return Object.fromEntries(definitions.map((definition) => [definition.id, '']));
+  }
+
+  async function prepareContactCustomFields() {
+    loadingContactCustomFields = true;
+    try {
+      contactCustomFieldDefs = await loadCustomFieldDefinitions('contact');
+      contactCustomFieldValues = blankCustomFieldValues(contactCustomFieldDefs);
+    } finally {
+      loadingContactCustomFields = false;
+    }
+  }
+
+  async function prepareDealCustomFields() {
+    loadingDealCustomFields = true;
+    try {
+      dealCustomFieldDefs = await loadCustomFieldDefinitions('deal');
+      dealCustomFieldValues = blankCustomFieldValues(dealCustomFieldDefs);
+    } finally {
+      loadingDealCustomFields = false;
+    }
+  }
+
+  async function prepareActivityCustomFields() {
+    loadingActivityCustomFields = true;
+    try {
+      activityCustomFieldDefs = await loadCustomFieldDefinitions('activity');
+      activityCustomFieldValues = blankCustomFieldValues(activityCustomFieldDefs);
+    } finally {
+      loadingActivityCustomFields = false;
+    }
+  }
+
+  async function persistCustomFields(
+    entityId: string,
+    values: Record<string, string>,
+  ) {
+    const updates = Object.entries(values)
+      .filter(([, value]) => value.trim().length > 0)
+      .map(([fieldDefId, value]) =>
+        setCustomFieldValue({
+          fieldDefId,
+          entityId,
+          value,
+        })
+      );
+
+    if (updates.length === 0) {
+      return;
+    }
+
+    await Promise.all(updates);
+  }
+
   $effect(() => {
     const modal = uiStore.activeModal;
     if (modal === lastModal) {
@@ -104,14 +206,17 @@
 
     if (modal === 'addContact') {
       resetContactForm();
+      void prepareContactCustomFields();
     }
 
     if (modal === 'addDeal') {
       resetDealForm();
+      void prepareDealCustomFields();
     }
 
     if (modal === 'addActivity') {
       resetActivityForm();
+      void prepareActivityCustomFields();
     }
   });
 
@@ -123,7 +228,7 @@
 
     isSavingContact = true;
     try {
-      await contactStore.createContact({
+      const contact = await contactStore.createContact({
         firstName: contactFirstName.trim(),
         lastName: contactLastName.trim(),
         email: contactEmail.trim() || null,
@@ -135,7 +240,11 @@
         website: null,
         address: null,
       });
+      await persistCustomFields(contact.id, contactCustomFieldValues);
       uiStore.closeModal();
+    } catch (err) {
+      console.error('[GlobalModalHost] Failed to create contact:', err);
+      uiStore.toastError('Failed to save contact custom fields.');
     } finally {
       isSavingContact = false;
     }
@@ -149,7 +258,7 @@
 
     isSavingDeal = true;
     try {
-      await dealStore.createDeal({
+      const deal = await dealStore.createDeal({
         name: dealName.trim(),
         value: Number.isFinite(dealValue) ? dealValue : 0,
         currency: dealCurrency || settingsStore.currency || 'USD',
@@ -160,7 +269,11 @@
         description: dealDescription.trim() || null,
         tags: [],
       });
+      await persistCustomFields(deal.id, dealCustomFieldValues);
       uiStore.closeModal();
+    } catch (err) {
+      console.error('[GlobalModalHost] Failed to create deal:', err);
+      uiStore.toastError('Failed to save deal custom fields.');
     } finally {
       isSavingDeal = false;
     }
@@ -174,7 +287,7 @@
 
     isSavingActivity = true;
     try {
-      await activityStore.createActivity({
+      const activity = await activityStore.createActivity({
         subject: activitySubject.trim(),
         type: activityType,
         dueDate: activityDueDate || null,
@@ -182,7 +295,11 @@
         contactId: modalDataString('contactId') || null,
         dealId: modalDataString('dealId') || null,
       });
+      await persistCustomFields(activity.id, activityCustomFieldValues);
       uiStore.closeModal();
+    } catch (err) {
+      console.error('[GlobalModalHost] Failed to create activity:', err);
+      uiStore.toastError('Failed to save activity custom fields.');
     } finally {
       isSavingActivity = false;
     }
@@ -221,6 +338,16 @@
           </select>
         </div>
       </div>
+      {#if loadingContactCustomFields}
+        <p class="custom-field-loading">{t('common.loading')}</p>
+      {:else}
+        <CustomFieldInputs
+          definitions={contactCustomFieldDefs}
+          values={contactCustomFieldValues}
+          onchange={(fieldDefId, value) => updateCustomFieldValue('contact', fieldDefId, value)}
+          disabled={isSavingContact}
+        />
+      {/if}
     {/snippet}
     {#snippet footer()}
       <button class="btn btn-secondary" type="button" onclick={() => uiStore.closeModal()}>{t('common.cancel')}</button>
@@ -268,6 +395,16 @@
           <textarea id="modal-deal-description" class="input textarea" rows="3" bind:value={dealDescription}></textarea>
         </div>
       </div>
+      {#if loadingDealCustomFields}
+        <p class="custom-field-loading">{t('common.loading')}</p>
+      {:else}
+        <CustomFieldInputs
+          definitions={dealCustomFieldDefs}
+          values={dealCustomFieldValues}
+          onchange={(fieldDefId, value) => updateCustomFieldValue('deal', fieldDefId, value)}
+          disabled={isSavingDeal}
+        />
+      {/if}
     {/snippet}
     {#snippet footer()}
       <button class="btn btn-secondary" type="button" onclick={() => uiStore.closeModal()}>{t('common.cancel')}</button>
@@ -304,6 +441,16 @@
           <textarea id="modal-activity-notes" class="input textarea" rows="3" bind:value={activityNotes}></textarea>
         </div>
       </div>
+      {#if loadingActivityCustomFields}
+        <p class="custom-field-loading">{t('common.loading')}</p>
+      {:else}
+        <CustomFieldInputs
+          definitions={activityCustomFieldDefs}
+          values={activityCustomFieldValues}
+          onchange={(fieldDefId, value) => updateCustomFieldValue('activity', fieldDefId, value)}
+          disabled={isSavingActivity}
+        />
+      {/if}
     {/snippet}
     {#snippet footer()}
       <button class="btn btn-secondary" type="button" onclick={() => uiStore.closeModal()}>{t('common.cancel')}</button>
@@ -334,6 +481,11 @@
   .form-label {
     font-size: var(--text-xs);
     font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+  }
+
+  .custom-field-loading {
+    font-size: var(--text-sm);
     color: var(--text-secondary);
   }
 
