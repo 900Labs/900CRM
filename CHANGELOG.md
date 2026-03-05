@@ -19,6 +19,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Added reusable dynamic custom-field renderer component for create/edit forms (`src/lib/components/CustomFieldInputs.svelte`).
 - Added custom field UI integration for contact/deal/activity create flows in the global modal host.
 - Added custom field UI integration for contact detail edit flow, including value loading, editing, save, and cancel reset behavior.
+- Added reporting backend contracts for analytics:
+  - Pipeline conversion report endpoint (`get_pipeline_conversion_report`).
+  - Activity funnel report endpoint (`get_activity_funnel_report`).
+  - Typed frontend API wrapper (`src/lib/api/reports.ts`).
+- Added schema migration v2 analytics indexes to keep report queries efficient on constrained hardware.
 - Added a lightweight open-source and low-resource guardrail checklist and wired it into the PR template/workflow.
 
 ### Fixed — 2026-03-05
@@ -36,7 +41,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### In Progress
 - Custom field filter UX for list/pipeline/activity views — planned for v1.1.0
 - Desktop notifications and reminders for upcoming activities — planned for v1.1.0
-- Pipeline conversion reports and activity funnel analytics — planned for v1.1.0
+- Pipeline conversion and activity funnel report UI/dashboard integration — planned for v1.1.0
 - Portuguese (Brazilian) and Vietnamese translations — planned for v1.1.0
 
 ---
