@@ -1,0 +1,928 @@
+<script lang="ts">
+  /**
+   * ContactDetail.svelte — Contact detail and edit view for 900CRM.
+   *
+   * Features:
+   *   - Editable fields: firstName, lastName, email, phone, organization,
+   *     website, address, type
+   *   - Inline notes editor via NoteEditor
+   *   - Tag management via TagPicker
+   *   - Linked deals list (from dealStore)
+   *   - Activity timeline (from activityStore)
+   *   - Back button (go to /contacts)
+   *   - Soft-delete with confirmation
+   */
+
+  import { onMount } from 'svelte';
+  import { t } from '$lib/i18n';
+  import { contactStore } from '$lib/stores/contacts';
+  import { dealStore } from '$lib/stores/deals';
+  import { activityStore } from '$lib/stores/activities';
+  import { uiStore } from '$lib/stores/ui';
+  import { settingsStore } from '$lib/stores/settings';
+  import type { Contact, UpdateContactPayload } from '$lib/api/contacts';
+  import type { Deal } from '$lib/api/deals';
+  import { formatFullName, formatDate, formatRelativeTime, formatCurrency, formatInitials } from '$lib/utils/formatters';
+  import { validateEmail, validateUrl } from '$lib/utils/validators';
+  import NoteEditor from '$lib/components/NoteEditor.svelte';
+  import TagPicker from '$lib/components/TagPicker.svelte';
+  import ActivityFeed from '$lib/components/ActivityFeed.svelte';
+  import EmptyState from '$lib/components/EmptyState.svelte';
+  import Modal from '$lib/components/Modal.svelte';
+
+  // ── Props ───────────────────────────────────────────────────────────────────
+
+  /** Contact ID to load — read from hash routing. */
+  const { contactId }: { contactId: string } = $props();
+
+  // ── State ───────────────────────────────────────────────────────────────────
+
+  let contact = $state<Contact | null>(null);
+  let isLoading = $state(true);
+  let isSaving = $state(false);
+  let isDeleting = $state(false);
+  let showDeleteConfirm = $state(false);
+  let loadError = $state<string | null>(null);
+
+  // Editable form fields — kept in sync with contact
+  let firstName = $state('');
+  let lastName = $state('');
+  let email = $state('');
+  let phone = $state('');
+  let organization = $state('');
+  let website = $state('');
+  let address = $state('');
+  let contactType = $state<'person' | 'org'>('person');
+  let notes = $state('');
+  let tags = $state<string[]>([]);
+
+  let isDirty = $state(false);
+  let emailError = $state<string | null>(null);
+  let websiteError = $state<string | null>(null);
+
+  // Linked data
+  let linkedDeals = $state<Deal[]>([]);
+  let dealsLoading = $state(false);
+
+  // ── Derived ─────────────────────────────────────────────────────────────────
+
+  const displayName = $derived(
+    contact ? formatFullName(contact.firstName, contact.lastName) : t('common.loading')
+  );
+
+  const initials = $derived(
+    contact ? formatInitials(contact.firstName, contact.lastName) : '?'
+  );
+
+  const avatarColor = $derived(() => {
+    if (!contact) return 0;
+    const str = contact.firstName + contact.lastName;
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash) % 8;
+  });
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+  onMount(async () => {
+    await loadContact();
+  });
+
+  async function loadContact() {
+    isLoading = true;
+    loadError = null;
+    try {
+      // Prefer the already-loaded selectedContact if ID matches
+      let c = contactStore.selectedContact?.id === contactId
+        ? contactStore.selectedContact
+        : null;
+
+      if (!c) {
+        // Fallback: load from the contacts list
+        c = contactStore.contacts.find((x) => x.id === contactId) ?? null;
+      }
+
+      if (!c) {
+        // Last resort: not in cache, but we can't call getContact directly from
+        // the page — trigger a store load and find again.
+        await contactStore.loadContacts();
+        c = contactStore.contacts.find((x) => x.id === contactId) ?? null;
+      }
+
+      if (!c) {
+        loadError = t('errors.notFound');
+        return;
+      }
+
+      contact = c;
+      populateForm(c);
+
+      // Load linked deals and activities in parallel
+      dealsLoading = true;
+      await Promise.all([
+        dealStore.loadDeals({ contactId }),
+        activityStore.setFilters({ contactId }),
+      ]);
+      linkedDeals = dealStore.deals.filter((d) => d.contactId === contactId);
+    } catch (err) {
+      loadError = t('errors.loadFailed');
+      console.error('[ContactDetail] Load error:', err);
+    } finally {
+      isLoading = false;
+      dealsLoading = false;
+    }
+  }
+
+  function populateForm(c: Contact) {
+    firstName    = c.firstName ?? '';
+    lastName     = c.lastName ?? '';
+    email        = c.email ?? '';
+    phone        = c.phone ?? '';
+    organization = c.organization ?? '';
+    website      = c.website ?? '';
+    address      = c.address ?? '';
+    contactType  = c.type;
+    notes        = c.notes ?? '';
+    tags         = [...(c.tags ?? [])];
+    isDirty      = false;
+  }
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
+  function markDirty() {
+    isDirty = true;
+  }
+
+  function validateForm(): boolean {
+    emailError   = null;
+    websiteError = null;
+
+    if (email) {
+      const r = validateEmail(email);
+      if (!r.valid) { emailError = r.error ?? t('common.invalidEmail'); return false; }
+    }
+    if (website) {
+      const r = validateUrl(website);
+      if (!r.valid) { websiteError = r.error ?? t('common.invalidUrl'); return false; }
+    }
+    return true;
+  }
+
+  async function handleSave() {
+    if (!contact || !isDirty) return;
+    if (!validateForm()) return;
+
+    isSaving = true;
+    try {
+      const payload: UpdateContactPayload = {
+        firstName: firstName.trim() || undefined,
+        lastName:  lastName.trim()  || undefined,
+        email:     email.trim()     || null,
+        phone:     phone.trim()     || null,
+        organization: organization.trim() || null,
+        website:   website.trim()   || null,
+        address:   address.trim()   || null,
+        type:      contactType,
+        notes:     notes            || null,
+        tags,
+      };
+      const updated = await contactStore.updateContact(contact.id, payload);
+      contact = updated;
+      isDirty = false;
+    } catch (err) {
+      // error already toasted by store
+      console.error('[ContactDetail] Save error:', err);
+    } finally {
+      isSaving = false;
+    }
+  }
+
+  async function handleDelete() {
+    if (!contact) return;
+    isDeleting = true;
+    try {
+      await contactStore.deleteContact(contact.id);
+      // Navigate back to contacts list
+      window.location.hash = '/contacts';
+    } catch (err) {
+      console.error('[ContactDetail] Delete error:', err);
+    } finally {
+      isDeleting = false;
+      showDeleteConfirm = false;
+    }
+  }
+
+  function handleBack() {
+    window.location.hash = '/contacts';
+  }
+
+  function handleNotesSave(newNotes: string) {
+    notes = newNotes;
+    isDirty = true;
+    // Auto-save notes immediately
+    handleSave();
+  }
+
+  function handleTagsChange(newTags: string[]) {
+    tags = newTags;
+    isDirty = true;
+  }
+</script>
+
+<div class="page-content contact-detail-page">
+  {#if isLoading}
+    <!-- Loading skeleton -->
+    <div class="detail-loading" aria-live="polite" aria-label={t('common.loading')}>
+      <div class="skeleton skeleton-header"></div>
+      <div class="skeleton-fields">
+        {#each [1, 2, 3, 4] as i (i)}
+          <div class="skeleton skeleton-field"></div>
+        {/each}
+      </div>
+    </div>
+
+  {:else if loadError}
+    <div class="detail-error" role="alert">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span>{loadError}</span>
+      <button class="btn btn-secondary btn-sm" onclick={loadContact} type="button">
+        {t('common.retry')}
+      </button>
+    </div>
+
+  {:else if contact}
+    <!-- ── Page header ──────────────────────────────────────────────────────── -->
+    <div class="page-header">
+      <div class="header-left">
+        <button class="btn-back" onclick={handleBack} type="button" aria-label={t('common.back')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+          {t('common.back')}
+        </button>
+
+        <div class="contact-identity">
+          <div class="avatar avatar-lg avatar-color-{avatarColor()}" aria-hidden="true">
+            {initials}
+          </div>
+          <div class="identity-text">
+            <h1 class="page-title">{displayName}</h1>
+            <span class="contact-type-badge">{t(`contacts.${contact.type}`)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        {#if isDirty}
+          <button
+            class="btn btn-primary btn-sm"
+            onclick={handleSave}
+            disabled={isSaving}
+            type="button"
+          >
+            {isSaving ? t('common.loading') : t('common.save')}
+          </button>
+          <button
+            class="btn btn-secondary btn-sm"
+            onclick={() => { if (contact) populateForm(contact); }}
+            disabled={isSaving}
+            type="button"
+          >
+            {t('common.cancel')}
+          </button>
+        {/if}
+        <button
+          class="btn btn-danger btn-sm"
+          onclick={() => showDeleteConfirm = true}
+          type="button"
+          aria-label={t('contacts.deleteContact')}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/>
+          </svg>
+          {t('contacts.deleteContact')}
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Main content grid ─────────────────────────────────────────────────── -->
+    <div class="detail-grid">
+
+      <!-- LEFT COLUMN: editable fields + notes + tags -->
+      <div class="detail-main">
+
+        <!-- Core fields card -->
+        <section class="card detail-fields" aria-labelledby="fields-heading">
+          <div class="card-header">
+            <h2 class="section-title" id="fields-heading">{t('contacts.editContact')}</h2>
+          </div>
+          <div class="card-body">
+            <div class="fields-grid">
+
+              <!-- First / Last name -->
+              <div class="field-group">
+                <label class="field-label" for="firstName">{t('contacts.firstName')}</label>
+                <input
+                  id="firstName"
+                  class="input"
+                  type="text"
+                  bind:value={firstName}
+                  oninput={markDirty}
+                  autocomplete="given-name"
+                />
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="lastName">{t('contacts.lastName')}</label>
+                <input
+                  id="lastName"
+                  class="input"
+                  type="text"
+                  bind:value={lastName}
+                  oninput={markDirty}
+                  autocomplete="family-name"
+                />
+              </div>
+
+              <!-- Email -->
+              <div class="field-group field-group--full">
+                <label class="field-label" for="email">{t('contacts.email')}</label>
+                <input
+                  id="email"
+                  class="input"
+                  class:input-error={!!emailError}
+                  type="email"
+                  bind:value={email}
+                  oninput={() => { markDirty(); emailError = null; }}
+                  autocomplete="email"
+                />
+                {#if emailError}
+                  <p class="field-error">{emailError}</p>
+                {/if}
+              </div>
+
+              <!-- Phone -->
+              <div class="field-group">
+                <label class="field-label" for="phone">{t('contacts.phone')}</label>
+                <input
+                  id="phone"
+                  class="input"
+                  type="tel"
+                  bind:value={phone}
+                  oninput={markDirty}
+                  autocomplete="tel"
+                />
+              </div>
+
+              <!-- Organization -->
+              <div class="field-group">
+                <label class="field-label" for="organization">{t('contacts.organization')}</label>
+                <input
+                  id="organization"
+                  class="input"
+                  type="text"
+                  bind:value={organization}
+                  oninput={markDirty}
+                  autocomplete="organization"
+                />
+              </div>
+
+              <!-- Website -->
+              <div class="field-group">
+                <label class="field-label" for="website">{t('contacts.website')}</label>
+                <input
+                  id="website"
+                  class="input"
+                  class:input-error={!!websiteError}
+                  type="url"
+                  bind:value={website}
+                  oninput={() => { markDirty(); websiteError = null; }}
+                  placeholder="https://"
+                  autocomplete="url"
+                />
+                {#if websiteError}
+                  <p class="field-error">{websiteError}</p>
+                {/if}
+              </div>
+
+              <!-- Address -->
+              <div class="field-group field-group--full">
+                <label class="field-label" for="address">{t('contacts.address')}</label>
+                <textarea
+                  id="address"
+                  class="input textarea"
+                  bind:value={address}
+                  oninput={markDirty}
+                  rows="2"
+                  autocomplete="street-address"
+                ></textarea>
+              </div>
+
+              <!-- Type -->
+              <div class="field-group">
+                <label class="field-label" id="type-label">{t('contacts.type')}</label>
+                <div class="radio-group" role="radiogroup" aria-labelledby="type-label">
+                  <label class="radio-option">
+                    <input
+                      type="radio"
+                      name="contactType"
+                      value="person"
+                      bind:group={contactType}
+                      onchange={markDirty}
+                    />
+                    <span>{t('contacts.person')}</span>
+                  </label>
+                  <label class="radio-option">
+                    <input
+                      type="radio"
+                      name="contactType"
+                      value="org"
+                      bind:group={contactType}
+                      onchange={markDirty}
+                    />
+                    <span>{t('contacts.org')}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Metadata footer -->
+            <div class="fields-meta">
+              <span>
+                {t('contacts.created')}:
+                {formatDate(contact.createdAt, settingsStore.dateFormat as 'MMM D, YYYY')}
+              </span>
+              <span>
+                {t('contacts.updated')}:
+                {formatRelativeTime(contact.updatedAt)}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tags card -->
+        <section class="card detail-tags" aria-labelledby="tags-heading">
+          <div class="card-header">
+            <h2 class="section-title" id="tags-heading">{t('contacts.tags')}</h2>
+          </div>
+          <div class="card-body">
+            <TagPicker
+              bind:tags={tags}
+              onchange={handleTagsChange}
+            />
+          </div>
+        </section>
+
+        <!-- Notes card -->
+        <section class="card detail-notes" aria-labelledby="notes-heading">
+          <div class="card-header">
+            <h2 class="section-title" id="notes-heading">{t('contacts.notes')}</h2>
+          </div>
+          <div class="card-body">
+            <NoteEditor
+              value={notes}
+              onsave={handleNotesSave}
+            />
+          </div>
+        </section>
+      </div>
+
+      <!-- RIGHT COLUMN: linked deals + activity timeline -->
+      <div class="detail-sidebar">
+
+        <!-- Linked deals -->
+        <section class="card detail-deals" aria-labelledby="deals-heading">
+          <div class="card-header">
+            <h2 class="section-title" id="deals-heading">{t('contacts.linkedDeals')}</h2>
+            <button
+              class="btn btn-secondary btn-xs"
+              onclick={() => uiStore.openModal('addDeal')}
+              type="button"
+            >
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M6 1v10M1 6h10"/>
+              </svg>
+              {t('deals.addDeal')}
+            </button>
+          </div>
+          <div class="card-body">
+            {#if dealsLoading}
+              <div class="sidebar-loading" aria-label={t('common.loading')}>
+                {#each [1, 2] as i (i)}
+                  <div class="skeleton skeleton-deal-row"></div>
+                {/each}
+              </div>
+            {:else if linkedDeals.length === 0}
+              <EmptyState
+                icon="deals"
+                title={t('deals.noDeals')}
+                description={t('deals.noDealsDesc')}
+                compact={true}
+              />
+            {:else}
+              <ul class="deals-list" role="list">
+                {#each linkedDeals as deal (deal.id)}
+                  <li class="deal-row">
+                    <div class="deal-row-info">
+                      <span class="deal-row-name">{deal.name}</span>
+                      <span class="deal-row-stage stage-badge stage-{deal.stage}">
+                        {t(`deals.stages.${deal.stage}`)}
+                      </span>
+                    </div>
+                    <span class="deal-row-value">
+                      {formatCurrency(deal.value, deal.currency, settingsStore.language)}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          </div>
+        </section>
+
+        <!-- Activity timeline -->
+        <section class="card detail-activity" aria-labelledby="activity-heading">
+          <div class="card-header">
+            <h2 class="section-title" id="activity-heading">{t('contacts.activityTimeline')}</h2>
+            <button
+              class="btn btn-secondary btn-xs"
+              onclick={() => uiStore.openModal('addActivity')}
+              type="button"
+            >
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M6 1v10M1 6h10"/>
+              </svg>
+              {t('activities.addActivity')}
+            </button>
+          </div>
+          <div class="card-body">
+            <ActivityFeed
+              activities={activityStore.activities}
+              loading={activityStore.isLoading}
+              maxItems={10}
+            />
+          </div>
+        </section>
+      </div>
+    </div>
+  {/if}
+</div>
+
+<!-- ── Delete confirmation modal ─────────────────────────────────────────────── -->
+<Modal bind:open={showDeleteConfirm} title={t('contacts.deleteContact')} size="sm">
+  {#snippet body()}
+    <p class="confirm-message">{t('contacts.confirmDelete')}</p>
+  {/snippet}
+  {#snippet footer()}
+    <div class="modal-footer-actions">
+      <button
+        class="btn btn-secondary"
+        onclick={() => showDeleteConfirm = false}
+        disabled={isDeleting}
+        type="button"
+      >
+        {t('common.cancel')}
+      </button>
+      <button
+        class="btn btn-danger"
+        onclick={handleDelete}
+        disabled={isDeleting}
+        type="button"
+      >
+        {isDeleting ? t('common.loading') : t('common.delete')}
+      </button>
+    </div>
+  {/snippet}
+</Modal>
+
+<style>
+  /* ── Layout ─────────────────────────────────────────────────────────────── */
+
+  .contact-detail-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .header-left {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .header-actions {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  /* ── Back button ─────────────────────────────────────────────────────────── */
+
+  .btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: var(--space-1) 0;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+
+  .btn-back:hover {
+    color: var(--text-accent);
+  }
+
+  /* ── Contact identity ────────────────────────────────────────────────────── */
+
+  .contact-identity {
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+  }
+
+  .identity-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .contact-type-badge {
+    display: inline-block;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+    background-color: var(--surface-raised);
+    border-radius: 9999px;
+    padding: 2px var(--space-3);
+    border: var(--border-width) solid var(--border-default);
+  }
+
+  /* ── Avatar ──────────────────────────────────────────────────────────────── */
+
+  .avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: var(--weight-semibold);
+    border-radius: 50%;
+    flex-shrink: 0;
+    user-select: none;
+    letter-spacing: 0.02em;
+  }
+
+  .avatar-lg {
+    width: 56px;
+    height: 56px;
+    font-size: var(--text-lg);
+  }
+
+  .avatar-color-0 { background-color: #E8F4F7; color: #20808D; }
+  .avatar-color-1 { background-color: #FEF3E2; color: #A84B2F; }
+  .avatar-color-2 { background-color: #E8F5EC; color: #2D8659; }
+  .avatar-color-3 { background-color: #F3E8FF; color: #7C3AED; }
+  .avatar-color-4 { background-color: #FFF0F0; color: #C0392B; }
+  .avatar-color-5 { background-color: #EEF2FF; color: #3B5BDB; }
+  .avatar-color-6 { background-color: #FFF8E1; color: #D4A017; }
+  .avatar-color-7 { background-color: #F0FFF4; color: #2D8659; }
+
+  /* ── Detail grid ─────────────────────────────────────────────────────────── */
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: var(--space-6);
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .detail-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .detail-main,
+  .detail-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+
+  /* ── Fields grid ─────────────────────────────────────────────────────────── */
+
+  .fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+  }
+
+  @media (max-width: 640px) {
+    .fields-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .field-group--full {
+    grid-column: 1 / -1;
+  }
+
+  .field-label {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .textarea {
+    resize: vertical;
+    min-height: 64px;
+    font-family: inherit;
+  }
+
+  .input-error {
+    border-color: var(--color-danger) !important;
+  }
+
+  .field-error {
+    font-size: var(--text-xs);
+    color: var(--color-danger);
+    margin: 0;
+  }
+
+  .radio-group {
+    display: flex;
+    gap: var(--space-5);
+  }
+
+  .radio-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    color: var(--text-secondary);
+  }
+
+  .fields-meta {
+    display: flex;
+    gap: var(--space-6);
+    margin-block-start: var(--space-5);
+    padding-block-start: var(--space-4);
+    border-block-start: var(--border-width) solid var(--border-default);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted, var(--text-secondary));
+  }
+
+  /* ── Deals list ──────────────────────────────────────────────────────────── */
+
+  .deals-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .deal-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    border: var(--border-width) solid var(--border-default);
+    background-color: var(--surface-default);
+  }
+
+  .deal-row-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  .deal-row-name {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .deal-row-value {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-accent);
+    flex-shrink: 0;
+  }
+
+  /* Stage badges */
+  .stage-badge {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    border-radius: 9999px;
+    padding: 2px var(--space-2);
+  }
+
+  .stage-lead         { background: #E8F4F7; color: #20808D; }
+  .stage-qualified    { background: #E8F5EC; color: #2D8659; }
+  .stage-proposal     { background: #FFF8E1; color: #D4A017; }
+  .stage-negotiation  { background: #FEF3E2; color: #A84B2F; }
+  .stage-closedWon    { background: #E8F5EC; color: #2D8659; }
+  .stage-closedLost   { background: #FFF0F0; color: #C0392B; }
+
+  /* ── Loading states ──────────────────────────────────────────────────────── */
+
+  .detail-loading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .skeleton-header {
+    height: 64px;
+    border-radius: var(--radius-lg);
+  }
+
+  .skeleton-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+  }
+
+  .skeleton-field {
+    height: 56px;
+    border-radius: var(--radius-md);
+  }
+
+  .skeleton-deal-row {
+    height: 44px;
+    border-radius: var(--radius-md);
+    margin-block-end: var(--space-2);
+  }
+
+  .sidebar-loading {
+    padding: var(--space-2);
+  }
+
+  /* ── Error state ─────────────────────────────────────────────────────────── */
+
+  .detail-error {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-5) var(--space-6);
+    background-color: var(--color-danger-50, #FFF0F0);
+    color: var(--color-danger);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+  }
+
+  /* ── Delete confirmation ─────────────────────────────────────────────────── */
+
+  .confirm-message {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .modal-footer-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+
+  /* ── Danger button ───────────────────────────────────────────────────────── */
+
+  :global(.btn-danger) {
+    background-color: var(--color-danger);
+    color: #fff;
+    border-color: var(--color-danger);
+  }
+
+  :global(.btn-danger:hover:not(:disabled)) {
+    background-color: #a93226;
+    border-color: #a93226;
+  }
+
+  :global(.btn-xs) {
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-xs);
+  }
+</style>
