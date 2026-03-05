@@ -20,6 +20,7 @@
   import { activityStore } from '$lib/stores/activities';
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
+  import { composeEmail } from '$lib/api/email';
   import type { Contact, UpdateContactPayload } from '$lib/api/contacts';
   import type { Deal } from '$lib/api/deals';
   import {
@@ -301,6 +302,24 @@
     tags = newTags;
     isDirty = true;
   }
+
+  async function handleComposeEmail() {
+    const to = contact?.email?.trim();
+    if (!to) {
+      uiStore.toastError(t('common.invalidEmail'));
+      return;
+    }
+
+    try {
+      await composeEmail({
+        to,
+        subject: '',
+      });
+    } catch (err) {
+      console.error('[ContactDetail] Failed to open email composer:', err);
+      uiStore.toastError(t('settings.emailComposeFailed'));
+    }
+  }
 </script>
 
 <div class="page-content contact-detail-page">
@@ -370,6 +389,19 @@
             type="button"
           >
             {t('common.cancel')}
+          </button>
+        {/if}
+        {#if contact.email}
+          <button
+            class="btn btn-secondary btn-sm"
+            onclick={handleComposeEmail}
+            type="button"
+            aria-label={t('activities.email')}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 7L2 7"/>
+            </svg>
+            {t('activities.email')}
           </button>
         {/if}
         <button

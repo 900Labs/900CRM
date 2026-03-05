@@ -13,3 +13,4 @@
 | 009 | 2026-03-05 | `sprint-009-desktop-notification-reminders` | Desktop reminder notifications for upcoming activities with persisted settings and lightweight polling | Completed |
 | 010 | 2026-03-05 | `sprint-010-ptbr-vietnamese-translations` | Portuguese (Brazil) and Vietnamese full-locale support with lazy-load i18n registration and docs alignment | Completed |
 | 011 | 2026-03-05 | `sprint-011-multi-currency-display` | Multi-currency-safe dashboard/pipeline value display with grouped currency totals and normalized currency handling | Completed |
+| 012 | 2026-03-05 | `sprint-012-email-integration-optional` | Optional IMAP/SMTP settings with lightweight endpoint tests and local `mailto` compose action | Completed |

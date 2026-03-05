@@ -18,6 +18,16 @@
 //! | `sync_url`     | `""`           | Remote sync endpoint URL |
 //! | `notifications_enabled` | `"true"` | Whether desktop reminders are enabled |
 //! | `reminder_lead_minutes` | `"30"`   | Minutes before due time to trigger reminders |
+//! | `email_integration_enabled` | `"false"` | Enables optional IMAP/SMTP tooling |
+//! | `smtp_host`    | `""`           | SMTP server hostname |
+//! | `smtp_port`    | `"587"`        | SMTP server port |
+//! | `smtp_username`| `""`           | SMTP username |
+//! | `smtp_password`| `""`           | SMTP password (local-only storage) |
+//! | `smtp_from`    | `""`           | Default sender email address |
+//! | `imap_host`    | `""`           | IMAP server hostname |
+//! | `imap_port`    | `"993"`        | IMAP server port |
+//! | `imap_username`| `""`           | IMAP username |
+//! | `imap_password`| `""`           | IMAP password (local-only storage) |
 
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};

@@ -8,9 +8,10 @@
    *   3. Theme — light / dark / system
    *   4. Date format — 4 preset formats
    *   5. Sync — enable/disable toggle + server URL
-   *   6. Notifications — desktop reminder preferences
-   *   7. About — 900 Labs mission statement
-   *   8. Data management — export all, import data
+   *   6. Email integration — optional IMAP/SMTP endpoint settings
+   *   7. Notifications — desktop reminder preferences
+   *   8. About — 900 Labs mission statement
+   *   9. Data management — export all, import data
    *
    * Each setting auto-saves via settingsStore.updateSetting().
    * No separate Save button needed — changes apply immediately.
@@ -22,6 +23,7 @@
   import { availableLocales } from '$lib/i18n';
   import { uiStore } from '$lib/stores/ui';
   import type { AppSettings } from '$lib/api/settings';
+  import { testEmailServerConnection } from '$lib/api/email';
   import ImportExport from '$lib/components/ImportExport.svelte';
 
   // ── Types ────────────────────────────────────────────────────────────────────
@@ -72,6 +74,20 @@
   let syncUrlDirty = $state(false);
   let reminderLeadMinutesLocal = $state('30');
   let reminderLeadDirty = $state(false);
+  let smtpHostLocal = $state('');
+  let smtpPortLocal = $state('587');
+  let smtpUsernameLocal = $state('');
+  let smtpPasswordLocal = $state('');
+  let smtpFromLocal = $state('');
+  let imapHostLocal = $state('');
+  let imapPortLocal = $state('993');
+  let imapUsernameLocal = $state('');
+  let imapPasswordLocal = $state('');
+  let emailFieldDirty = $state<Record<string, boolean>>({});
+  let smtpTestLoading = $state(false);
+  let imapTestLoading = $state(false);
+  let smtpTestMessage = $state<string | null>(null);
+  let imapTestMessage = $state<string | null>(null);
 
   let showImportExport = $state(false);
 
@@ -80,6 +96,15 @@
   onMount(() => {
     syncUrlLocal = settingsStore.syncUrl;
     reminderLeadMinutesLocal = String(settingsStore.reminderLeadMinutes);
+    smtpHostLocal = settingsStore.smtpHost;
+    smtpPortLocal = String(settingsStore.smtpPort);
+    smtpUsernameLocal = settingsStore.smtpUsername;
+    smtpPasswordLocal = settingsStore.smtpPassword;
+    smtpFromLocal = settingsStore.smtpFrom;
+    imapHostLocal = settingsStore.imapHost;
+    imapPortLocal = String(settingsStore.imapPort);
+    imapUsernameLocal = settingsStore.imapUsername;
+    imapPasswordLocal = settingsStore.imapPassword;
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -165,6 +190,104 @@
     if (e.key === 'Enter') {
       (e.target as HTMLInputElement).blur();
       await handleReminderLeadCommit();
+    }
+  }
+
+  async function handleEmailIntegrationToggle() {
+    await updateSetting('emailIntegrationEnabled', !settingsStore.emailIntegrationEnabled);
+  }
+
+  function markEmailFieldDirty(key: string) {
+    emailFieldDirty = { ...emailFieldDirty, [key]: true };
+  }
+
+  function clearEmailFieldDirty(key: string) {
+    emailFieldDirty = { ...emailFieldDirty, [key]: false };
+  }
+
+  function parsePort(raw: string, fallback: number): number {
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(65535, Math.max(1, parsed));
+  }
+
+  async function commitEmailStringSetting<K extends keyof AppSettings>(
+    key: K,
+    value: string,
+    trim = true,
+  ) {
+    if (!emailFieldDirty[String(key)]) return;
+    clearEmailFieldDirty(String(key));
+    const normalized = trim ? value.trim() : value;
+    await updateSetting(key, normalized as AppSettings[K]);
+  }
+
+  async function commitEmailPortSetting<K extends keyof AppSettings>(
+    key: K,
+    value: string,
+    fallback: number,
+    setLocal: (next: string) => void,
+  ) {
+    if (!emailFieldDirty[String(key)]) return;
+    clearEmailFieldDirty(String(key));
+    const normalized = parsePort(value, fallback);
+    setLocal(String(normalized));
+    await updateSetting(key, normalized as AppSettings[K]);
+  }
+
+  async function testSmtpConnection() {
+    const host = smtpHostLocal.trim();
+    const port = parsePort(smtpPortLocal, 587);
+    if (!host) {
+      smtpTestMessage = t('settings.emailTestFailed');
+      return;
+    }
+
+    smtpPortLocal = String(port);
+    smtpTestLoading = true;
+    smtpTestMessage = null;
+    try {
+      const result = await testEmailServerConnection({
+        protocol: 'smtp',
+        host,
+        port,
+      });
+      smtpTestMessage = result.success
+        ? `${t('settings.emailTestSuccess')} (${result.latencyMs}ms)`
+        : `${t('settings.emailTestFailed')}: ${result.details}`;
+    } catch (err) {
+      console.error('[Settings] SMTP test failed:', err);
+      smtpTestMessage = t('settings.emailTestFailed');
+    } finally {
+      smtpTestLoading = false;
+    }
+  }
+
+  async function testImapConnection() {
+    const host = imapHostLocal.trim();
+    const port = parsePort(imapPortLocal, 993);
+    if (!host) {
+      imapTestMessage = t('settings.emailTestFailed');
+      return;
+    }
+
+    imapPortLocal = String(port);
+    imapTestLoading = true;
+    imapTestMessage = null;
+    try {
+      const result = await testEmailServerConnection({
+        protocol: 'imap',
+        host,
+        port,
+      });
+      imapTestMessage = result.success
+        ? `${t('settings.emailTestSuccess')} (${result.latencyMs}ms)`
+        : `${t('settings.emailTestFailed')}: ${result.details}`;
+    } catch (err) {
+      console.error('[Settings] IMAP test failed:', err);
+      imapTestMessage = t('settings.emailTestFailed');
+    } finally {
+      imapTestLoading = false;
     }
   }
 
@@ -393,6 +516,194 @@
                   autocomplete="url"
                   spellcheck={false}
                 />
+              </div>
+            </div>
+          {/if}
+        </div>
+      </section>
+
+      <!-- Email integration -->
+      <section class="card settings-section" aria-labelledby="email-heading">
+        <div class="card-header">
+          <h2 class="section-title" id="email-heading">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="m22 6-10 7L2 6"/>
+            </svg>
+            {t('settings.emailIntegration')}
+          </h2>
+          {#if savingKey === 'emailIntegrationEnabled'
+            || savingKey === 'smtpHost'
+            || savingKey === 'smtpPort'
+            || savingKey === 'smtpUsername'
+            || savingKey === 'smtpPassword'
+            || savingKey === 'smtpFrom'
+            || savingKey === 'imapHost'
+            || savingKey === 'imapPort'
+            || savingKey === 'imapUsername'
+            || savingKey === 'imapPassword'}
+            <span class="saving-indicator" aria-live="polite">{t('common.loading')}</span>
+          {/if}
+        </div>
+        <div class="card-body sync-body">
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <span class="toggle-label">{t('settings.emailIntegrationEnabled')}</span>
+              <span class="toggle-desc">{t('settings.emailComposeHint')}</span>
+            </div>
+            <button
+              class="toggle-switch"
+              class:toggle-switch--on={settingsStore.emailIntegrationEnabled}
+              onclick={handleEmailIntegrationToggle}
+              role="switch"
+              aria-checked={settingsStore.emailIntegrationEnabled}
+              aria-label={t('settings.emailIntegrationEnabled')}
+              type="button"
+            >
+              <span class="toggle-thumb"></span>
+            </button>
+          </div>
+
+          {#if settingsStore.emailIntegrationEnabled}
+            <div class="email-grid">
+              <div class="field-row">
+                <label class="field-label" for="smtp-host">{t('settings.smtpHost')}</label>
+                <input
+                  id="smtp-host"
+                  class="input"
+                  type="text"
+                  value={smtpHostLocal}
+                  oninput={(e) => { smtpHostLocal = (e.target as HTMLInputElement).value; markEmailFieldDirty('smtpHost'); }}
+                  onblur={() => commitEmailStringSetting('smtpHost', smtpHostLocal)}
+                  placeholder="smtp.example.com"
+                  spellcheck={false}
+                />
+              </div>
+              <div class="field-row">
+                <label class="field-label" for="smtp-port">{t('settings.smtpPort')}</label>
+                <input
+                  id="smtp-port"
+                  class="input"
+                  type="number"
+                  min="1"
+                  max="65535"
+                  value={smtpPortLocal}
+                  oninput={(e) => { smtpPortLocal = (e.target as HTMLInputElement).value; markEmailFieldDirty('smtpPort'); }}
+                  onblur={() => commitEmailPortSetting('smtpPort', smtpPortLocal, 587, (v) => smtpPortLocal = v)}
+                />
+              </div>
+              <div class="field-row">
+                <label class="field-label" for="smtp-user">{t('settings.smtpUsername')}</label>
+                <input
+                  id="smtp-user"
+                  class="input"
+                  type="text"
+                  value={smtpUsernameLocal}
+                  oninput={(e) => { smtpUsernameLocal = (e.target as HTMLInputElement).value; markEmailFieldDirty('smtpUsername'); }}
+                  onblur={() => commitEmailStringSetting('smtpUsername', smtpUsernameLocal)}
+                  spellcheck={false}
+                />
+              </div>
+              <div class="field-row">
+                <label class="field-label" for="smtp-pass">{t('settings.smtpPassword')}</label>
+                <input
+                  id="smtp-pass"
+                  class="input"
+                  type="password"
+                  value={smtpPasswordLocal}
+                  oninput={(e) => { smtpPasswordLocal = (e.target as HTMLInputElement).value; markEmailFieldDirty('smtpPassword'); }}
+                  onblur={() => commitEmailStringSetting('smtpPassword', smtpPasswordLocal, false)}
+                />
+              </div>
+              <div class="field-row field-row--wide">
+                <label class="field-label" for="smtp-from">{t('settings.smtpFrom')}</label>
+                <input
+                  id="smtp-from"
+                  class="input"
+                  type="email"
+                  value={smtpFromLocal}
+                  oninput={(e) => { smtpFromLocal = (e.target as HTMLInputElement).value; markEmailFieldDirty('smtpFrom'); }}
+                  onblur={() => commitEmailStringSetting('smtpFrom', smtpFromLocal)}
+                  placeholder="sales@example.com"
+                  autocomplete="email"
+                />
+              </div>
+              <div class="field-row email-test-row">
+                <button
+                  class="btn btn-secondary btn-sm"
+                  type="button"
+                  onclick={testSmtpConnection}
+                  disabled={smtpTestLoading}
+                >
+                  {smtpTestLoading ? t('common.loading') : t('settings.emailTestConnection')}
+                </button>
+                {#if smtpTestMessage}
+                  <span class="field-hint">{smtpTestMessage}</span>
+                {/if}
+              </div>
+            </div>
+
+            <div class="email-grid">
+              <div class="field-row">
+                <label class="field-label" for="imap-host">{t('settings.imapHost')}</label>
+                <input
+                  id="imap-host"
+                  class="input"
+                  type="text"
+                  value={imapHostLocal}
+                  oninput={(e) => { imapHostLocal = (e.target as HTMLInputElement).value; markEmailFieldDirty('imapHost'); }}
+                  onblur={() => commitEmailStringSetting('imapHost', imapHostLocal)}
+                  placeholder="imap.example.com"
+                  spellcheck={false}
+                />
+              </div>
+              <div class="field-row">
+                <label class="field-label" for="imap-port">{t('settings.imapPort')}</label>
+                <input
+                  id="imap-port"
+                  class="input"
+                  type="number"
+                  min="1"
+                  max="65535"
+                  value={imapPortLocal}
+                  oninput={(e) => { imapPortLocal = (e.target as HTMLInputElement).value; markEmailFieldDirty('imapPort'); }}
+                  onblur={() => commitEmailPortSetting('imapPort', imapPortLocal, 993, (v) => imapPortLocal = v)}
+                />
+              </div>
+              <div class="field-row">
+                <label class="field-label" for="imap-user">{t('settings.imapUsername')}</label>
+                <input
+                  id="imap-user"
+                  class="input"
+                  type="text"
+                  value={imapUsernameLocal}
+                  oninput={(e) => { imapUsernameLocal = (e.target as HTMLInputElement).value; markEmailFieldDirty('imapUsername'); }}
+                  onblur={() => commitEmailStringSetting('imapUsername', imapUsernameLocal)}
+                  spellcheck={false}
+                />
+              </div>
+              <div class="field-row">
+                <label class="field-label" for="imap-pass">{t('settings.imapPassword')}</label>
+                <input
+                  id="imap-pass"
+                  class="input"
+                  type="password"
+                  value={imapPasswordLocal}
+                  oninput={(e) => { imapPasswordLocal = (e.target as HTMLInputElement).value; markEmailFieldDirty('imapPassword'); }}
+                  onblur={() => commitEmailStringSetting('imapPassword', imapPasswordLocal, false)}
+                />
+              </div>
+              <div class="field-row email-test-row">
+                <button
+                  class="btn btn-secondary btn-sm"
+                  type="button"
+                  onclick={testImapConnection}
+                  disabled={imapTestLoading}
+                >
+                  {imapTestLoading ? t('common.loading') : t('settings.emailTestConnection')}
+                </button>
+                {#if imapTestMessage}
+                  <span class="field-hint">{imapTestMessage}</span>
+                {/if}
               </div>
             </div>
           {/if}
@@ -868,6 +1179,28 @@
     width: 100%;
   }
 
+  .email-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-raised);
+  }
+
+  .field-row--wide {
+    grid-column: span 2;
+  }
+
+  .email-test-row {
+    grid-column: span 2;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+
   /* ── About section ───────────────────────────────────────────────────────── */
 
   .about-body {
@@ -977,5 +1310,16 @@
   .data-action-desc {
     font-size: var(--text-xs);
     color: var(--text-secondary);
+  }
+
+  @media (max-width: 900px) {
+    .email-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .field-row--wide,
+    .email-test-row {
+      grid-column: span 1;
+    }
   }
 </style>
