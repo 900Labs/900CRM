@@ -24,6 +24,7 @@
     type EntityTypeCustomFieldValue,
   } from '$lib/api/customFields';
   import { formatCurrency } from '$lib/utils/formatters';
+  import { sumByCurrency } from '$lib/utils/currency';
   import DealCard from '$lib/components/DealCard.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
@@ -165,8 +166,10 @@
   const columns = $derived(
     DEAL_STAGES.map((stage) => {
       const deals = (dealStore.dealsByStage[stage] ?? []).filter((deal) => matchesCustomField(deal.id));
-      const totalValue = deals.reduce((sum, d) => sum + (d.value ?? 0), 0);
-      return { stage, deals, totalValue };
+      const currencyTotals = sumByCurrency(
+        deals.map((deal) => ({ currency: deal.currency, value: deal.value }))
+      );
+      return { stage, deals, currencyTotals };
     })
   );
 
@@ -293,9 +296,13 @@
           {#if col.deals.length > 0}
             <div class="col-total">
               <span class="col-total-label">{t('deals.totalValue')}:</span>
-              <span class="col-total-value">
-                {formatCurrency(col.totalValue, settingsStore.currency, settingsStore.language)}
-              </span>
+              <div class="col-total-values" role="list" aria-label={t('deals.totalValue')}>
+                {#each col.currencyTotals as total (total.currency)}
+                  <span class="col-total-value" role="listitem">
+                    {formatCurrency(total.total, total.currency, settingsStore.language)}
+                  </span>
+                {/each}
+              </div>
             </div>
           {/if}
 
@@ -498,8 +505,8 @@
   /* ── Column total ────────────────────────────────────────────────────────── */
 
   .col-total {
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: auto 1fr;
     gap: var(--space-2);
     font-size: var(--text-xs);
     color: var(--text-secondary);
@@ -509,6 +516,14 @@
 
   .col-total-label {
     color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  .col-total-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    justify-content: flex-end;
   }
 
   .col-total-value {
