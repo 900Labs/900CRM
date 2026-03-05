@@ -41,7 +41,7 @@ use rusqlite::Connection;
 use crate::utils::errors::{CrmError, CrmResult};
 
 /// The current schema version. Increment whenever a new migration is added.
-const CURRENT_SCHEMA_VERSION: u32 = 2;
+const CURRENT_SCHEMA_VERSION: u32 = 3;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Database struct
@@ -165,6 +165,10 @@ impl Database {
 
         if current_version < 2 {
             self.migrate_v2()?;
+        }
+
+        if current_version < 3 {
+            self.migrate_v3()?;
         }
 
         self.conn.execute_batch(&format!(
@@ -372,6 +376,8 @@ impl Database {
             INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES ('date_format',  'YYYY-MM-DD', '');
             INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES ('sync_enabled', 'false',      '');
             INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES ('sync_url',     '',           '');
+            INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES ('notifications_enabled', 'true',  '');
+            INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES ('reminder_lead_minutes', '30',   '');
 
             -- ──────────────────────────────────────────────────────────────────
             -- sync_changelog
@@ -439,6 +445,27 @@ impl Database {
         )?;
 
         log::info!("Migration v2 complete");
+        Ok(())
+    }
+
+    /// Schema v3 migration — notification/reminder settings defaults.
+    ///
+    /// Ensures existing installations receive the new desktop-reminder setting
+    /// keys without requiring a full schema rebuild.
+    fn migrate_v3(&mut self) -> CrmResult<()> {
+        log::info!("Running database migration v3");
+
+        self.conn.execute_batch(
+            r#"
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES ('notifications_enabled', 'true', '');
+
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES ('reminder_lead_minutes', '30', '');
+            "#,
+        )?;
+
+        log::info!("Migration v3 complete");
         Ok(())
     }
 

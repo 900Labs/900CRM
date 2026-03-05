@@ -37,6 +37,12 @@ class SettingsStore {
   /** URL of the sync server. */
   syncUrl = $state<string>('');
 
+  /** Whether desktop activity reminders are enabled. */
+  notificationsEnabled = $state<boolean>(true);
+
+  /** Minutes before due time to trigger reminders. */
+  reminderLeadMinutes = $state<number>(30);
+
   /** Whether settings have been loaded from the backend. */
   loaded = $state<boolean>(false);
 
@@ -55,6 +61,8 @@ class SettingsStore {
       this.dateFormat = data.dateFormat;
       this.syncEnabled = data.syncEnabled;
       this.syncUrl    = data.syncUrl;
+      this.notificationsEnabled = data.notificationsEnabled;
+      this.reminderLeadMinutes = data.reminderLeadMinutes;
       this.loaded     = true;
 
       // Apply immediately
