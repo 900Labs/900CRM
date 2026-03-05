@@ -368,11 +368,11 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for full details on how to get st
 - [x] Windows, macOS, Linux installers
 
 ### v1.1.0 — Planned
-- [ ] Custom fields on any entity type
-- [ ] Reports and conversion funnels
-- [ ] Desktop reminders and notifications
+- [x] Custom fields on any entity type
+- [x] Reports and conversion funnels
+- [x] Desktop reminders and notifications
 - [ ] Email integration (IMAP/SMTP, optional)
-- [ ] Multi-currency display
+- [x] Multi-currency display
 - [x] Additional languages: Portuguese (Brazilian), Vietnamese
 - [ ] Additional languages: Hausa, Bengali
 

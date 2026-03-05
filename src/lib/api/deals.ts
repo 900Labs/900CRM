@@ -3,6 +3,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { normalizeCurrencyCode } from '$lib/utils/currency';
 
 export type DealStage =
   | 'lead'
@@ -115,7 +116,7 @@ function mapDeal(deal: BackendDeal): Deal {
     id: deal.id,
     name: deal.title,
     value: Number.isFinite(deal.value) ? deal.value : 0,
-    currency: deal.currency || 'USD',
+    currency: normalizeCurrencyCode(deal.currency),
     stage: toUiStage(deal.stage),
     probability: deal.probability ?? 0,
     expectedCloseDate: deal.expected_close,
