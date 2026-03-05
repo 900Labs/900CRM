@@ -48,6 +48,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Added lightweight SMTP/IMAP endpoint reachability test command (`test_email_server_connection`).
   - Added schema migration v4 to seed email integration setting defaults for existing installs.
   - Added contact detail action to open local mail composer via `mailto:`.
+- Added complete Hausa and Bengali locale support:
+  - Added `src/lib/i18n/ha.json` and `src/lib/i18n/bn.json`.
+  - Registered `ha` and `bn` in `availableLocales` and lazy locale loading.
 - Added schema migration v2 analytics indexes to keep report queries efficient on constrained hardware.
 - Added a lightweight open-source and low-resource guardrail checklist and wired it into the PR template/workflow.
 
