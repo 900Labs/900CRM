@@ -11,3 +11,4 @@
 | 007 | 2026-03-05 | `sprint-007-reports-dashboard-ui` | Dashboard integration for pipeline conversion/activity funnel reports with localized labels and lightweight visualization cards | Completed |
 | 008 | 2026-03-05 | `sprint-008-custom-field-filters` | Custom-field filter UX for contacts/pipeline/activities with backend contact filtering and lightweight value-index lookups | Completed |
 | 009 | 2026-03-05 | `sprint-009-desktop-notification-reminders` | Desktop reminder notifications for upcoming activities with persisted settings and lightweight polling | Completed |
+| 010 | 2026-03-05 | `sprint-010-ptbr-vietnamese-translations` | Portuguese (Brazil) and Vietnamese full-locale support with lazy-load i18n registration and docs alignment | Completed |

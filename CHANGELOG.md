@@ -35,6 +35,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Added reminder polling service with at-most-once notifications per activity due timestamp.
   - Added settings for desktop reminders (`notifications_enabled`, `reminder_lead_minutes`).
   - Added schema migration v3 to backfill reminder setting defaults for existing installs.
+- Added complete Portuguese (Brazilian) and Vietnamese locale support:
+  - Added `src/lib/i18n/pt.json` and `src/lib/i18n/vi.json`.
+  - Registered `pt` and `vi` in `availableLocales` and lazy locale loading.
 - Added schema migration v2 analytics indexes to keep report queries efficient on constrained hardware.
 - Added a lightweight open-source and low-resource guardrail checklist and wired it into the PR template/workflow.
 
@@ -49,9 +52,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Corrected deal modal translation key usage from `deals.dealName` to existing locale key `deals.name`.
 - Fixed TypeScript nullability issues in contact-detail quick actions for add-deal/add-activity modal context opening.
 - Fixed contact-detail save/cancel consistency by including custom field state in dirty/reset/save handling.
-
-### In Progress
-- Portuguese (Brazilian) and Vietnamese translations — planned for v1.1.0
 
 ---
 

@@ -11,7 +11,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/900-labs/900crm/ci.yml?branch=main)](https://github.com/900-labs/900crm/actions)
 [![Platform: Windows | macOS | Linux](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/900-labs/900crm/releases)
-[![Languages: 6](https://img.shields.io/badge/Languages-6-brightgreen.svg)](https://github.com/900-labs/900crm#language-support)
+[![Languages: 8](https://img.shields.io/badge/Languages-8-brightgreen.svg)](https://github.com/900-labs/900crm#language-support)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 
@@ -228,6 +228,8 @@ The installer is self-contained and does not require an internet connection to i
 | Spanish | `es` | 100% | Complete |
 | Arabic | `ar` | 100% | Complete (RTL layout supported) |
 | Swahili | `sw` | 100% | Complete |
+| Portuguese (Brazil) | `pt` | 100% | Complete |
+| Vietnamese | `vi` | 100% | Complete |
 | Hindi | `hi` | 85% | In progress — contributions welcome |
 
 To add a new language or improve an existing translation, see the [Translation Guide in CONTRIBUTING.md](CONTRIBUTING.md#translation-guide).
@@ -284,6 +286,8 @@ For a deep dive into the module structure, data flow, sync protocol, and design 
 │   │   │   ├── es.json           # Spanish
 │   │   │   ├── ar.json           # Arabic (RTL)
 │   │   │   ├── sw.json           # Swahili
+│   │   │   ├── pt.json           # Portuguese (Brazil)
+│   │   │   ├── vi.json           # Vietnamese
 │   │   │   └── hi.json           # Hindi
 │   │   └── utils/                # Shared helpers
 │   └── routes/                   # SvelteKit routes
@@ -369,7 +373,8 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for full details on how to get st
 - [ ] Desktop reminders and notifications
 - [ ] Email integration (IMAP/SMTP, optional)
 - [ ] Multi-currency display
-- [ ] Additional languages (Portuguese, Vietnamese, Hausa, Bengali)
+- [x] Additional languages: Portuguese (Brazilian), Vietnamese
+- [ ] Additional languages: Hausa, Bengali
 
 ### v2.0.0 — Planned (Long-term)
 - [ ] Plugin system for community extensions
