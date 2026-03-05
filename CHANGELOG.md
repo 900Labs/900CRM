@@ -23,6 +23,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Pipeline conversion report endpoint (`get_pipeline_conversion_report`).
   - Activity funnel report endpoint (`get_activity_funnel_report`).
   - Typed frontend API wrapper (`src/lib/api/reports.ts`).
+- Added dashboard report UI integration for analytics:
+  - Pipeline conversion and activity funnel cards on the dashboard.
+  - Lightweight stage/type bar visualization with localized labels.
+  - Graceful partial-failure fallback so core dashboard stats still load if reports are unavailable.
 - Added schema migration v2 analytics indexes to keep report queries efficient on constrained hardware.
 - Added a lightweight open-source and low-resource guardrail checklist and wired it into the PR template/workflow.
 
@@ -41,7 +45,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### In Progress
 - Custom field filter UX for list/pipeline/activity views — planned for v1.1.0
 - Desktop notifications and reminders for upcoming activities — planned for v1.1.0
-- Pipeline conversion and activity funnel report UI/dashboard integration — planned for v1.1.0
 - Portuguese (Brazilian) and Vietnamese translations — planned for v1.1.0
 
 ---

@@ -27,7 +27,21 @@
     "addContact": "Agregar contacto",
     "addDeal": "Agregar negocio",
     "addActivity": "Agregar actividad",
-    "noActivity": "Sin actividad reciente"
+    "noActivity": "Sin actividad reciente",
+    "reports": {
+      "title": "Reportes de conversión y embudo",
+      "pipelineTitle": "Conversión de pipeline",
+      "activityTitle": "Embudo de actividades",
+      "winRate": "Tasa de éxito",
+      "closedWon": "Cerrados ganados",
+      "openDeals": "Negocios abiertos",
+      "completionRate": "Tasa de finalización",
+      "pending": "Pendientes",
+      "overdueRate": "Tasa de vencidos",
+      "noPipelineData": "Aún no hay datos de pipeline",
+      "noActivityData": "Aún no hay datos de actividad",
+      "loadFailed": "Algunas métricas de reportes no están disponibles temporalmente."
+    }
   },
   "contacts": {
     "title": "Contactos",

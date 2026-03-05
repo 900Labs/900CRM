@@ -27,7 +27,21 @@
     "addContact": "إضافة جهة اتصال",
     "addDeal": "إضافة صفقة",
     "addActivity": "إضافة نشاط",
-    "noActivity": "لا يوجد نشاط حديث"
+    "noActivity": "لا يوجد نشاط حديث",
+    "reports": {
+      "title": "تقارير التحويل والقمع",
+      "pipelineTitle": "تحويل خط المبيعات",
+      "activityTitle": "قمع الأنشطة",
+      "winRate": "معدل الفوز",
+      "closedWon": "الصفقات المكتسبة",
+      "openDeals": "الصفقات المفتوحة",
+      "completionRate": "معدل الإكمال",
+      "pending": "قيد الانتظار",
+      "overdueRate": "معدل التأخر",
+      "noPipelineData": "لا توجد بيانات لخط المبيعات بعد",
+      "noActivityData": "لا توجد بيانات للأنشطة بعد",
+      "loadFailed": "بعض مؤشرات التقارير غير متاحة مؤقتًا."
+    }
   },
   "contacts": {
     "title": "جهات الاتصال",

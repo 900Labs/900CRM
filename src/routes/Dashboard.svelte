@@ -12,18 +12,36 @@
   import { t } from '$lib/i18n';
   import { getDashboardStats } from '$lib/api/dashboard';
   import type { DashboardStats } from '$lib/api/dashboard';
+  import {
+    getActivityFunnelReport,
+    getPipelineConversionReport,
+    type ActivityFunnelReport,
+    type PipelineConversionReport,
+  } from '$lib/api/reports';
   import { activityStore } from '$lib/stores/activities';
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
-  import { formatCurrency } from '$lib/utils/formatters';
+  import { formatCompactNumber, formatCurrency, formatPercent } from '$lib/utils/formatters';
   import StatCard from '$lib/components/StatCard.svelte';
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
 
   // ── State ───────────────────────────────────────────────────────────────────
 
   let stats = $state<DashboardStats | null>(null);
+  let pipelineReport = $state<PipelineConversionReport | null>(null);
+  let activityReport = $state<ActivityFunnelReport | null>(null);
   let isLoading = $state(true);
   let error = $state<string | null>(null);
+  let reportError = $state<string | null>(null);
+
+  const stageLabelKeyMap: Record<string, string> = {
+    Lead: 'lead',
+    Qualified: 'qualified',
+    Proposal: 'proposal',
+    Negotiation: 'negotiation',
+    'Closed Won': 'closedWon',
+    'Closed Lost': 'closedLost',
+  };
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -33,16 +51,67 @@
       : '—'
   );
 
+  const visibleStageMetrics = $derived(
+    (pipelineReport?.stage_metrics ?? []).filter((metric) => metric.count > 0 || metric.stage_share > 0).slice(0, 6)
+  );
+
+  const visibleActivityTypes = $derived(
+    (activityReport?.by_type ?? []).slice(0, 4)
+  );
+
+  function asPercentRatio(ratio: number, decimals = 1): string {
+    return formatPercent(Math.max(0, Math.min(100, ratio * 100)), decimals);
+  }
+
+  function ratioWidth(ratio: number): string {
+    return `${Math.max(0, Math.min(100, ratio * 100))}%`;
+  }
+
+  function stageLabel(stage: string): string {
+    const key = stageLabelKeyMap[stage];
+    return key ? t(`deals.stages.${key}`) : stage;
+  }
+
+  function activityTypeLabel(type: string): string {
+    const normalized = type.trim().toLowerCase();
+    const map: Record<string, string> = {
+      task: t('activities.task'),
+      call: t('activities.call'),
+      meeting: t('activities.meeting'),
+      email: t('activities.email'),
+      note: t('activities.notes'),
+    };
+    return map[normalized] ?? type;
+  }
+
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
   onMount(async () => {
     isLoading = true;
+    error = null;
+    reportError = null;
+
     try {
       const [dashStats] = await Promise.all([
         getDashboardStats(),
         activityStore.loadUpcoming(),
       ]);
       stats = dashStats;
+
+      const [pipelineResult, activityResult] = await Promise.allSettled([
+        getPipelineConversionReport(),
+        getActivityFunnelReport(),
+      ]);
+
+      if (pipelineResult.status === 'fulfilled') {
+        pipelineReport = pipelineResult.value;
+      }
+      if (activityResult.status === 'fulfilled') {
+        activityReport = activityResult.value;
+      }
+      if (pipelineResult.status === 'rejected' || activityResult.status === 'rejected') {
+        reportError = t('dashboard.reports.loadFailed');
+      }
     } catch (err) {
       error = t('errors.loadFailed');
       console.error('[Dashboard] Load error:', err);
@@ -116,6 +185,104 @@
         loading={isLoading}
       />
     </section>
+
+    <section class="report-grid" aria-label={t('dashboard.reports.title')}>
+      <section class="card report-card" aria-labelledby="pipeline-report-heading">
+        <div class="card-header report-header">
+          <h2 class="section-title" id="pipeline-report-heading">{t('dashboard.reports.pipelineTitle')}</h2>
+          <span class="report-kpi-value">
+            {isLoading || !pipelineReport ? '…' : asPercentRatio(pipelineReport.overall_win_rate)}
+          </span>
+        </div>
+        <div class="report-subtitle">{t('dashboard.reports.winRate')}</div>
+
+        <div class="report-summary-grid">
+          <div class="summary-stat">
+            <span class="summary-stat-label">{t('dashboard.reports.closedWon')}</span>
+            <span class="summary-stat-value">
+              {isLoading || !pipelineReport ? '…' : formatCompactNumber(pipelineReport.closed_won)}
+            </span>
+          </div>
+          <div class="summary-stat">
+            <span class="summary-stat-label">{t('dashboard.reports.openDeals')}</span>
+            <span class="summary-stat-value">
+              {isLoading || !pipelineReport ? '…' : formatCompactNumber(pipelineReport.open_deals)}
+            </span>
+          </div>
+        </div>
+
+        {#if !isLoading && pipelineReport}
+          {#if visibleStageMetrics.length === 0}
+            <p class="report-empty">{t('dashboard.reports.noPipelineData')}</p>
+          {:else}
+            <ul class="metric-list" role="list">
+              {#each visibleStageMetrics as metric (metric.stage)}
+                <li class="metric-row">
+                  <div class="metric-row-header">
+                    <span class="metric-label">{stageLabel(metric.stage)}</span>
+                    <span class="metric-value">{formatCompactNumber(metric.count)}</span>
+                  </div>
+                  <div class="metric-bar-track">
+                    <span class="metric-bar-fill" style={`width: ${ratioWidth(metric.stage_share)}`}></span>
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {/if}
+      </section>
+
+      <section class="card report-card" aria-labelledby="activity-report-heading">
+        <div class="card-header report-header">
+          <h2 class="section-title" id="activity-report-heading">{t('dashboard.reports.activityTitle')}</h2>
+          <span class="report-kpi-value">
+            {isLoading || !activityReport ? '…' : asPercentRatio(activityReport.completion_rate)}
+          </span>
+        </div>
+        <div class="report-subtitle">{t('dashboard.reports.completionRate')}</div>
+
+        <div class="report-summary-grid">
+          <div class="summary-stat">
+            <span class="summary-stat-label">{t('dashboard.reports.pending')}</span>
+            <span class="summary-stat-value">
+              {isLoading || !activityReport ? '…' : formatCompactNumber(activityReport.pending_activities)}
+            </span>
+          </div>
+          <div class="summary-stat">
+            <span class="summary-stat-label">{t('dashboard.reports.overdueRate')}</span>
+            <span class="summary-stat-value">
+              {isLoading || !activityReport ? '…' : asPercentRatio(activityReport.overdue_rate)}
+            </span>
+          </div>
+        </div>
+
+        {#if !isLoading && activityReport}
+          {#if visibleActivityTypes.length === 0}
+            <p class="report-empty">{t('dashboard.reports.noActivityData')}</p>
+          {:else}
+            <ul class="metric-list" role="list">
+              {#each visibleActivityTypes as metric (metric.activity_type)}
+                <li class="metric-row">
+                  <div class="metric-row-header">
+                    <span class="metric-label">{activityTypeLabel(metric.activity_type)}</span>
+                    <span class="metric-value">{asPercentRatio(metric.completion_rate)}</span>
+                  </div>
+                  <div class="metric-bar-track">
+                    <span class="metric-bar-fill" style={`width: ${ratioWidth(metric.completion_rate)}`}></span>
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {/if}
+      </section>
+    </section>
+
+    {#if reportError}
+      <div class="dashboard-warning" role="status">
+        {reportError}
+      </div>
+    {/if}
 
     <!-- Content grid: activity feed + quick actions -->
     <div class="dashboard-grid">
@@ -213,6 +380,116 @@
     align-items: start;
   }
 
+  .report-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-6);
+  }
+
+  .report-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .report-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+
+  .report-kpi-value {
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .report-subtitle {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    margin-top: calc(var(--space-4) * -1);
+  }
+
+  .report-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .summary-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-3);
+    border-radius: var(--border-radius-sm);
+    background: var(--surface-hover);
+  }
+
+  .summary-stat-label {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+  }
+
+  .summary-stat-value {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .metric-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .metric-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .metric-row-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    font-size: var(--text-xs);
+  }
+
+  .metric-label {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .metric-value {
+    color: var(--text-primary);
+    font-weight: var(--weight-medium);
+  }
+
+  .metric-bar-track {
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--surface-hover);
+    overflow: hidden;
+  }
+
+  .metric-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-primary-500);
+  }
+
+  .report-empty {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+  }
+
   @media (max-width: 900px) {
     .dashboard-grid {
       grid-template-columns: 1fr;
@@ -274,6 +551,14 @@
     background-color: var(--color-danger-50);
     color: var(--color-danger-600);
     border-radius: var(--border-radius-md);
+    font-size: var(--text-sm);
+  }
+
+  .dashboard-warning {
+    padding: var(--space-4) var(--space-5);
+    border-radius: var(--border-radius-md);
+    background-color: var(--color-warning-50);
+    color: var(--color-warning-600);
     font-size: var(--text-sm);
   }
 </style>
