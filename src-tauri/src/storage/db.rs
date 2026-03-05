@@ -351,6 +351,8 @@ impl Database {
                 ON custom_field_values (entity_id);
             CREATE INDEX IF NOT EXISTS idx_custom_field_values_field_def
                 ON custom_field_values (field_def_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_field_values_field_entity
+                ON custom_field_values (field_def_id, entity_id);
 
             -- ──────────────────────────────────────────────────────────────────
             -- settings

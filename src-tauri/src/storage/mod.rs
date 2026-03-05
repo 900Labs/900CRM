@@ -20,6 +20,7 @@
 
 pub mod activities;
 pub mod contacts;
+pub mod custom_fields;
 pub mod db;
 pub mod deals;
 pub mod notes;

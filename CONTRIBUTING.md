@@ -475,6 +475,7 @@ When adding new code, write tests for:
 3. Code is formatted: `npm run format` and `cargo fmt`
 4. If your change touches the UI, include a screenshot or screen recording
 5. Update documentation affected by your change
+6. Complete the mission guardrails checklist in `docs/OPEN_SOURCE_GUARDRAIL_CHECKLIST.md`
 
 ### PR Description
 
@@ -484,6 +485,7 @@ Fill in all sections of the PR template:
 - How was it tested?
 - Screenshots (for UI changes)
 - Checklist
+- Open-source and low-resource guardrail confirmations
 
 ### Review Process
 

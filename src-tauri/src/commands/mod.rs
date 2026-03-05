@@ -12,11 +12,13 @@
 //! | [`deal_commands`]     | Deal CRUD, pipeline management |
 //! | [`activity_commands`] | Activity CRUD, scheduling |
 //! | [`dashboard_commands`]| Aggregate statistics |
+//! | [`custom_field_commands`] | Custom field definitions and values |
 //! | [`import_export`]     | CSV import/export via file dialog |
 //! | [`settings_commands`] | Application preferences |
 
 pub mod activity_commands;
 pub mod contact_commands;
+pub mod custom_field_commands;
 pub mod dashboard_commands;
 pub mod deal_commands;
 pub mod import_export;
