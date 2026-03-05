@@ -27,7 +27,21 @@
     "addContact": "Add Contact",
     "addDeal": "Add Deal",
     "addActivity": "Add Activity",
-    "noActivity": "No recent activity"
+    "noActivity": "No recent activity",
+    "reports": {
+      "title": "Conversion and Funnel Reports",
+      "pipelineTitle": "Pipeline Conversion",
+      "activityTitle": "Activity Funnel",
+      "winRate": "Win Rate",
+      "closedWon": "Closed Won",
+      "openDeals": "Open Deals",
+      "completionRate": "Completion Rate",
+      "pending": "Pending",
+      "overdueRate": "Overdue Rate",
+      "noPipelineData": "No pipeline data yet",
+      "noActivityData": "No activity data yet",
+      "loadFailed": "Some report metrics are temporarily unavailable."
+    }
   },
   "contacts": {
     "title": "Contacts",

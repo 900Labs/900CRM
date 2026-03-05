@@ -27,7 +27,21 @@
     "addContact": "Ajouter un contact",
     "addDeal": "Ajouter une affaire",
     "addActivity": "Ajouter une activité",
-    "noActivity": "Aucune activité récente"
+    "noActivity": "Aucune activité récente",
+    "reports": {
+      "title": "Rapports de conversion et d'entonnoir",
+      "pipelineTitle": "Conversion du pipeline",
+      "activityTitle": "Entonnoir d'activités",
+      "winRate": "Taux de gain",
+      "closedWon": "Affaires gagnées",
+      "openDeals": "Affaires ouvertes",
+      "completionRate": "Taux d'achèvement",
+      "pending": "En attente",
+      "overdueRate": "Taux de retard",
+      "noPipelineData": "Pas encore de données de pipeline",
+      "noActivityData": "Pas encore de données d'activité",
+      "loadFailed": "Certaines métriques de rapport sont temporairement indisponibles."
+    }
   },
   "contacts": {
     "title": "Contacts",

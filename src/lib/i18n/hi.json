@@ -27,7 +27,21 @@
     "addContact": "संपर्क जोड़ें",
     "addDeal": "सौदा जोड़ें",
     "addActivity": "गतिविधि जोड़ें",
-    "noActivity": "कोई हालिया गतिविधि नहीं"
+    "noActivity": "कोई हालिया गतिविधि नहीं",
+    "reports": {
+      "title": "कन्वर्ज़न और फ़नल रिपोर्ट",
+      "pipelineTitle": "पाइपलाइन कन्वर्ज़न",
+      "activityTitle": "गतिविधि फ़नल",
+      "winRate": "जीत दर",
+      "closedWon": "जीते हुए बंद",
+      "openDeals": "खुले सौदे",
+      "completionRate": "पूर्णता दर",
+      "pending": "लंबित",
+      "overdueRate": "विलंब दर",
+      "noPipelineData": "अभी कोई पाइपलाइन डेटा नहीं है",
+      "noActivityData": "अभी कोई गतिविधि डेटा नहीं है",
+      "loadFailed": "कुछ रिपोर्ट मेट्रिक्स अस्थायी रूप से उपलब्ध नहीं हैं।"
+    }
   },
   "contacts": {
     "title": "संपर्क",
