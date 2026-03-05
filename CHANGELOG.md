@@ -43,6 +43,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Updated dashboard KPI rendering to handle mixed-currency pipelines without forcing a single-currency format.
   - Updated pipeline stage totals to show per-currency totals for mixed-currency columns.
   - Added currency normalization helpers and stricter deal-currency input normalization.
+- Added optional email integration (IMAP/SMTP):
+  - Added email integration settings for SMTP/IMAP endpoints and local compose workflow.
+  - Added lightweight SMTP/IMAP endpoint reachability test command (`test_email_server_connection`).
+  - Added schema migration v4 to seed email integration setting defaults for existing installs.
+  - Added contact detail action to open local mail composer via `mailto:`.
 - Added schema migration v2 analytics indexes to keep report queries efficient on constrained hardware.
 - Added a lightweight open-source and low-resource guardrail checklist and wired it into the PR template/workflow.
 

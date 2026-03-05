@@ -41,7 +41,7 @@ use rusqlite::Connection;
 use crate::utils::errors::{CrmError, CrmResult};
 
 /// The current schema version. Increment whenever a new migration is added.
-const CURRENT_SCHEMA_VERSION: u32 = 3;
+const CURRENT_SCHEMA_VERSION: u32 = 4;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Database struct
@@ -169,6 +169,10 @@ impl Database {
 
         if current_version < 3 {
             self.migrate_v3()?;
+        }
+
+        if current_version < 4 {
+            self.migrate_v4()?;
         }
 
         self.conn.execute_batch(&format!(
@@ -466,6 +470,43 @@ impl Database {
         )?;
 
         log::info!("Migration v3 complete");
+        Ok(())
+    }
+
+    /// Schema v4 migration — optional email integration defaults.
+    ///
+    /// Seeds IMAP/SMTP configuration keys for existing installs.
+    fn migrate_v4(&mut self) -> CrmResult<()> {
+        log::info!("Running database migration v4");
+
+        self.conn.execute_batch(
+            r#"
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES ('email_integration_enabled', 'false', '');
+
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES ('smtp_host', '', '');
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES ('smtp_port', '587', '');
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES ('smtp_username', '', '');
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES ('smtp_password', '', '');
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES ('smtp_from', '', '');
+
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES ('imap_host', '', '');
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES ('imap_port', '993', '');
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES ('imap_username', '', '');
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES ('imap_password', '', '');
+            "#,
+        )?;
+
+        log::info!("Migration v4 complete");
         Ok(())
     }
 

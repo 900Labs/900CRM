@@ -294,6 +294,8 @@ pub fn run() {
             commands::settings_commands::get_settings,
             commands::settings_commands::get_setting,
             commands::settings_commands::update_setting,
+            // ── Email integration commands ───────────────────────────────────
+            commands::email_commands::test_email_server_connection,
             // ── Sync status commands ────────────────────────────────────────
             commands::sync_commands::get_sync_status,
             commands::sync_commands::trigger_sync,

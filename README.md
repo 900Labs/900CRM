@@ -371,7 +371,7 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for full details on how to get st
 - [x] Custom fields on any entity type
 - [x] Reports and conversion funnels
 - [x] Desktop reminders and notifications
-- [ ] Email integration (IMAP/SMTP, optional)
+- [x] Email integration (IMAP/SMTP, optional)
 - [x] Multi-currency display
 - [x] Additional languages: Portuguese (Brazilian), Vietnamese
 - [ ] Additional languages: Hausa, Bengali
