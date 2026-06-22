@@ -71,10 +71,27 @@ Organization mutations now go through `crm-core` services and repositories:
 - Desktop Tauri commands remain thin IPC wrappers over `crm-core`; they do not
   own SQL.
 
+## Backup Foundation
+
+`crm-core` now exposes local backup primitives for future high-risk migrations:
+
+- `create_local_backup` writes a full standalone SQLite snapshot plus
+  `metadata.json`.
+- Backup metadata records `created_at`, `app_version`, `schema_version`, and
+  `device_id`.
+- `validate_local_backup` checks metadata compatibility, database schema
+  version, and required core table presence before any restore path can proceed.
+- Restore remains conservative: replacing an app database requires an explicit
+  confirmation flag from the caller and should only run after the active core
+  connection has been closed.
+
+This foundation is intended to protect users before any destructive
+contact/organization normalization is considered.
+
 ## Deferred
 
 - Final normalized `contacts` rebuild with only target columns.
 - Removal of legacy organization-as-contact rows and `contacts.org_id`.
 - `pipeline_stages`, `deal_contacts`, and `activity_links` normalization.
-- JSON export and backup behavior beyond existing CSV flows.
+- User-facing backup/restore UI and any backup scheduling.
 - Sync server behavior.

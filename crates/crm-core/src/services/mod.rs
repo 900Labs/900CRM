@@ -27,10 +27,13 @@ use crate::utils::{
 };
 
 mod audit;
+mod backup;
 mod contacts;
 mod organizations;
 mod proposed_actions;
 mod settings;
+
+pub use backup::{LocalBackup, LocalBackupMetadata, LocalBackupValidation, LocalRestoreResult};
 
 #[cfg(test)]
 mod tests;

@@ -35,14 +35,15 @@
 //! `Mutex<Database>` inside `AppState`, ensuring single-threaded access.
 //! WAL mode is enabled so readers never block writers.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 
 use crate::utils::errors::{CrmError, CrmResult};
 
 /// The current schema version. Increment whenever a new migration is added.
 const CURRENT_SCHEMA_VERSION: u32 = 3;
+const DATABASE_FILENAME: &str = "900crm.db";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Database struct
@@ -67,6 +68,9 @@ pub struct Database {
     /// Exposed as `pub(crate)` so sibling storage modules can use `prepare`,
     /// `execute`, `query_row`, etc. directly.
     pub(crate) conn: Connection,
+
+    /// Absolute or caller-provided path to the SQLite database file.
+    db_path: PathBuf,
 }
 
 impl Database {
@@ -92,7 +96,7 @@ impl Database {
             ))
         })?;
 
-        let db_path = app_data_dir.join("900crm.db");
+        let db_path = app_data_dir.join(DATABASE_FILENAME);
         log::info!("Opening SQLite database at {}", db_path.display());
 
         let conn = Connection::open(&db_path).map_err(|e| {
@@ -103,12 +107,54 @@ impl Database {
             ))
         })?;
 
-        let mut db = Self { conn };
+        let mut db = Self { conn, db_path };
         db.configure()?;
         db.run_migrations()?;
 
         log::info!("Database initialized successfully");
         Ok(db)
+    }
+
+    pub fn database_filename() -> &'static str {
+        DATABASE_FILENAME
+    }
+
+    pub fn current_schema_version() -> u32 {
+        CURRENT_SCHEMA_VERSION
+    }
+
+    pub fn db_path(&self) -> &Path {
+        &self.db_path
+    }
+
+    pub fn schema_version(&self) -> CrmResult<u32> {
+        self.conn
+            .query_row("PRAGMA user_version;", [], |row| row.get(0))
+            .map_err(CrmError::from)
+    }
+
+    /// Writes a transactionally consistent SQLite snapshot to `destination`.
+    ///
+    /// The live database uses WAL mode, so callers should not copy the database
+    /// file directly. `VACUUM INTO` asks SQLite to produce a complete standalone
+    /// database image that includes committed WAL contents.
+    pub fn write_snapshot(&self, destination: &Path) -> CrmResult<()> {
+        if destination.exists() {
+            return Err(CrmError::InvalidInput(format!(
+                "Backup database '{}' already exists",
+                destination.display()
+            )));
+        }
+
+        if let Some(parent) = destination.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        self.conn.execute(
+            "VACUUM main INTO ?1",
+            params![destination.to_string_lossy().as_ref()],
+        )?;
+        Ok(())
     }
 
     // ─── Configuration ────────────────────────────────────────────────────────

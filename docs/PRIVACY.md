@@ -24,6 +24,18 @@ The core database uses:
 - Soft deletes for CRM records.
 - Audit log foundations for accountable changes.
 
+## Local Backups
+
+`crm-core` can create a local full-database backup as a standalone SQLite
+snapshot plus `metadata.json`. The metadata records backup creation time, app
+version, schema version, and device ID so future restore flows can validate
+compatibility before replacing any local database.
+
+Backups are not uploaded or transmitted by the core app. They contain the same
+CRM data as the local database and should be protected with the same care.
+Restore remains explicitly confirmed by the caller; validation alone does not
+replace user data.
+
 ## AI and MCP Boundary
 
 The core app contains no built-in AI agent. It does not send CRM data to an
@@ -36,6 +48,8 @@ mutating CRM records directly.
 ## Deferred Privacy Work
 
 - App lock and local encryption are not implemented in this sprint.
+- Backup encryption and user-facing backup storage controls are not implemented
+  in this sprint.
 - Remote MCP binding is out of scope.
 - Sync server behavior is out of scope.
 - External-client approval UI is out of scope.

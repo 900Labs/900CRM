@@ -17,6 +17,164 @@ fn count(core: &CrmCore, sql: &str) -> i64 {
 }
 
 #[test]
+fn create_local_backup_writes_snapshot_and_metadata() {
+    let (mut core, path) = open_test_core();
+
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Backup".to_string()),
+            Some("Tester".to_string()),
+            None,
+            Some("backup@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created before backup");
+
+    let backup_dir = path.join("backup");
+    let backup = core
+        .create_local_backup(&backup_dir)
+        .expect("backup should be created");
+
+    assert_eq!(backup.metadata.backup_format_version, 1);
+    assert_eq!(backup.metadata.app_version, env!("CARGO_PKG_VERSION"));
+    assert_eq!(
+        backup.metadata.schema_version,
+        crate::storage::Database::current_schema_version()
+    );
+    assert_eq!(backup.metadata.device_id, core.device_id());
+    assert_eq!(backup.metadata.database_file, "900crm.db");
+    assert!(std::path::Path::new(&backup.database_path).is_file());
+    assert!(std::path::Path::new(&backup.metadata_path).is_file());
+
+    let backup_conn =
+        rusqlite::Connection::open(&backup.database_path).expect("backup database should open");
+    let backed_up_contact_count: i64 = backup_conn
+        .query_row(
+            "SELECT COUNT(*) FROM contacts WHERE id = ?1",
+            params![contact.id],
+            |row| row.get(0),
+        )
+        .expect("backup contact count should query");
+    assert_eq!(backed_up_contact_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn backup_metadata_validation_accepts_current_schema() {
+    let (core, path) = open_test_core();
+    let backup_dir = path.join("backup");
+    let backup = core
+        .create_local_backup(&backup_dir)
+        .expect("backup should be created");
+
+    let validation = core
+        .validate_local_backup(&backup_dir)
+        .expect("backup should validate");
+
+    assert_eq!(validation.metadata, backup.metadata);
+    assert_eq!(validation.database_path, backup.database_path);
+    assert_eq!(validation.metadata_path, backup.metadata_path);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn restore_requires_explicit_confirmation() {
+    let (core, path) = open_test_core();
+    let backup_dir = path.join("backup");
+    core.create_local_backup(&backup_dir)
+        .expect("backup should be created");
+
+    let restore_dir = path.join("restore-target");
+    let err = CrmCore::restore_local_backup_to_app_data(&restore_dir, &backup_dir, false)
+        .expect_err("restore should require explicit confirmation");
+
+    match err {
+        crate::utils::errors::CrmError::InvalidInput(message) => {
+            assert!(message.contains("requires explicit confirmation"));
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
+    assert!(!restore_dir.join("900crm.db").exists());
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn invalid_restore_is_rejected_before_applying() {
+    let (source_core, source_path) = open_test_core();
+    let backup_dir = source_path.join("backup");
+    let backup = source_core
+        .create_local_backup(&backup_dir)
+        .expect("backup should be created");
+
+    let mut metadata: super::backup::LocalBackupMetadata = serde_json::from_slice(
+        &std::fs::read(&backup.metadata_path).expect("metadata should read"),
+    )
+    .expect("metadata should parse");
+    metadata.schema_version = crate::storage::Database::current_schema_version() + 1;
+    std::fs::write(
+        &backup.metadata_path,
+        serde_json::to_vec_pretty(&metadata).expect("metadata should serialize"),
+    )
+    .expect("metadata should be overwritten");
+
+    let (mut target_core, target_path) = open_test_core();
+    let existing = target_core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Existing".to_string()),
+            Some("Target".to_string()),
+            None,
+            Some("existing@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("target contact should be created");
+    drop(target_core);
+
+    let err = CrmCore::restore_local_backup_to_app_data(&target_path, &backup_dir, true)
+        .expect_err("future-schema backup should be rejected");
+    match err {
+        crate::utils::errors::CrmError::InvalidInput(message) => {
+            assert!(message.contains("newer than supported schema version"));
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
+
+    let target_core = CrmCore::open(&target_path).expect("target core should still open");
+    let preserved_count: i64 = target_core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM contacts WHERE id = ?1",
+            params![existing.id],
+            |row| row.get(0),
+        )
+        .expect("preserved target contact count should query");
+    assert_eq!(preserved_count, 1);
+
+    drop(source_core);
+    drop(target_core);
+    let _ = std::fs::remove_dir_all(source_path);
+    let _ = std::fs::remove_dir_all(target_path);
+}
+
+#[test]
 fn activity_stats_query_counts_completed_overdue_and_due_today() {
     let (mut core, path) = open_test_core();
     let today = now_iso8601()[..10].to_string();
