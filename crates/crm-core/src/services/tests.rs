@@ -1,7 +1,7 @@
 use rusqlite::params;
 
 use super::CrmCore;
-use crate::utils::uuid::new_uuid;
+use crate::utils::{datetime::now_iso8601, uuid::new_uuid};
 
 fn open_test_core() -> (CrmCore, std::path::PathBuf) {
     let path = std::env::temp_dir().join(format!("900crm-core-test-{}", new_uuid()));
@@ -14,6 +14,220 @@ fn count(core: &CrmCore, sql: &str) -> i64 {
         .conn
         .query_row(sql, [], |row| row.get(0))
         .expect("count query should succeed")
+}
+
+#[test]
+fn activity_stats_query_counts_completed_overdue_and_due_today() {
+    let (mut core, path) = open_test_core();
+    let today = now_iso8601()[..10].to_string();
+
+    core.create_activity(
+        "task".to_string(),
+        "Due today".to_string(),
+        None,
+        Some(format!("{today}T23:59:59Z")),
+        None,
+        None,
+    )
+    .expect("due-today activity should be created");
+    core.create_activity(
+        "task".to_string(),
+        "Past due".to_string(),
+        None,
+        Some("2000-01-01T00:00:00Z".to_string()),
+        None,
+        None,
+    )
+    .expect("overdue activity should be created");
+    let completed = core
+        .create_activity(
+            "task".to_string(),
+            "Completed".to_string(),
+            None,
+            Some("2000-01-01T00:00:00Z".to_string()),
+            None,
+            None,
+        )
+        .expect("completed activity should be created");
+    core.mark_activity_complete(&completed.id)
+        .expect("activity should be marked complete");
+
+    let stats = crate::crm_engine::activities::get_activity_stats(&core.db.conn)
+        .expect("activity stats should query");
+    assert_eq!(stats.total, 3);
+    assert_eq!(stats.completed, 1);
+    assert_eq!(stats.overdue, 1);
+    assert_eq!(stats.due_today, 1);
+    assert_eq!(stats.pending, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn duplicate_detection_uses_contact_repository_queries() {
+    let (mut core, path) = open_test_core();
+
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Amina".to_string()),
+            Some("Diallo".to_string()),
+            None,
+            Some("amina@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+
+    let email_input = crate::crm_engine::contacts::ContactInput {
+        contact_type: Some("person".to_string()),
+        first_name: Some("Other".to_string()),
+        last_name: Some("Person".to_string()),
+        org_name: None,
+        email: Some("AMINA@example.com".to_string()),
+        phone: None,
+        address: None,
+        city: None,
+        country: None,
+        org_id: None,
+        notes: None,
+    };
+    let email_matches =
+        crate::crm_engine::contacts::find_duplicate_candidates(&core.db.conn, &email_input)
+            .expect("email duplicate detection should query");
+    assert_eq!(email_matches.len(), 1);
+    assert_eq!(email_matches[0].contact.id, contact.id);
+    assert_eq!(email_matches[0].score, 1.0);
+
+    let name_input = crate::crm_engine::contacts::ContactInput {
+        contact_type: Some("person".to_string()),
+        first_name: Some("Amina".to_string()),
+        last_name: Some("Diallo".to_string()),
+        org_name: None,
+        email: None,
+        phone: None,
+        address: None,
+        city: None,
+        country: None,
+        org_id: None,
+        notes: None,
+    };
+    let name_matches =
+        crate::crm_engine::contacts::find_duplicate_candidates(&core.db.conn, &name_input)
+            .expect("name duplicate detection should query");
+    assert_eq!(name_matches.len(), 1);
+    assert_eq!(name_matches[0].contact.id, contact.id);
+    assert_eq!(name_matches[0].score, 0.9);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn pipeline_age_query_ignores_closed_deals() {
+    let (mut core, path) = open_test_core();
+
+    let active = core
+        .create_deal(
+            "Current active deal".to_string(),
+            Some(100.0),
+            None,
+            Some("Lead".to_string()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("active deal should be created");
+    let closed = core
+        .create_deal(
+            "Old closed deal".to_string(),
+            Some(100.0),
+            None,
+            Some("Closed Won".to_string()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("closed deal should be created");
+
+    core.db
+        .conn
+        .execute(
+            "UPDATE deals SET created_at = '2000-01-01T00:00:00Z' WHERE id = ?1",
+            params![closed.id],
+        )
+        .expect("closed deal timestamp should update");
+
+    let age = crate::storage::deals::get_average_active_deal_age_days(&core.db.conn)
+        .expect("average active deal age should query");
+    assert!(
+        age < 1.0,
+        "closed deal age should not affect active average, got {age}"
+    );
+
+    let active_lookup = core
+        .get_deal(&active.id)
+        .expect("active deal should remain");
+    assert_eq!(active_lookup.stage, "Lead");
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn unified_search_uses_storage_repositories_for_all_entities() {
+    let (mut core, path) = open_test_core();
+
+    core.create_contact(
+        Some("person".to_string()),
+        Some("Clinic".to_string()),
+        Some("Lead".to_string()),
+        Some("Clinic Partners".to_string()),
+        Some("clinic@example.com".to_string()),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("contact should be created");
+    core.create_deal(
+        "Clinic expansion".to_string(),
+        Some(2500.0),
+        None,
+        Some("Proposal".to_string()),
+        None,
+        None,
+        None,
+        Some("Expansion project".to_string()),
+    )
+    .expect("deal should be created");
+    core.create_activity(
+        "call".to_string(),
+        "Call clinic".to_string(),
+        Some("Discuss rollout".to_string()),
+        None,
+        None,
+        None,
+    )
+    .expect("activity should be created");
+
+    let results = crate::crm_engine::search::unified_search(&core.db.conn, "Clinic", 10)
+        .expect("unified search should query");
+    assert!(results.iter().any(|r| r.entity_type == "contact"));
+    assert!(results.iter().any(|r| r.entity_type == "deal"));
+    assert!(results.iter().any(|r| r.entity_type == "activity"));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
 }
 
 #[test]

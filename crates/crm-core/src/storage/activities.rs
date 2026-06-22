@@ -65,6 +65,72 @@ pub struct Activity {
     pub device_id: String,
 }
 
+/// Aggregate activity counts used by dashboard orchestration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityStatsCounts {
+    pub total: i64,
+    pub completed: i64,
+    pub overdue: i64,
+    pub due_today: i64,
+}
+
+/// Loads aggregate activity counts for dashboard statistics.
+pub fn get_activity_stats_counts(
+    conn: &Connection,
+    now: &str,
+    today_prefix: &str,
+) -> CrmResult<ActivityStatsCounts> {
+    let total: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM activities WHERE deleted_at IS NULL",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let completed: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM activities WHERE deleted_at IS NULL AND completed = 1",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let overdue: i64 = conn
+        .query_row(
+            r#"
+            SELECT COUNT(*) FROM activities
+            WHERE deleted_at IS NULL
+              AND completed = 0
+              AND due_date IS NOT NULL
+              AND due_date < ?1
+            "#,
+            params![now],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let due_today: i64 = conn
+        .query_row(
+            r#"
+            SELECT COUNT(*) FROM activities
+            WHERE deleted_at IS NULL
+              AND completed = 0
+              AND due_date LIKE ?1
+            "#,
+            params![format!("{today_prefix}%")],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    Ok(ActivityStatsCounts {
+        total,
+        completed,
+        overdue,
+        due_today,
+    })
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CRUD
 // ─────────────────────────────────────────────────────────────────────────────

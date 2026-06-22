@@ -11,6 +11,7 @@
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
+use crate::storage::activities as activity_storage;
 use crate::utils::{
     datetime::now_iso8601,
     errors::{CrmError, CrmResult},
@@ -114,68 +115,24 @@ pub struct ActivityStats {
     pub due_today: i64,
 }
 
-/// Computes [`ActivityStats`] by querying the database.
+/// Computes [`ActivityStats`] from repository-provided activity counts.
 ///
 /// Used by the dashboard command to show activity health at a glance.
 ///
 /// # Errors
 ///
-/// Returns [`CrmError::Database`] on SQL failure.
+/// Returns [`CrmError::Database`] on storage failure.
 pub fn get_activity_stats(conn: &Connection) -> CrmResult<ActivityStats> {
     let now = now_iso8601();
-    // Today's date prefix (first 10 chars of ISO 8601 timestamp)
     let today_prefix = &now[..10];
-
-    let total: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM activities WHERE deleted_at IS NULL",
-            [],
-            |r| r.get(0),
-        )
-        .unwrap_or(0);
-
-    let completed: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM activities WHERE deleted_at IS NULL AND completed = 1",
-            [],
-            |r| r.get(0),
-        )
-        .unwrap_or(0);
-
-    let overdue: i64 = conn
-        .query_row(
-            r#"
-            SELECT COUNT(*) FROM activities
-            WHERE deleted_at IS NULL
-              AND completed = 0
-              AND due_date IS NOT NULL
-              AND due_date < ?1
-            "#,
-            rusqlite::params![now],
-            |r| r.get(0),
-        )
-        .unwrap_or(0);
-
-    let due_today: i64 = conn
-        .query_row(
-            r#"
-            SELECT COUNT(*) FROM activities
-            WHERE deleted_at IS NULL
-              AND completed = 0
-              AND due_date LIKE ?1
-            "#,
-            rusqlite::params![format!("{}%", today_prefix)],
-            |r| r.get(0),
-        )
-        .unwrap_or(0);
-
-    let pending = total - completed - overdue;
+    let counts = activity_storage::get_activity_stats_counts(conn, &now, today_prefix)?;
+    let pending = counts.total - counts.completed - counts.overdue;
 
     Ok(ActivityStats {
-        total,
-        completed,
+        total: counts.total,
+        completed: counts.completed,
         pending: pending.max(0),
-        overdue,
-        due_today,
+        overdue: counts.overdue,
+        due_today: counts.due_today,
     })
 }

@@ -5,27 +5,28 @@ next focused cleanup sprint. It is not a product roadmap.
 
 ## TCH-001: Move Remaining SQL Out Of `crm_engine`
 
-Status: open
+Status: resolved in `codex/crm-engine-storage-boundary-cleanup`
 
 The target architecture says SQL belongs only in `crates/crm-core/src/storage`.
-Most Tauri command SQL has been moved behind `crm-core` services and storage
-repositories, but these transitional modules still contain direct SQL:
+The remaining direct database queries have been moved out of these legacy
+business-logic modules:
 
 - `crates/crm-core/src/crm_engine/activities.rs`
 - `crates/crm-core/src/crm_engine/contacts.rs`
 - `crates/crm-core/src/crm_engine/pipeline.rs`
 - `crates/crm-core/src/crm_engine/search.rs`
 
-Cleanup direction:
+Repository ownership after cleanup:
 
-- Move duplicate/contact discovery SQL into `storage::contacts`.
-- Move activity stats SQL into `storage::activities` or `storage::dashboard`.
-- Move pipeline conversion SQL into `storage::deals` or a pipeline repository.
-- Move global search SQL into dedicated search repository functions.
-- Keep `crm_engine` focused on pure business rules and calculations.
+- Duplicate/contact discovery queries live in `storage::contacts`.
+- Activity stats queries live in `storage::activities`.
+- Pipeline age and summary queries live in `storage::deals`.
+- Global search queries live in `storage::search`.
+- `crm_engine` remains responsible for validation, scoring, result formatting,
+  and cross-repository orchestration.
 
-This sprint does not perform the migration because the tooling/lockfile fix,
-service split, and readiness tests are the reliability priority.
+Focused Rust tests now cover the moved query paths for activity stats, duplicate
+detection, pipeline age filtering, and unified search composition.
 
 ## TCH-002: Frontend Tooling Depends On Materialized Local Files
 

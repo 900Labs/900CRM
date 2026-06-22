@@ -125,7 +125,7 @@ pub struct PipelineMetrics {
 ///
 /// # Errors
 ///
-/// Returns [`CrmError::Database`] on SQL failure.
+/// Returns [`CrmError::Database`] on storage failure.
 pub fn get_pipeline_metrics(conn: &Connection) -> CrmResult<PipelineMetrics> {
     let stages = crate::storage::deals::get_pipeline_summary(conn)?;
 
@@ -139,25 +139,7 @@ pub fn get_pipeline_metrics(conn: &Connection) -> CrmResult<PipelineMetrics> {
         .map(|s| s.count)
         .sum();
 
-    // Average deal age in days for active deals.
-    let average_deal_age_days: f64 = conn
-        .query_row(
-            r#"
-            SELECT AVG(
-                CAST(
-                    (julianday('now') - julianday(created_at))
-                AS REAL)
-            )
-            FROM deals
-            WHERE deleted_at IS NULL
-              AND stage NOT IN ('Closed Won', 'Closed Lost')
-            "#,
-            [],
-            |row| row.get::<_, Option<f64>>(0),
-        )
-        .ok()
-        .flatten()
-        .unwrap_or(0.0);
+    let average_deal_age_days = crate::storage::deals::get_average_active_deal_age_days(conn)?;
 
     log::debug!(
         "Pipeline metrics: active={} total_value={:.2} win_rate={:.2}",

@@ -602,6 +602,43 @@ pub fn search_contacts(conn: &Connection, query: &str) -> CrmResult<Vec<Contact>
     Ok(contacts)
 }
 
+/// Finds active contacts with an email address matching case-insensitively.
+pub fn find_active_contacts_by_email(conn: &Connection, email: &str) -> CrmResult<Vec<Contact>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, contact_type, first_name, last_name, org_name, email, phone,
+               address, city, country, org_id, organization_id, notes,
+               created_at, updated_at, deleted_at, device_id
+        FROM contacts
+        WHERE LOWER(email) = LOWER(?1) AND deleted_at IS NULL
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![email], row_to_contact)?;
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+/// Finds active contacts with an exact case-insensitive first/last name match.
+pub fn find_active_contacts_by_name(
+    conn: &Connection,
+    first_name: &str,
+    last_name: &str,
+) -> CrmResult<Vec<Contact>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, contact_type, first_name, last_name, org_name, email, phone,
+               address, city, country, org_id, organization_id, notes,
+               created_at, updated_at, deleted_at, device_id
+        FROM contacts
+        WHERE LOWER(first_name) = ?1 AND LOWER(last_name) = ?2
+          AND deleted_at IS NULL
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![first_name, last_name], row_to_contact)?;
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal helpers
 // ─────────────────────────────────────────────────────────────────────────────

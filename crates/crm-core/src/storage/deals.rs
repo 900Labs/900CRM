@@ -376,6 +376,28 @@ pub fn get_pipeline_summary(conn: &Connection) -> CrmResult<Vec<PipelineSummary>
     Ok(summaries)
 }
 
+/// Returns the average age in days for active, non-deleted deals.
+pub fn get_average_active_deal_age_days(conn: &Connection) -> CrmResult<f64> {
+    let average = conn
+        .query_row(
+            r#"
+            SELECT AVG(
+                CAST(
+                    (julianday('now') - julianday(created_at))
+                AS REAL)
+            )
+            FROM deals
+            WHERE deleted_at IS NULL
+              AND stage NOT IN ('Closed Won', 'Closed Lost')
+            "#,
+            [],
+            |row| row.get::<_, Option<f64>>(0),
+        )?
+        .unwrap_or(0.0);
+
+    Ok(average)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal helpers
 // ─────────────────────────────────────────────────────────────────────────────

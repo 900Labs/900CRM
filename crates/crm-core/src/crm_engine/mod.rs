@@ -21,11 +21,10 @@
 //! the `Database`). It is stored in `AppState` under a `Mutex` for consistency
 //! with the rest of the architecture.
 //!
-//! # Transitional status
+//! # Storage boundary
 //!
-//! Some legacy modules in this namespace still contain repository-style SQL.
-//! Track that cleanup under `docs/TRANSITIONAL_DEBT.md` (`TCH-001`). New SQL
-//! should go in `crate::storage`, not in `crm_engine`.
+//! Persistent queries belong in `crate::storage`. This namespace should stay
+//! focused on validation, domain rules, and orchestration.
 
 pub mod activities;
 pub mod contacts;

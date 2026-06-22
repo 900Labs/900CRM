@@ -30,6 +30,7 @@ pub mod external_clients;
 pub mod notes;
 pub mod organizations;
 pub mod proposed_actions;
+pub mod search;
 pub mod settings;
 pub mod sync;
 pub mod tags;

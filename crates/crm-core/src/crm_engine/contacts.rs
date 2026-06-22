@@ -153,7 +153,7 @@ pub struct DuplicateCandidate {
 ///
 /// # Errors
 ///
-/// Returns [`CrmError::Database`] on SQL failure.
+/// Returns [`CrmError::Database`] on storage failure.
 pub fn find_duplicate_candidates(
     conn: &Connection,
     input: &ContactInput,
@@ -163,28 +163,12 @@ pub fn find_duplicate_candidates(
     // Check email match.
     if let Some(email) = &input.email {
         if !email.trim().is_empty() {
-            let mut stmt = conn.prepare(
-                r#"
-                SELECT id, contact_type, first_name, last_name, org_name, email, phone,
-                       address, city, country, org_id, organization_id, notes,
-                       created_at, updated_at, deleted_at, device_id
-                FROM contacts
-                WHERE LOWER(email) = LOWER(?1) AND deleted_at IS NULL
-                "#,
-            )?;
-
-            let rows = stmt.query_map(rusqlite::params![email], |row| {
-                Ok(contacts_row_to_contact(row))
-            })?;
-
-            for row in rows.filter_map(|r| r.ok()) {
-                if let Ok(contact) = row {
-                    candidates.push(DuplicateCandidate {
-                        reason: format!("Same email address: {}", email),
-                        score: 1.0,
-                        contact,
-                    });
-                }
+            for contact in contacts::find_active_contacts_by_email(conn, email)? {
+                candidates.push(DuplicateCandidate {
+                    reason: format!("Same email address: {}", email),
+                    score: 1.0,
+                    contact,
+                });
             }
         }
     }
@@ -204,33 +188,16 @@ pub fn find_duplicate_candidates(
         .to_lowercase();
 
     if !first.is_empty() || !last.is_empty() {
-        let mut stmt = conn.prepare(
-            r#"
-            SELECT id, contact_type, first_name, last_name, org_name, email, phone,
-                   address, city, country, org_id, organization_id, notes,
-                   created_at, updated_at, deleted_at, device_id
-            FROM contacts
-            WHERE LOWER(first_name) = ?1 AND LOWER(last_name) = ?2
-              AND deleted_at IS NULL
-            "#,
-        )?;
-
-        let rows = stmt.query_map(rusqlite::params![first, last], |row| {
-            Ok(contacts_row_to_contact(row))
-        })?;
-
-        for row in rows.filter_map(|r| r.ok()) {
-            if let Ok(contact) = row {
-                // Avoid duplicating a candidate already added via email.
-                if candidates.iter().any(|c| c.contact.id == contact.id) {
-                    continue;
-                }
-                candidates.push(DuplicateCandidate {
-                    reason: format!("Same name: {} {}", contact.first_name, contact.last_name),
-                    score: 0.9,
-                    contact,
-                });
+        for contact in contacts::find_active_contacts_by_name(conn, &first, &last)? {
+            // Avoid duplicating a candidate already added via email.
+            if candidates.iter().any(|c| c.contact.id == contact.id) {
+                continue;
             }
+            candidates.push(DuplicateCandidate {
+                reason: format!("Same name: {} {}", contact.first_name, contact.last_name),
+                score: 0.9,
+                contact,
+            });
         }
     }
 
@@ -257,7 +224,7 @@ pub fn find_duplicate_candidates(
 ///
 /// - [`CrmError::NotFound`] — Either contact does not exist.
 /// - [`CrmError::InvalidInput`] — `target_id == source_id`.
-/// - [`CrmError::Database`] — SQL failure.
+/// - [`CrmError::Database`] — storage failure.
 pub fn merge_contacts(
     conn: &Connection,
     target_id: &str,
@@ -372,7 +339,7 @@ pub fn merge_contacts(
 ///
 /// - [`CrmError::NotFound`] — Either contact does not exist.
 /// - [`CrmError::InvalidInput`] — Type mismatch.
-/// - [`CrmError::Database`] — SQL failure.
+/// - [`CrmError::Database`] — storage failure.
 pub fn link_contact_to_org(
     conn: &Connection,
     person_id: &str,
@@ -410,31 +377,4 @@ pub fn link_contact_to_org(
         Some(Some(org_contact_id)),
         None,
     )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Internal helper (re-used by duplicate detection)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Converts a rusqlite Row into a Contact (used within this module).
-fn contacts_row_to_contact(row: &rusqlite::Row<'_>) -> rusqlite::Result<Contact> {
-    Ok(Contact {
-        id: row.get(0)?,
-        contact_type: row.get(1)?,
-        first_name: row.get(2)?,
-        last_name: row.get(3)?,
-        org_name: row.get(4)?,
-        email: row.get(5)?,
-        phone: row.get(6)?,
-        address: row.get(7)?,
-        city: row.get(8)?,
-        country: row.get(9)?,
-        org_id: row.get(10)?,
-        organization_id: row.get(11)?,
-        notes: row.get(12)?,
-        created_at: row.get(13)?,
-        updated_at: row.get(14)?,
-        deleted_at: row.get(15)?,
-        device_id: row.get(16)?,
-    })
 }
