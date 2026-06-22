@@ -1,0 +1,12 @@
+[package]
+name = "crm-mcp"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Placeholder for the optional 900CRM MCP server"
+
+[dependencies]
+crm-core = { path = "../crm-core" }

@@ -1,0 +1,115 @@
+//! 900CRM desktop shell.
+//!
+//! The desktop crate owns Tauri setup and IPC command registration only.
+//! Business logic, SQLite storage, audit, and MCP-readiness foundations live in
+//! the Tauri-independent `crm-core` crate.
+
+use std::sync::Mutex;
+
+use crm_core::CrmCore;
+use tauri::Manager;
+
+pub mod commands;
+pub mod state;
+
+pub use state::AppState;
+
+pub fn run() {
+    let default_log_level = if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "info"
+    };
+
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default_log_level))
+        .init();
+
+    log::info!(
+        "900CRM desktop v{} starting ({})",
+        env!("CARGO_PKG_VERSION"),
+        if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        }
+    );
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_notification::init())
+        .setup(|app| {
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("Failed to resolve app data directory");
+            let core = CrmCore::open(&app_data_dir).expect("Failed to initialize 900CRM core");
+
+            log::info!("App data directory: {}", app_data_dir.display());
+            log::info!("Device id: {}", core.device_id());
+            log::info!(
+                "CrmCore initialized with {} default pipeline stages",
+                core.default_stage_count()
+            );
+
+            app.manage(AppState {
+                core: Mutex::new(core),
+                data_dir: app_data_dir,
+            });
+
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::contact_commands::create_contact,
+            commands::contact_commands::get_contact,
+            commands::contact_commands::list_contacts,
+            commands::contact_commands::update_contact,
+            commands::contact_commands::delete_contact,
+            commands::contact_commands::restore_contact,
+            commands::contact_commands::search_contacts,
+            commands::contact_commands::merge_contacts,
+            commands::organization_commands::create_organization,
+            commands::organization_commands::get_organization,
+            commands::organization_commands::list_organizations,
+            commands::organization_commands::update_organization,
+            commands::organization_commands::delete_organization,
+            commands::organization_commands::link_contact_to_organization,
+            commands::deal_commands::create_deal,
+            commands::deal_commands::get_deal,
+            commands::deal_commands::list_deals,
+            commands::deal_commands::list_deals_by_stage,
+            commands::deal_commands::update_deal,
+            commands::deal_commands::move_deal_stage,
+            commands::deal_commands::delete_deal,
+            commands::deal_commands::get_pipeline_summary,
+            commands::activity_commands::create_activity,
+            commands::activity_commands::get_activity,
+            commands::activity_commands::list_activities,
+            commands::activity_commands::list_activities_for_contact,
+            commands::activity_commands::list_activities_for_deal,
+            commands::activity_commands::list_upcoming_activities,
+            commands::activity_commands::mark_activity_complete,
+            commands::activity_commands::mark_activity_incomplete,
+            commands::activity_commands::update_activity,
+            commands::activity_commands::delete_activity,
+            commands::dashboard_commands::get_dashboard_stats,
+            commands::custom_field_commands::list_custom_field_defs,
+            commands::custom_field_commands::create_custom_field_def,
+            commands::custom_field_commands::update_custom_field_def,
+            commands::custom_field_commands::delete_custom_field_def,
+            commands::custom_field_commands::set_custom_field_value,
+            commands::custom_field_commands::list_custom_field_values,
+            commands::import_export::import_contacts_csv,
+            commands::import_export::export_contacts_csv,
+            commands::import_export::import_deals_csv,
+            commands::import_export::export_deals_csv,
+            commands::settings_commands::get_settings,
+            commands::settings_commands::get_setting,
+            commands::settings_commands::update_setting,
+            commands::sync_commands::get_sync_status,
+            commands::sync_commands::trigger_sync,
+        ])
+        .run(tauri::generate_context!())
+        .expect("Error while running 900CRM application");
+}

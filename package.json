@@ -1,0 +1,27 @@
+{
+  "name": "900crm",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Offline-first CRM for developing nations — 900 Labs open infrastructure initiative",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/900-labs/900crm"
+  },
+  "type": "module",
+  "workspaces": [
+    "apps/desktop"
+  ],
+  "scripts": {
+    "dev": "npm --workspace apps/desktop run dev",
+    "build": "npm --workspace apps/desktop run build",
+    "preview": "npm --workspace apps/desktop run preview",
+    "check": "node scripts/check-frontend.mjs",
+    "check:tooling": "node scripts/verify-frontend-tooling.mjs",
+    "check:watch": "npm --workspace apps/desktop run check:watch",
+    "test": "node scripts/test-frontend.mjs",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "tauri": "npm --workspace apps/desktop run tauri"
+  }
+}

@@ -1,0 +1,139 @@
+use crm_core::storage::contacts::{Contact, ContactListParams, ContactListResult};
+use tauri::State;
+
+use crate::AppState;
+
+#[tauri::command]
+pub async fn create_contact(
+    state: State<'_, AppState>,
+    contact_type: Option<String>,
+    first_name: Option<String>,
+    last_name: Option<String>,
+    org_name: Option<String>,
+    email: Option<String>,
+    phone: Option<String>,
+    address: Option<String>,
+    city: Option<String>,
+    country: Option<String>,
+    org_id: Option<String>,
+    notes: Option<String>,
+) -> Result<Contact, String> {
+    let mut core = state
+        .core
+        .lock()
+        .map_err(|e| format!("Lock error: {}", e))?;
+    core.create_contact(
+        contact_type,
+        first_name,
+        last_name,
+        org_name,
+        email,
+        phone,
+        address,
+        city,
+        country,
+        org_id,
+        notes,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_contact(state: State<'_, AppState>, id: String) -> Result<Contact, String> {
+    let core = state
+        .core
+        .lock()
+        .map_err(|e| format!("Lock error: {}", e))?;
+    core.get_contact(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_contacts(
+    state: State<'_, AppState>,
+    params: Option<ContactListParams>,
+) -> Result<ContactListResult, String> {
+    let core = state
+        .core
+        .lock()
+        .map_err(|e| format!("Lock error: {}", e))?;
+    core.list_contacts(params).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_contact(
+    state: State<'_, AppState>,
+    id: String,
+    contact_type: Option<String>,
+    first_name: Option<String>,
+    last_name: Option<String>,
+    org_name: Option<String>,
+    email: Option<String>,
+    phone: Option<String>,
+    address: Option<String>,
+    city: Option<String>,
+    country: Option<String>,
+    notes: Option<String>,
+) -> Result<Contact, String> {
+    let mut core = state
+        .core
+        .lock()
+        .map_err(|e| format!("Lock error: {}", e))?;
+    core.update_contact(
+        &id,
+        contact_type,
+        first_name,
+        last_name,
+        org_name,
+        email,
+        phone,
+        address,
+        city,
+        country,
+        notes,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_contact(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let mut core = state
+        .core
+        .lock()
+        .map_err(|e| format!("Lock error: {}", e))?;
+    core.delete_contact(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn restore_contact(state: State<'_, AppState>, id: String) -> Result<Contact, String> {
+    let mut core = state
+        .core
+        .lock()
+        .map_err(|e| format!("Lock error: {}", e))?;
+    core.restore_contact(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn search_contacts(
+    state: State<'_, AppState>,
+    query: String,
+) -> Result<Vec<Contact>, String> {
+    let core = state
+        .core
+        .lock()
+        .map_err(|e| format!("Lock error: {}", e))?;
+    core.search_contacts(&query).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn merge_contacts(
+    state: State<'_, AppState>,
+    target_id: String,
+    source_id: String,
+) -> Result<Contact, String> {
+    let mut core = state
+        .core
+        .lock()
+        .map_err(|e| format!("Lock error: {}", e))?;
+    core.merge_contacts(&target_id, &source_id)
+        .map_err(|e| e.to_string())
+}

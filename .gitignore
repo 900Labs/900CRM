@@ -1,0 +1,21 @@
+/pdf/
+node_modules/
+.npm-cache/
+.svelte-kit/
+dist/
+/build/
+apps/desktop/build/*
+!apps/desktop/build/.gitkeep
+target/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+.DS_Store
+
+# Local analysis and recovery artifacts.
+.desloppify/
+.git.broken.*
+AGENTS.md
+ARCHITECTURE 2.md
+scorecard.png
+docs/build_spec_gap_analysis_*.md
+apps/desktop/src-tauri/src/commands/* 2.rs

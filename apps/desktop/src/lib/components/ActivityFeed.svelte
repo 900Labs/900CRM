@@ -1,0 +1,245 @@
+<script lang="ts">
+  /**
+   * ActivityFeed.svelte — Chronological activity timeline for 900CRM.
+   *
+   * Displays a list of activities with type icons, relative timestamps,
+   * and linked entity names. Used on Dashboard and ContactDetail.
+   */
+
+  import type { Activity } from '$lib/api/activities';
+  import { t } from '$lib/i18n';
+  import { formatRelativeTime } from '$lib/utils/formatters';
+  import EmptyState from './EmptyState.svelte';
+
+  // ── Props ──────────────────────────────────────────────────────────────────
+
+  let {
+    activities = [],
+    loading = false,
+    maxItems = 10,
+    showEmpty = true,
+    compact = false,
+  }: {
+    activities?: Activity[];
+    loading?: boolean;
+    maxItems?: number;
+    showEmpty?: boolean;
+    compact?: boolean;
+  } = $props();
+
+  // ── Derived ────────────────────────────────────────────────────────────────
+
+  const visible = $derived(activities.slice(0, maxItems));
+
+  function iconForType(type: string): string {
+    const icons: Record<string, string> = {
+      task:    'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
+      call:    'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.1 19.79 19.79 0 0 1 1.61 4.5 2 2 0 0 1 3.6 2.32h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.76-.76a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z',
+      meeting: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm8 4a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm4 2v-2a4 4 0 0 0-3-3.87',
+      email:   'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm0 0l8 8 8-8',
+    };
+    return icons[type] ?? icons.task;
+  }
+
+  function colorForStatus(status: string): string {
+    if (status === 'completed') return 'var(--color-success-500)';
+    if (status === 'overdue')   return 'var(--color-danger-500)';
+    return 'var(--color-primary-500)';
+  }
+
+  function typeLabel(type: string): string {
+    const map: Record<string, string> = {
+      task:    t('activities.task'),
+      call:    t('activities.call'),
+      meeting: t('activities.meeting'),
+      email:   t('activities.email'),
+    };
+    return map[type] ?? type;
+  }
+</script>
+
+<div class="activity-feed" class:compact>
+  {#if loading}
+    {#each Array(3) as _, i (i)}
+      <div class="activity-skeleton">
+        <div class="skeleton activity-icon-skeleton"></div>
+        <div class="activity-skeleton-content">
+          <div class="skeleton activity-skeleton-title"></div>
+          <div class="skeleton activity-skeleton-meta"></div>
+        </div>
+      </div>
+    {/each}
+  {:else if visible.length === 0}
+    {#if showEmpty}
+      <EmptyState
+        icon="activities"
+        title={t('activities.noActivities')}
+        compact={true}
+      />
+    {/if}
+  {:else}
+    <ul class="activity-list" role="list">
+      {#each visible as activity (activity.id)}
+        <li class="activity-item" class:completed={activity.status === 'completed'}>
+          <!-- Icon -->
+          <div
+            class="activity-icon-wrap"
+            style="color: {colorForStatus(activity.status)};"
+            aria-hidden="true"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d={iconForType(activity.type)} />
+            </svg>
+          </div>
+
+          <!-- Content -->
+          <div class="activity-content">
+            <p class="activity-subject">{activity.subject}</p>
+            <div class="activity-meta">
+              <span class="activity-type-label">{typeLabel(activity.type)}</span>
+              {#if activity.contactName}
+                <span class="activity-dot" aria-hidden="true">·</span>
+                <span>{activity.contactName}</span>
+              {/if}
+              {#if activity.dueDate}
+                <span class="activity-dot" aria-hidden="true">·</span>
+                <span
+                  class="activity-time"
+                  class:overdue={activity.status === 'overdue'}
+                >
+                  {formatRelativeTime(activity.dueDate)}
+                </span>
+              {/if}
+            </div>
+          </div>
+
+          <!-- Status badge -->
+          {#if !compact}
+            <span class="badge {activity.status === 'completed' ? 'badge-success' : activity.status === 'overdue' ? 'badge-danger' : 'badge-neutral'} activity-status">
+              {t(`activities.${activity.status}`)}
+            </span>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  {/if}
+</div>
+
+<style>
+  .activity-feed {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+    padding: var(--space-4) 0;
+    border-block-end: var(--border-width) solid var(--border-subtle);
+    transition: opacity var(--duration-fast) var(--ease-out);
+  }
+
+  .activity-item:last-child {
+    border-block-end: none;
+  }
+
+  .activity-item.completed {
+    opacity: 0.6;
+  }
+
+  .activity-icon-wrap {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: var(--surface-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-block-start: 2px;
+  }
+
+  .activity-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .activity-subject {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .activity-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+  }
+
+  .activity-type-label {
+    text-transform: capitalize;
+  }
+
+  .activity-dot {
+    color: var(--border-strong);
+  }
+
+  .activity-time.overdue {
+    color: var(--text-danger);
+  }
+
+  .activity-status {
+    flex-shrink: 0;
+    margin-block-start: 2px;
+  }
+
+  /* Skeleton */
+  .activity-skeleton {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4) 0;
+  }
+
+  .activity-icon-skeleton {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .activity-skeleton-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .activity-skeleton-title {
+    height: 13px;
+    width: 60%;
+    border-radius: var(--border-radius-sm);
+  }
+
+  .activity-skeleton-meta {
+    height: 11px;
+    width: 40%;
+    border-radius: var(--border-radius-sm);
+  }
+</style>
