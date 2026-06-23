@@ -890,6 +890,64 @@ fn migration_v3_bridges_legacy_organization_contacts_without_deleting_contacts()
 }
 
 #[test]
+fn normalization_migration_preflight_reports_clean_migrated_database() {
+    let (core, path) = open_test_core();
+
+    let report = core
+        .normalization_migration_preflight()
+        .expect("preflight report should be generated");
+
+    assert_eq!(report.legacy_organization_contacts, 0);
+    assert_eq!(report.contacts_with_org_id_missing_organization_id, 0);
+    assert_eq!(report.contacts_with_invalid_organization_links, 0);
+    assert!(report.backup_restore_baseline_available);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn normalization_migration_preflight_counts_legacy_and_invalid_links() {
+    let (core, path) = open_test_core();
+
+    let now = now_iso8601();
+    core.db
+        .conn
+        .execute_batch(&format!(
+            r#"
+            INSERT INTO contacts
+                (id, contact_type, first_name, last_name, org_name, email, phone,
+                 address, city, country, org_id, organization_id, notes,
+                 created_at, updated_at, device_id)
+            VALUES
+                ('legacy-org', 'organization', '', '', 'Legacy Org', '', '',
+                 '', '', '', NULL, NULL, '', '{now}', '{now}', 'device-a'),
+                ('person-with-missing-normalized', 'person', 'Amina', 'Diallo', 'Legacy Org', '', '',
+                 '', '', '', 'legacy-org', NULL, '', '{now}', '{now}', 'device-a'),
+                ('person-as-org', 'person', 'Wrong', 'Type', '', '', '',
+                 '', '', '', NULL, NULL, '', '{now}', '{now}', 'device-a'),
+                ('person-with-invalid-org-id', 'person', 'Invalid', 'Legacy Link', '', '', '',
+                 '', '', '', 'person-as-org', NULL, '', '{now}', '{now}', 'device-a'),
+                ('person-with-invalid-organization-id', 'person', 'Invalid', 'Normalized Link', '', '', '',
+                 '', '', '', NULL, 'missing-organization', '', '{now}', '{now}', 'device-a');
+            "#
+        ))
+        .expect("test contacts should be inserted");
+
+    let report = core
+        .normalization_migration_preflight()
+        .expect("preflight report should be generated");
+
+    assert_eq!(report.legacy_organization_contacts, 1);
+    assert_eq!(report.contacts_with_org_id_missing_organization_id, 2);
+    assert_eq!(report.contacts_with_invalid_organization_links, 2);
+    assert!(report.backup_restore_baseline_available);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn migration_v2_creates_required_readiness_tables() {
     let (core, path) = open_test_core();
 

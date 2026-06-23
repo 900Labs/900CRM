@@ -27,6 +27,7 @@ pub mod dashboard;
 pub mod db;
 pub mod deals;
 pub mod external_clients;
+pub mod migration_readiness;
 pub mod notes;
 pub mod organizations;
 pub mod proposed_actions;

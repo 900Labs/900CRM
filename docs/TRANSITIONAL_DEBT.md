@@ -65,6 +65,16 @@ surfaces, Settings UI controls, and confirmed-only restore. That reduces the
 data-preservation risk before future destructive normalization, but it does not
 by itself authorize a destructive contacts-table rewrite.
 
+The normalization preflight now reports the remaining migration hazards without
+mutating data:
+
+- Active legacy organization contacts still stored in `contacts`.
+- Active contacts with `org_id` but no normalized `organization_id`.
+- Active contacts whose legacy or normalized organization link points at a
+  missing, deleted, or wrong-type organization record.
+- Whether the local backup/restore baseline is present before destructive work
+  is even considered.
+
 Remaining debt:
 
 - The old contacts table still contains organization-specific columns and
@@ -76,8 +86,15 @@ Remaining debt:
 
 Cleanup direction:
 
-- Keep organization CRUD in `storage::organizations` and `services::organizations`.
-- Move remaining organization-as-contact UX into normalized organization flows
-  only after data-preservation and rollback decisions are explicit.
-- Do not destructively normalize the `contacts` table until users have a clear
-  migration/rollback path.
+1. Require a fresh local backup and successful backup validation.
+2. Run the normalization preflight and resolve invalid organization links first.
+3. Mirror any remaining valid `org_id` links into `organization_id` without
+   deleting legacy data.
+4. Move remaining organization-as-contact UX into normalized organization flows
+   only after data-preservation and rollback decisions are explicit.
+5. Only after the preflight reports no blockers, plan a separate destructive
+   migration for legacy organization contact rows and legacy columns.
+
+Do not destructively normalize the `contacts` table until users have a clear
+migration/rollback path and the destructive migration has its own focused
+sprint.

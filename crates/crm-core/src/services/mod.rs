@@ -29,11 +29,13 @@ use crate::utils::{
 mod audit;
 mod backup;
 mod contacts;
+mod migration_readiness;
 mod organizations;
 mod proposed_actions;
 mod settings;
 
 pub use backup::{LocalBackup, LocalBackupMetadata, LocalBackupValidation, LocalRestoreResult};
+pub use migration_readiness::NormalizationMigrationPreflight;
 
 #[cfg(test)]
 mod tests;

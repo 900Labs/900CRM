@@ -71,6 +71,23 @@ Organization mutations now go through `crm-core` services and repositories:
 - Desktop Tauri commands remain thin IPC wrappers over `crm-core`; they do not
   own SQL.
 
+## Normalization Migration Readiness
+
+`crm-core` now exposes a non-mutating normalization migration preflight for the
+remaining contacts/organizations cleanup. The report counts:
+
+- Active legacy organization contacts still stored in `contacts` with
+  `contact_type = 'organization'`.
+- Active contacts that still have `org_id` but no normalized
+  `organization_id`.
+- Active contacts whose `org_id` or `organization_id` points at a missing,
+  deleted, or wrong-type organization record.
+- Whether the backup/restore baseline is available on the local database before
+  any destructive migration is considered.
+
+The preflight is intentionally read-only. It does not rewrite contacts, remove
+legacy columns, or authorize a destructive normalization.
+
 ## Backup and Restore Foundation
 
 `crm-core` exposes local backup primitives for future high-risk migrations, and
