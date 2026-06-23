@@ -1,0 +1,12 @@
+[package]
+name = "crm-sdk"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Placeholder SDK crate for future 900CRM integrations"
+
+[dependencies]
+crm-core = { path = "../crm-core" }
