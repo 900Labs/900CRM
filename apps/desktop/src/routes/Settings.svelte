@@ -9,7 +9,7 @@
    *   4. Date format — 4 preset formats
    *   5. Sync — enable/disable toggle + server URL
    *   6. About — 900 Labs mission statement
-   *   7. Data management — export all, import data
+   *   7. Data management — export, import, local backup/restore
    *
    * Each setting auto-saves via settingsStore.updateSetting().
    * No separate Save button needed — changes apply immediately.
@@ -21,12 +21,27 @@
   import { availableLocales } from '$lib/i18n';
   import { uiStore } from '$lib/stores/ui';
   import type { AppSettings } from '$lib/api/settings';
+  import {
+    createLocalBackup,
+    restoreLocalBackupToAppData,
+    validateLocalBackup,
+    type LocalBackupMetadata,
+    type LocalBackupValidation,
+  } from '$lib/api/backup';
   import ImportExport from '$lib/components/ImportExport.svelte';
 
   // ── Types ────────────────────────────────────────────────────────────────────
 
   type ThemeOption = 'light' | 'dark' | 'system';
   type DateFormat  = 'YYYY-MM-DD' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'MMM D, YYYY';
+  type BackupOperation = 'create' | 'validate' | 'prepareRestore' | 'restore' | null;
+  type BackupStatus = { type: 'success' | 'error' | 'info'; message: string };
+  type BackupDetails = {
+    backupDir: string;
+    createdAt: string;
+    schemaVersion: number;
+    databaseFile: string;
+  };
 
   // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -71,6 +86,11 @@
   let syncUrlDirty = $state(false);
 
   let showImportExport = $state(false);
+  let backupOperation = $state<BackupOperation>(null);
+  let backupStatus = $state<BackupStatus | null>(null);
+  let backupDetails = $state<BackupDetails | null>(null);
+  let restoreCandidate = $state<LocalBackupValidation | null>(null);
+  const isBackupBusy = $derived(backupOperation !== null);
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -142,6 +162,142 @@
 
   function handleImportData() {
     showImportExport = true;
+  }
+
+  async function chooseBackupFolder(): Promise<string | null> {
+    try {
+      const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
+      const selected = await openDialog({
+        directory: true,
+        multiple: false,
+        title: t('settings.chooseBackupFolder'),
+      });
+
+      return typeof selected === 'string' ? selected : null;
+    } catch {
+      uiStore.toastError(t('settings.folderPickerFailed'));
+      return null;
+    }
+  }
+
+  function formatBackupDate(value: string): string {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  }
+
+  function setBackupDetails(backupDir: string, metadata: LocalBackupMetadata) {
+    backupDetails = {
+      backupDir,
+      createdAt: formatBackupDate(metadata.createdAt),
+      schemaVersion: metadata.schemaVersion,
+      databaseFile: metadata.databaseFile,
+    };
+  }
+
+  function getBackupErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    return t('errors.generic');
+  }
+
+  function setBackupFailure(error: unknown) {
+    const message = getBackupErrorMessage(error);
+    backupStatus = { type: 'error', message };
+    uiStore.toastError(message);
+  }
+
+  async function handleCreateBackup() {
+    const backupDir = await chooseBackupFolder();
+    if (!backupDir) {
+      return;
+    }
+
+    backupOperation = 'create';
+    backupStatus = null;
+    restoreCandidate = null;
+    try {
+      const backup = await createLocalBackup(backupDir);
+      setBackupDetails(backup.backupDir, backup.metadata);
+      backupStatus = { type: 'success', message: t('settings.backupCreated') };
+      uiStore.toastSuccess(t('settings.backupCreated'));
+    } catch (error) {
+      setBackupFailure(error);
+    } finally {
+      backupOperation = null;
+    }
+  }
+
+  async function handleValidateBackup() {
+    const backupDir = await chooseBackupFolder();
+    if (!backupDir) {
+      return;
+    }
+
+    backupOperation = 'validate';
+    backupStatus = null;
+    restoreCandidate = null;
+    try {
+      const validation = await validateLocalBackup(backupDir);
+      setBackupDetails(validation.backupDir, validation.metadata);
+      backupStatus = { type: 'success', message: t('settings.backupValidated') };
+      uiStore.toastSuccess(t('settings.backupValidated'));
+    } catch (error) {
+      setBackupFailure(error);
+    } finally {
+      backupOperation = null;
+    }
+  }
+
+  async function handlePrepareRestore() {
+    const backupDir = await chooseBackupFolder();
+    if (!backupDir) {
+      return;
+    }
+
+    backupOperation = 'prepareRestore';
+    backupStatus = null;
+    restoreCandidate = null;
+    try {
+      const validation = await validateLocalBackup(backupDir);
+      restoreCandidate = validation;
+      setBackupDetails(validation.backupDir, validation.metadata);
+      backupStatus = { type: 'info', message: t('settings.restoreReady') };
+      uiStore.toast(t('settings.restoreReady'), 'info');
+    } catch (error) {
+      setBackupFailure(error);
+    } finally {
+      backupOperation = null;
+    }
+  }
+
+  function handleCancelRestore() {
+    restoreCandidate = null;
+    backupStatus = { type: 'info', message: t('settings.restoreCanceled') };
+    uiStore.toast(t('settings.restoreCanceled'), 'info');
+  }
+
+  async function handleConfirmRestore() {
+    if (!restoreCandidate) {
+      return;
+    }
+
+    backupOperation = 'restore';
+    backupStatus = null;
+    try {
+      const result = await restoreLocalBackupToAppData(restoreCandidate.backupDir, true);
+      setBackupDetails(restoreCandidate.backupDir, result.metadata);
+      restoreCandidate = null;
+      backupStatus = { type: 'success', message: t('settings.restoreCompleted') };
+      uiStore.toastSuccess(t('settings.restoreCompleted'));
+    } catch (error) {
+      setBackupFailure(error);
+    } finally {
+      backupOperation = null;
+    }
   }
 </script>
 
@@ -461,6 +617,108 @@
               </svg>
               {t('settings.importData')}
             </button>
+          </div>
+
+          <div class="data-action data-action--stacked">
+            <div class="data-action-main">
+              <div class="data-action-info">
+                <span class="data-action-label">{t('settings.localBackup')}</span>
+                <span class="data-action-desc">{t('settings.localBackupDesc')}</span>
+              </div>
+            </div>
+
+            <div class="backup-actions" aria-label={t('settings.localBackup')}>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick={handleCreateBackup}
+                disabled={isBackupBusy}
+                type="button"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                </svg>
+                {backupOperation === 'create' ? t('settings.creatingBackup') : t('settings.createBackup')}
+              </button>
+
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick={handleValidateBackup}
+                disabled={isBackupBusy}
+                type="button"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <path d="M20 6L9 17l-5-5"/>
+                </svg>
+                {backupOperation === 'validate' ? t('settings.validatingBackup') : t('settings.validateBackup')}
+              </button>
+
+              <button
+                class="btn btn-secondary btn-sm btn-danger-soft"
+                onclick={handlePrepareRestore}
+                disabled={isBackupBusy}
+                type="button"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/>
+                  <path d="M3 3v5h5M12 7v5l3 3"/>
+                </svg>
+                {backupOperation === 'prepareRestore' ? t('settings.validatingBackup') : t('settings.restoreBackup')}
+              </button>
+            </div>
+
+            {#if backupStatus}
+              <div class="backup-status backup-status--{backupStatus.type}" role="status">
+                {backupStatus.message}
+              </div>
+            {/if}
+
+            {#if backupDetails}
+              <dl class="backup-details" aria-label={t('settings.backupDetails')}>
+                <div>
+                  <dt>{t('settings.backupPath')}</dt>
+                  <dd>{backupDetails.backupDir}</dd>
+                </div>
+                <div>
+                  <dt>{t('settings.createdAt')}</dt>
+                  <dd>{backupDetails.createdAt}</dd>
+                </div>
+                <div>
+                  <dt>{t('settings.schemaVersion')}</dt>
+                  <dd>{backupDetails.schemaVersion}</dd>
+                </div>
+                <div>
+                  <dt>{t('settings.databaseFile')}</dt>
+                  <dd>{backupDetails.databaseFile}</dd>
+                </div>
+              </dl>
+            {/if}
+
+            {#if restoreCandidate}
+              <div class="restore-confirmation" role="alert">
+                <div>
+                  <span class="restore-confirmation-title">{t('settings.restoreConfirmTitle')}</span>
+                  <span class="restore-confirmation-desc">{t('settings.restoreConfirmDesc')}</span>
+                </div>
+                <div class="restore-confirmation-actions">
+                  <button
+                    class="btn btn-secondary btn-sm"
+                    onclick={handleCancelRestore}
+                    disabled={backupOperation === 'restore'}
+                    type="button"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                  <button
+                    class="btn btn-primary btn-sm"
+                    onclick={handleConfirmRestore}
+                    disabled={backupOperation === 'restore'}
+                    type="button"
+                  >
+                    {backupOperation === 'restore' ? t('settings.restoringBackup') : t('settings.confirmRestore')}
+                  </button>
+                </div>
+              </div>
+            {/if}
           </div>
         </div>
       </section>
@@ -863,6 +1121,18 @@
     border: var(--border-width) solid var(--border-default);
   }
 
+  .data-action--stacked {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .data-action-main {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+
   .data-action-info {
     display: flex;
     flex-direction: column;
@@ -879,5 +1149,107 @@
   .data-action-desc {
     font-size: var(--text-xs);
     color: var(--text-secondary);
+  }
+
+  .backup-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .backup-actions .btn {
+    flex: 1 1 120px;
+    justify-content: center;
+  }
+
+  .btn-danger-soft {
+    color: var(--color-danger);
+    border-color: color-mix(in srgb, var(--color-danger) 35%, var(--border-default));
+  }
+
+  .btn-danger-soft:hover:not(:disabled) {
+    border-color: var(--color-danger);
+    background-color: color-mix(in srgb, var(--color-danger) 8%, var(--surface-raised));
+  }
+
+  .backup-status {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+    line-height: 1.5;
+  }
+
+  .backup-status--success {
+    color: var(--color-success);
+    background-color: color-mix(in srgb, var(--color-success) 10%, transparent);
+  }
+
+  .backup-status--error {
+    color: var(--color-danger);
+    background-color: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  }
+
+  .backup-status--info {
+    color: var(--text-accent);
+    background-color: var(--surface-active);
+  }
+
+  .backup-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: 0;
+    padding: var(--space-3) 0 0 0;
+    border-block-start: var(--border-width) solid var(--border-default);
+  }
+
+  .backup-details div {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .backup-details dt {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+  }
+
+  .backup-details dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--text-xs);
+    color: var(--text-primary);
+  }
+
+  .restore-confirmation {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    border: var(--border-width) solid color-mix(in srgb, var(--color-danger) 35%, var(--border-default));
+    background-color: color-mix(in srgb, var(--color-danger) 7%, var(--surface-default));
+  }
+
+  .restore-confirmation-title {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--color-danger);
+  }
+
+  .restore-confirmation-desc {
+    display: block;
+    margin-block-start: var(--space-1);
+    font-size: var(--text-xs);
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+
+  .restore-confirmation-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
   }
 </style>

@@ -27,6 +27,7 @@
   // ── State ───────────────────────────────────────────────────────────────────
 
   let currentRoute = $state('/');
+  let localeReady = $state(isLocaleReady());
 
   // ── Navigation ─────────────────────────────────────────────────────────────
 
@@ -98,6 +99,7 @@
 
     // Load settings (applies theme + locale)
     await settingsStore.loadSettings();
+    localeReady = isLocaleReady();
 
     // Listen for hash changes
     window.addEventListener('hashchange', () => {
@@ -198,7 +200,7 @@
     {/if}
 
     <!-- Route content -->
-    {#if isLocaleReady()}
+    {#if localeReady}
       {@render children()}
     {:else}
       <div class="locale-loading">
