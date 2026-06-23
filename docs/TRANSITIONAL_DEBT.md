@@ -60,9 +60,10 @@ deleting or rewriting the original contacts. Contact linking now writes
 `contacts.organization_id` and mirrors `contacts.org_id`.
 
 The backup foundation now provides `crm-core` methods for full local SQLite
-backup creation, metadata validation, and confirmed-only restore. That reduces
-the data-preservation risk before future destructive normalization, but it does
-not by itself authorize a destructive contacts-table rewrite.
+backup creation, metadata and SQLite integrity validation, desktop command/API
+surfaces, Settings UI controls, and confirmed-only restore. That reduces the
+data-preservation risk before future destructive normalization, but it does not
+by itself authorize a destructive contacts-table rewrite.
 
 Remaining debt:
 
@@ -77,7 +78,6 @@ Cleanup direction:
 
 - Keep organization CRUD in `storage::organizations` and `services::organizations`.
 - Move remaining organization-as-contact UX into normalized organization flows
-  only after backup UX, restore UX, and data-preservation decisions are
-  explicit.
+  only after data-preservation and rollback decisions are explicit.
 - Do not destructively normalize the `contacts` table until users have a clear
   migration/rollback path.

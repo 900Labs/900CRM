@@ -33,8 +33,10 @@ compatibility before replacing any local database.
 
 Backups are not uploaded or transmitted by the core app. They contain the same
 CRM data as the local database and should be protected with the same care.
-Restore remains explicitly confirmed by the caller; validation alone does not
-replace user data.
+Restore remains explicitly confirmed by the caller and the Settings UI; backup
+validation alone does not replace user data. Validation includes metadata,
+schema/readiness checks, and SQLite `quick_check` integrity validation before a
+restore can proceed.
 
 ## AI and MCP Boundary
 
@@ -48,8 +50,7 @@ mutating CRM records directly.
 ## Deferred Privacy Work
 
 - App lock and local encryption are not implemented in this sprint.
-- Backup encryption and user-facing backup storage controls are not implemented
-  in this sprint.
+- Backup encryption and backup scheduling are not implemented in this sprint.
 - Remote MCP binding is out of scope.
 - Sync server behavior is out of scope.
 - External-client approval UI is out of scope.

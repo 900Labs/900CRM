@@ -76,6 +76,9 @@ Full-text search across contacts, deals, and activities. Instant results as you 
 ### Import / Export
 Bring your existing data in with one-click CSV import for contacts, deals, and activities. Export any data set to CSV for use in spreadsheets, accounting tools, or data migration. Your data is always portable.
 
+### Local Backup / Restore
+Create a full local database backup, validate backup integrity, and restore only after an explicit destructive confirmation. See [Backup and Restore Baseline](docs/BACKUP_RESTORE.md) for the current safety model and verification checklist.
+
 ### Internationalization (i18n)
 The entire interface is localized. Switch languages in settings instantly. Full right-to-left (RTL) layout support for Arabic and future RTL languages. Community translations welcome.
 
@@ -227,7 +230,7 @@ Pass criteria:
 
 Runtime artifact policy:
 - `.svelte-kit/`, generated `build/` contents, and other generated outputs are local artifacts and are not part of the source-of-truth architecture contract.
-- `apps/desktop/build/.gitkeep` is tracked only so Tauri config validation can compile from a fresh checkout.
+- The Tauri build script creates the ignored `apps/desktop/build/` directory when Cargo validates `frontendDist` before a frontend build exists.
 - CI/release pipelines generate runtime bundles from source on demand.
 - Pull requests should focus on source files (`apps/desktop/src/`, `apps/desktop/src-tauri/`, `crates/`, `docs/`) rather than checked-in generated trees.
 
