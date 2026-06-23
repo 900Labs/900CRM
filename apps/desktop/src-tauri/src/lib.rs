@@ -54,7 +54,7 @@ pub fn run() {
             );
 
             app.manage(AppState {
-                core: Mutex::new(core),
+                core: Mutex::new(Some(core)),
                 data_dir: app_data_dir,
             });
 
@@ -100,6 +100,9 @@ pub fn run() {
             commands::custom_field_commands::delete_custom_field_def,
             commands::custom_field_commands::set_custom_field_value,
             commands::custom_field_commands::list_custom_field_values,
+            commands::backup_commands::create_local_backup,
+            commands::backup_commands::validate_local_backup,
+            commands::backup_commands::restore_local_backup_to_app_data,
             commands::import_export::import_contacts_csv,
             commands::import_export::export_contacts_csv,
             commands::import_export::import_deals_csv,
