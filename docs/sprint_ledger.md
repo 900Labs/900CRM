@@ -15,3 +15,4 @@
 | 011 | 2026-03-05 | `sprint-011-multi-currency-display` | Multi-currency-safe dashboard/pipeline value display with grouped currency totals and normalized currency handling | Completed |
 | 012 | 2026-03-05 | `sprint-012-email-integration-optional` | Optional IMAP/SMTP settings with lightweight endpoint tests and local `mailto` compose action | Completed |
 | 013 | 2026-03-05 | `sprint-013-hausa-bengali-translations` | Hausa and Bengali full-locale support with i18n lazy-loader wiring and roadmap/doc closure | Completed |
+| 014 | 2026-06-23 | `codex/backup-ui-surface-preserve` | Backup API wrappers, Settings Data Management controls, explicit restore confirmation, tests, and backup/restore docs | Completed |
