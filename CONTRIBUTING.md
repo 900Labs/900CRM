@@ -78,17 +78,14 @@ Use a descriptive branch name:
 Make sure all [prerequisites](README.md#prerequisites) are installed first, then:
 
 ```bash
-# Install Node.js frontend dependencies
+# Install root workspace dependencies, including the npm-managed Tauri CLI
 npm install
-
-# Install the Tauri CLI (only needed once)
-cargo install tauri-cli --version "^2.0"
 ```
 
 ### 6. Run in development mode
 
 ```bash
-cargo tauri dev
+npm run tauri -- dev
 ```
 
 The 900CRM window should open. You are ready to work.
@@ -130,32 +127,41 @@ Platform-specific system dependencies are listed in the [README Quick Start](REA
 ### Useful Commands
 
 ```bash
-# Start development server with hot-reload
-cargo tauri dev
+# Start the desktop app with hot-reload
+npm run tauri -- dev
 
-# Type-check the frontend
+# Start only the Svelte dev server
+npm run dev
+
+# Type-check the desktop frontend
 npm run check
 
-# Lint the frontend
+# Check the Rust workspace
+cargo check --workspace
+
+# Lint the frontend workspace
 npm run lint
 
-# Format all frontend files
+# Format frontend and docs files
 npm run format
 
-# Run Rust linting (from project root)
-cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+# Run Rust linting
+cargo clippy --workspace -- -D warnings
 
 # Format Rust code
-cargo fmt --manifest-path src-tauri/Cargo.toml
+cargo fmt --all
 
-# Run Rust unit tests
-cargo test --manifest-path src-tauri/Cargo.toml
+# Run Rust unit and integration tests
+cargo test --workspace
 
 # Run frontend tests (vitest)
 npm run test
 
-# Build for production
-cargo tauri build
+# Build the frontend production bundle
+npm run build
+
+# Build desktop installers
+npm run tauri -- build
 ```
 
 ---
@@ -166,51 +172,47 @@ Understanding where things live helps you know where to make changes.
 
 ```
 900crm/
-├── src/                          # Svelte 5 frontend source
-│   ├── lib/
-│   │   ├── components/           # Reusable Svelte components
-│   │   │   ├── contacts/         # Contact list, detail panel, editor form
-│   │   │   ├── pipeline/         # Kanban board, deal cards, stage editor
-│   │   │   ├── activities/       # Activity feed, task editor, calendar view
-│   │   │   ├── dashboard/        # Metric cards, mini charts, recent feed
-│   │   │   └── shared/           # Buttons, inputs, badges, modals, toasts
-│   │   ├── stores/               # Svelte 5 rune-based reactive state
-│   │   ├── api/                  # Typed wrappers around Tauri invoke calls
-│   │   ├── i18n/                 # Translation JSON files + i18n loader
-│   │   └── utils/                # Date formatting, CSV helpers, validators
-│   └── routes/                   # SvelteKit routes (pages)
-│       ├── +layout.svelte        # App shell: sidebar nav, top bar
-│       ├── dashboard/            # /dashboard route
-│       ├── contacts/             # /contacts and /contacts/[id] routes
-│       ├── pipeline/             # /pipeline (kanban board) route
-│       ├── activities/           # /activities route
-│       └── settings/             # /settings route
-├── src-tauri/                    # Rust backend
-│   ├── src/
-│   │   ├── main.rs               # Tauri app setup, plugin registration
-│   │   ├── commands/             # Tauri #[tauri::command] IPC handlers
-│   │   │   ├── contacts.rs       # create_contact, get_contact, list_contacts, update_contact, delete_contact
-│   │   │   ├── deals.rs          # Deal + pipeline stage CRUD
-│   │   │   ├── activities.rs     # Activity CRUD, completion tracking
-│   │   │   ├── search.rs         # full_text_search command
-│   │   │   ├── import_export.rs  # import_csv, export_csv commands
-│   │   │   └── settings.rs       # get_settings, update_settings
-│   │   ├── crm_engine/           # Business logic, decoupled from Tauri
-│   │   │   ├── contacts.rs       # Contact domain logic, validation
-│   │   │   ├── deals.rs          # Pipeline logic, stage transitions
-│   │   │   ├── activities.rs     # Activity scheduling, overdue detection
-│   │   │   └── search.rs         # FTS5 index management, query builder
-│   │   ├── storage/              # Database layer (rusqlite)
-│   │   │   ├── schema.rs         # Schema DDL, migration runner
-│   │   │   ├── queries.rs        # Typed SQL query functions
-│   │   │   └── sync.rs           # Changelog table, sync push/pull
-│   │   └── utils/                # Error types, CSV parser, common helpers
-│   ├── capabilities/             # Tauri v2 IPC permission definitions
-│   ├── icons/                    # App icons (all required sizes)
-│   └── tauri.conf.json           # App identifier, window config, bundle config
+├── apps/
+│   └── desktop/
+│       ├── src/                  # Svelte 5 frontend source
+│       │   ├── lib/
+│       │   │   ├── components/   # Reusable Svelte components
+│       │   │   ├── stores/       # Svelte 5 rune-based reactive state
+│       │   │   ├── api/          # Typed wrappers around Tauri invoke calls
+│       │   │   ├── i18n/         # Translation JSON files + i18n loader
+│       │   │   ├── services/     # Frontend service helpers
+│       │   │   └── utils/        # Date formatting, CSV helpers, validators
+│       │   ├── routes/           # SvelteKit routes and route components
+│       │   ├── app.css           # Global styles and design tokens
+│       │   ├── app.d.ts
+│       │   └── app.html
+│       ├── src-tauri/            # Tauri shell and IPC command layer
+│       │   ├── src/
+│       │   │   ├── main.rs       # Native entry point
+│       │   │   ├── lib.rs        # Tauri app setup, plugin registration
+│       │   │   ├── state.rs      # Managed application state
+│       │   │   └── commands/     # Tauri #[tauri::command] IPC handlers
+│       │   ├── capabilities/     # Tauri v2 IPC permission definitions
+│       │   ├── icons/            # App icons (all required sizes)
+│       │   └── tauri.conf.json   # App identifier, window config, bundle config
+│       ├── package.json
+│       ├── svelte.config.js
+│       ├── tsconfig.json
+│       └── vite.config.ts
+├── crates/
+│   ├── crm-core/                 # Shared Rust CRM domain, storage, services
+│   │   └── src/
+│   │       ├── crm_engine/       # Business logic, decoupled from Tauri
+│   │       ├── storage/          # Database layer (rusqlite)
+│   │       ├── domain/           # Domain models
+│   │       ├── services/         # Application services
+│   │       ├── search/           # Search support
+│   │       └── import_export/    # CSV import/export support
+│   ├── crm-mcp/                  # MCP integration placeholder
+│   └── crm-sdk/                  # SDK placeholder
+├── scripts/                      # Root verification helpers
 ├── plugins/                      # Plugin directory (v2.0 planned)
 │   └── README.md                 # Plugin development guide
-├── tests/                        # Integration tests
 └── .github/
     ├── workflows/
     │   ├── ci.yml                # CI: lint, type-check, test, build
@@ -228,8 +230,8 @@ Consistent code style makes the project easier to read and review for everyone, 
 
 ### Rust
 
-- **Formatting:** Run `cargo fmt` before committing. CI will reject unformatted code.
-- **Linting:** Run `cargo clippy -- -D warnings`. Fix all warnings. Do not use `#[allow(...)]` without a comment explaining why.
+- **Formatting:** Run `cargo fmt --all` before committing. CI will reject unformatted code.
+- **Linting:** Run `cargo clippy --workspace -- -D warnings`. Fix all warnings. Do not use `#[allow(...)]` without a comment explaining why.
 - **Documentation:** All public functions, structs, enums, and traits must have `///` doc comments. Explain *what* the item does and *why* it exists.
 
   ```rust
@@ -252,7 +254,7 @@ Consistent code style makes the project easier to read and review for everyone, 
 
 ### TypeScript
 
-- **Strict mode:** `tsconfig.json` has `strict: true`. Do not disable it.
+- **Strict mode:** `apps/desktop/tsconfig.json` has `strict: true`. Do not disable it.
 - **Explicit return types** on all exported functions.
 - **JSDoc on exports:**
 
@@ -307,7 +309,7 @@ Consistent code style makes the project easier to read and review for everyone, 
 
 ### CSS
 
-- Reference CSS custom properties defined in `src/lib/styles/tokens.css`. Do not hardcode colour values, spacing, or font sizes.
+- Reference CSS custom properties defined in `apps/desktop/src/app.css`. Do not hardcode colour values, spacing, or font sizes.
 
   ```css
   /* Good */
@@ -385,10 +387,10 @@ on first launch. Data from v1.0.0 is fully preserved.
 
 ```bash
 # Run all Rust unit and integration tests
-cargo test --manifest-path src-tauri/Cargo.toml
+cargo test --workspace
 
 # Run a specific Rust test
-cargo test --manifest-path src-tauri/Cargo.toml test_contact_import_utf8
+cargo test --workspace test_contact_import_utf8
 
 # Run frontend unit tests (vitest)
 npm run test
@@ -436,7 +438,7 @@ mod tests {
 ### Writing Frontend Tests (vitest)
 
 ```typescript
-// src/lib/utils/formatters.test.ts
+// apps/desktop/src/lib/utils/formatters.test.ts
 import { describe, it, expect } from 'vitest';
 import { formatDealValue } from './formatters';
 
@@ -470,9 +472,9 @@ When adding new code, write tests for:
 
 ### Before You Open a PR
 
-1. All tests pass: `cargo test` and `npm run test`
-2. No lint errors: `npm run lint` and `cargo clippy -- -D warnings`
-3. Code is formatted: `npm run format` and `cargo fmt`
+1. All tests pass: `cargo test --workspace` and `npm run test`
+2. No lint errors: `npm run lint` and `cargo clippy --workspace -- -D warnings`
+3. Code is formatted: `npm run format` and `cargo fmt --all`
 4. If your change touches the UI, include a screenshot or screen recording
 5. Update documentation affected by your change
 6. Complete the mission guardrails checklist in `docs/OPEN_SOURCE_GUARDRAIL_CHECKLIST.md`
@@ -499,8 +501,8 @@ Fill in all sections of the PR template:
 All PRs must pass:
 - `npm run check` — TypeScript type checking
 - `npm run lint` — ESLint and Svelte checks
-- `cargo clippy -- -D warnings` — Rust linting
-- `cargo test` — Rust unit tests
+- `cargo clippy --workspace -- -D warnings` — Rust linting
+- `cargo test --workspace` — Rust unit tests
 - `npm run test` — Frontend unit tests
 - Build must succeed on Ubuntu, Windows, and macOS
 
@@ -546,14 +548,14 @@ We need more test coverage, particularly for:
 
 ## Translation Guide
 
-All user-facing strings live in JSON files under `src/lib/i18n/`. Adding a new language requires only five steps.
+All user-facing strings live in JSON files under `apps/desktop/src/lib/i18n/`. Adding a new language requires only five steps.
 
 ### Adding a New Language
 
 **Step 1 — Copy the English base file**
 
 ```bash
-cp src/lib/i18n/en.json src/lib/i18n/LANGUAGE_CODE.json
+cp apps/desktop/src/lib/i18n/en.json apps/desktop/src/lib/i18n/LANGUAGE_CODE.json
 ```
 
 Replace `LANGUAGE_CODE` with an [IETF language tag](https://www.iana.org/assignments/language-subtag-registry) (e.g., `pt` for Portuguese, `vi` for Vietnamese, `ha` for Hausa).
@@ -581,7 +583,7 @@ For example, in French:
 
 **Step 3 — Register the language**
 
-In `src/lib/i18n/index.ts`, add your language metadata to `availableLocales`:
+In `apps/desktop/src/lib/i18n/index.ts`, add your language metadata to `availableLocales`:
 
 ```typescript
 export const availableLocales: LocaleInfo[] = [
@@ -617,7 +619,7 @@ Open a PR with your new translation file. In the PR description, indicate what p
 ### Updating an Existing Translation
 
 If you find a translation that is incorrect, unclear, or outdated:
-1. Edit the relevant `src/lib/i18n/LANGUAGE_CODE.json` file
+1. Edit the relevant `apps/desktop/src/lib/i18n/LANGUAGE_CODE.json` file
 2. Submit a PR with a brief explanation of the change
 
 ---
@@ -626,18 +628,18 @@ If you find a translation that is incorrect, unclear, or outdated:
 
 | Module | Path | Primary Maintainer | Description |
 |---|---|---|---|
-| CRM Engine — Contacts | `src-tauri/src/crm_engine/contacts.rs` | Community | Contact domain logic |
-| CRM Engine — Deals | `src-tauri/src/crm_engine/deals.rs` | Community | Pipeline and deal logic |
-| CRM Engine — Activities | `src-tauri/src/crm_engine/activities.rs` | Community | Activity scheduling |
-| CRM Engine — Search | `src-tauri/src/crm_engine/search.rs` | Community | FTS5 index management |
-| Storage Layer | `src-tauri/src/storage/` | 900 Labs Core | SQLite schema and queries |
-| Sync Engine | `src-tauri/src/storage/sync.rs` | 900 Labs Core | Changelog-based sync |
-| Tauri Commands | `src-tauri/src/commands/` | Community | IPC command handlers |
-| Frontend — Pipeline | `src/lib/components/pipeline/` | Community | Kanban UI components |
-| Frontend — Contacts | `src/lib/components/contacts/` | Community | Contact UI components |
-| Frontend — Activities | `src/lib/components/activities/` | Community | Activity UI components |
-| Frontend — Dashboard | `src/lib/components/dashboard/` | Community | Dashboard metrics UI |
-| Internationalization | `src/lib/i18n/` | Community | Translation files |
+| CRM Engine — Contacts | `crates/crm-core/src/crm_engine/contacts.rs` | Community | Contact domain logic |
+| CRM Engine — Deals | `crates/crm-core/src/crm_engine/deals.rs` | Community | Pipeline and deal logic |
+| CRM Engine — Activities | `crates/crm-core/src/crm_engine/activities.rs` | Community | Activity scheduling |
+| CRM Engine — Search | `crates/crm-core/src/crm_engine/search.rs` | Community | FTS5 index management |
+| Storage Layer | `crates/crm-core/src/storage/` | 900 Labs Core | SQLite schema and queries |
+| Sync Engine | `crates/crm-core/src/storage/sync.rs` | 900 Labs Core | Changelog-based sync |
+| Tauri Commands | `apps/desktop/src-tauri/src/commands/` | Community | IPC command handlers |
+| Frontend — Pipeline | `apps/desktop/src/lib/components/KanbanBoard.svelte` | Community | Kanban UI components |
+| Frontend — Contacts | `apps/desktop/src/lib/components/ContactCard.svelte` | Community | Contact UI components |
+| Frontend — Activities | `apps/desktop/src/lib/components/ActivityFeed.svelte` | Community | Activity UI components |
+| Frontend — Dashboard | `apps/desktop/src/routes/Dashboard.svelte` | Community | Dashboard metrics UI |
+| Internationalization | `apps/desktop/src/lib/i18n/` | Community | Translation files |
 | CI/Release pipeline | `.github/workflows/` | 900 Labs Core | Build and release automation |
 
 "Community" means the module is open for community contributions. "900 Labs Core" means changes should be discussed in an issue first.

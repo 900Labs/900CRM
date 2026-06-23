@@ -184,21 +184,22 @@ cd 900crm
 npm install
 ```
 
-**Step 3 — Install the Tauri CLI**
+**Step 3 — Run the fast checks**
 
 ```bash
-cargo install tauri-cli --version "^2.0"
+npm run check
+cargo check --workspace
 ```
 
-This compiles the Tauri CLI from source. The first run takes several minutes; subsequent runs use the cached build.
+These commands use the root npm and Cargo workspaces to validate the desktop frontend and Rust crates.
 
 **Step 4 — Run in development mode**
 
 ```bash
-cargo tauri dev
+npm run tauri -- dev
 ```
 
-This starts the Svelte dev server with hot-reload, compiles the Rust backend, and opens the 900CRM window. Svelte changes hot-reload instantly; Rust changes trigger a recompile (10–30 seconds).
+This starts the Svelte dev server with hot-reload, compiles the Tauri shell, and opens the 900CRM window from `apps/desktop`. Use `npm run dev` when you only need the frontend dev server, `npm run build` for the frontend production bundle, and `cargo test --workspace` for Rust tests.
 
 ---
 
@@ -219,7 +220,7 @@ The installer is self-contained and does not require an internet connection to i
 
 ## Language Support
 
-900CRM is fully internationalized. Translations live in `src/lib/i18n/` and can be contributed by anyone.
+900CRM is fully internationalized. Translations live in `apps/desktop/src/lib/i18n/` and can be contributed by anyone.
 
 | Language | Code | Coverage | Status |
 |---|---|---|---|
@@ -248,7 +249,8 @@ To add a new language or improve an existing translation, see the [Translation G
 │                                                            │
 │  ┌─────────────────────────┐  ┌────────────────────────┐  │
 │  │   Rust Backend           │  │  WebView (UI)           │  │
-│  │   (src-tauri/src/)       │◄─┤  (Svelte 5 / TS)       │  │
+│  │ apps/desktop/src-tauri   │◄─┤  apps/desktop/src      │  │
+│  │ crates/crm-core          │  │  Svelte 5 / TS         │  │
 │  │                         │  │                        │  │
 │  │  • CRM Engine            │  │  • Dashboard           │  │
 │  │  • Storage (SQLite)      │  │  • Contacts view       │  │
@@ -272,61 +274,47 @@ For a deep dive into the module structure, data flow, sync protocol, and design 
 
 ```
 900crm/
-├── src/                          # Svelte 5 frontend source
-│   ├── lib/
-│   │   ├── components/           # Reusable Svelte components
-│   │   │   ├── contacts/         # Contact list, detail, editor
-│   │   │   ├── pipeline/         # Kanban board, deal cards
-│   │   │   ├── activities/       # Activity feed, task editor
-│   │   │   ├── dashboard/        # Metric cards, charts
-│   │   │   └── shared/           # Buttons, inputs, modals
-│   │   ├── stores/               # Svelte 5 rune-based state
-│   │   ├── api/                  # Tauri invoke wrappers
-│   │   ├── i18n/                 # Translation JSON files
-│   │   │   ├── en.json           # English (base)
-│   │   │   ├── fr.json           # French
-│   │   │   ├── es.json           # Spanish
-│   │   │   ├── ar.json           # Arabic (RTL)
-│   │   │   ├── sw.json           # Swahili
-│   │   │   ├── pt.json           # Portuguese (Brazil)
-│   │   │   ├── vi.json           # Vietnamese
-│   │   │   ├── ha.json           # Hausa
-│   │   │   ├── bn.json           # Bengali
-│   │   │   └── hi.json           # Hindi
-│   │   └── utils/                # Shared helpers
-│   └── routes/                   # SvelteKit routes
-│       ├── +layout.svelte        # App shell, nav, sidebar
-│       ├── dashboard/            # Dashboard route
-│       ├── contacts/             # Contacts routes
-│       ├── pipeline/             # Pipeline / deals route
-│       ├── activities/           # Activities route
-│       └── settings/             # Settings route
-├── src-tauri/                    # Tauri / Rust backend
-│   ├── src/
-│   │   ├── main.rs               # Entry point, Tauri setup
-│   │   ├── commands/             # Tauri IPC command handlers
-│   │   │   ├── contacts.rs       # CRUD for contacts
-│   │   │   ├── deals.rs          # CRUD for deals + pipeline
-│   │   │   ├── activities.rs     # CRUD for activities
-│   │   │   ├── search.rs         # Full-text search
-│   │   │   ├── import_export.rs  # CSV import/export
-│   │   │   └── settings.rs       # User preferences
-│   │   ├── crm_engine/           # Business logic layer
-│   │   │   ├── contacts.rs       # Contact domain logic
-│   │   │   ├── deals.rs          # Deal / pipeline logic
-│   │   │   ├── activities.rs     # Activity logic
-│   │   │   └── search.rs         # Search indexing
-│   │   ├── storage/              # Database access layer
-│   │   │   ├── schema.rs         # SQLite schema + migrations
-│   │   │   ├── queries.rs        # Typed query functions
-│   │   │   └── sync.rs           # Changelog-based sync
-│   │   └── utils/                # Shared utilities
-│   ├── capabilities/             # Tauri v2 permission definitions
-│   ├── icons/                    # App icons (all sizes)
-│   └── tauri.conf.json           # Tauri build configuration
+├── apps/
+│   └── desktop/
+│       ├── src/                  # Svelte 5 frontend source
+│       │   ├── lib/
+│       │   │   ├── components/   # Reusable Svelte components
+│       │   │   ├── stores/       # Svelte 5 rune-based state
+│       │   │   ├── api/          # Tauri invoke wrappers
+│       │   │   ├── i18n/         # Translation JSON files
+│       │   │   ├── services/     # Frontend service helpers
+│       │   │   └── utils/        # Shared frontend helpers
+│       │   ├── routes/           # SvelteKit routes and route components
+│       │   ├── app.css           # Global styles and design tokens
+│       │   ├── app.d.ts
+│       │   └── app.html
+│       ├── src-tauri/            # Tauri shell and IPC command layer
+│       │   ├── src/
+│       │   │   ├── main.rs
+│       │   │   ├── lib.rs
+│       │   │   ├── state.rs
+│       │   │   └── commands/     # Tauri command handlers
+│       │   ├── capabilities/     # Tauri v2 permission definitions
+│       │   ├── icons/            # App icons (all sizes)
+│       │   └── tauri.conf.json   # Tauri build configuration
+│       ├── package.json          # Desktop workspace scripts and deps
+│       ├── svelte.config.js
+│       ├── tsconfig.json
+│       └── vite.config.ts
+├── crates/
+│   ├── crm-core/                 # Shared Rust CRM domain, storage, services
+│   │   └── src/
+│   │       ├── crm_engine/       # Business rules
+│   │       ├── storage/          # SQLite access and sync persistence
+│   │       ├── domain/           # Domain models
+│   │       ├── services/         # Application services
+│   │       ├── search/           # Search support
+│   │       └── import_export/    # CSV import/export support
+│   ├── crm-mcp/                  # MCP integration placeholder
+│   └── crm-sdk/                  # SDK placeholder
+├── scripts/                      # Root verification helpers
 ├── plugins/                      # Community plugin directory
 │   └── README.md                 # Plugin development guide
-├── tests/                        # Integration tests
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml                # CI pipeline
@@ -341,10 +329,10 @@ For a deep dive into the module structure, data flow, sync protocol, and design 
 ├── LICENSE
 ├── README.md                     # You are here
 ├── SECURITY.md
-├── package.json
-├── svelte.config.js
-├── tsconfig.json
-└── vite.config.ts
+├── Cargo.toml                    # Rust workspace manifest
+├── package.json                  # Root npm workspace scripts
+├── package-lock.json
+└── pnpm-workspace.yaml
 ```
 
 ---

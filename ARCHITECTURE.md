@@ -25,7 +25,7 @@ If you are new to the codebase, read this document before diving into the source
 
 900CRM is a two-process desktop application built on [Tauri v2](https://tauri.app/). The two processes are:
 
-1. **Rust backend** — handles all data operations, business logic, file I/O, and import/export. Has full native OS access.
+1. **Rust backend** — a Tauri shell in `apps/desktop/src-tauri` plus shared CRM logic in `crates/crm-core`. Handles all data operations, business logic, file I/O, and import/export.
 2. **WebView frontend** — a Svelte 5 application rendered in the system WebView. Handles all UI rendering and user interaction. Cannot access the OS directly.
 
 The two processes communicate via **Tauri IPC**: the frontend calls named commands, the backend executes them, and returns results as serialized JSON.
@@ -36,7 +36,8 @@ The two processes communicate via **Tauri IPC**: the frontend calls named comman
 │                                                                  │
 │  ┌──────────────────────────┐    ┌────────────────────────────┐  │
 │  │      Rust Backend         │    │    WebView (Frontend)       │  │
-│  │   (src-tauri/src/)        │◄──►│    (Svelte 5 / TypeScript) │  │
+│  │ apps/desktop/src-tauri    │◄──►│    apps/desktop/src         │  │
+│  │ crates/crm-core           │    │    Svelte 5 / TypeScript   │  │
 │  │                          │    │                            │  │
 │  │  ┌────────────────────┐  │    │  ┌──────────────────────┐  │  │
 │  │  │   Tauri Commands   │  │    │  │   Routes / Pages     │  │  │
@@ -69,139 +70,104 @@ The two processes communicate via **Tauri IPC**: the frontend calls named comman
 
 ## Module Map
 
-### Rust Backend (`src-tauri/src/`)
+### Tauri Shell (`apps/desktop/src-tauri/src/`)
 
 ```
-src-tauri/src/
-├── main.rs                    Entry point. Configures and launches the Tauri app.
-│                              Registers all command handlers and managed state.
+apps/desktop/src-tauri/src/
+├── main.rs                    Native entry point.
+├── lib.rs                     Configures and launches the Tauri app.
+├── state.rs                   Managed application state shared by commands.
 │
 ├── commands/                  Tauri IPC command handlers.
 │   │                          These are thin wrappers: validate input, call
-│   │                          crm_engine, return serialized result or error.
+│   │                          crm-core services, return serialized result or error.
 │   │                          No business logic lives here.
 │   │
-│   ├── contacts.rs            create_contact, get_contact, list_contacts,
+│   ├── contact_commands.rs    create_contact, get_contact, list_contacts,
 │   │                          update_contact, delete_contact, search_contacts
 │   │
-│   ├── deals.rs               create_deal, get_deal, list_deals, update_deal,
+│   ├── deal_commands.rs       create_deal, get_deal, list_deals, update_deal,
 │   │                          delete_deal, move_deal_to_stage, list_pipeline_stages,
 │   │                          create_pipeline_stage, update_pipeline_stage
 │   │
-│   ├── activities.rs          create_activity, get_activity, list_activities,
+│   ├── activity_commands.rs   create_activity, get_activity, list_activities,
 │   │                          update_activity, delete_activity, complete_activity
-│   │
-│   ├── search.rs              full_text_search (searches contacts + deals + activities)
 │   │
 │   ├── import_export.rs       import_contacts_csv, export_contacts_csv,
 │   │                          import_deals_csv, export_deals_csv,
 │   │                          export_activities_csv, get_import_preview
 │   │
-│   └── settings.rs            get_settings, update_settings
-│
-├── crm_engine/                Business logic layer, fully decoupled from Tauri.
-│   │                          Testable in isolation. No Tauri types here.
-│   │
-│   ├── contacts.rs            Contact creation validation, duplicate detection,
-│   │                          tag normalization, relationship graph queries
-│   │
-│   ├── deals.rs               Pipeline stage transition rules, deal value
-│   │                          aggregation, win rate calculation, stage ordering
-│   │
-│   ├── activities.rs          Activity scheduling, overdue detection,
-│   │                          completion tracking, activity-to-entity linking
-│   │
-│   └── search.rs              FTS5 query building, result ranking, index
-│                              update triggers on entity mutation
-│
-├── storage/                   Database access layer. All SQL lives here.
-│   │
-│   ├── schema.rs              CREATE TABLE statements, schema version tracking,
-│   │                          migration runner (applies migrations in order)
-│   │
-│   ├── queries.rs             Typed query functions. Every SQL query is a
-│   │                          Rust function with typed parameters and results.
-│   │                          No raw SQL outside this module.
-│   │
-│   └── sync.rs                Changelog table management, push/pull logic,
-│                              conflict detection, last-write-wins merge
-│
-└── utils/                     Shared utilities used across all modules.
-    ├── errors.rs              Error types (CrmError enum with thiserror)
-    ├── csv.rs                 CSV parsing and serialization helpers
-    ├── datetime.rs            Timestamp formatting and timezone handling
-    └── ids.rs                 UUID v4 generation for entity IDs
+│   ├── dashboard_commands.rs  Dashboard metrics and summaries
+│   ├── report_commands.rs     Reporting command handlers
+│   ├── custom_field_commands.rs
+│   ├── organization_commands.rs
+│   ├── email_commands.rs
+│   ├── sync_commands.rs
+│   ├── backup_commands.rs
+│   └── settings_commands.rs   get_settings, update_settings
 ```
 
-### Frontend (`src/`)
+### CRM Core (`crates/crm-core/src/`)
 
 ```
-src/
-├── routes/                    SvelteKit routes (pages)
-│   ├── +layout.svelte         App shell: persistent sidebar navigation,
-│   │                          top bar with search, notifications badge
-│   ├── dashboard/
-│   │   └── +page.svelte       Dashboard metrics and recent activity feed
-│   ├── contacts/
-│   │   ├── +page.svelte       Contacts list with search and filter
-│   │   └── [id]/
-│   │       └── +page.svelte   Contact detail panel with activity timeline
-│   ├── pipeline/
-│   │   └── +page.svelte       Kanban board — deals grouped by stage
-│   ├── activities/
-│   │   └── +page.svelte       Activity feed with filters and bulk actions
-│   └── settings/
-│       └── +page.svelte       Language, theme, date format, data location
+crates/crm-core/src/
+├── crm_engine/                Business rules, fully decoupled from Tauri.
+│   ├── contacts.rs            Contact validation and relationship logic
+│   ├── deals.rs               Deal rules and pipeline calculations
+│   ├── activities.rs          Activity scheduling and completion tracking
+│   ├── pipeline.rs            Pipeline stage rules
+│   └── search.rs              Search query building and ranking
 │
-└── lib/
-    ├── components/            Reusable Svelte components
-    │   ├── contacts/          ContactCard, ContactEditor, ContactDetail,
-    │   │                      ContactImportDialog, TagBadge
-    │   ├── pipeline/          KanbanBoard, KanbanColumn, DealCard,
-    │   │                      DealEditor, StageEditor, PipelineSummary
-    │   ├── activities/        ActivityFeed, ActivityItem, ActivityEditor,
-    │   │                      ActivityFilters, OverdueBadge
-    │   ├── dashboard/         MetricCard, PipelineChart, RecentContacts,
-    │   │                      UpcomingActivities, WinRateDisplay
-    │   └── shared/            Button, Input, Select, Modal, Toast,
-    │                          Badge, Avatar, EmptyState, LoadingSpinner,
-    │                          ConfirmDialog, DatePicker, SearchInput
-    │
-    ├── stores/                Svelte 5 rune-based reactive state
-    │   ├── contacts.svelte.ts  contacts list, selected contact, filters
-    │   ├── deals.svelte.ts     pipeline stages, deals by stage
-    │   ├── activities.svelte.ts activity feed, filters
-    │   ├── search.svelte.ts    search query, results
-    │   └── settings.svelte.ts  user preferences
-    │
-    ├── api/                   Typed wrappers around Tauri invoke calls.
-    │   │                      Each function mirrors one Tauri command.
-    │   │                      All async, all return typed results or throw.
-    │   ├── contacts.ts
-    │   ├── deals.ts
-    │   ├── activities.ts
-    │   ├── search.ts
-    │   ├── importExport.ts
-    │   └── settings.ts
-    │
-    ├── i18n/                  Translation files and i18n loader
-    │   ├── index.ts           Language registry, locale loading, t() function
-    │   ├── en.json            English (base language, always 100%)
-    │   ├── fr.json            French
-    │   ├── es.json            Spanish
-    │   ├── ar.json            Arabic (RTL)
-    │   ├── sw.json            Swahili
-    │   └── hi.json            Hindi
-    │
-    ├── styles/
-    │   ├── tokens.css         Design tokens: colors, spacing, typography,
-    │   │                      border-radius, shadows
-    │   └── global.css         Reset, base styles, RTL overrides
-    │
-    └── utils/                 Shared helper functions
-        ├── formatters.ts      Currency, date, phone number formatting
-        ├── validators.ts      Email, phone, URL validation
-        └── sorting.ts         Entity sorting helpers
+├── storage/                   SQLite access layer. All SQL lives here.
+│   ├── db.rs                  Database opening and migration setup
+│   ├── contacts.rs            Contact persistence
+│   ├── deals.rs               Deal persistence
+│   ├── activities.rs          Activity persistence
+│   ├── sync.rs                Changelog and sync persistence
+│   ├── settings.rs            Settings persistence
+│   └── search.rs              FTS persistence
+│
+├── domain/                    Domain models shared by services and storage.
+├── services/                  Application services used by Tauri commands.
+├── search/                    Search support modules.
+├── import_export/             CSV import/export support.
+├── audit/                     Audit support.
+├── permissions/               Permission helpers.
+└── utils/                     Shared utility modules.
+```
+
+### Rust Placeholders (`crates/crm-mcp/`, `crates/crm-sdk/`)
+
+```
+crates/crm-mcp/src/main.rs     Placeholder for future MCP integration.
+crates/crm-sdk/src/lib.rs      Placeholder for future SDK exports.
+```
+
+### Frontend (`apps/desktop/src/`)
+
+```
+apps/desktop/src/
+├── routes/                    SvelteKit routes and route-level components
+│   ├── +layout.svelte         App shell: persistent sidebar navigation
+│   ├── +page.svelte           Default route
+│   ├── Dashboard.svelte       Dashboard metrics and recent activity feed
+│   ├── Contacts.svelte        Contacts list with search and filter
+│   ├── ContactDetail.svelte   Contact detail panel with activity timeline
+│   ├── Pipeline.svelte        Kanban board — deals grouped by stage
+│   ├── Activities.svelte      Activity feed with filters
+│   └── Settings.svelte        Language, theme, date format, data location
+│
+├── lib/
+│   ├── components/            Reusable Svelte components
+│   ├── stores/                Svelte 5 rune-based reactive state
+│   ├── api/                   Typed wrappers around Tauri invoke calls
+│   ├── i18n/                  Translation files and i18n loader
+│   ├── services/              Frontend service helpers
+│   └── utils/                 Shared helper functions
+│
+├── app.css                    Global styles and design tokens
+├── app.d.ts
+└── app.html
 ```
 
 ---
@@ -223,10 +189,10 @@ All components follow consistent patterns:
 
 ### State Management
 
-State is managed in store modules (`src/lib/stores/`). Each store is a Svelte module file (`.svelte.ts`) that exports reactive `$state` variables and mutating functions. Components subscribe by importing the store.
+State is managed in store modules (`apps/desktop/src/lib/stores/`). Each store exports reactive `$state` variables and mutating functions. Components subscribe by importing the store.
 
 ```typescript
-// src/lib/stores/contacts.svelte.ts
+// apps/desktop/src/lib/stores/contacts.ts
 let contacts = $state<Contact[]>([]);
 let loading = $state(false);
 
@@ -241,13 +207,13 @@ export { contacts, loading };
 
 ### API Layer
 
-The `src/lib/api/` layer provides typed wrappers around Tauri's `invoke()` function. This separation means:
+The `apps/desktop/src/lib/api/` layer provides typed wrappers around Tauri's `invoke()` function. This separation means:
 - Components never depend on the string names of Tauri commands
 - TypeScript enforces the correct argument and return types
 - The API layer can be mocked in unit tests without mocking Tauri
 
 ```typescript
-// src/lib/api/contacts.ts
+// apps/desktop/src/lib/api/contacts.ts
 import { invoke } from '@tauri-apps/api/core';
 import type { Contact, NewContact, UpdateContact } from '$lib/types';
 
@@ -281,25 +247,25 @@ Language switching is reactive and takes effect immediately without a page reloa
 
 ### Command Handlers
 
-Commands (`src-tauri/src/commands/`) are the entry points for all frontend requests. They follow a strict pattern:
+Commands (`apps/desktop/src-tauri/src/commands/`) are the entry points for all frontend requests. They follow a strict pattern:
 
 1. Deserialize input (Tauri handles JSON deserialization automatically)
-2. Validate input (call crm_engine validation functions)
+2. Validate input (call `crm-core` validation functions)
 3. Acquire a database connection from the managed connection pool
-4. Call the appropriate crm_engine function
+4. Call the appropriate `crm-core` service or engine function
 5. Return the result (Tauri serializes to JSON automatically)
 
 Commands contain no business logic. They are glue between the IPC layer and the engine.
 
 ### CRM Engine
 
-The engine (`src-tauri/src/crm_engine/`) contains all business logic. It is a pure Rust library with no Tauri dependencies. This makes it fully unit-testable without spinning up a Tauri application.
+The engine (`crates/crm-core/src/crm_engine/`) contains business logic. It is part of a pure Rust crate with no Tauri dependencies, which makes it unit-testable without spinning up a Tauri application.
 
 The engine functions take a `&Connection` parameter (the SQLite connection) and the domain input, and return `Result<T, CrmError>`. They call storage queries to read and write data, apply business rules, and return domain objects.
 
 ### Storage Layer
 
-The storage layer (`src-tauri/src/storage/`) owns all SQL. Every query is a Rust function with typed parameters and return types. No raw SQL strings appear anywhere outside this module. This ensures that all SQL is auditable in one place and that schema changes only require updating one module.
+The storage layer (`crates/crm-core/src/storage/`) owns SQL persistence. Every query is a Rust function with typed parameters and return types. This keeps SQL auditable in one place and isolates schema changes to the shared core crate.
 
 ---
 
@@ -316,7 +282,7 @@ ContactEditor.svelte → validates form fields locally
          │
          ▼
 [API layer]
-src/lib/api/contacts.ts → createContact(formData)
+apps/desktop/src/lib/api/contacts.ts → createContact(formData)
          │
          ▼
 [Tauri IPC bridge]
@@ -324,13 +290,13 @@ invoke('create_contact', { data: formData })
          │ (JSON serialized)
          ▼
 [Rust command handler]
-commands/contacts.rs → create_contact(data, state)
+apps/desktop/src-tauri/src/commands/contact_commands.rs → create_contact(data, state)
   • Input deserialized from JSON
   • State (DB connection pool) acquired
          │
          ▼
 [CRM Engine]
-crm_engine/contacts.rs → create_contact(&conn, new_contact)
+crates/crm-core/src/crm_engine/contacts.rs → create_contact(&conn, new_contact)
   • Validates required fields
   • Normalizes tags (lowercase, trim)
   • Checks for duplicate email
@@ -338,7 +304,7 @@ crm_engine/contacts.rs → create_contact(&conn, new_contact)
          │
          ▼
 [Storage layer]
-storage/queries.rs → insert_contact(&conn, contact)
+crates/crm-core/src/storage/contacts.rs → insert_contact(&conn, contact)
   • Executes INSERT INTO contacts ...
   • Inserts associated tags into contact_tags
   • Inserts changelog entry (for sync)
