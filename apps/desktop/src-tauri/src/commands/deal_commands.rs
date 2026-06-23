@@ -1,0 +1,105 @@
+use crm_core::storage::deals::{Deal, PipelineSummary};
+use tauri::State;
+
+use crate::AppState;
+
+#[tauri::command]
+pub async fn create_deal(
+    state: State<'_, AppState>,
+    title: String,
+    value: Option<f64>,
+    currency: Option<String>,
+    stage: Option<String>,
+    probability: Option<i32>,
+    expected_close: Option<String>,
+    contact_id: Option<String>,
+    notes: Option<String>,
+) -> Result<Deal, String> {
+    let mut core = super::lock_core(&state)?;
+    core.create_deal(
+        title,
+        value,
+        currency,
+        stage,
+        probability,
+        expected_close,
+        contact_id,
+        notes,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_deal(state: State<'_, AppState>, id: String) -> Result<Deal, String> {
+    let core = super::lock_core(&state)?;
+    core.get_deal(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_deals(state: State<'_, AppState>) -> Result<Vec<Deal>, String> {
+    let core = super::lock_core(&state)?;
+    core.list_deals().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_deals_by_stage(
+    state: State<'_, AppState>,
+    stage: String,
+) -> Result<Vec<Deal>, String> {
+    let core = super::lock_core(&state)?;
+    core.list_deals_by_stage(&stage).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_deal(
+    state: State<'_, AppState>,
+    id: String,
+    title: Option<String>,
+    value: Option<f64>,
+    currency: Option<String>,
+    stage: Option<String>,
+    probability: Option<i32>,
+    expected_close: Option<String>,
+    contact_id: Option<String>,
+    notes: Option<String>,
+) -> Result<Deal, String> {
+    let mut core = super::lock_core(&state)?;
+    core.update_deal(
+        &id,
+        title,
+        value,
+        currency,
+        stage,
+        probability,
+        expected_close,
+        contact_id,
+        notes,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn move_deal_stage(
+    state: State<'_, AppState>,
+    id: String,
+    stage: String,
+    probability: Option<i32>,
+) -> Result<Deal, String> {
+    let mut core = super::lock_core(&state)?;
+    core.move_deal_stage(&id, &stage, probability)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_deal(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let mut core = super::lock_core(&state)?;
+    core.delete_deal(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_pipeline_summary(
+    state: State<'_, AppState>,
+) -> Result<Vec<PipelineSummary>, String> {
+    let core = super::lock_core(&state)?;
+    core.get_pipeline_summary().map_err(|e| e.to_string())
+}

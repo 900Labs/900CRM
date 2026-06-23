@@ -3,6 +3,9 @@ node_modules/
 .svelte-kit/
 dist/
 build/
+target/
 src-tauri/target/
+apps/desktop/src-tauri/target/
 src-tauri/gen/
+apps/desktop/src-tauri/gen/
 .DS_Store
