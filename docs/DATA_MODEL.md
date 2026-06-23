@@ -80,7 +80,8 @@ Organization mutations now go through `crm-core` services and repositories:
 - Backup metadata records `created_at`, `app_version`, `schema_version`, and
   `device_id`.
 - `validate_local_backup` checks metadata compatibility, database schema
-  version, and required core table presence before any restore path can proceed.
+  version, required core table presence, and SQLite `quick_check` integrity
+  before any restore path can proceed.
 - Restore remains conservative: replacing an app database requires an explicit
   confirmation flag from the caller and should only run after the active core
   connection has been closed.

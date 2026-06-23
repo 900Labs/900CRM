@@ -175,6 +175,74 @@ fn invalid_restore_is_rejected_before_applying() {
 }
 
 #[test]
+fn corrupt_backup_database_is_rejected_by_integrity_validation() {
+    let (core, path) = open_test_core();
+    let backup_dir = path.join("backup");
+    let backup = core
+        .create_local_backup(&backup_dir)
+        .expect("backup should be created");
+
+    std::fs::write(&backup.database_path, b"not a sqlite database")
+        .expect("backup database should be overwritten with corrupt bytes");
+
+    let err = core
+        .validate_local_backup(&backup_dir)
+        .expect_err("corrupt backup should be rejected");
+    match err {
+        crate::utils::errors::CrmError::InvalidInput(message) => {
+            assert!(
+                message.contains("invalid") || message.contains("integrity check failed"),
+                "unexpected message: {message}"
+            );
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
+
+    let leftover_validation_files = std::fs::read_dir(&backup_dir)
+        .expect("backup dir should be readable")
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_string_lossy()
+                .contains("integrity-check")
+        })
+        .count();
+    assert_eq!(leftover_validation_files, 0);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn failed_confirmed_restore_removes_temporary_restore_file() {
+    let (core, path) = open_test_core();
+    let backup_dir = path.join("backup");
+    core.create_local_backup(&backup_dir)
+        .expect("backup should be created");
+
+    let restore_dir = path.join("restore-target");
+    let conflicting_database_dir = restore_dir.join("900crm.db");
+    std::fs::create_dir_all(&conflicting_database_dir)
+        .expect("conflicting database directory should be created");
+
+    let err = CrmCore::restore_local_backup_to_app_data(&restore_dir, &backup_dir, true)
+        .expect_err("restore should fail when target database path is a directory");
+    match err {
+        crate::utils::errors::CrmError::Io(_) => {}
+        other => panic!("expected Io restore failure, got {other:?}"),
+    }
+
+    assert!(
+        !restore_dir.join("900crm.db.restore_tmp").exists(),
+        "failed restore should remove temporary database copy"
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn activity_stats_query_counts_completed_overdue_and_due_today() {
     let (mut core, path) = open_test_core();
     let today = now_iso8601()[..10].to_string();

@@ -9,6 +9,7 @@ use crate::storage;
 use crate::utils::{
     datetime::now_iso8601,
     errors::{CrmError, CrmResult as InternalCrmResult},
+    uuid::new_uuid,
 };
 
 use super::CrmCore;
@@ -113,8 +114,10 @@ impl CrmCore {
             fs::remove_file(&temporary_restore_path)?;
         }
 
-        fs::copy(&validation.database_path, &temporary_restore_path)?;
-        replace_database_file(&temporary_restore_path, &target_database_path)?;
+        let mut restore_guard = TempFileGuard::prepare(&temporary_restore_path)?;
+        fs::copy(&validation.database_path, restore_guard.path())?;
+        replace_database_file(restore_guard.path(), &target_database_path)?;
+        restore_guard.disarm();
         remove_sidecar_if_exists(&target_database_path, "wal")?;
         remove_sidecar_if_exists(&target_database_path, "shm")?;
 
@@ -232,12 +235,16 @@ fn validate_backup_database(database_path: &Path, expected_schema_version: u32) 
         )));
     }
 
+    validate_sqlite_integrity(database_path)?;
+
     let conn = Connection::open_with_flags(
         database_path,
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-    )?;
-    let actual_schema_version: u32 =
-        conn.query_row("PRAGMA user_version;", [], |row| row.get(0))?;
+    )
+    .map_err(|err| invalid_backup_database(database_path, err))?;
+    let actual_schema_version: u32 = conn
+        .query_row("PRAGMA user_version;", [], |row| row.get(0))
+        .map_err(|err| invalid_backup_database(database_path, err))?;
 
     if actual_schema_version != expected_schema_version {
         return Err(CrmError::InvalidInput(format!(
@@ -246,16 +253,18 @@ fn validate_backup_database(database_path: &Path, expected_schema_version: u32) 
         )));
     }
 
-    let required_table_count: i64 = conn.query_row(
-        r#"
+    let required_table_count: i64 = conn
+        .query_row(
+            r#"
         SELECT COUNT(*)
         FROM sqlite_master
         WHERE type = 'table'
           AND name IN ('contacts', 'settings', 'sync_changelog')
         "#,
-        [],
-        |row| row.get(0),
-    )?;
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|err| invalid_backup_database(database_path, err))?;
 
     if required_table_count != 3 {
         return Err(CrmError::InvalidInput(format!(
@@ -264,6 +273,37 @@ fn validate_backup_database(database_path: &Path, expected_schema_version: u32) 
         )));
     }
 
+    Ok(())
+}
+
+fn validate_sqlite_integrity(database_path: &Path) -> CrmResult<()> {
+    let validation_copy_path = database_path.with_file_name(format!(
+        ".{}.integrity-check-{}",
+        database_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("900crm.db"),
+        new_uuid()
+    ));
+    let mut validation_guard = TempFileGuard::prepare(&validation_copy_path)?;
+    fs::copy(database_path, validation_guard.path())?;
+
+    let conn = Connection::open(validation_guard.path())
+        .map_err(|err| invalid_backup_database(database_path, err))?;
+    let check_result: String = conn
+        .query_row("PRAGMA quick_check;", [], |row| row.get(0))
+        .map_err(|err| invalid_backup_database(database_path, err))?;
+
+    drop(conn);
+
+    if check_result != "ok" {
+        return Err(CrmError::InvalidInput(format!(
+            "Backup database integrity check failed: {}",
+            check_result
+        )));
+    }
+
+    validation_guard.cleanup()?;
     Ok(())
 }
 
@@ -289,6 +329,60 @@ fn replace_database_file(source: &Path, target: &Path) -> CrmResult<()> {
     Ok(())
 }
 
+struct TempFileGuard {
+    path: PathBuf,
+    armed: bool,
+}
+
+impl TempFileGuard {
+    fn prepare(path: &Path) -> CrmResult<Self> {
+        match fs::remove_file(path) {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => return Err(CrmError::Io(err.to_string())),
+        }
+
+        Ok(Self {
+            path: path.to_path_buf(),
+            armed: true,
+        })
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+
+    fn cleanup(&mut self) -> CrmResult<()> {
+        if !self.armed {
+            return Ok(());
+        }
+
+        match fs::remove_file(&self.path) {
+            Ok(()) => {
+                self.armed = false;
+                Ok(())
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                self.armed = false;
+                Ok(())
+            }
+            Err(err) => Err(CrmError::Io(err.to_string())),
+        }
+    }
+}
+
+impl Drop for TempFileGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
+
 fn remove_sidecar_if_exists(database_path: &Path, extension: &str) -> CrmResult<()> {
     let sidecar = database_path.with_extension(format!(
         "{}-{}",
@@ -312,6 +406,14 @@ fn canonicalize_if_exists(path: &Path) -> InternalCrmResult<PathBuf> {
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(path.to_path_buf()),
         Err(err) => Err(CrmError::Io(err.to_string())),
     }
+}
+
+fn invalid_backup_database(path: &Path, err: rusqlite::Error) -> CrmError {
+    CrmError::InvalidInput(format!(
+        "Backup database '{}' is invalid: {}",
+        path.display(),
+        err
+    ))
 }
 
 fn path_to_string(path: &Path) -> String {
