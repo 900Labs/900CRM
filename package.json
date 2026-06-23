@@ -9,37 +9,19 @@
     "url": "https://github.com/900-labs/900crm"
   },
   "type": "module",
+  "workspaces": [
+    "apps/desktop"
+  ],
   "scripts": {
-    "dev": "vite dev",
-    "build": "vite build",
-    "preview": "vite preview",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "dev": "npm --workspace apps/desktop run dev",
+    "build": "npm --workspace apps/desktop run build",
+    "preview": "npm --workspace apps/desktop run preview",
+    "check": "node scripts/check-frontend.mjs",
+    "check:tooling": "node scripts/verify-frontend-tooling.mjs",
+    "check:watch": "npm --workspace apps/desktop run check:watch",
+    "test": "node scripts/test-frontend.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "tauri": "tauri"
-  },
-  "devDependencies": {
-    "@sveltejs/adapter-static": "^3.0.0",
-    "@sveltejs/kit": "^2.0.0",
-    "@sveltejs/vite-plugin-svelte": "^4.0.0",
-    "@tauri-apps/cli": "^2.0.0",
-    "@types/node": "^22.0.0",
-    "eslint": "^9.0.0",
-    "prettier": "^3.0.0",
-    "prettier-plugin-svelte": "^3.0.0",
-    "svelte": "^5.0.0",
-    "svelte-check": "^4.0.0",
-    "typescript": "^5.0.0",
-    "vite": "^6.0.0",
-    "vitest": "^2.0.0"
-  },
-  "dependencies": {
-    "@sveltejs/adapter-auto": "^3.0.0",
-    "@tauri-apps/api": "^2.0.0",
-    "@tauri-apps/plugin-dialog": "^2.0.0",
-    "@tauri-apps/plugin-fs": "^2.0.0",
-    "@tauri-apps/plugin-shell": "^2.0.0",
-    "@tauri-apps/plugin-notification": "^2.0.0"
+    "tauri": "npm --workspace apps/desktop run tauri"
   }
 }
