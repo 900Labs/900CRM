@@ -3,13 +3,20 @@
   import { t } from '$lib/i18n';
   import { uiStore } from '$lib/stores/ui';
   import { contactStore } from '$lib/stores/contacts';
+  import { organizationStore } from '$lib/stores/organizations';
   import { dealStore } from '$lib/stores/deals';
   import { activityStore } from '$lib/stores/activities';
   import { settingsStore } from '$lib/stores/settings';
   import { DEAL_STAGES } from '$lib/api/deals';
   import type { DealStage } from '$lib/api/deals';
+  import type { Contact } from '$lib/api/contacts';
   import type { ActivityType } from '$lib/api/activities';
+  import type { Organization } from '$lib/api/organizations';
   import { normalizeCurrencyCode } from '$lib/utils/currency';
+  import {
+    contactDisplayName,
+    loadDealRelationshipLookups,
+  } from '$lib/utils/dealRelationships';
   import {
     listCustomFieldDefinitions,
     setCustomFieldValue,
@@ -33,7 +40,12 @@
   let dealStage = $state<DealStage>('lead');
   let dealProbability = $state<number>(10);
   let dealExpectedCloseDate = $state('');
+  let dealContactId = $state('');
+  let dealOrganizationId = $state('');
   let dealDescription = $state('');
+  let dealRelationshipContacts = $state<Contact[]>([]);
+  let dealRelationshipOrganizations = $state<Organization[]>([]);
+  let loadingDealRelationships = $state(false);
 
   let isSavingActivity = $state(false);
   let activitySubject = $state('');
@@ -54,6 +66,28 @@
   let loadingActivityCustomFields = $state(false);
 
   let lastModal = $state<string | null>(null);
+
+  const dealContactOptions = $derived.by(() => {
+    const selected = contactStore.selectedContact;
+    if (!selected || selected.id !== dealContactId) {
+      return dealRelationshipContacts;
+    }
+    if (dealRelationshipContacts.some((contact) => contact.id === selected.id)) {
+      return dealRelationshipContacts;
+    }
+    return [selected, ...dealRelationshipContacts];
+  });
+
+  const dealOrganizationOptions = $derived.by(() => {
+    const selected = organizationStore.selectedOrganization;
+    if (!selected || selected.id !== dealOrganizationId) {
+      return dealRelationshipOrganizations;
+    }
+    if (dealRelationshipOrganizations.some((organization) => organization.id === selected.id)) {
+      return dealRelationshipOrganizations;
+    }
+    return [selected, ...dealRelationshipOrganizations];
+  });
 
   function modalDataString(key: string): string {
     const value = uiStore.modalData?.[key];
@@ -104,6 +138,8 @@
     dealStage = normalizeStage(modalDataString('stage'));
     dealProbability = defaultProbability(dealStage);
     dealExpectedCloseDate = '';
+    dealContactId = modalDataString('contactId');
+    dealOrganizationId = modalDataString('organizationId');
     dealDescription = '';
   }
 
@@ -171,6 +207,20 @@
     }
   }
 
+  async function prepareDealRelationships() {
+    loadingDealRelationships = true;
+    try {
+      const lookups = await loadDealRelationshipLookups();
+      dealRelationshipContacts = lookups.contacts;
+      dealRelationshipOrganizations = lookups.organizations;
+    } catch (err) {
+      console.error('[GlobalModalHost] Failed to load deal relationships:', err);
+      uiStore.toastError('Failed to load deal relationships.');
+    } finally {
+      loadingDealRelationships = false;
+    }
+  }
+
   async function prepareActivityCustomFields() {
     loadingActivityCustomFields = true;
     try {
@@ -218,6 +268,7 @@
     if (modal === 'addDeal') {
       resetDealForm();
       void prepareDealCustomFields();
+      void prepareDealRelationships();
     }
 
     if (modal === 'addActivity') {
@@ -271,7 +322,8 @@
         stage: dealStage,
         probability: dealProbability,
         expectedCloseDate: dealExpectedCloseDate || null,
-        contactId: modalDataString('contactId') || null,
+        contactId: dealContactId || null,
+        organizationId: dealOrganizationId || null,
         description: dealDescription.trim() || null,
         tags: [],
       });
@@ -404,6 +456,42 @@
           <label class="form-label" for="modal-deal-close-date">{t('deals.expectedClose')}</label>
           <input id="modal-deal-close-date" class="input" type="date" bind:value={dealExpectedCloseDate} />
         </div>
+        <div class="form-group">
+          <label class="form-label" for="modal-deal-organization">{t('contacts.organization')}</label>
+          <select
+            id="modal-deal-organization"
+            class="select"
+            bind:value={dealOrganizationId}
+            disabled={loadingDealRelationships || isSavingDeal}
+            aria-busy={loadingDealRelationships}
+          >
+            {#if loadingDealRelationships && dealOrganizationId}
+              <option value={dealOrganizationId}>{t('common.loading')}</option>
+            {/if}
+            <option value="">{loadingDealRelationships ? t('common.loading') : t('common.none')}</option>
+            {#each dealOrganizationOptions as organization (organization.id)}
+              <option value={organization.id}>{organization.name}</option>
+            {/each}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="modal-deal-contact">{t('deals.contact')}</label>
+          <select
+            id="modal-deal-contact"
+            class="select"
+            bind:value={dealContactId}
+            disabled={loadingDealRelationships || isSavingDeal}
+            aria-busy={loadingDealRelationships}
+          >
+            {#if loadingDealRelationships && dealContactId}
+              <option value={dealContactId}>{t('common.loading')}</option>
+            {/if}
+            <option value="">{loadingDealRelationships ? t('common.loading') : t('common.none')}</option>
+            {#each dealContactOptions as contact (contact.id)}
+              <option value={contact.id}>{contactDisplayName(contact)}</option>
+            {/each}
+          </select>
+        </div>
         <div class="form-group form-group--full">
           <label class="form-label" for="modal-deal-description">{t('deals.description')}</label>
           <textarea id="modal-deal-description" class="input textarea" rows="3" bind:value={dealDescription}></textarea>
@@ -422,7 +510,7 @@
     {/snippet}
     {#snippet footer()}
       <button class="btn btn-secondary" type="button" onclick={() => uiStore.closeModal()}>{t('common.cancel')}</button>
-      <button class="btn btn-primary" type="button" onclick={submitDeal} disabled={isSavingDeal}>
+      <button class="btn btn-primary" type="button" onclick={submitDeal} disabled={isSavingDeal || loadingDealRelationships}>
         {isSavingDeal ? t('common.loading') : t('common.save')}
       </button>
     {/snippet}
