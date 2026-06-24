@@ -125,6 +125,8 @@ pub fn run() {
             commands::report_commands::get_pipeline_conversion_report,
             commands::report_commands::get_activity_funnel_report,
             commands::search_commands::global_search,
+            commands::audit_pending_commands::list_recent_audit_log,
+            commands::audit_pending_commands::list_pending_proposed_actions,
             commands::backup_commands::create_local_backup,
             commands::backup_commands::validate_local_backup,
             commands::backup_commands::restore_local_backup_to_app_data,

@@ -874,6 +874,147 @@ fn create_proposed_action_writes_proposed_action_and_audit() {
 }
 
 #[test]
+fn list_pending_proposed_actions_returns_only_pending_actions_in_created_order() {
+    let (mut core, path) = open_test_core();
+
+    let approved_action = core
+        .create_external_proposed_action_stub(
+            None,
+            "create_activity".to_string(),
+            "create_activity_draft".to_string(),
+            Some("activity".to_string()),
+            None,
+            r#"{"title":"Done"}"#.to_string(),
+            None,
+        )
+        .expect("approved proposed action should be created");
+    core.db
+        .conn
+        .execute(
+            "UPDATE proposed_actions SET status = 'approved', approved_at = ?1 WHERE id = ?2",
+            params![now_iso8601(), &approved_action.id],
+        )
+        .expect("proposed action status should update");
+
+    let first_pending = core
+        .create_external_proposed_action_stub(
+            None,
+            "create_activity".to_string(),
+            "create_activity_draft".to_string(),
+            Some("activity".to_string()),
+            None,
+            r#"{"title":"First pending"}"#.to_string(),
+            None,
+        )
+        .expect("first pending proposed action should be created");
+    let second_pending = core
+        .create_external_proposed_action_stub(
+            None,
+            "create_activity".to_string(),
+            "create_activity_draft".to_string(),
+            Some("activity".to_string()),
+            None,
+            r#"{"title":"Second pending"}"#.to_string(),
+            None,
+        )
+        .expect("second pending proposed action should be created");
+    core.db
+        .conn
+        .execute(
+            "UPDATE proposed_actions SET created_at = '2026-06-24T08:00:00Z' WHERE id = ?1",
+            params![&first_pending.id],
+        )
+        .expect("first pending timestamp should update");
+    core.db
+        .conn
+        .execute(
+            "UPDATE proposed_actions SET created_at = '2026-06-24T09:00:00Z' WHERE id = ?1",
+            params![&second_pending.id],
+        )
+        .expect("second pending timestamp should update");
+
+    let pending = core
+        .list_pending_proposed_actions()
+        .expect("pending proposed actions should list");
+
+    assert_eq!(pending.len(), 2);
+    assert_eq!(pending[0].id, first_pending.id);
+    assert_eq!(pending[1].id, second_pending.id);
+    assert!(pending.iter().all(|action| action.status == "pending"));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn list_recent_audit_log_returns_latest_entries_with_storage_limit_floor() {
+    let (mut core, path) = open_test_core();
+
+    let first_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("First".to_string()),
+            Some("Contact".to_string()),
+            None,
+            Some("first.audit@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("first contact should be created");
+    let second_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Second".to_string()),
+            Some("Contact".to_string()),
+            None,
+            Some("second.audit@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("second contact should be created");
+
+    core.db
+        .conn
+        .execute(
+            "UPDATE audit_log SET created_at = '2026-06-24T08:00:00Z' WHERE entity_id = ?1",
+            params![&first_contact.id],
+        )
+        .expect("first audit timestamp should update");
+    core.db
+        .conn
+        .execute(
+            "UPDATE audit_log SET created_at = '2026-06-24T09:00:00Z' WHERE entity_id = ?1",
+            params![&second_contact.id],
+        )
+        .expect("second audit timestamp should update");
+
+    let latest = core
+        .list_recent_audit_log(1)
+        .expect("recent audit log should list");
+    assert_eq!(latest.len(), 1);
+    assert_eq!(
+        latest[0].entity_id.as_deref(),
+        Some(second_contact.id.as_str())
+    );
+
+    let floored = core
+        .list_recent_audit_log(0)
+        .expect("zero limit should be floored by storage");
+    assert_eq!(floored.len(), 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn create_organization_writes_organization_audit_and_sync() {
     let (mut core, path) = open_test_core();
 
