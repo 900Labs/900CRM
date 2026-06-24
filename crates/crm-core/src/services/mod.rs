@@ -41,6 +41,7 @@ mod settings;
 
 pub use backup::{LocalBackup, LocalBackupMetadata, LocalBackupValidation, LocalRestoreResult};
 pub use migration_readiness::NormalizationMigrationPreflight;
+pub use notes_tags::TagColorUpdate;
 
 #[cfg(test)]
 mod tests;
