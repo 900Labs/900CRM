@@ -667,7 +667,7 @@ pub fn search_contacts(conn: &Connection, query: &str) -> CrmResult<Vec<Contact>
         "#,
     )?;
 
-    let rows = stmt.query_map(params![fts_query], |row| row_to_contact(row))?;
+    let rows = stmt.query_map(params![fts_query], row_to_contact)?;
     let contacts: Vec<Contact> = rows.filter_map(|r| r.ok()).collect();
 
     log::debug!(

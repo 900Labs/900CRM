@@ -9,6 +9,8 @@ use crate::storage::{
 use super::{record_audit_json, CrmCore};
 
 impl CrmCore {
+    // Preserve the existing field-level service API used by Tauri command wiring.
+    #[allow(clippy::too_many_arguments)]
     pub fn create_contact(
         &mut self,
         contact_type: Option<String>,
@@ -86,6 +88,8 @@ impl CrmCore {
         storage::contacts::list_contacts(&self.db.conn, &params.unwrap_or_default())
     }
 
+    // Preserve the existing field-level service API used by Tauri command wiring.
+    #[allow(clippy::too_many_arguments)]
     pub fn update_contact(
         &mut self,
         id: &str,

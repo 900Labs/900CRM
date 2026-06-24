@@ -40,6 +40,8 @@ impl CrmCore {
         )
     }
 
+    // Preserve the placeholder API shape until external-client execution is implemented.
+    #[allow(clippy::too_many_arguments)]
     pub fn create_external_proposed_action_stub(
         &mut self,
         client_id: Option<String>,

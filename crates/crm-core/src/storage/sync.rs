@@ -177,7 +177,7 @@ pub fn get_all_pending_changes(conn: &Connection) -> CrmResult<Vec<SyncChange>> 
         "#,
     )?;
 
-    let rows = stmt.query_map([], |row| row_to_sync_change(row))?;
+    let rows = stmt.query_map([], row_to_sync_change)?;
     let changes: Vec<SyncChange> = rows.filter_map(|r| r.ok()).collect();
 
     log::debug!("get_all_pending_changes: {} entries", changes.len());

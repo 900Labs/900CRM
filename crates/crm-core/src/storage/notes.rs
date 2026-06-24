@@ -136,7 +136,7 @@ pub fn get_notes_for_entity(
         "#,
     )?;
 
-    let rows = stmt.query_map(params![entity_type, entity_id], |row| row_to_note(row))?;
+    let rows = stmt.query_map(params![entity_type, entity_id], row_to_note)?;
     let notes: Vec<Note> = rows.filter_map(|r| r.ok()).collect();
 
     log::debug!(
