@@ -45,6 +45,18 @@ export interface ContactListResponse {
   pageSize: number;
 }
 
+export type ContactDuplicateMatchType = 'email' | 'phone';
+
+export interface ContactDuplicateCandidate {
+  sourceId: string;
+  sourceDisplayLabel: string;
+  targetId: string;
+  targetDisplayLabel: string;
+  matchType: ContactDuplicateMatchType;
+  matchedValue: string;
+  reason: string;
+}
+
 interface BackendContact {
   id: string;
   contact_type: 'person' | 'organization' | string;
@@ -68,6 +80,16 @@ interface BackendContactListResponse {
   total: number;
   page: number;
   per_page: number;
+}
+
+interface BackendContactDuplicateCandidate {
+  source_id: string;
+  source_display_label: string;
+  target_id: string;
+  target_display_label: string;
+  match_type: ContactDuplicateMatchType;
+  matched_value: string;
+  reason: string;
 }
 
 function toNullable(value: string | null | undefined): string | null {
@@ -98,6 +120,20 @@ function mapContact(contact: BackendContact): Contact {
     createdAt: contact.created_at,
     updatedAt: contact.updated_at,
     deletedAt: contact.deleted_at,
+  };
+}
+
+function mapContactDuplicateCandidate(
+  candidate: BackendContactDuplicateCandidate,
+): ContactDuplicateCandidate {
+  return {
+    sourceId: candidate.source_id,
+    sourceDisplayLabel: candidate.source_display_label,
+    targetId: candidate.target_id,
+    targetDisplayLabel: candidate.target_display_label,
+    matchType: candidate.match_type,
+    matchedValue: candidate.matched_value,
+    reason: candidate.reason,
   };
 }
 
@@ -190,6 +226,13 @@ export async function deleteContact(id: string): Promise<void> {
 export async function searchContacts(query: string): Promise<Contact[]> {
   const contacts = await invoke<BackendContact[]>('search_contacts', { query });
   return contacts.map(mapContact);
+}
+
+export async function listContactDuplicateCandidates(): Promise<ContactDuplicateCandidate[]> {
+  const candidates = await invoke<BackendContactDuplicateCandidate[]>(
+    'list_contact_duplicate_candidates',
+  );
+  return candidates.map(mapContactDuplicateCandidate);
 }
 
 export async function mergeContacts(sourceId: string, targetId: string): Promise<Contact> {

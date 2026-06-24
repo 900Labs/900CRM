@@ -12,8 +12,16 @@ import {
   updateContact,
   deleteContact,
   searchContacts,
+  listContactDuplicateCandidates,
+  mergeContacts,
 } from '$lib/api/contacts';
-import type { Contact, CreateContactPayload, UpdateContactPayload, ListContactsParams } from '$lib/api/contacts';
+import type {
+  Contact,
+  ContactDuplicateCandidate,
+  CreateContactPayload,
+  UpdateContactPayload,
+  ListContactsParams,
+} from '$lib/api/contacts';
 import { uiStore } from './ui';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,6 +65,18 @@ class ContactStore {
 
   /** Whether a search is in progress. */
   isSearching = $state<boolean>(false);
+
+  /** Read-only duplicate merge candidates. */
+  duplicateCandidates = $state<ContactDuplicateCandidate[]>([]);
+
+  /** Whether duplicate candidates are being checked. */
+  duplicateCandidatesLoading = $state<boolean>(false);
+
+  /** Duplicate candidate load error, if any. */
+  duplicateCandidatesError = $state<string | null>(null);
+
+  /** Whether a duplicate merge is in progress. */
+  isMergingDuplicates = $state<boolean>(false);
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -179,6 +199,52 @@ class ContactStore {
       this.searchResults = [];
     } finally {
       this.isSearching = false;
+    }
+  }
+
+  /**
+   * Load read-only duplicate candidates for active contacts.
+   */
+  async loadDuplicateCandidates(): Promise<void> {
+    this.duplicateCandidatesLoading = true;
+    this.duplicateCandidatesError = null;
+    try {
+      this.duplicateCandidates = await listContactDuplicateCandidates();
+    } catch (err) {
+      this.duplicateCandidates = [];
+      this.duplicateCandidatesError = err instanceof Error ? err.message : 'Failed to check duplicates';
+      uiStore.toastError('Failed to check contact duplicates');
+      throw err;
+    } finally {
+      this.duplicateCandidatesLoading = false;
+    }
+  }
+
+  /**
+   * Merge one duplicate contact into another and refresh affected state.
+   */
+  async mergeDuplicateContacts(sourceId: string, targetId: string): Promise<Contact> {
+    this.isMergingDuplicates = true;
+    try {
+      const contact = await mergeContacts(sourceId, targetId);
+      await this.loadContacts();
+      try {
+        await this.loadDuplicateCandidates();
+      } catch {
+        // loadDuplicateCandidates already records inline state and a toast.
+      }
+      if (this.selectedContact?.id === sourceId) {
+        this.selectedContact = contact;
+      } else if (this.selectedContact?.id === targetId) {
+        this.selectedContact = contact;
+      }
+      uiStore.toastSuccess('Contacts merged');
+      return contact;
+    } catch (err) {
+      uiStore.toastError('Failed to merge contacts');
+      throw err;
+    } finally {
+      this.isMergingDuplicates = false;
     }
   }
 

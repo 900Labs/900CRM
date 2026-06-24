@@ -11,7 +11,7 @@
   import { t } from '$lib/i18n';
   import { contactStore } from '$lib/stores/contacts';
   import { uiStore } from '$lib/stores/ui';
-  import type { Contact } from '$lib/api/contacts';
+  import type { Contact, ContactDuplicateCandidate } from '$lib/api/contacts';
   import type { Column } from '$lib/components/DataTable.svelte';
   import { formatFullName, formatDate } from '$lib/utils/formatters';
   import { settingsStore } from '$lib/stores/settings';
@@ -34,6 +34,47 @@
   let selectedCustomFieldDefId = $state('');
   let customFieldQuery = $state('');
   let customFieldsLoading = $state(true);
+  let selectedDuplicateKey = $state('');
+  let mergeDirection = $state<'suggested' | 'swapped'>('suggested');
+
+  const selectedDuplicateCandidate = $derived(
+    contactStore.duplicateCandidates.find((candidate) => duplicateCandidateKey(candidate) === selectedDuplicateKey)
+      ?? contactStore.duplicateCandidates[0]
+      ?? null,
+  );
+  const duplicateMergePreview = $derived(
+    selectedDuplicateCandidate
+      ? mergeDirection === 'swapped'
+        ? {
+            sourceId: selectedDuplicateCandidate.targetId,
+            sourceLabel: selectedDuplicateCandidate.targetDisplayLabel,
+            targetId: selectedDuplicateCandidate.sourceId,
+            targetLabel: selectedDuplicateCandidate.sourceDisplayLabel,
+          }
+        : {
+            sourceId: selectedDuplicateCandidate.sourceId,
+            sourceLabel: selectedDuplicateCandidate.sourceDisplayLabel,
+            targetId: selectedDuplicateCandidate.targetId,
+            targetLabel: selectedDuplicateCandidate.targetDisplayLabel,
+          }
+      : null,
+  );
+  const duplicateControlsDisabled = $derived(
+    contactStore.duplicateCandidatesLoading || contactStore.isMergingDuplicates,
+  );
+
+  $effect(() => {
+    const candidates = contactStore.duplicateCandidates;
+    if (candidates.length === 0) {
+      selectedDuplicateKey = '';
+      mergeDirection = 'suggested';
+      return;
+    }
+    if (!candidates.some((candidate) => duplicateCandidateKey(candidate) === selectedDuplicateKey)) {
+      selectedDuplicateKey = duplicateCandidateKey(candidates[0]);
+      mergeDirection = 'suggested';
+    }
+  });
 
   // ── Column definitions ─────────────────────────────────────────────────────
 
@@ -79,6 +120,7 @@
   onMount(async () => {
     await Promise.all([
       contactStore.loadContacts(),
+      contactStore.loadDuplicateCandidates().catch(() => undefined),
       loadCustomFieldDefinitions(),
     ]);
   });
@@ -163,6 +205,54 @@
     customFieldQuery = '';
     await applyCustomFieldFilter();
   }
+
+  function duplicateCandidateKey(candidate: ContactDuplicateCandidate): string {
+    return [
+      candidate.matchType,
+      candidate.matchedValue,
+      candidate.sourceId,
+      candidate.targetId,
+    ].join(':');
+  }
+
+  function duplicateCandidateLabel(candidate: ContactDuplicateCandidate): string {
+    const matchLabel = candidate.matchType === 'email' ? t('contacts.email') : t('contacts.phone');
+    return t('contacts.duplicatesCandidateOption', {
+      source: candidate.sourceDisplayLabel,
+      target: candidate.targetDisplayLabel,
+      type: matchLabel,
+      value: candidate.matchedValue,
+    });
+  }
+
+  function handleDuplicateCandidateChange(event: Event) {
+    selectedDuplicateKey = (event.target as HTMLSelectElement).value;
+    mergeDirection = 'suggested';
+  }
+
+  async function refreshDuplicateCandidates() {
+    await contactStore.loadDuplicateCandidates();
+  }
+
+  async function handleMergeDuplicateCandidate() {
+    if (!duplicateMergePreview) {
+      return;
+    }
+
+    const confirmed = window.confirm(t('contacts.duplicatesConfirmMerge', {
+      source: duplicateMergePreview.sourceLabel,
+      target: duplicateMergePreview.targetLabel,
+    }));
+    if (!confirmed) {
+      return;
+    }
+
+    await contactStore.mergeDuplicateContacts(
+      duplicateMergePreview.sourceId,
+      duplicateMergePreview.targetId,
+    );
+    mergeDirection = 'suggested';
+  }
 </script>
 
 <div class="page-content contacts-page">
@@ -186,6 +276,14 @@
         type="button"
       >
         {t('common.import')} / {t('common.export')}
+      </button>
+      <button
+        class="btn btn-secondary btn-sm"
+        onclick={refreshDuplicateCandidates}
+        type="button"
+        disabled={duplicateControlsDisabled}
+      >
+        {contactStore.duplicateCandidatesLoading ? t('contacts.duplicatesChecking') : t('contacts.duplicatesCheck')}
       </button>
     </div>
   </div>
@@ -256,6 +354,91 @@
       </button>
     </div>
   </div>
+
+  {#if contactStore.duplicateCandidatesLoading || contactStore.duplicateCandidatesError || contactStore.duplicateCandidates.length > 0}
+    <section class="duplicate-warning" aria-live="polite">
+      {#if contactStore.duplicateCandidatesLoading}
+        <div class="duplicate-status">
+          <span class="duplicate-dot" aria-hidden="true"></span>
+          {t('contacts.duplicatesChecking')}
+        </div>
+      {:else if contactStore.duplicateCandidatesError}
+        <div class="duplicate-status duplicate-error">
+          <strong>{t('contacts.duplicatesCheckFailed')}</strong>
+          <span>{contactStore.duplicateCandidatesError}</span>
+          <button
+            class="btn btn-secondary btn-sm"
+            type="button"
+            onclick={refreshDuplicateCandidates}
+            disabled={duplicateControlsDisabled}
+          >
+            {t('contacts.duplicatesRetry')}
+          </button>
+        </div>
+      {:else if selectedDuplicateCandidate && duplicateMergePreview}
+        <div class="duplicate-summary">
+          <div>
+            <h2>{t('contacts.duplicatesFound', { count: contactStore.duplicateCandidates.length })}</h2>
+            <p>{selectedDuplicateCandidate.reason}</p>
+          </div>
+          <span class="duplicate-match">
+            {selectedDuplicateCandidate.matchType === 'email' ? t('contacts.email') : t('contacts.phone')}: {selectedDuplicateCandidate.matchedValue}
+          </span>
+        </div>
+
+        <div class="duplicate-controls">
+          <label class="duplicate-select-label" for="duplicate-candidate-select">
+            {t('contacts.duplicatesReviewLabel')}
+          </label>
+          <select
+            id="duplicate-candidate-select"
+            class="input duplicate-select"
+            value={selectedDuplicateKey}
+            onchange={handleDuplicateCandidateChange}
+            disabled={duplicateControlsDisabled}
+          >
+            {#each contactStore.duplicateCandidates as candidate (duplicateCandidateKey(candidate))}
+              <option value={duplicateCandidateKey(candidate)}>
+                {duplicateCandidateLabel(candidate)}
+              </option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="duplicate-merge-preview">
+          <div>
+            <span class="preview-label">{t('contacts.duplicatesSource')}</span>
+            <strong>{duplicateMergePreview.sourceLabel}</strong>
+          </div>
+          <div>
+            <span class="preview-label">{t('contacts.duplicatesTarget')}</span>
+            <strong>{duplicateMergePreview.targetLabel}</strong>
+          </div>
+          <button
+            class="btn btn-ghost btn-sm"
+            type="button"
+            onclick={() => mergeDirection = mergeDirection === 'suggested' ? 'swapped' : 'suggested'}
+            disabled={duplicateControlsDisabled}
+          >
+            {t('contacts.duplicatesSwap')}
+          </button>
+        </div>
+
+        <p class="duplicate-explanation">{t('contacts.duplicatesExplanation')}</p>
+
+        <div class="duplicate-actions">
+          <button
+            class="btn btn-primary btn-sm"
+            type="button"
+            onclick={handleMergeDuplicateCandidate}
+            disabled={duplicateControlsDisabled}
+          >
+            {contactStore.isMergingDuplicates ? t('contacts.duplicatesMerging') : t('contacts.duplicatesMergeAction')}
+          </button>
+        </div>
+      {/if}
+    </section>
+  {/if}
 
   <!-- Table -->
   <div class="contacts-table card">
@@ -350,6 +533,113 @@
     height: 34px;
   }
 
+  .duplicate-warning {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border: var(--border-width) solid var(--color-warning-500);
+    border-radius: var(--border-radius-lg);
+    background: var(--color-warning-50);
+  }
+
+  .duplicate-status {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+  }
+
+  .duplicate-error {
+    color: var(--text-danger);
+    flex-wrap: wrap;
+  }
+
+  .duplicate-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--color-warning-500);
+  }
+
+  .duplicate-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+
+  .duplicate-summary h2 {
+    margin: 0 0 var(--space-1);
+    font-size: var(--text-base);
+    line-height: 1.4;
+  }
+
+  .duplicate-summary p,
+  .duplicate-explanation {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+
+  .duplicate-match {
+    flex-shrink: 0;
+    padding: var(--space-1) var(--space-3);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: 9999px;
+    background: var(--surface-card);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+  }
+
+  .duplicate-controls {
+    display: grid;
+    grid-template-columns: minmax(140px, max-content) minmax(240px, 1fr);
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .duplicate-select-label,
+  .preview-label {
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    text-transform: uppercase;
+  }
+
+  .duplicate-select {
+    min-width: 0;
+    height: 34px;
+  }
+
+  .duplicate-merge-preview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .duplicate-merge-preview > div {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .duplicate-merge-preview strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .duplicate-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
   .filter-chip {
     padding: var(--space-2) var(--space-4);
     border-radius: 9999px;
@@ -376,5 +666,28 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+  }
+
+  @media (max-width: 760px) {
+    .duplicate-summary,
+    .duplicate-merge-preview {
+      grid-template-columns: 1fr;
+    }
+
+    .duplicate-summary {
+      display: grid;
+    }
+
+    .duplicate-controls {
+      grid-template-columns: 1fr;
+    }
+
+    .duplicate-actions {
+      justify-content: stretch;
+    }
+
+    .duplicate-actions .btn {
+      width: 100%;
+    }
   }
 </style>
