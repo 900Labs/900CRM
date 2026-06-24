@@ -76,6 +76,9 @@ Full-text search across contacts, deals, and activities. Instant results as you 
 ### Import / Export
 Bring your existing data in with one-click CSV import for contacts, deals, and activities. Export any data set to CSV for use in spreadsheets, accounting tools, or data migration. Your data is always portable.
 
+### Backup / Restore
+Create local SQLite backups from Settings, validate backup integrity before restore, and restore only after explicit confirmation. See [Backup and Restore](docs/BACKUP_RESTORE.md) for the safety workflow.
+
 ### Internationalization (i18n)
 The entire interface is localized. Switch languages in settings instantly. Full right-to-left (RTL) layout support for Arabic and future RTL languages. Community translations welcome.
 
@@ -105,7 +108,7 @@ Fixed broadband in Sub-Saharan Africa costs over 20% of per capita income. Mobil
 900CRM fills the gap: a **capable, beautiful CRM that works on a $200 laptop with no internet connection and no server** — and costs nothing to use.
 
 **Your data belongs to you.**
-There is no account to create, no cloud to sync to, no telemetry, no analytics. Your contacts, deals, and business relationships live in a SQLite database on your machine. You can back it up with a USB drive, move it to a new computer, or inspect it with any SQLite tool.
+There is no account to create, no cloud to sync to, no telemetry, no analytics. Your contacts, deals, and business relationships live in a SQLite database on your machine. You can back it up with the Settings data-management tools, copy it to a USB drive, move it to a new computer, or inspect it with any SQLite tool. See [Backup and Restore](docs/BACKUP_RESTORE.md) for the local backup workflow and restore safety checks.
 
 ---
 
@@ -257,6 +260,7 @@ To add a new language or improve an existing translation, see the [Translation G
 │  │  • Sync engine           │  │  • Pipeline kanban     │  │
 │  │  • IPC command server    │  │  • Activities feed     │  │
 │  │  • Import/Export         │  │  • Search              │  │
+│  │  • Backup/Restore        │  │  • Settings            │  │
 │  └─────────────────────────┘  └────────────────────────┘  │
 │            ▲                            │                   │
 │            └──── Tauri IPC bridge ──────┘                   │
@@ -365,6 +369,7 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for full details on how to get st
 - [x] Desktop reminders and notifications
 - [x] Email integration (IMAP/SMTP, optional)
 - [x] Multi-currency display
+- [x] Local backup validation and restore UI
 - [x] Additional languages: Portuguese (Brazilian), Vietnamese
 - [x] Additional languages: Hausa, Bengali
 
