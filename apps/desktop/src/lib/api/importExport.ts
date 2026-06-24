@@ -6,6 +6,33 @@ import { invoke } from '@tauri-apps/api/core';
 
 export type ImportExportEntity = 'contacts' | 'deals' | 'organizations';
 export type ImportPreflightEntity = 'contacts' | 'organizations';
+export type ContactImportTargetField =
+  | 'first_name'
+  | 'last_name'
+  | 'org_name'
+  | 'email'
+  | 'phone'
+  | 'address'
+  | 'city'
+  | 'country'
+  | 'notes';
+export type OrganizationImportTargetField =
+  | 'name'
+  | 'email'
+  | 'phone'
+  | 'website'
+  | 'address_line1'
+  | 'address_line2'
+  | 'city'
+  | 'region'
+  | 'country'
+  | 'postal_code'
+  | 'description';
+export type ImportTargetField = ContactImportTargetField | OrganizationImportTargetField;
+export type ImportColumnMapping<TTarget extends string = ImportTargetField> = Record<
+  string,
+  TTarget | null
+>;
 
 export interface ImportResult {
   created: number;
@@ -48,8 +75,25 @@ const preflightCommands: Record<ImportPreflightEntity, string> = {
   organizations: 'preflight_organizations_csv_import',
 };
 
+const importWithMappingCommands: Record<ImportPreflightEntity, string> = {
+  contacts: 'import_contacts_csv_with_mapping',
+  organizations: 'import_organizations_csv_with_mapping',
+};
+
+const preflightWithMappingCommands: Record<ImportPreflightEntity, string> = {
+  contacts: 'preflight_contacts_csv_import_with_mapping',
+  organizations: 'preflight_organizations_csv_import_with_mapping',
+};
+
 function filePathArgs(filePath: string) {
   return { file_path: filePath };
+}
+
+function filePathAndMappingArgs<TTarget extends string>(
+  filePath: string,
+  mapping: ImportColumnMapping<TTarget>,
+) {
+  return { file_path: filePath, mapping };
 }
 
 export async function importContactsCsv(filePath: string): Promise<ImportResult> {
@@ -64,6 +108,26 @@ export async function preflightContactsCsvImport(
   filePath: string,
 ): Promise<ImportPreflightReport> {
   return invoke<ImportPreflightReport>(preflightCommands.contacts, filePathArgs(filePath));
+}
+
+export async function importContactsCsvWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<ContactImportTargetField>,
+): Promise<ImportResult> {
+  return invoke<ImportResult>(
+    importWithMappingCommands.contacts,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
+export async function preflightContactsCsvImportWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<ContactImportTargetField>,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightWithMappingCommands.contacts,
+    filePathAndMappingArgs(filePath, mapping),
+  );
 }
 
 export async function importDealsCsv(filePath: string): Promise<ImportResult> {
@@ -88,6 +152,26 @@ export async function preflightOrganizationsCsvImport(
   return invoke<ImportPreflightReport>(preflightCommands.organizations, filePathArgs(filePath));
 }
 
+export async function importOrganizationsCsvWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<OrganizationImportTargetField>,
+): Promise<ImportResult> {
+  return invoke<ImportResult>(
+    importWithMappingCommands.organizations,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
+export async function preflightOrganizationsCsvImportWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<OrganizationImportTargetField>,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightWithMappingCommands.organizations,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
 export async function importCsv(
   entity: ImportExportEntity,
   filePath: string,
@@ -104,4 +188,26 @@ export async function preflightCsv(
   filePath: string,
 ): Promise<ImportPreflightReport> {
   return invoke<ImportPreflightReport>(preflightCommands[entity], filePathArgs(filePath));
+}
+
+export async function importCsvWithMapping(
+  entity: ImportPreflightEntity,
+  filePath: string,
+  mapping: ImportColumnMapping,
+): Promise<ImportResult> {
+  return invoke<ImportResult>(
+    importWithMappingCommands[entity],
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
+export async function preflightCsvWithMapping(
+  entity: ImportPreflightEntity,
+  filePath: string,
+  mapping: ImportColumnMapping,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightWithMappingCommands[entity],
+    filePathAndMappingArgs(filePath, mapping),
+  );
 }

@@ -14,12 +14,18 @@ import {
   exportDealsCsv,
   exportOrganizationsCsv,
   importContactsCsv,
+  importContactsCsvWithMapping,
   importCsv,
+  importCsvWithMapping,
   importDealsCsv,
   importOrganizationsCsv,
+  importOrganizationsCsvWithMapping,
   preflightContactsCsvImport,
+  preflightContactsCsvImportWithMapping,
   preflightCsv,
+  preflightCsvWithMapping,
   preflightOrganizationsCsvImport,
+  preflightOrganizationsCsvImportWithMapping,
 } from './importExport';
 
 describe('import/export API', () => {
@@ -147,5 +153,100 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_organizations_csv_import', {
       file_path: '/tmp/orgs.csv',
     });
+  });
+
+  it('maps contact CSV import/preflight commands with field mappings', async () => {
+    const mapping = {
+      'Given Name': 'first_name',
+      Surname: 'last_name',
+      'Email Address': 'email',
+      Ignore: null,
+    } as const;
+
+    invokeMock.mockResolvedValueOnce({ created: 1, skipped: 0, errors: [] });
+    await expect(importContactsCsvWithMapping('/tmp/contacts.csv', mapping)).resolves.toEqual({
+      created: 1,
+      skipped: 0,
+      errors: [],
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_csv_with_mapping', {
+      file_path: '/tmp/contacts.csv',
+      mapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'contacts',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightContactsCsvImportWithMapping('/tmp/contacts.csv', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_contacts_csv_import_with_mapping',
+      {
+        file_path: '/tmp/contacts.csv',
+        mapping,
+      },
+    );
+  });
+
+  it('maps organization CSV import/preflight commands with field mappings', async () => {
+    const mapping = {
+      Company: 'name',
+      Inbox: 'email',
+      Telephone: 'phone',
+      Skip: null,
+    } as const;
+
+    invokeMock.mockResolvedValueOnce({ created: 1, skipped: 0, errors: [] });
+    await importOrganizationsCsvWithMapping('/tmp/organizations.csv', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_organizations_csv_with_mapping', {
+      file_path: '/tmp/organizations.csv',
+      mapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'organizations',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightOrganizationsCsvImportWithMapping('/tmp/organizations.csv', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_organizations_csv_import_with_mapping',
+      {
+        file_path: '/tmp/organizations.csv',
+        mapping,
+      },
+    );
+  });
+
+  it('routes generic mapped CSV helpers by entity', async () => {
+    const mapping = {
+      Company: 'name',
+      Inbox: 'email',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce({ created: 1, skipped: 0, errors: [] });
+    await importCsvWithMapping('organizations', '/tmp/orgs.csv', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_organizations_csv_with_mapping', {
+      file_path: '/tmp/orgs.csv',
+      mapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'organizations',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightCsvWithMapping('organizations', '/tmp/orgs.csv', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_organizations_csv_import_with_mapping',
+      {
+        file_path: '/tmp/orgs.csv',
+        mapping,
+      },
+    );
   });
 });
