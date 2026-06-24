@@ -26,3 +26,4 @@
 | 022 | 2026-06-24 | `codex/activity-relationships-ui-surface` | Activity create controls and activity list relationship labels for contact, organization, and deal links using existing frontend APIs without backend changes | Completed |
 | 023 | 2026-06-24 | `codex/global-search-core-surface` | Global search core/Tauri/frontend API surface for contacts, organizations, deals, activities, notes, and tags without SearchBar UI changes | Completed |
 | 024 | 2026-06-24 | `codex/global-search-ui-surface` | Visible SearchBar integration with global search results across contacts, organizations, deals, activities, notes, and tags without backend changes | Completed |
+| 025 | 2026-06-24 | `codex/import-export-api-organization-csv-foundation` | Organization CSV import/export foundation and typed frontend Import/Export API wrappers without mapping wizard or duplicate-warning UI | Completed |

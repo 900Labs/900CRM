@@ -28,8 +28,8 @@ use crate::storage::{
 };
 use crate::utils::{
     csv::{
-        parse_contacts_csv, parse_deals_csv, write_contacts_csv, write_deals_csv, ContactCsvRow,
-        DealCsvRow,
+        parse_contacts_csv, parse_deals_csv, parse_organizations_csv, write_contacts_csv,
+        write_deals_csv, write_organizations_csv, ContactCsvRow, DealCsvRow, OrganizationCsvRow,
     },
     datetime::now_iso8601,
     errors::{CrmError, CrmResult as InternalCrmResult},
@@ -881,6 +881,79 @@ impl CrmCore {
         let count = rows.len() as u32;
         let file = fs::File::create(file_path)?;
         write_deals_csv(BufWriter::new(file), &rows)?;
+        Ok(count)
+    }
+
+    pub fn import_organizations_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_organizations_csv(file_content.as_slice())?;
+        let mut created = 0u32;
+        let mut skipped = 0u32;
+        let mut errors = Vec::new();
+
+        for (i, row) in rows.iter().enumerate() {
+            match self.create_organization(
+                row.name.clone(),
+                row.email.clone(),
+                row.phone.clone(),
+                row.website.clone(),
+                row.address_line1.clone(),
+                row.address_line2.clone(),
+                row.city.clone(),
+                row.region.clone(),
+                row.country.clone(),
+                row.postal_code.clone(),
+                row.description.clone(),
+            ) {
+                Ok(organization) => {
+                    let _ = storage::audit::record_audit(
+                        &self.db.conn,
+                        ACTOR_IMPORT,
+                        None,
+                        "import_row",
+                        Some("organization"),
+                        Some(&organization.id),
+                        None,
+                        None,
+                        &self.device_id,
+                    );
+                    created += 1;
+                }
+                Err(e) => {
+                    errors.push(format!("Row {}: {} ({})", i + 2, e, row.name));
+                    skipped += 1;
+                }
+            }
+        }
+
+        Ok(ImportResult {
+            created,
+            skipped,
+            errors,
+        })
+    }
+
+    pub fn export_organizations_csv(&self, file_path: &str) -> CrmResult<u32> {
+        let organizations = storage::organizations::list_organizations(&self.db.conn)?;
+        let rows: Vec<OrganizationCsvRow> = organizations
+            .iter()
+            .map(|organization| OrganizationCsvRow {
+                name: organization.name.clone(),
+                email: organization.email.clone(),
+                phone: organization.phone.clone(),
+                website: organization.website.clone(),
+                address_line1: organization.address_line1.clone(),
+                address_line2: organization.address_line2.clone(),
+                city: organization.city.clone(),
+                region: organization.region.clone(),
+                country: organization.country.clone(),
+                postal_code: organization.postal_code.clone(),
+                description: organization.description.clone(),
+            })
+            .collect();
+        let count = rows.len() as u32;
+        let file = fs::File::create(file_path)?;
+        write_organizations_csv(BufWriter::new(file), &rows)?;
         Ok(count)
     }
 
