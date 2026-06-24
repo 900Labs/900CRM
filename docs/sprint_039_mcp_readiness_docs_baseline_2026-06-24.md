@@ -10,7 +10,8 @@ Scope: Documentation-only MCP readiness baseline for the current placeholder and
 - Clarified that 900CRM core has no built-in AI agent and no internet, cloud, or model-provider requirement.
 - Documented that `crates/crm-mcp` is a placeholder only and does not implement or start an MCP server.
 - Documented current external-client records, permission rows, proposed actions, audit log, Pending Actions UI, and approve/reject state.
-- Clarified that proposed-action approval records a decision but does not execute the requested action.
+- Documented the then-current approve/reject decision-only behavior; Sprint 051
+  supersedes that baseline for supported `create_activity_draft` actions.
 - Added README and architecture links to the readiness baseline.
 
 ## Boundaries
