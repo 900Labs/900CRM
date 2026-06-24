@@ -4,7 +4,7 @@
    */
 
   import { t } from '$lib/i18n';
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import type { Snippet } from 'svelte';
 
   type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -104,10 +104,9 @@
 
   onMount(() => {
     document.addEventListener('keydown', handleGlobalKeyDown);
-  });
-
-  onDestroy(() => {
-    document.removeEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleGlobalKeyDown);
+    };
   });
 </script>
 
