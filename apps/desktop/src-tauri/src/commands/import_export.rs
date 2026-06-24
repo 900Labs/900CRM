@@ -57,6 +57,16 @@ pub async fn export_contacts_csv(
 }
 
 #[tauri::command]
+pub async fn export_contacts_json(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<u32, String> {
+    let core = super::lock_core(&state)?;
+    core.export_contacts_json(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn import_deals_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -104,6 +114,16 @@ pub async fn export_deals_csv(
 ) -> Result<u32, String> {
     let core = super::lock_core(&state)?;
     core.export_deals_csv(&file_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_deals_json(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<u32, String> {
+    let core = super::lock_core(&state)?;
+    core.export_deals_json(&file_path)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -155,5 +175,15 @@ pub async fn export_organizations_csv(
 ) -> Result<u32, String> {
     let core = super::lock_core(&state)?;
     core.export_organizations_csv(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_organizations_json(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<u32, String> {
+    let core = super::lock_core(&state)?;
+    core.export_organizations_json(&file_path)
         .map_err(|e| e.to_string())
 }

@@ -27,6 +27,15 @@ fn import_mapping(pairs: &[(&str, Option<&str>)]) -> ImportColumnMapping {
         .collect()
 }
 
+fn read_json_export(path: &std::path::Path) -> Vec<serde_json::Value> {
+    let json = std::fs::read_to_string(path).expect("JSON export should read");
+    assert!(
+        json.contains("\n  {"),
+        "JSON export should be pretty-printed"
+    );
+    serde_json::from_str::<Vec<serde_json::Value>>(&json).expect("JSON export should parse")
+}
+
 fn create_test_proposed_action(core: &mut CrmCore, title: &str) -> ProposedAction {
     create_test_proposed_action_with_input(core, format!(r#"{{"title":"{}"}}"#, title))
 }
@@ -3117,6 +3126,159 @@ fn preflight_organizations_csv_import_flags_name_email_and_phone_duplicates_with
 }
 
 #[test]
+fn export_contacts_json_writes_active_flat_rows() {
+    let (mut core, path) = open_test_core();
+
+    core.create_contact(
+        Some("person".to_string()),
+        Some("Ada".to_string()),
+        Some("Lovelace".to_string()),
+        Some("Analytical Engines".to_string()),
+        Some("ada@example.com".to_string()),
+        Some("+15550123".to_string()),
+        Some("1 Example Street".to_string()),
+        Some("London".to_string()),
+        Some("UK".to_string()),
+        None,
+        Some("Prefers email".to_string()),
+    )
+    .expect("active contact should be created");
+    let deleted = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Deleted".to_string()),
+            Some("Contact".to_string()),
+            None,
+            Some("deleted@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("deleted contact should be created");
+    core.delete_contact(&deleted.id)
+        .expect("deleted contact should be soft-deleted");
+
+    let json_path = path.join("contacts-export.json");
+    let count = core
+        .export_contacts_json(json_path.to_str().expect("path should be valid UTF-8"))
+        .expect("contact JSON export should succeed");
+
+    assert_eq!(count, 1);
+    let rows = read_json_export(&json_path);
+    assert_eq!(rows.len(), 1);
+    let row = rows[0]
+        .as_object()
+        .expect("contact row should be an object");
+    assert_eq!(
+        row.get("first_name").and_then(|value| value.as_str()),
+        Some("Ada")
+    );
+    assert_eq!(
+        row.get("last_name").and_then(|value| value.as_str()),
+        Some("Lovelace")
+    );
+    assert_eq!(
+        row.get("org_name").and_then(|value| value.as_str()),
+        Some("Analytical Engines")
+    );
+    assert_eq!(
+        row.get("email").and_then(|value| value.as_str()),
+        Some("ada@example.com")
+    );
+    assert_eq!(
+        row.get("notes").and_then(|value| value.as_str()),
+        Some("Prefers email")
+    );
+    assert!(row.get("id").is_none());
+    assert!(row.get("deleted_at").is_none());
+    assert!(!rows
+        .iter()
+        .any(|row| row.get("first_name").and_then(|value| value.as_str()) == Some("Deleted")));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn export_deals_json_writes_active_flat_rows() {
+    let (mut core, path) = open_test_core();
+
+    core.create_deal(
+        "Acme Renewal".to_string(),
+        Some(12500.0),
+        Some("EUR".to_string()),
+        Some("Proposal".to_string()),
+        Some(55),
+        Some("2026-10-01".to_string()),
+        None,
+        None,
+        Some("Includes onboarding".to_string()),
+    )
+    .expect("active deal should be created");
+    let deleted = core
+        .create_deal(
+            "Deleted Renewal".to_string(),
+            Some(2500.0),
+            Some("USD".to_string()),
+            Some("Lead".to_string()),
+            Some(10),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("deleted deal should be created");
+    core.delete_deal(&deleted.id)
+        .expect("deleted deal should be soft-deleted");
+
+    let json_path = path.join("deals-export.json");
+    let count = core
+        .export_deals_json(json_path.to_str().expect("path should be valid UTF-8"))
+        .expect("deal JSON export should succeed");
+
+    assert_eq!(count, 1);
+    let rows = read_json_export(&json_path);
+    assert_eq!(rows.len(), 1);
+    let row = rows[0].as_object().expect("deal row should be an object");
+    assert_eq!(
+        row.get("title").and_then(|value| value.as_str()),
+        Some("Acme Renewal")
+    );
+    assert_eq!(
+        row.get("value").and_then(|value| value.as_str()),
+        Some("12500.00")
+    );
+    assert_eq!(
+        row.get("currency").and_then(|value| value.as_str()),
+        Some("EUR")
+    );
+    assert_eq!(
+        row.get("stage").and_then(|value| value.as_str()),
+        Some("Proposal")
+    );
+    assert_eq!(
+        row.get("expected_close").and_then(|value| value.as_str()),
+        Some("2026-10-01")
+    );
+    assert_eq!(
+        row.get("notes").and_then(|value| value.as_str()),
+        Some("Includes onboarding")
+    );
+    assert!(row.get("id").is_none());
+    assert!(row.get("probability").is_none());
+    assert!(row.get("deleted_at").is_none());
+    assert!(!rows
+        .iter()
+        .any(|row| row.get("title").and_then(|value| value.as_str()) == Some("Deleted Renewal")));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn export_organizations_csv_writes_optional_fields() {
     let (mut core, path) = open_test_core();
 
@@ -3152,6 +3314,84 @@ fn export_organizations_csv_writes_optional_fields() {
     assert!(csv.contains("Lagos State"));
     assert!(csv.contains("100001"));
     assert!(csv.contains("Regional partner"));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn export_organizations_json_writes_active_flat_rows() {
+    let (mut core, path) = open_test_core();
+
+    core.create_organization(
+        "Acme Health".to_string(),
+        Some("hello@acme.example".to_string()),
+        Some("+123456".to_string()),
+        Some("https://acme.example".to_string()),
+        Some("Dock 4".to_string()),
+        Some("Suite 9".to_string()),
+        Some("Lagos".to_string()),
+        Some("Lagos State".to_string()),
+        Some("NG".to_string()),
+        Some("100001".to_string()),
+        Some("Regional partner".to_string()),
+    )
+    .expect("active organization should be created");
+    let deleted = core
+        .create_organization(
+            "Deleted Org".to_string(),
+            Some("deleted@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("deleted organization should be created");
+    core.delete_organization(&deleted.id)
+        .expect("deleted organization should be soft-deleted");
+
+    let json_path = path.join("organizations-export.json");
+    let count = core
+        .export_organizations_json(json_path.to_str().expect("path should be valid UTF-8"))
+        .expect("organization JSON export should succeed");
+
+    assert_eq!(count, 1);
+    let rows = read_json_export(&json_path);
+    assert_eq!(rows.len(), 1);
+    let row = rows[0]
+        .as_object()
+        .expect("organization row should be an object");
+    assert_eq!(
+        row.get("name").and_then(|value| value.as_str()),
+        Some("Acme Health")
+    );
+    assert_eq!(
+        row.get("email").and_then(|value| value.as_str()),
+        Some("hello@acme.example")
+    );
+    assert_eq!(
+        row.get("phone").and_then(|value| value.as_str()),
+        Some("+123456")
+    );
+    assert_eq!(
+        row.get("website").and_then(|value| value.as_str()),
+        Some("https://acme.example")
+    );
+    assert_eq!(
+        row.get("description").and_then(|value| value.as_str()),
+        Some("Regional partner")
+    );
+    assert!(row.get("id").is_none());
+    assert!(row.get("source").is_none());
+    assert!(row.get("deleted_at").is_none());
+    assert!(!rows
+        .iter()
+        .any(|row| row.get("name").and_then(|value| value.as_str()) == Some("Deleted Org")));
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);

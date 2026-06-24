@@ -866,6 +866,21 @@ impl CrmCore {
     }
 
     pub fn export_contacts_csv(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_contact_rows()?;
+        let count = rows.len() as u32;
+        let file = fs::File::create(file_path)?;
+        write_contacts_csv(BufWriter::new(file), &rows)?;
+        Ok(count)
+    }
+
+    pub fn export_contacts_json(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_contact_rows()?;
+        let count = rows.len() as u32;
+        write_json_export(file_path, &rows)?;
+        Ok(count)
+    }
+
+    fn export_contact_rows(&self) -> CrmResult<Vec<ContactCsvRow>> {
         let params = ContactListParams {
             page: 1,
             per_page: 100_000,
@@ -877,7 +892,7 @@ impl CrmCore {
             custom_field_query: None,
         };
         let result = storage::contacts::list_contacts(&self.db.conn, &params)?;
-        let rows: Vec<ContactCsvRow> = result
+        Ok(result
             .contacts
             .iter()
             .map(|c| ContactCsvRow {
@@ -891,11 +906,7 @@ impl CrmCore {
                 country: Some(c.country.clone()).filter(|s| !s.is_empty()),
                 notes: Some(c.notes.clone()).filter(|s| !s.is_empty()),
             })
-            .collect();
-        let count = rows.len() as u32;
-        let file = fs::File::create(file_path)?;
-        write_contacts_csv(BufWriter::new(file), &rows)?;
-        Ok(count)
+            .collect())
     }
 
     pub fn import_deals_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
@@ -1006,8 +1017,23 @@ impl CrmCore {
     }
 
     pub fn export_deals_csv(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_deal_rows()?;
+        let count = rows.len() as u32;
+        let file = fs::File::create(file_path)?;
+        write_deals_csv(BufWriter::new(file), &rows)?;
+        Ok(count)
+    }
+
+    pub fn export_deals_json(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_deal_rows()?;
+        let count = rows.len() as u32;
+        write_json_export(file_path, &rows)?;
+        Ok(count)
+    }
+
+    fn export_deal_rows(&self) -> CrmResult<Vec<DealCsvRow>> {
         let all_deals = storage::deals::list_deals(&self.db.conn)?;
-        let rows: Vec<DealCsvRow> = all_deals
+        Ok(all_deals
             .iter()
             .map(|d| DealCsvRow {
                 title: d.title.clone(),
@@ -1017,11 +1043,7 @@ impl CrmCore {
                 expected_close: d.expected_close.clone(),
                 notes: Some(d.notes.clone()).filter(|s| !s.is_empty()),
             })
-            .collect();
-        let count = rows.len() as u32;
-        let file = fs::File::create(file_path)?;
-        write_deals_csv(BufWriter::new(file), &rows)?;
-        Ok(count)
+            .collect())
     }
 
     pub fn import_organizations_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
@@ -1177,8 +1199,23 @@ impl CrmCore {
     }
 
     pub fn export_organizations_csv(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_organization_rows()?;
+        let count = rows.len() as u32;
+        let file = fs::File::create(file_path)?;
+        write_organizations_csv(BufWriter::new(file), &rows)?;
+        Ok(count)
+    }
+
+    pub fn export_organizations_json(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_organization_rows()?;
+        let count = rows.len() as u32;
+        write_json_export(file_path, &rows)?;
+        Ok(count)
+    }
+
+    fn export_organization_rows(&self) -> CrmResult<Vec<OrganizationCsvRow>> {
         let organizations = storage::organizations::list_organizations(&self.db.conn)?;
-        let rows: Vec<OrganizationCsvRow> = organizations
+        Ok(organizations
             .iter()
             .map(|organization| OrganizationCsvRow {
                 name: organization.name.clone(),
@@ -1193,11 +1230,7 @@ impl CrmCore {
                 postal_code: organization.postal_code.clone(),
                 description: organization.description.clone(),
             })
-            .collect();
-        let count = rows.len() as u32;
-        let file = fs::File::create(file_path)?;
-        write_organizations_csv(BufWriter::new(file), &rows)?;
-        Ok(count)
+            .collect())
     }
 
     fn set_activity_completion(&mut self, id: &str, completed: bool) -> CrmResult<Activity> {
@@ -1235,6 +1268,15 @@ impl CrmCore {
         tx.commit()?;
         Ok(activity)
     }
+}
+
+fn write_json_export<T>(file_path: &str, rows: &[T]) -> CrmResult<()>
+where
+    T: Serialize,
+{
+    let json = serde_json::to_string_pretty(rows)?;
+    fs::write(file_path, format!("{json}\n"))?;
+    Ok(())
 }
 
 fn load_or_create_device_id(db: &storage::Database) -> CrmResult<String> {
