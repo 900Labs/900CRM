@@ -11,6 +11,8 @@
   import Activities from './Activities.svelte';
   import Settings from './Settings.svelte';
   import ContactDetail from './ContactDetail.svelte';
+  import AuditLog from './AuditLog.svelte';
+  import PendingActions from './PendingActions.svelte';
 
   let route = $state('/');
   let contactId = $state<string | null>(null);
@@ -56,6 +58,18 @@
       return;
     }
 
+    if (normalized === '/audit-log') {
+      route = '/audit-log';
+      contactId = null;
+      return;
+    }
+
+    if (normalized === '/pending-actions') {
+      route = '/pending-actions';
+      contactId = null;
+      return;
+    }
+
     route = '/';
     contactId = null;
   }
@@ -87,6 +101,10 @@
   <Activities />
 {:else if route === '/settings'}
   <Settings />
+{:else if route === '/audit-log'}
+  <AuditLog />
+{:else if route === '/pending-actions'}
+  <PendingActions />
 {:else}
   <Dashboard />
 {/if}

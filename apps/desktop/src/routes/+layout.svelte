@@ -70,6 +70,18 @@
       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7l2 2 4-4',
     },
     {
+      id: 'audit-log',
+      label: () => t('nav.auditLog'),
+      href: '/audit-log',
+      icon: 'M9 12h6M9 16h6M9 8h6M5 4h14v16H5zM5 8H3m2 4H3m2 4H3',
+    },
+    {
+      id: 'pending-actions',
+      label: () => t('nav.pendingActions'),
+      href: '/pending-actions',
+      icon: 'M12 6v6l4 2M21 12a9 9 0 11-9-9M19 3v5h-5',
+    },
+    {
       id: 'settings',
       label: () => t('nav.settings'),
       href: '/settings',
