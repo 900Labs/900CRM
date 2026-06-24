@@ -25,6 +25,24 @@ pub async fn list_pending_proposed_actions(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn approve_proposed_action(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<ProposedAction, String> {
+    let mut core = lock_core(&state)?;
+    core.approve_proposed_action(id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn reject_proposed_action(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<ProposedAction, String> {
+    let mut core = lock_core(&state)?;
+    core.reject_proposed_action(id).map_err(|e| e.to_string())
+}
+
 fn audit_log_limit(limit: Option<u32>) -> u32 {
     limit
         .unwrap_or(DEFAULT_AUDIT_LOG_LIMIT)

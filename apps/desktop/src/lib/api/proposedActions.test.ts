@@ -8,7 +8,12 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: invokeMock,
 }));
 
-import { listPendingProposedActions, type ProposedAction } from './proposedActions';
+import {
+  approveProposedAction,
+  listPendingProposedActions,
+  rejectProposedAction,
+  type ProposedAction,
+} from './proposedActions';
 
 const backendAction = {
   id: 'proposed-1',
@@ -55,5 +60,43 @@ describe('proposed actions API', () => {
     await expect(listPendingProposedActions()).resolves.toEqual([action]);
 
     expect(invokeMock).toHaveBeenCalledWith('list_pending_proposed_actions');
+  });
+
+  it('maps approveProposedAction to approve_proposed_action', async () => {
+    const approvedBackendAction = {
+      ...backendAction,
+      status: 'approved',
+      approved_at: '2026-06-24T08:05:00Z',
+    };
+    invokeMock.mockResolvedValueOnce(approvedBackendAction);
+
+    await expect(approveProposedAction('proposed-1')).resolves.toEqual({
+      ...action,
+      status: 'approved',
+      approvedAt: '2026-06-24T08:05:00Z',
+    });
+
+    expect(invokeMock).toHaveBeenCalledWith('approve_proposed_action', {
+      id: 'proposed-1',
+    });
+  });
+
+  it('maps rejectProposedAction to reject_proposed_action', async () => {
+    const rejectedBackendAction = {
+      ...backendAction,
+      status: 'rejected',
+      rejected_at: '2026-06-24T08:06:00Z',
+    };
+    invokeMock.mockResolvedValueOnce(rejectedBackendAction);
+
+    await expect(rejectProposedAction('proposed-1')).resolves.toEqual({
+      ...action,
+      status: 'rejected',
+      rejectedAt: '2026-06-24T08:06:00Z',
+    });
+
+    expect(invokeMock).toHaveBeenCalledWith('reject_proposed_action', {
+      id: 'proposed-1',
+    });
   });
 });

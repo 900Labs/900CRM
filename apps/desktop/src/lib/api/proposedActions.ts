@@ -61,3 +61,13 @@ export async function listPendingProposedActions(): Promise<ProposedAction[]> {
   const actions = await invoke<BackendProposedAction[]>('list_pending_proposed_actions');
   return actions.map(mapProposedAction);
 }
+
+export async function approveProposedAction(id: string): Promise<ProposedAction> {
+  const action = await invoke<BackendProposedAction>('approve_proposed_action', { id });
+  return mapProposedAction(action);
+}
+
+export async function rejectProposedAction(id: string): Promise<ProposedAction> {
+  const action = await invoke<BackendProposedAction>('reject_proposed_action', { id });
+  return mapProposedAction(action);
+}

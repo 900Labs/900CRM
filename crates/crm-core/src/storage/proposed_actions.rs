@@ -1,7 +1,11 @@
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
-use crate::utils::{datetime::now_iso8601, errors::CrmResult, uuid::new_uuid};
+use crate::utils::{
+    datetime::now_iso8601,
+    errors::{CrmError, CrmResult},
+    uuid::new_uuid,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProposedAction {
@@ -107,4 +111,120 @@ pub fn list_pending_proposed_actions(conn: &Connection) -> CrmResult<Vec<Propose
     })?;
 
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+pub fn approve_proposed_action(conn: &Connection, id: &str) -> CrmResult<ProposedAction> {
+    decide_proposed_action(conn, id, ProposedActionDecision::Approve, |_, _| Ok(()))
+}
+
+pub fn reject_proposed_action(conn: &Connection, id: &str) -> CrmResult<ProposedAction> {
+    decide_proposed_action(conn, id, ProposedActionDecision::Reject, |_, _| Ok(()))
+}
+
+#[cfg(test)]
+pub(crate) fn approve_proposed_action_after_test_status_change(
+    conn: &Connection,
+    id: &str,
+    next_status: &str,
+) -> CrmResult<ProposedAction> {
+    decide_proposed_action(conn, id, ProposedActionDecision::Approve, |conn, id| {
+        conn.execute(
+            "UPDATE proposed_actions SET status = ?1 WHERE id = ?2",
+            params![next_status, id],
+        )?;
+        Ok(())
+    })
+}
+
+pub fn get_proposed_action(conn: &Connection, id: &str) -> CrmResult<Option<ProposedAction>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, client_id, action_type, tool_name, entity_type, entity_id,
+               input_json, proposed_output_json, status, created_at,
+               approved_at, rejected_at, executed_at, device_id
+        FROM proposed_actions
+        WHERE id = ?1
+        "#,
+    )?;
+
+    match stmt.query_row(params![id], map_proposed_action_row) {
+        Ok(action) => Ok(Some(action)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(err) => Err(err.into()),
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ProposedActionDecision {
+    Approve,
+    Reject,
+}
+
+fn decide_proposed_action(
+    conn: &Connection,
+    id: &str,
+    decision: ProposedActionDecision,
+    before_update: impl FnOnce(&Connection, &str) -> CrmResult<()>,
+) -> CrmResult<ProposedAction> {
+    let current = get_proposed_action(conn, id)?
+        .ok_or_else(|| CrmError::NotFound(format!("Proposed action '{}' was not found", id)))?;
+    if current.status != "pending" {
+        return Err(CrmError::InvalidInput(format!(
+            "Proposed action '{}' must be pending before it can be approved or rejected; current status is '{}'",
+            id, current.status
+        )));
+    }
+
+    let decided_at = now_iso8601();
+    before_update(conn, id)?;
+    let updated_rows = match decision {
+        ProposedActionDecision::Approve => conn.execute(
+            r#"
+                UPDATE proposed_actions
+                SET status = 'approved', approved_at = ?1
+                WHERE id = ?2 AND status = 'pending'
+                "#,
+            params![decided_at, id],
+        )?,
+        ProposedActionDecision::Reject => conn.execute(
+            r#"
+                UPDATE proposed_actions
+                SET status = 'rejected', rejected_at = ?1
+                WHERE id = ?2 AND status = 'pending'
+                "#,
+            params![decided_at, id],
+        )?,
+    };
+    if updated_rows != 1 {
+        return Err(CrmError::InvalidInput(format!(
+            "Proposed action '{}' was no longer pending before the decision could be recorded",
+            id
+        )));
+    }
+
+    get_proposed_action(conn, id)?.ok_or_else(|| {
+        CrmError::NotFound(format!(
+            "Proposed action '{}' was not found after decision",
+            id
+        ))
+    })
+}
+
+fn map_proposed_action_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProposedAction> {
+    Ok(ProposedAction {
+        id: row.get(0)?,
+        client_id: row.get(1)?,
+        action_type: row.get(2)?,
+        tool_name: row.get(3)?,
+        entity_type: row.get(4)?,
+        entity_id: row.get(5)?,
+        input_json: row.get(6)?,
+        proposed_output_json: row.get(7)?,
+        status: row.get(8)?,
+        created_at: row.get(9)?,
+        approved_at: row.get(10)?,
+        rejected_at: row.get(11)?,
+        executed_at: row.get(12)?,
+        device_id: row.get(13)?,
+    })
 }
