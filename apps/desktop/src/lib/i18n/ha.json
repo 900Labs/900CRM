@@ -14,7 +14,8 @@
     "contacts": "Lambobi",
     "pipeline": "Pipeline",
     "activities": "Ayyuka",
-    "settings": "Saituna"
+    "settings": "Saituna",
+    "organizations": "Kungiyoyi"
   },
   "dashboard": {
     "title": "Allon Dubawa",
@@ -278,5 +279,39 @@
     "exporting": "Ana fitarwa…",
     "success": "An kammala fitarwa",
     "failed": "Fitarwa ta gaza"
+  },
+  "organizations": {
+    "title": "Kungiyoyi",
+    "addOrganization": "Kara kungiya",
+    "editOrganization": "Gyara kungiya",
+    "deleteOrganization": "Share kungiya",
+    "search": "Nemo kungiyoyi...",
+    "name": "Suna",
+    "email": "Imel",
+    "phone": "Waya",
+    "website": "Shafin yanar gizo",
+    "location": "Wuri",
+    "addressLine1": "Adireshi layi 1",
+    "addressLine2": "Adireshi layi 2",
+    "city": "Birni",
+    "region": "Yanki",
+    "country": "Kasa",
+    "postalCode": "Lambar gidan waya",
+    "description": "Bayani",
+    "created": "An kirkira",
+    "updated": "An sabunta",
+    "noOrganizations": "Babu kungiyoyi tukuna",
+    "noOrganizationsDesc": "Kirkiri rikodin kungiya ba tare da sauya rubutun kungiya na lambobi ba.",
+    "createOrganization": "Kirkiri kungiya",
+    "updateOrganization": "Sabunta kungiya",
+    "confirmDelete": "A share {name}? Wannan ba zai share lambobin da aka hada ba.",
+    "contactLink": "Hada lamba da kungiya",
+    "contactId": "ID na lamba",
+    "linkContact": "Hada lamba",
+    "clearContactLink": "Goge hadin lamba",
+    "linkContactDesc": "Shigar da ID na lamba don hada ko goge alakar kungiya.",
+    "linkCreated": "An hada lamba da kungiya",
+    "linkCleared": "An goge alakar kungiya daga lamba",
+    "linkContactRequired": "Ana bukatar ID na lamba"
   }
 }

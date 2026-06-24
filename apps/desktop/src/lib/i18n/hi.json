@@ -14,7 +14,8 @@
     "contacts": "संपर्क",
     "pipeline": "पाइपलाइन",
     "activities": "गतिविधियाँ",
-    "settings": "सेटिंग्स"
+    "settings": "सेटिंग्स",
+    "organizations": "संगठन"
   },
   "dashboard": {
     "title": "डैशबोर्ड",
@@ -278,5 +279,39 @@
     "exporting": "निर्यात हो रहा है…",
     "success": "निर्यात पूर्ण",
     "failed": "निर्यात विफल"
+  },
+  "organizations": {
+    "title": "संगठन",
+    "addOrganization": "संगठन जोड़ें",
+    "editOrganization": "संगठन संपादित करें",
+    "deleteOrganization": "संगठन हटाएं",
+    "search": "संगठन खोजें...",
+    "name": "नाम",
+    "email": "ईमेल",
+    "phone": "फ़ोन",
+    "website": "वेबसाइट",
+    "location": "स्थान",
+    "addressLine1": "पता पंक्ति 1",
+    "addressLine2": "पता पंक्ति 2",
+    "city": "शहर",
+    "region": "क्षेत्र",
+    "country": "देश",
+    "postalCode": "डाक कोड",
+    "description": "विवरण",
+    "created": "बनाया गया",
+    "updated": "अपडेट किया गया",
+    "noOrganizations": "अभी कोई संगठन नहीं है",
+    "noOrganizationsDesc": "मौजूदा संपर्क संगठन टेक्स्ट बदले बिना संगठन रिकॉर्ड बनाएं।",
+    "createOrganization": "संगठन बनाएं",
+    "updateOrganization": "संगठन अपडेट करें",
+    "confirmDelete": "{name} हटाएं? इससे जुड़े संपर्क नहीं हटेंगे।",
+    "contactLink": "संपर्क को संगठन से लिंक करें",
+    "contactId": "संपर्क ID",
+    "linkContact": "संपर्क लिंक करें",
+    "clearContactLink": "संपर्क लिंक साफ़ करें",
+    "linkContactDesc": "पहले दर्ज संगठन संदर्भ को लिंक या साफ़ करने के लिए मौजूदा संपर्क ID दर्ज करें।",
+    "linkCreated": "संपर्क संगठन से लिंक हुआ",
+    "linkCleared": "संपर्क का संगठन लिंक साफ़ हुआ",
+    "linkContactRequired": "संपर्क ID आवश्यक है"
   }
 }

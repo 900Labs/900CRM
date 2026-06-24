@@ -14,7 +14,8 @@
     "contacts": "Anwani",
     "pipeline": "Mtiririko",
     "activities": "Shughuli",
-    "settings": "Mipangilio"
+    "settings": "Mipangilio",
+    "organizations": "Mashirika"
   },
   "dashboard": {
     "title": "Dashibodi",
@@ -278,5 +279,39 @@
     "exporting": "Inatoa…",
     "success": "Utoleshaji umekamilika",
     "failed": "Utoleshaji umeshindwa"
+  },
+  "organizations": {
+    "title": "Mashirika",
+    "addOrganization": "Ongeza shirika",
+    "editOrganization": "Hariri shirika",
+    "deleteOrganization": "Futa shirika",
+    "search": "Tafuta mashirika...",
+    "name": "Jina",
+    "email": "Barua pepe",
+    "phone": "Simu",
+    "website": "Tovuti",
+    "location": "Mahali",
+    "addressLine1": "Anwani mstari 1",
+    "addressLine2": "Anwani mstari 2",
+    "city": "Jiji",
+    "region": "Eneo",
+    "country": "Nchi",
+    "postalCode": "Msimbo wa posta",
+    "description": "Maelezo",
+    "created": "Imeundwa",
+    "updated": "Imesasishwa",
+    "noOrganizations": "Bado hakuna mashirika",
+    "noOrganizationsDesc": "Unda rekodi ya shirika bila kubadilisha maandishi ya shirika yaliyopo kwenye anwani.",
+    "createOrganization": "Unda shirika",
+    "updateOrganization": "Sasisha shirika",
+    "confirmDelete": "Futa {name}? Hii haifuti anwani zilizounganishwa.",
+    "contactLink": "Unganisha anwani na shirika",
+    "contactId": "ID ya anwani",
+    "linkContact": "Unganisha anwani",
+    "clearContactLink": "Futa kiungo cha anwani",
+    "linkContactDesc": "Weka ID ya anwani iliyopo ili kuunganisha au kufuta rejea yake ya shirika.",
+    "linkCreated": "Anwani imeunganishwa na shirika",
+    "linkCleared": "Kiungo cha shirika cha anwani kimefutwa",
+    "linkContactRequired": "ID ya anwani inahitajika"
   }
 }
