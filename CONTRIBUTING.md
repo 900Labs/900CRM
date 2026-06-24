@@ -220,11 +220,8 @@ Understanding where things live helps you know where to make changes.
 │   └── README.md                 # Plugin development guide
 └── .github/
     ├── workflows/
-    │   ├── ci.yml                # CI: lint, type-check, test, build
-    │   └── release.yml           # Release: build on tag push, upload artifacts
-    └── ISSUE_TEMPLATE/
-        ├── bug_report.md
-        └── feature_request.md
+    │   └── ci.yml                # Ubuntu PR and main-branch verification
+    └── pull_request_template.md  # Pull request checklist and guardrails
 ```
 
 ---
@@ -503,13 +500,19 @@ Fill in all sections of the PR template:
 
 ### CI Requirements
 
+Initial GitHub Actions CI runs on `ubuntu-latest` for pull requests and pushes
+to `main`. It is a verification workflow only; release installers and
+cross-platform packaging are not built by CI yet.
+
 All PRs must pass:
-- `npm run check` — TypeScript and Svelte diagnostics
 - `npm run lint` — ESLint for JavaScript repo tooling/config files
-- `cargo clippy --workspace -- -D warnings` — Rust linting
-- `cargo test --workspace` — Rust unit tests
+- `npm run check` — TypeScript and Svelte diagnostics
 - `npm run test` — Frontend unit tests
-- Build must succeed on Ubuntu, Windows, and macOS
+- `npm run build` — Frontend production build
+- `cargo fmt --all -- --check` — Rust formatting check
+- `cargo clippy --workspace -- -D warnings` — Rust linting
+- `cargo check --workspace` — Rust workspace compile check
+- `cargo test --workspace` — Rust unit tests
 
 ---
 
@@ -645,7 +648,7 @@ If you find a translation that is incorrect, unclear, or outdated:
 | Frontend — Activities | `apps/desktop/src/lib/components/ActivityFeed.svelte` | Community | Activity UI components |
 | Frontend — Dashboard | `apps/desktop/src/routes/Dashboard.svelte` | Community | Dashboard metrics UI |
 | Internationalization | `apps/desktop/src/lib/i18n/` | Community | Translation files |
-| CI/Release pipeline | `.github/workflows/` | 900 Labs Core | Build and release automation |
+| CI workflow | `.github/workflows/` | 900 Labs Core | Pull request and main-branch verification |
 
 "Community" means the module is open for community contributions. "900 Labs Core" means changes should be discussed in an issue first.
 
