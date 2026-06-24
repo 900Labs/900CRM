@@ -759,6 +759,463 @@ fn link_contact_to_organization_writes_contact_audit_and_sync() {
 }
 
 #[test]
+fn note_lifecycle_writes_note_audit_sync_and_soft_deletes() {
+    let (mut core, path) = open_test_core();
+
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Amina".to_string()),
+            Some("Diallo".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+
+    let note = core
+        .create_note(
+            "contact".to_string(),
+            contact.id.clone(),
+            "Initial note".to_string(),
+        )
+        .expect("note should be created");
+    assert_eq!(note.content, "Initial note");
+
+    let created_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'create' AND entity_type = 'note' AND entity_id = ?1",
+            params![note.id],
+            |row| row.get(0),
+        )
+        .expect("note create audit count should query");
+    assert_eq!(created_audit_count, 1);
+
+    let created_sync_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'note' AND entity_id = ?1 AND field_name = '__create__'",
+            params![note.id],
+            |row| row.get(0),
+        )
+        .expect("note create sync count should query");
+    assert_eq!(created_sync_count, 1);
+
+    let updated = core
+        .update_note(&note.id, "Updated note".to_string())
+        .expect("note should update");
+    assert_eq!(updated.content, "Updated note");
+
+    let body_content_pair: (String, String) = core
+        .db
+        .conn
+        .query_row(
+            "SELECT content, body FROM notes WHERE id = ?1",
+            params![note.id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("note content/body should query");
+    assert_eq!(
+        body_content_pair,
+        ("Updated note".to_string(), "Updated note".to_string())
+    );
+
+    core.delete_note(&note.id).expect("note should soft delete");
+
+    assert!(core.get_note(&note.id).is_err());
+    assert!(core
+        .list_notes_for_entity("contact".to_string(), contact.id.clone())
+        .expect("contact notes should list")
+        .is_empty());
+
+    let deleted_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM notes WHERE id = ?1 AND deleted_at IS NOT NULL",
+            params![note.id],
+            |row| row.get(0),
+        )
+        .expect("note deleted count should query");
+    assert_eq!(deleted_count, 1);
+
+    let delete_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'delete' AND entity_type = 'note' AND entity_id = ?1",
+            params![note.id],
+            |row| row.get(0),
+        )
+        .expect("note delete audit count should query");
+    assert_eq!(delete_audit_count, 1);
+
+    let delete_sync_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'note' AND entity_id = ?1 AND field_name = '__delete__'",
+            params![note.id],
+            |row| row.get(0),
+        )
+        .expect("note delete sync count should query");
+    assert_eq!(delete_sync_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn notes_read_legacy_content_and_target_body_without_loss() {
+    let (mut core, path) = open_test_core();
+
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Compat".to_string()),
+            Some("Tester".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+
+    let now = now_iso8601();
+    core.db
+        .conn
+        .execute(
+            r#"
+            INSERT INTO notes
+                (id, content, body, entity_type, entity_id, created_at, updated_at, device_id)
+            VALUES
+                ('legacy-content-note', 'Legacy content', NULL, 'contact', ?1, ?2, ?2, 'device-a')
+            "#,
+            params![contact.id, now],
+        )
+        .expect("legacy content note should insert");
+    core.db
+        .conn
+        .execute(
+            r#"
+            INSERT INTO notes
+                (id, content, body, entity_type, entity_id, created_at, updated_at, device_id)
+            VALUES
+                ('target-body-note', '', 'Target body', 'contact', ?1, ?2, ?2, 'device-a')
+            "#,
+            params![contact.id, now],
+        )
+        .expect("target body note should insert");
+
+    let legacy = core
+        .get_note("legacy-content-note")
+        .expect("legacy content note should read");
+    assert_eq!(legacy.content, "Legacy content");
+
+    let target = core
+        .get_note("target-body-note")
+        .expect("target body note should read");
+    assert_eq!(target.content, "Target body");
+
+    let updated = core
+        .update_note("target-body-note", "Unified body".to_string())
+        .expect("target body note should update");
+    assert_eq!(updated.content, "Unified body");
+
+    let body_content_pair: (String, String) = core
+        .db
+        .conn
+        .query_row(
+            "SELECT content, body FROM notes WHERE id = 'target-body-note'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("updated content/body should query");
+    assert_eq!(
+        body_content_pair,
+        ("Unified body".to_string(), "Unified body".to_string())
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn tag_lifecycle_writes_tag_audit_sync_and_soft_deletes() {
+    let (mut core, path) = open_test_core();
+
+    let tag = core
+        .create_tag("VIP".to_string(), Some("#ef4444".to_string()))
+        .expect("tag should be created");
+    assert_eq!(tag.name, "VIP");
+    assert_eq!(tag.color, "#ef4444");
+
+    let create_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'create' AND entity_type = 'tag' AND entity_id = ?1",
+            params![tag.id],
+            |row| row.get(0),
+        )
+        .expect("tag create audit count should query");
+    assert_eq!(create_audit_count, 1);
+
+    let create_sync_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'tag' AND entity_id = ?1 AND field_name = '__create__'",
+            params![tag.id],
+            |row| row.get(0),
+        )
+        .expect("tag create sync count should query");
+    assert_eq!(create_sync_count, 1);
+
+    let updated = core
+        .update_tag(
+            &tag.id,
+            Some("Priority".to_string()),
+            Some("#0f766e".to_string()),
+        )
+        .expect("tag should update");
+    assert_eq!(updated.name, "Priority");
+    assert_eq!(updated.color, "#0f766e");
+
+    core.delete_tag(&tag.id).expect("tag should soft delete");
+
+    assert!(core.get_tag(&tag.id).is_err());
+    assert!(core
+        .list_tags()
+        .expect("tags should list")
+        .iter()
+        .all(|listed| listed.id != tag.id));
+
+    let deleted_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM tags WHERE id = ?1 AND deleted_at IS NOT NULL",
+            params![tag.id],
+            |row| row.get(0),
+        )
+        .expect("tag deleted count should query");
+    assert_eq!(deleted_count, 1);
+
+    let delete_sync_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'tag' AND entity_id = ?1 AND field_name = '__delete__'",
+            params![tag.id],
+            |row| row.get(0),
+        )
+        .expect("tag delete sync count should query");
+    assert_eq!(delete_sync_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn tag_apply_remove_mirrors_legacy_and_target_links_with_audit_sync() {
+    let (mut core, path) = open_test_core();
+
+    let organization = core
+        .create_organization(
+            "Acme Health".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("organization should be created");
+    let tag = core
+        .create_tag("Partner".to_string(), None)
+        .expect("tag should be created");
+
+    core.apply_tag_to_entity(
+        "organization".to_string(),
+        organization.id.clone(),
+        tag.id.clone(),
+    )
+    .expect("tag should apply to organization");
+
+    let tags = core
+        .list_tags_for_entity("organization".to_string(), organization.id.clone())
+        .expect("organization tags should list");
+    assert_eq!(tags.len(), 1);
+    assert_eq!(tags[0].id, tag.id);
+
+    let legacy_link_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM entity_tags WHERE entity_type = 'organization' AND entity_id = ?1 AND tag_id = ?2",
+            params![organization.id, tag.id],
+            |row| row.get(0),
+        )
+        .expect("legacy entity_tags count should query");
+    assert_eq!(legacy_link_count, 1);
+
+    let target_link_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM tag_links WHERE entity_type = 'organization' AND entity_id = ?1 AND tag_id = ?2 AND deleted_at IS NULL",
+            params![organization.id, tag.id],
+            |row| row.get(0),
+        )
+        .expect("target tag_links count should query");
+    assert_eq!(target_link_count, 1);
+
+    let apply_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'apply_tag' AND entity_type = 'organization' AND entity_id = ?1",
+            params![organization.id],
+            |row| row.get(0),
+        )
+        .expect("apply tag audit count should query");
+    assert_eq!(apply_audit_count, 1);
+
+    let apply_sync_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'organization' AND entity_id = ?1 AND field_name = 'tags' AND new_value = ?2",
+            params![organization.id, tag.id],
+            |row| row.get(0),
+        )
+        .expect("apply tag sync count should query");
+    assert_eq!(apply_sync_count, 1);
+
+    core.remove_tag_from_entity(
+        "organization".to_string(),
+        organization.id.clone(),
+        tag.id.clone(),
+    )
+    .expect("tag should remove from organization");
+
+    assert!(core
+        .list_tags_for_entity("organization".to_string(), organization.id.clone())
+        .expect("organization tags should list after remove")
+        .is_empty());
+
+    let legacy_removed_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM entity_tags WHERE entity_type = 'organization' AND entity_id = ?1 AND tag_id = ?2",
+            params![organization.id, tag.id],
+            |row| row.get(0),
+        )
+        .expect("legacy entity_tags removed count should query");
+    assert_eq!(legacy_removed_count, 0);
+
+    let target_active_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM tag_links WHERE entity_type = 'organization' AND entity_id = ?1 AND tag_id = ?2 AND deleted_at IS NULL",
+            params![organization.id, tag.id],
+            |row| row.get(0),
+        )
+        .expect("target active tag_links count should query");
+    assert_eq!(target_active_count, 0);
+
+    let target_soft_deleted_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM tag_links WHERE entity_type = 'organization' AND entity_id = ?1 AND tag_id = ?2 AND deleted_at IS NOT NULL",
+            params![organization.id, tag.id],
+            |row| row.get(0),
+        )
+        .expect("target soft-deleted tag_links count should query");
+    assert_eq!(target_soft_deleted_count, 1);
+
+    let remove_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'remove_tag' AND entity_type = 'organization' AND entity_id = ?1",
+            params![organization.id],
+            |row| row.get(0),
+        )
+        .expect("remove tag audit count should query");
+    assert_eq!(remove_audit_count, 1);
+
+    let remove_sync_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'organization' AND entity_id = ?1 AND field_name = 'tags' AND old_value = ?2",
+            params![organization.id, tag.id],
+            |row| row.get(0),
+        )
+        .expect("remove tag sync count should query");
+    assert_eq!(remove_sync_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn notes_and_tags_reject_unknown_entity_references() {
+    let (mut core, path) = open_test_core();
+
+    assert!(core
+        .create_note(
+            "invoice".to_string(),
+            "entity-1".to_string(),
+            "Unsupported".to_string(),
+        )
+        .is_err());
+
+    assert!(core
+        .create_note(
+            "contact".to_string(),
+            "missing-contact".to_string(),
+            "Missing".to_string(),
+        )
+        .is_err());
+
+    let tag = core
+        .create_tag("Follow-up".to_string(), None)
+        .expect("tag should be created");
+    assert!(core
+        .apply_tag_to_entity(
+            "deal".to_string(),
+            "missing-deal".to_string(),
+            tag.id.clone(),
+        )
+        .is_err());
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn external_clients_default_to_disabled() {
     let (mut core, path) = open_test_core();
 

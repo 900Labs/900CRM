@@ -14,10 +14,12 @@ pub mod dashboard_commands;
 pub mod deal_commands;
 pub mod email_commands;
 pub mod import_export;
+pub mod note_commands;
 pub mod organization_commands;
 pub mod report_commands;
 pub mod settings_commands;
 pub mod sync_commands;
+pub mod tag_commands;
 
 pub(crate) struct CoreGuard<'a> {
     guard: MutexGuard<'a, Option<CrmCore>>,
