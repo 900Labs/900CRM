@@ -39,3 +39,4 @@
 | 035 | 2026-06-24 | `codex/proposed-actions-decision-api-surface` | Pending-only proposed-action approve/reject core, Tauri, and frontend API foundation with audit entries and no execution/UI/MCP behavior | Completed |
 | 036 | 2026-06-24 | `codex/proposed-actions-decision-ui-surface` | `/pending-actions` approve/reject decision controls using Sprint 035 frontend API wrappers with pending-only refresh/removal and no execution behavior | Completed |
 | 037 | 2026-06-24 | `codex/external-client-permissions-core-surface` | External-client permission row storage and core evaluation for read/draft access with proposed-action draft gating and no UI/Tauri/MCP behavior | Completed |
+| 038 | 2026-06-24 | `codex/external-client-permissions-api-surface` | Thin Tauri commands and typed frontend API wrappers/tests for external-client permission listing, upsert, and read/draft evaluation without UI work | Completed |
