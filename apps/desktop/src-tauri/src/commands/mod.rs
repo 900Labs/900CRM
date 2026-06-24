@@ -14,6 +14,7 @@ pub mod custom_field_commands;
 pub mod dashboard_commands;
 pub mod deal_commands;
 pub mod email_commands;
+pub mod external_client_commands;
 pub mod import_export;
 pub mod note_commands;
 pub mod organization_commands;
