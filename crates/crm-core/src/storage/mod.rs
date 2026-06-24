@@ -26,6 +26,7 @@ pub mod custom_fields;
 pub mod dashboard;
 pub mod db;
 pub mod deals;
+pub mod external_client_permissions;
 pub mod external_clients;
 pub mod migration_readiness;
 pub mod notes;

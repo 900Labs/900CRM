@@ -1,8 +1,10 @@
 use crate::audit::ACTOR_DESKTOP_APP;
 use crate::result::CrmResult;
 use crate::storage::{self, external_clients::ExternalClient, proposed_actions::ProposedAction};
-use crate::utils::errors::CrmError;
 
+use super::external_client_permissions::{
+    ensure_external_client_draft_permission, required_external_client_field,
+};
 use super::{record_audit_json, CrmCore};
 
 impl CrmCore {
@@ -48,8 +50,20 @@ impl CrmCore {
         input_json: String,
         proposed_output_json: Option<String>,
     ) -> CrmResult<ProposedAction> {
+        let client_id = client_id
+            .as_deref()
+            .map(|id| required_external_client_field("client_id", id))
+            .transpose()?;
+        let tool_name = if client_id.is_some() {
+            required_external_client_field("tool_name", &tool_name)?
+        } else {
+            tool_name
+        };
         let device_id = self.device_id.clone();
         let tx = self.db.conn.unchecked_transaction()?;
+        if let Some(client_id) = client_id.as_deref() {
+            ensure_external_client_draft_permission(&tx, client_id, &tool_name)?;
+        }
         let proposed_action = storage::proposed_actions::create_proposed_action(
             &tx,
             client_id.as_deref(),
@@ -104,18 +118,6 @@ impl CrmCore {
         tx.commit()?;
         Ok(proposed_action)
     }
-}
-
-fn required_external_client_field(field: &str, value: &str) -> CrmResult<String> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(CrmError::InvalidInput(format!(
-            "External client {} is required",
-            field
-        )));
-    }
-
-    Ok(trimmed.to_string())
 }
 
 #[derive(Debug, Clone, Copy)]
