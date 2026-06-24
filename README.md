@@ -44,7 +44,7 @@ Learn more at [900labs.com/impact](https://www.900labs.com/impact).
 
 Your business data stays on your device. Nothing is ever uploaded anywhere.
 
-<!-- screenshot -->
+![900CRM dashboard overview screen](docs/assets/readme/900crm-dashboard.png)
 
 ---
 
@@ -53,22 +53,20 @@ Your business data stays on your device. Nothing is ever uploaded anywhere.
 ### Contacts
 Manage your full network of people and organizations. Add custom fields, tag contacts, write notes, and attach file links. Search across your entire contact database instantly.
 
-<!-- screenshot -->
+![900CRM contacts management screen](docs/assets/readme/900crm-contacts.png)
 
 ### Pipeline
 Visual kanban-style deal pipeline with drag-and-drop stages. Track every deal from first contact to close. See the total value of your pipeline at a glance. Customize stages to match your sales process.
 
-<!-- screenshot -->
+![900CRM pipeline kanban screen](docs/assets/readme/900crm-pipeline.png)
 
 ### Activities
 Link tasks, calls, meetings, and follow-ups to any contact or deal. Set due dates and receive desktop notifications. Never miss a follow-up again. Activity history gives you a complete timeline of every interaction.
 
-<!-- screenshot -->
+![900CRM activities screen](docs/assets/readme/900crm-activities.png)
 
 ### Dashboard
 At-a-glance business metrics on every launch: pipeline value, deals by stage, upcoming tasks, recently modified contacts, and activity completion rates. No configuration needed — it works out of the box.
-
-<!-- screenshot -->
 
 ### Search
 Full-text search across contacts, deals, and activities. Instant results as you type. Filter by entity type, date range, or tag. Works 100% offline — every search query stays on your machine.
@@ -78,6 +76,8 @@ Bring your existing data in with local CSV import for contacts, deals, and organ
 
 ### Backup / Restore
 Create local SQLite backups from Settings, validate backup integrity before restore, and restore only after explicit confirmation. See [Backup and Restore](docs/BACKUP_RESTORE.md) for the safety workflow.
+
+![900CRM settings data management surface](docs/assets/readme/900crm-data-management.png)
 
 ### Internationalization (i18n)
 The entire interface is localized. Switch languages in settings instantly. Full right-to-left (RTL) layout support for Arabic and future RTL languages. Community translations welcome.
