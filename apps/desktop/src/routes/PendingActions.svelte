@@ -1,32 +1,120 @@
 <script lang="ts">
   /**
-   * PendingActions.svelte - Read-only proposed-action review surface.
+   * PendingActions.svelte - Proposed-action decision surface for pending items.
    */
 
   import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
-  import { listPendingProposedActions, type ProposedAction } from '$lib/api/proposedActions';
+  import {
+    approveProposedAction,
+    listPendingProposedActions,
+    rejectProposedAction,
+    type ProposedAction,
+  } from '$lib/api/proposedActions';
   import { settingsStore } from '$lib/stores/settings';
+  import { uiStore } from '$lib/stores/ui.svelte';
 
   let actions = $state<ProposedAction[]>([]);
   let isLoading = $state(true);
   let error = $state<string | null>(null);
+  let loadRequestSeq = 0;
+  let decisionSeq = 0;
+  let decisionBusyById = $state<Record<string, 'approve' | 'reject'>>({});
+  let decisionErrorsById = $state<Record<string, string>>({});
+  let pageMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
+  const decidedActionIds = new Set<string>();
 
   onMount(() => {
     void loadActions();
   });
 
   async function loadActions() {
+    const requestSeq = ++loadRequestSeq;
+    const decisionSeqAtStart = decisionSeq;
     isLoading = true;
     error = null;
 
     try {
-      actions = await listPendingProposedActions();
+      const pendingActions = await listPendingProposedActions();
+      if (requestSeq === loadRequestSeq && decisionSeqAtStart === decisionSeq) {
+        actions = pendingActions.filter((action) => !decidedActionIds.has(action.id));
+      }
     } catch (err) {
-      console.error('[PendingActions] Failed to load pending actions:', err);
-      error = t('pendingActions.loadFailed');
+      if (requestSeq === loadRequestSeq && decisionSeqAtStart === decisionSeq) {
+        console.error('[PendingActions] Failed to load pending actions:', err);
+        error = t('pendingActions.loadFailed');
+      }
     } finally {
-      isLoading = false;
+      if (requestSeq === loadRequestSeq) {
+        isLoading = false;
+      }
+    }
+  }
+
+  function errorMessage(err: unknown): string {
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
+    }
+    if (typeof err === 'string' && err.trim()) {
+      return err;
+    }
+    return t('pendingActions.decisionFailed');
+  }
+
+  function setDecisionBusy(id: string, value: 'approve' | 'reject' | null) {
+    if (value) {
+      decisionBusyById = { ...decisionBusyById, [id]: value };
+      return;
+    }
+
+    const remaining = { ...decisionBusyById };
+    delete remaining[id];
+    decisionBusyById = remaining;
+  }
+
+  function clearDecisionError(id: string) {
+    const remaining = { ...decisionErrorsById };
+    delete remaining[id];
+    decisionErrorsById = remaining;
+  }
+
+  async function decideAction(action: ProposedAction, decision: 'approve' | 'reject') {
+    if (decisionBusyById[action.id]) return;
+
+    setDecisionBusy(action.id, decision);
+    clearDecisionError(action.id);
+    pageMessage = null;
+
+    try {
+      if (decision === 'approve') {
+        await approveProposedAction(action.id);
+      } else {
+        await rejectProposedAction(action.id);
+      }
+
+      decisionSeq += 1;
+      decidedActionIds.add(action.id);
+      actions = actions.filter((pendingAction) => pendingAction.id !== action.id);
+      error = null;
+
+      const message = decision === 'approve'
+        ? t('pendingActions.approveSuccess', { action: action.actionType })
+        : t('pendingActions.rejectSuccess', { action: action.actionType });
+      pageMessage = { type: 'success', text: message };
+      uiStore.toastSuccess(message);
+      void loadActions();
+    } catch (err) {
+      const message = errorMessage(err);
+      decisionErrorsById = { ...decisionErrorsById, [action.id]: message };
+      pageMessage = {
+        type: 'error',
+        text: decision === 'approve'
+          ? t('pendingActions.approveFailed')
+          : t('pendingActions.rejectFailed'),
+      };
+      uiStore.toastError(`${pageMessage.text}: ${message}`);
+    } finally {
+      setDecisionBusy(action.id, null);
     }
   }
 
@@ -108,6 +196,12 @@
     </button>
   </div>
 
+  {#if pageMessage}
+    <div class="decision-message {pageMessage.type}" role="status">
+      {pageMessage.text}
+    </div>
+  {/if}
+
   <div class="pending-table card">
     <div class="table-scroll">
       <table class="pending-list" aria-label={t('pendingActions.title')}>
@@ -122,18 +216,19 @@
             <th>{t('pendingActions.proposedOutput')}</th>
             <th>{t('pendingActions.status')}</th>
             <th>{t('pendingActions.deviceId')}</th>
+            <th>{t('pendingActions.decision')}</th>
           </tr>
         </thead>
         <tbody>
           {#if isLoading}
             {#each Array(6) as _, index (index)}
               <tr class="skeleton-row">
-                <td colspan="9"><div class="skeleton table-skeleton-cell"></div></td>
+                <td colspan="10"><div class="skeleton table-skeleton-cell"></div></td>
               </tr>
             {/each}
           {:else if error}
             <tr>
-              <td colspan="9" class="state-cell">
+              <td colspan="10" class="state-cell">
                 <div class="state-panel" role="alert">
                   <h2>{error}</h2>
                   <p>{t('pendingActions.loadFailedDesc')}</p>
@@ -145,7 +240,7 @@
             </tr>
           {:else if actions.length === 0}
             <tr>
-              <td colspan="9" class="state-cell">
+              <td colspan="10" class="state-cell">
                 <div class="state-panel">
                   <h2>{t('pendingActions.emptyTitle')}</h2>
                   <p>{t('pendingActions.emptyDesc')}</p>
@@ -180,6 +275,31 @@
                 </td>
                 <td><span class="status-badge">{action.status}</span></td>
                 <td><span class="mono">{compactId(action.deviceId)}</span></td>
+                <td>
+                  <div class="decision-controls" aria-busy={Boolean(decisionBusyById[action.id])}>
+                    <button
+                      class="btn btn-primary btn-sm decision-button"
+                      type="button"
+                      onclick={() => void decideAction(action, 'approve')}
+                      disabled={Boolean(decisionBusyById[action.id])}
+                    >
+                      {decisionBusyById[action.id] === 'approve' ? t('pendingActions.approving') : t('pendingActions.approve')}
+                    </button>
+                    <button
+                      class="btn btn-danger btn-sm decision-button"
+                      type="button"
+                      onclick={() => void decideAction(action, 'reject')}
+                      disabled={Boolean(decisionBusyById[action.id])}
+                    >
+                      {decisionBusyById[action.id] === 'reject' ? t('pendingActions.rejecting') : t('pendingActions.reject')}
+                    </button>
+                  </div>
+                  {#if decisionErrorsById[action.id]}
+                    <p class="decision-error" role="alert">
+                      {decisionErrorsById[action.id]}
+                    </p>
+                  {/if}
+                </td>
               </tr>
             {/each}
           {/if}
@@ -275,6 +395,44 @@
     color: var(--color-warning-600);
     font-size: var(--text-xs);
     font-weight: var(--weight-semibold);
+  }
+
+  .decision-message {
+    padding: var(--space-3) var(--space-4);
+    border: var(--border-width) solid var(--border-subtle);
+    border-radius: var(--border-radius-md);
+    font-size: var(--text-sm);
+  }
+
+  .decision-message.success {
+    border-color: var(--color-success-500);
+    background-color: var(--color-success-50);
+    color: var(--text-success);
+  }
+
+  .decision-message.error {
+    border-color: var(--color-danger-500);
+    background-color: var(--color-danger-50);
+    color: var(--text-danger);
+  }
+
+  .decision-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    min-width: 176px;
+  }
+
+  .decision-button {
+    min-width: 82px;
+  }
+
+  .decision-error {
+    margin: var(--space-2) 0 0;
+    max-width: 240px;
+    color: var(--color-danger-600);
+    font-size: var(--text-xs);
+    line-height: var(--leading-relaxed);
   }
 
   .state-cell {

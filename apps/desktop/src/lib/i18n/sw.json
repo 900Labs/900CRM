@@ -423,7 +423,7 @@
   },
   "pendingActions": {
     "title": "Pending Actions",
-    "subtitle": "Read-only proposed actions waiting for a future approval workflow.",
+    "subtitle": "Review pending proposed actions and approve or reject them without executing anything.",
     "actionType": "Action Type",
     "toolName": "Tool",
     "entity": "Entity",
@@ -441,6 +441,16 @@
     "jsonArrayCount": "{count} items",
     "jsonEmptyObject": "Empty object",
     "jsonObjectPreview": "{keys}",
-    "jsonObjectPreviewMore": "{keys} +{count}"
+    "jsonObjectPreviewMore": "{keys} +{count}",
+    "decision": "Decision",
+    "approve": "Approve",
+    "reject": "Reject",
+    "approving": "Approving...",
+    "rejecting": "Rejecting...",
+    "approveSuccess": "{action} approved. It was removed from pending actions.",
+    "rejectSuccess": "{action} rejected. It was removed from pending actions.",
+    "decisionFailed": "Failed to decide pending action",
+    "approveFailed": "Approval failed",
+    "rejectFailed": "Rejection failed"
   }
 }
