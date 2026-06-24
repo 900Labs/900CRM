@@ -23,6 +23,14 @@
     type EntityTypeCustomFieldValue,
   } from '$lib/api/customFields';
   import { formatDate, formatRelativeTime } from '$lib/utils/formatters';
+  import {
+    addSelectedActivityLinks,
+    deriveActivityRelationshipLabels,
+    loadActivityLinkIndex,
+    loadActivityRelationshipLookups,
+    type ActivityLinkIndex,
+    type ActivityRelationshipLookups,
+  } from '$lib/utils/activityRelationships';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
   // ── State ────────────────────────────────────────────────────────────────────
@@ -36,12 +44,24 @@
   let customFieldValuesLoading = $state(false);
   let customFieldFilterError = $state<string | null>(null);
   let customFieldValueIndex = $state<Record<string, Record<string, string>>>({});
+  let activityRelationshipLookups = $state<ActivityRelationshipLookups>({
+    contacts: [],
+    organizations: [],
+    deals: [],
+  });
+  let activityLinkIndex = $state<ActivityLinkIndex>({});
+  let activityRelationshipsLoading = $state(false);
+  let loadedActivityLinkKey = $state('');
+  let loadedActivityRelationshipVersion = $state(0);
 
   // Quick-add form
   let showQuickAdd  = $state(false);
   let qaSubject     = $state('');
   let qaType        = $state<ActivityType>('task');
   let qaDueDate     = $state('');
+  let qaContactId   = $state('');
+  let qaOrganizationId = $state('');
+  let qaDealId      = $state('');
   let qaSubmitting  = $state(false);
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -49,8 +69,25 @@
   onMount(async () => {
     await Promise.all([
       activityStore.loadActivities(),
+      ensureActivityRelationshipLookups(),
       loadCustomFieldDefinitions(),
     ]);
+    await refreshActivityLinks();
+  });
+
+  $effect(() => {
+    const activityLinkKey = activityStore.activities.map((activity) => activity.id).join('|');
+    const relationshipRefreshVersion = activityStore.relationshipRefreshVersion;
+    if (
+      activityLinkKey === loadedActivityLinkKey
+      && relationshipRefreshVersion === loadedActivityRelationshipVersion
+    ) {
+      return;
+    }
+
+    loadedActivityLinkKey = activityLinkKey;
+    loadedActivityRelationshipVersion = relationshipRefreshVersion;
+    void loadActivityLinksForCurrentActivities();
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -61,6 +98,7 @@
       type: type || undefined,
       status: statusFilter || undefined,
     });
+    await refreshActivityLinks();
   }
 
   async function handleStatusFilter(status: ActivityStatus | '') {
@@ -69,6 +107,34 @@
       type: typeFilter || undefined,
       status: status || undefined,
     });
+    await refreshActivityLinks();
+  }
+
+  async function ensureActivityRelationshipLookups() {
+    activityRelationshipsLoading = true;
+    try {
+      activityRelationshipLookups = await loadActivityRelationshipLookups();
+    } catch (err) {
+      console.error('[Activities] Failed to load activity relationship lookups:', err);
+      uiStore.toastError('Failed to load activity relationships.');
+    } finally {
+      activityRelationshipsLoading = false;
+    }
+  }
+
+  async function refreshActivityLinks() {
+    loadedActivityLinkKey = activityStore.activities.map((activity) => activity.id).join('|');
+    loadedActivityRelationshipVersion = activityStore.relationshipRefreshVersion;
+    await loadActivityLinksForCurrentActivities();
+  }
+
+  async function loadActivityLinksForCurrentActivities() {
+    try {
+      activityLinkIndex = await loadActivityLinkIndex(activityStore.activities.map((activity) => activity.id));
+    } catch (err) {
+      console.error('[Activities] Failed to load activity links:', err);
+      uiStore.toastError('Failed to load activity relationships.');
+    }
   }
 
   async function loadCustomFieldDefinitions() {
@@ -143,15 +209,25 @@
         subject:   qaSubject.trim(),
         notes:     null,
         dueDate:   qaDueDate || null,
-        contactId: null,
-        dealId:    null,
+        contactId: qaContactId || null,
+        dealId:    qaDealId || null,
       };
-      await activityStore.createActivity(payload);
+      const activity = await activityStore.createActivity(payload);
+      await addSelectedActivityLinks(activity.id, {
+        contactId: qaContactId || null,
+        organizationId: qaOrganizationId || null,
+        dealId: qaDealId || null,
+      });
+      activityStore.notifyRelationshipLinksChanged();
+      await refreshActivityLinks();
 
       // Reset form
       qaSubject  = '';
       qaType     = 'task';
       qaDueDate  = '';
+      qaContactId = '';
+      qaOrganizationId = '';
+      qaDealId = '';
       showQuickAdd = false;
     } catch (err) {
       console.error('[Activities] Quick-add error:', err);
@@ -165,6 +241,9 @@
     qaSubject     = '';
     qaType        = 'task';
     qaDueDate     = '';
+    qaContactId   = '';
+    qaOrganizationId = '';
+    qaDealId      = '';
   }
 
   // ── Type icon helper ─────────────────────────────────────────────────────────
@@ -279,6 +358,56 @@
             bind:value={qaDueDate}
             aria-label={t('activities.dueDate')}
           />
+        </div>
+
+        <div class="qa-field qa-field--relationship">
+          <label class="sr-only" for="qa-contact">{t('deals.contact')}</label>
+          <select
+            id="qa-contact"
+            class="input select-input"
+            bind:value={qaContactId}
+            disabled={activityRelationshipsLoading || qaSubmitting}
+            aria-busy={activityRelationshipsLoading}
+          >
+            <option value="">{activityRelationshipsLoading ? t('common.loading') : t('common.none')}</option>
+            {#each activityRelationshipLookups.contacts as contact (contact.id)}
+              <option value={contact.id}>
+                {[contact.firstName, contact.lastName].map((part) => part.trim()).filter(Boolean).join(' ') || contact.email || contact.id}
+              </option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="qa-field qa-field--relationship">
+          <label class="sr-only" for="qa-organization">{t('contacts.organization')}</label>
+          <select
+            id="qa-organization"
+            class="input select-input"
+            bind:value={qaOrganizationId}
+            disabled={activityRelationshipsLoading || qaSubmitting}
+            aria-busy={activityRelationshipsLoading}
+          >
+            <option value="">{activityRelationshipsLoading ? t('common.loading') : t('common.none')}</option>
+            {#each activityRelationshipLookups.organizations as organization (organization.id)}
+              <option value={organization.id}>{organization.name}</option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="qa-field qa-field--relationship">
+          <label class="sr-only" for="qa-deal">{t('deals.title')}</label>
+          <select
+            id="qa-deal"
+            class="input select-input"
+            bind:value={qaDealId}
+            disabled={activityRelationshipsLoading || qaSubmitting}
+            aria-busy={activityRelationshipsLoading}
+          >
+            <option value="">{activityRelationshipsLoading ? t('common.loading') : t('common.none')}</option>
+            {#each activityRelationshipLookups.deals as deal (deal.id)}
+              <option value={deal.id}>{deal.name}</option>
+            {/each}
+          </select>
         </div>
 
         <!-- Actions -->
@@ -415,6 +544,11 @@
     {:else}
       <ul class="activities-list" role="list">
         {#each filteredActivities as activity (activity.id)}
+          {@const relationships = deriveActivityRelationshipLabels(
+            activity,
+            activityLinkIndex[activity.id] ?? [],
+            activityRelationshipLookups,
+          )}
           <li class="activity-row" class:activity-row--completed={activity.status === 'completed'}>
             <!-- Type icon -->
             <div class="activity-icon-wrap activity-type-{activity.type}" aria-hidden="true">
@@ -440,22 +574,30 @@
                     {formatDate(activity.dueDate, settingsStore.dateFormat as 'MMM D, YYYY')}
                   </span>
                 {/if}
-                {#if activity.contactName}
+                {#each relationships.contacts as contact (contact.id)}
                   <span class="activity-linked">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                       <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8"/>
                     </svg>
-                    {activity.contactName}
+                    {contact.label}
                   </span>
-                {/if}
-                {#if activity.dealName}
+                {/each}
+                {#each relationships.organizations as organization (organization.id)}
+                  <span class="activity-linked">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01"/>
+                    </svg>
+                    {organization.label}
+                  </span>
+                {/each}
+                {#each relationships.deals as deal (deal.id)}
                   <span class="activity-linked">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                       <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                     </svg>
-                    {activity.dealName}
+                    {deal.label}
                   </span>
-                {/if}
+                {/each}
                 <span class="activity-time">{formatRelativeTime(activity.createdAt)}</span>
               </div>
             </div>
@@ -523,6 +665,7 @@
   .qa-field--type    { min-width: 120px; }
   .qa-field--subject { flex: 1; min-width: 200px; }
   .qa-field--date    { min-width: 148px; }
+  .qa-field--relationship { min-width: 172px; }
 
   .qa-actions {
     display: flex;
