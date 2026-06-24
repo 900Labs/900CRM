@@ -208,6 +208,17 @@ pub struct OrganizationCsvRow {
 /// assert_eq!(rows.len(), 1);
 /// ```
 pub fn parse_contacts_csv<R: Read>(reader: R) -> CrmResult<Vec<ContactCsvRow>> {
+    Ok(parse_contacts_csv_with_row_numbers(reader)?
+        .into_iter()
+        .map(|(_, row)| row)
+        .collect())
+}
+
+/// Parses contact CSV data and preserves the original 1-based source row
+/// number, including the header row offset.
+pub fn parse_contacts_csv_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, ContactCsvRow)>> {
     let mut rdr = csv::ReaderBuilder::new()
         .has_headers(true)
         .trim(csv::Trim::All)
@@ -215,14 +226,15 @@ pub fn parse_contacts_csv<R: Read>(reader: R) -> CrmResult<Vec<ContactCsvRow>> {
         .from_reader(reader);
 
     let mut rows = Vec::new();
-    for result in rdr.deserialize::<ContactCsvRow>() {
+    for (index, result) in rdr.deserialize::<ContactCsvRow>().enumerate() {
+        let row_number = index + 2;
         match result {
             Ok(row) => {
                 if row.first_name.trim().is_empty() {
                     log::debug!("Skipping CSV row with blank first_name");
                     continue;
                 }
-                rows.push(row);
+                rows.push((row_number, row));
             }
             Err(e) => {
                 log::error!("CSV parse error: {}", e);
@@ -280,6 +292,17 @@ pub fn parse_deals_csv<R: Read>(reader: R) -> CrmResult<Vec<DealCsvRow>> {
 ///
 /// Returns [`CrmError::Csv`] if the CSV is malformed.
 pub fn parse_organizations_csv<R: Read>(reader: R) -> CrmResult<Vec<OrganizationCsvRow>> {
+    Ok(parse_organizations_csv_with_row_numbers(reader)?
+        .into_iter()
+        .map(|(_, row)| row)
+        .collect())
+}
+
+/// Parses organization CSV data and preserves the original 1-based source row
+/// number, including the header row offset.
+pub fn parse_organizations_csv_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, OrganizationCsvRow)>> {
     let mut rdr = csv::ReaderBuilder::new()
         .has_headers(true)
         .trim(csv::Trim::All)
@@ -287,14 +310,15 @@ pub fn parse_organizations_csv<R: Read>(reader: R) -> CrmResult<Vec<Organization
         .from_reader(reader);
 
     let mut rows = Vec::new();
-    for result in rdr.deserialize::<OrganizationCsvRow>() {
+    for (index, result) in rdr.deserialize::<OrganizationCsvRow>().enumerate() {
+        let row_number = index + 2;
         match result {
             Ok(row) => {
                 if row.name.trim().is_empty() {
                     log::debug!("Skipping CSV row with blank name");
                     continue;
                 }
-                rows.push(row);
+                rows.push((row_number, row));
             }
             Err(e) => {
                 log::error!("CSV parse error: {}", e);

@@ -669,6 +669,22 @@ pub fn find_active_contacts_by_email(conn: &Connection, email: &str) -> CrmResul
     Ok(rows.filter_map(|r| r.ok()).collect())
 }
 
+/// Finds active contacts with a phone number matching exactly after trimming.
+pub fn find_active_contacts_by_phone(conn: &Connection, phone: &str) -> CrmResult<Vec<Contact>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, contact_type, first_name, last_name, org_name, email, phone,
+               address, city, country, org_id, organization_id, notes,
+               created_at, updated_at, deleted_at, device_id
+        FROM contacts
+        WHERE TRIM(phone) = TRIM(?1) AND deleted_at IS NULL
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![phone], row_to_contact)?;
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
 /// Finds active contacts with an exact case-insensitive first/last name match.
 pub fn find_active_contacts_by_name(
     conn: &Connection,
