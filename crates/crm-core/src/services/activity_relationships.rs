@@ -240,6 +240,8 @@ pub(super) fn sync_activity_links_after_mirror_update(
     )
 }
 
+// Legacy mirror sync needs both relationship endpoints and the mirrored field name.
+#[allow(clippy::too_many_arguments)]
 fn sync_one_legacy_mirror(
     conn: &rusqlite::Connection,
     before: &Activity,

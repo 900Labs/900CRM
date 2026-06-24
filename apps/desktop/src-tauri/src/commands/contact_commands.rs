@@ -5,6 +5,8 @@ use tauri::State;
 
 use crate::{commands::lock_core, AppState};
 
+// Preserve the existing field-level IPC command shape for frontend callers.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn create_contact(
     state: State<'_, AppState>,
@@ -52,6 +54,8 @@ pub async fn list_contacts(
     core.list_contacts(params).map_err(|e| e.to_string())
 }
 
+// Preserve the existing field-level IPC command shape for frontend callers.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn update_contact(
     state: State<'_, AppState>,

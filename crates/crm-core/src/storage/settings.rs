@@ -93,11 +93,7 @@ pub fn get_setting(conn: &Connection, key: &str) -> CrmResult<Option<Setting>> {
 /// # Errors
 ///
 /// Returns an error only on SQL failure, not on missing key.
-pub fn get_setting_or_default<'a>(
-    conn: &Connection,
-    key: &str,
-    default: &'a str,
-) -> CrmResult<String> {
+pub fn get_setting_or_default(conn: &Connection, key: &str, default: &str) -> CrmResult<String> {
     match get_setting(conn, key)? {
         Some(s) => Ok(s.value),
         None => Ok(default.to_string()),

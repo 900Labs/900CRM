@@ -86,6 +86,8 @@ pub async fn mark_activity_incomplete(
         .map_err(|e| e.to_string())
 }
 
+// Preserve the existing field-level IPC command shape for frontend callers.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn update_activity(
     state: State<'_, AppState>,

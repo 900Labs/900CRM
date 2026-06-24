@@ -213,7 +213,7 @@ pub fn list_deals(conn: &Connection) -> CrmResult<Vec<Deal>> {
         "#,
     )?;
 
-    let rows = stmt.query_map([], |row| row_to_deal(row))?;
+    let rows = stmt.query_map([], row_to_deal)?;
     let deals: Vec<Deal> = rows.filter_map(|r| r.ok()).collect();
 
     log::debug!("list_deals: {} results", deals.len());
@@ -236,7 +236,7 @@ pub fn list_deals_by_stage(conn: &Connection, stage: &str) -> CrmResult<Vec<Deal
         "#,
     )?;
 
-    let rows = stmt.query_map(params![stage], |row| row_to_deal(row))?;
+    let rows = stmt.query_map(params![stage], row_to_deal)?;
     let deals: Vec<Deal> = rows.filter_map(|r| r.ok()).collect();
 
     log::debug!(

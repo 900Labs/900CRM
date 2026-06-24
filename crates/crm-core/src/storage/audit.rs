@@ -78,7 +78,7 @@ pub fn list_recent_audit_log(conn: &Connection, limit: u32) -> CrmResult<Vec<Aud
         "#,
     )?;
 
-    let rows = stmt.query_map(params![limit.max(1).min(500)], |row| {
+    let rows = stmt.query_map(params![limit.clamp(1, 500)], |row| {
         Ok(AuditLogEntry {
             id: row.get(0)?,
             actor_type: row.get(1)?,
