@@ -3460,9 +3460,11 @@ fn external_clients_default_to_disabled() {
     let (mut core, path) = open_test_core();
 
     let client = core
-        .create_external_client_placeholder("Claude Desktop", "mcp")
+        .create_external_client_placeholder(" Claude Desktop ", " mcp ")
         .expect("external client placeholder should be created");
 
+    assert_eq!(client.name, "Claude Desktop");
+    assert_eq!(client.client_type, "mcp");
     assert_eq!(client.permission_mode, "disabled");
     assert!(!client.enabled);
 
@@ -3476,6 +3478,66 @@ fn external_clients_default_to_disabled() {
         )
         .expect("external client count should query");
     assert_eq!(disabled_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn list_external_clients_returns_disabled_placeholders_in_created_order() {
+    let (mut core, path) = open_test_core();
+
+    let first = core
+        .create_external_client_placeholder("Claude Desktop", "mcp")
+        .expect("first external client placeholder should be created");
+    let second = core
+        .create_external_client_placeholder("Local Script", "script")
+        .expect("second external client placeholder should be created");
+
+    let clients = core
+        .list_external_clients()
+        .expect("external clients should list");
+
+    assert_eq!(clients.len(), 2);
+    assert_eq!(clients[0].id, first.id);
+    assert_eq!(clients[1].id, second.id);
+    assert!(clients.iter().all(|client| !client.enabled));
+    assert!(clients
+        .iter()
+        .all(|client| client.permission_mode == "disabled"));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_client_placeholder_rejects_blank_required_fields() {
+    let (mut core, path) = open_test_core();
+
+    let blank_name = core
+        .create_external_client_placeholder("   ", "mcp")
+        .expect_err("blank external client name should be rejected");
+    match blank_name {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("name"));
+        }
+        other => panic!("expected InvalidInput for blank name, got {other:?}"),
+    }
+
+    let blank_type = core
+        .create_external_client_placeholder("Claude Desktop", "\t")
+        .expect_err("blank external client type should be rejected");
+    match blank_type {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("client_type"));
+        }
+        other => panic!("expected InvalidInput for blank client type, got {other:?}"),
+    }
+
+    let clients = core
+        .list_external_clients()
+        .expect("external clients should list after rejected creates");
+    assert!(clients.is_empty());
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);

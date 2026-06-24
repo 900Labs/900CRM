@@ -1,5 +1,6 @@
 use crate::result::CrmResult;
 use crate::storage::{self, external_clients::ExternalClient, proposed_actions::ProposedAction};
+use crate::utils::errors::CrmError;
 
 use super::{record_audit_json, CrmCore};
 
@@ -17,10 +18,13 @@ impl CrmCore {
         name: &str,
         client_type: &str,
     ) -> CrmResult<ExternalClient> {
+        let name = required_external_client_field("name", name)?;
+        let client_type = required_external_client_field("client_type", client_type)?;
+
         storage::external_clients::create_external_client_placeholder(
             &self.db.conn,
-            name,
-            client_type,
+            &name,
+            &client_type,
             &self.device_id,
         )
     }
@@ -61,4 +65,16 @@ impl CrmCore {
         tx.commit()?;
         Ok(proposed_action)
     }
+}
+
+fn required_external_client_field(field: &str, value: &str) -> CrmResult<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(CrmError::InvalidInput(format!(
+            "External client {} is required",
+            field
+        )));
+    }
+
+    Ok(trimmed.to_string())
 }
