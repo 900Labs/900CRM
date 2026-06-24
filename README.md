@@ -219,13 +219,15 @@ The E2E smoke suite runs the Vite-rendered browser shell with Playwright Chromiu
 
 ## Release Status
 
-900CRM does not currently publish pre-built installers or GitHub release
-artifacts. Current CI is verification-only and does not build Windows, macOS, or
-Linux packages.
+900CRM does not currently publish pre-built installers or public GitHub release
+artifacts. Current CI is verification-only; a separate manual release workflow
+can build unsigned Windows, macOS, and Linux release-candidate packages with
+per-platform checksums, release metadata, and an SPDX-shaped dependency
+inventory.
 
-The intended future release artifacts are:
+The intended public release artifacts are:
 
-| Platform | Future artifact | Minimum target |
+| Platform | Artifact | Minimum target |
 |---|---|---|
 | **Windows** | `.msi` or `.exe` installer | Windows 10 (1803+) |
 | **macOS** | `.dmg` disk image | macOS 11 Big Sur (Intel & Apple Silicon) |
@@ -233,8 +235,9 @@ The intended future release artifacts are:
 | **Linux** | `.AppImage` | Any modern Linux distribution |
 
 See [Release Readiness](docs/RELEASE.md) for the manual verification checklist,
-required future checksums/SBOM/release notes, and the explicit not-yet-implemented
-release-packaging boundaries.
+the guarded release-packaging workflow, generated checksums/SBOM metadata, and
+the explicit not-yet-implemented signing, notarization, and publishing
+boundaries.
 
 ---
 
@@ -335,7 +338,7 @@ Current implementation baselines are documented in [Data Model](docs/DATA_MODEL.
 │   │       └── import_export/    # CSV import/export support
 │   ├── crm-mcp/                  # MCP integration placeholder; not implemented
 │   └── crm-sdk/                  # SDK placeholder
-├── scripts/                      # Root verification helpers
+├── scripts/                      # Root verification and release metadata helpers
 ├── plugins/                      # Community plugin directory
 │   └── README.md                 # Plugin development guide
 ├── docs/                         # Required public docs and sprint notes
@@ -348,7 +351,8 @@ Current implementation baselines are documented in [Data Model](docs/DATA_MODEL.
 ├── samples/                      # Synthetic CSV data for manual import smoke tests
 ├── .github/
 │   ├── workflows/
-│   │   └── ci.yml                # Ubuntu PR and main-branch verification
+│   │   ├── ci.yml                # Ubuntu PR and main-branch verification
+│   │   └── release.yml           # Manual release-candidate packaging workflow
 │   └── pull_request_template.md  # Pull request checklist and guardrails
 ├── ARCHITECTURE.md               # Technical architecture guide
 ├── CHANGELOG.md
