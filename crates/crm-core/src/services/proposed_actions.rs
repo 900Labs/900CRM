@@ -1,3 +1,4 @@
+use crate::audit::ACTOR_DESKTOP_APP;
 use crate::result::CrmResult;
 use crate::storage::{self, external_clients::ExternalClient, proposed_actions::ProposedAction};
 use crate::utils::errors::CrmError;
@@ -7,6 +8,14 @@ use super::{record_audit_json, CrmCore};
 impl CrmCore {
     pub fn list_pending_proposed_actions(&self) -> CrmResult<Vec<ProposedAction>> {
         storage::proposed_actions::list_pending_proposed_actions(&self.db.conn)
+    }
+
+    pub fn approve_proposed_action(&mut self, id: String) -> CrmResult<ProposedAction> {
+        self.decide_proposed_action(id, ProposedActionDecision::Approve)
+    }
+
+    pub fn reject_proposed_action(&mut self, id: String) -> CrmResult<ProposedAction> {
+        self.decide_proposed_action(id, ProposedActionDecision::Reject)
     }
 
     pub fn list_external_clients(&self) -> CrmResult<Vec<ExternalClient>> {
@@ -65,6 +74,36 @@ impl CrmCore {
         tx.commit()?;
         Ok(proposed_action)
     }
+
+    fn decide_proposed_action(
+        &mut self,
+        id: String,
+        decision: ProposedActionDecision,
+    ) -> CrmResult<ProposedAction> {
+        let device_id = self.device_id.clone();
+        let tx = self.db.conn.unchecked_transaction()?;
+        let before = storage::proposed_actions::get_proposed_action(&tx, &id)?;
+        let proposed_action = match decision {
+            ProposedActionDecision::Approve => {
+                storage::proposed_actions::approve_proposed_action(&tx, &id)?
+            }
+            ProposedActionDecision::Reject => {
+                storage::proposed_actions::reject_proposed_action(&tx, &id)?
+            }
+        };
+        record_audit_json(
+            &tx,
+            ACTOR_DESKTOP_APP,
+            decision.audit_action(),
+            Some("proposed_action"),
+            Some(&proposed_action.id),
+            before.as_ref(),
+            Some(&proposed_action),
+            &device_id,
+        )?;
+        tx.commit()?;
+        Ok(proposed_action)
+    }
 }
 
 fn required_external_client_field(field: &str, value: &str) -> CrmResult<String> {
@@ -77,4 +116,19 @@ fn required_external_client_field(field: &str, value: &str) -> CrmResult<String>
     }
 
     Ok(trimmed.to_string())
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ProposedActionDecision {
+    Approve,
+    Reject,
+}
+
+impl ProposedActionDecision {
+    fn audit_action(self) -> &'static str {
+        match self {
+            ProposedActionDecision::Approve => "approve_proposed_action",
+            ProposedActionDecision::Reject => "reject_proposed_action",
+        }
+    }
 }
