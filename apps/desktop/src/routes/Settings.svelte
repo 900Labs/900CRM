@@ -1054,7 +1054,7 @@
             <span class="about-meta-item">900 Labs</span>
             <a
               class="about-meta-link"
-              href="https://github.com/900labs/900crm"
+              href="https://github.com/900Labs/900CRM"
               target="_blank"
               rel="noopener noreferrer"
             >

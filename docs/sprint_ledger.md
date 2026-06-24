@@ -51,3 +51,4 @@
 | 047 | 2026-06-24 | `codex/unencrypted-export-backup-warning` | Settings Data Management warnings and docs for unencrypted local CSV exports and backup folders without backend or encryption behavior changes | Completed |
 | 048 | 2026-06-24 | `codex/component-test-harness-foundation` | Svelte component-render Vitest harness with jsdom-backed Modal and EmptyState tests while preserving existing API/util test coverage | Completed |
 | 049 | 2026-06-24 | `codex/readme-screenshot-baseline` | README screenshot baseline with committed browser-shell assets and an opt-in capture helper without product/runtime or release-packaging changes | Completed |
+| 050 | 2026-06-24 | `codex/canonical-repository-url-alignment` | Canonical public self-repository URL alignment across README badges/links, package metadata, Cargo metadata, and the app-visible Settings GitHub link | Completed |
