@@ -28,8 +28,8 @@ Scope: Frontend-only surface for Sprint 019 deal relationship fields in deal cre
 - [x] `npm run test`
 - [x] `npm run build`
 - [x] `cargo fmt --all -- --check`
-- [x] `CARGO_TARGET_DIR=/Volumes/T7/Code/Codex/900CRM-targets/deal-relationships-ui-surface-fix cargo check --workspace`
-- [x] `CARGO_TARGET_DIR=/Volumes/T7/Code/Codex/900CRM-targets/deal-relationships-ui-surface-fix cargo test --workspace`
+- [x] `cargo check --workspace`
+- [x] `cargo test --workspace`
 - [x] Raw SQL scan in `apps/desktop/src-tauri/src/commands`
 - [x] Raw SQL scan in `crates/crm-core/src/crm_engine`
 - [x] Plain `.ts` rune scan

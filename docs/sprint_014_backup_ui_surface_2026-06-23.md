@@ -32,9 +32,9 @@ Branch: `codex/backup-ui-surface-preserve`
 - `npm run check` -> passed, `svelte-check found 0 errors and 0 warnings`
 - `npm run test` -> passed, `src/lib/api/backup.test.ts` 4 tests passed
 - `npm run build` -> passed
-- `CARGO_TARGET_DIR=/Volumes/T7/Code/Codex/900CRM-targets/backup-ui-surface-preserve cargo fmt --all -- --check` -> passed
-- `CARGO_TARGET_DIR=/Volumes/T7/Code/Codex/900CRM-targets/backup-ui-surface-preserve cargo check --workspace` -> passed
-- `CARGO_TARGET_DIR=/Volumes/T7/Code/Codex/900CRM-targets/backup-ui-surface-preserve cargo test --workspace` -> passed, 20 unit tests passed
+- `cargo fmt --all -- --check` -> passed
+- `cargo check --workspace` -> passed
+- `cargo test --workspace` -> passed, 20 unit tests passed
 
 ## Preservation Notes
 - Email settings remain in `Settings.svelte` and `apps/desktop/src/lib/api/email.ts`.
