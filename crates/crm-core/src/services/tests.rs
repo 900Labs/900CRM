@@ -1152,6 +1152,446 @@ fn update_deal_clearing_contact_id_removes_primary_deal_contact_audit_and_sync()
 }
 
 #[test]
+fn create_activity_with_contact_and_deal_creates_activity_links_audit_and_sync() {
+    let (mut core, path) = open_test_core();
+
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Amina".to_string()),
+            Some("Diallo".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+    let deal = core
+        .create_deal(
+            "Clinic expansion".to_string(),
+            Some(2500.0),
+            None,
+            Some("Proposal".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("deal should be created");
+
+    let activity = core
+        .create_activity(
+            "task".to_string(),
+            "Follow up".to_string(),
+            None,
+            None,
+            Some(contact.id.clone()),
+            Some(deal.id.clone()),
+        )
+        .expect("activity should be created");
+
+    assert_eq!(activity.contact_id.as_deref(), Some(contact.id.as_str()));
+    assert_eq!(activity.deal_id.as_deref(), Some(deal.id.as_str()));
+    let links = core
+        .list_activity_links(&activity.id)
+        .expect("activity links should list");
+    assert_eq!(links.len(), 2);
+    assert!(links.iter().any(|link| {
+        link.entity_type == crate::storage::activities::ActivityLinkEntityType::Contact
+            && link.entity_id == contact.id
+    }));
+    assert!(links.iter().any(|link| {
+        link.entity_type == crate::storage::activities::ActivityLinkEntityType::Deal
+            && link.entity_id == deal.id
+    }));
+
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM audit_log WHERE action IN ('link_contact', 'link_deal') AND entity_type = 'activity_link'"
+        ),
+        2
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'activity_link' AND field_name = '__create__'"
+        ),
+        2
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn duplicate_contact_and_deal_activity_links_do_not_rewrite_activity_or_audit_sync() {
+    let (mut core, path) = open_test_core();
+
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Amina".to_string()),
+            Some("Diallo".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+    let deal = core
+        .create_deal(
+            "Clinic expansion".to_string(),
+            Some(2500.0),
+            None,
+            Some("Proposal".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("deal should be created");
+    let activity = core
+        .create_activity(
+            "task".to_string(),
+            "Follow up".to_string(),
+            None,
+            None,
+            Some(contact.id.clone()),
+            Some(deal.id.clone()),
+        )
+        .expect("activity should be created");
+
+    let links_before = core
+        .list_activity_links(&activity.id)
+        .expect("activity links should list before duplicate adds");
+    let contact_link_id = links_before
+        .iter()
+        .find(|link| {
+            link.entity_type == crate::storage::activities::ActivityLinkEntityType::Contact
+                && link.entity_id == contact.id
+        })
+        .expect("contact link should exist")
+        .id
+        .clone();
+    let deal_link_id = links_before
+        .iter()
+        .find(|link| {
+            link.entity_type == crate::storage::activities::ActivityLinkEntityType::Deal
+                && link.entity_id == deal.id
+        })
+        .expect("deal link should exist")
+        .id
+        .clone();
+
+    let sentinel_updated_at = "2026-06-24T09:15:00Z";
+    core.db
+        .conn
+        .execute(
+            "UPDATE activities SET updated_at = ?1 WHERE id = ?2",
+            params![sentinel_updated_at, activity.id.as_str()],
+        )
+        .expect("activity updated_at should be pinned");
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let duplicate_contact_link = core
+        .add_activity_link(&activity.id, "contact", &contact.id)
+        .expect("duplicate contact activity link should be a no-op");
+    let duplicate_deal_link = core
+        .add_activity_link(&activity.id, "deal", &deal.id)
+        .expect("duplicate deal activity link should be a no-op");
+
+    assert_eq!(duplicate_contact_link.id, contact_link_id);
+    assert_eq!(duplicate_deal_link.id, deal_link_id);
+    let activity_after_duplicates = core
+        .get_activity(&activity.id)
+        .expect("activity should load after duplicate adds");
+    assert_eq!(
+        activity_after_duplicates.updated_at.as_str(),
+        sentinel_updated_at
+    );
+    assert_eq!(
+        activity_after_duplicates.contact_id.as_deref(),
+        Some(contact.id.as_str())
+    );
+    assert_eq!(
+        activity_after_duplicates.deal_id.as_deref(),
+        Some(deal.id.as_str())
+    );
+    let active_link_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM activity_links WHERE activity_id = ?1 AND deleted_at IS NULL",
+            params![activity.id],
+            |row| row.get(0),
+        )
+        .expect("active activity link count should query");
+    assert_eq!(active_link_count, 2);
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn update_activity_changing_and_clearing_contact_deal_keeps_links_and_mirrors_aligned() {
+    let (mut core, path) = open_test_core();
+
+    let first_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Amina".to_string()),
+            Some("Diallo".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("first contact should be created");
+    let second_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Luis".to_string()),
+            Some("Rivera".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("second contact should be created");
+    let first_deal = core
+        .create_deal(
+            "First deal".to_string(),
+            Some(1000.0),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("first deal should be created");
+    let second_deal = core
+        .create_deal(
+            "Second deal".to_string(),
+            Some(2000.0),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("second deal should be created");
+    let activity = core
+        .create_activity(
+            "task".to_string(),
+            "Follow up".to_string(),
+            None,
+            None,
+            Some(first_contact.id.clone()),
+            Some(first_deal.id.clone()),
+        )
+        .expect("activity should be created");
+
+    let updated = core
+        .update_activity(
+            &activity.id,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(Some(second_contact.id.clone())),
+            Some(Some(second_deal.id.clone())),
+        )
+        .expect("activity relationships should update");
+    assert_eq!(
+        updated.contact_id.as_deref(),
+        Some(second_contact.id.as_str())
+    );
+    assert_eq!(updated.deal_id.as_deref(), Some(second_deal.id.as_str()));
+
+    let active_links = core
+        .list_activity_links(&activity.id)
+        .expect("activity links should list after update");
+    assert_eq!(active_links.len(), 2);
+    assert!(active_links
+        .iter()
+        .any(|link| link.entity_id == second_contact.id));
+    assert!(active_links
+        .iter()
+        .any(|link| link.entity_id == second_deal.id));
+
+    let cleared = core
+        .update_activity(
+            &activity.id,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(None),
+            Some(None),
+        )
+        .expect("activity relationships should clear");
+    assert_eq!(cleared.contact_id, None);
+    assert_eq!(cleared.deal_id, None);
+    assert!(core
+        .list_activity_links(&activity.id)
+        .expect("activity links should be empty after clear")
+        .is_empty());
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM activity_links WHERE deleted_at IS NOT NULL"
+        ),
+        4
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'activity_link' AND field_name = '__delete__'"
+        ),
+        4
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'activity' AND field_name IN ('contact_id', 'deal_id')"
+        ),
+        4
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn organization_activity_link_validates_reference_writes_audit_sync_and_skips_legacy_columns() {
+    let (mut core, path) = open_test_core();
+
+    let organization = core
+        .create_organization(
+            "Regional Clinic".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("organization should be created");
+    let activity = core
+        .create_activity(
+            "meeting".to_string(),
+            "Planning call".to_string(),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("activity should be created");
+
+    let err = core
+        .add_activity_link(&activity.id, "organization", "missing-org")
+        .expect_err("missing organization should be rejected");
+    match err {
+        crate::utils::errors::CrmError::NotFound(_) => {}
+        other => panic!("expected NotFound, got {other:?}"),
+    }
+
+    let link = core
+        .add_activity_link(&activity.id, "organization", &organization.id)
+        .expect("organization activity link should be created");
+    assert_eq!(link.entity_id, organization.id);
+    assert_eq!(
+        link.entity_type,
+        crate::storage::activities::ActivityLinkEntityType::Organization
+    );
+
+    let activity_after_link = core
+        .get_activity(&activity.id)
+        .expect("activity should load after organization link");
+    assert_eq!(activity_after_link.contact_id, None);
+    assert_eq!(activity_after_link.deal_id, None);
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'link_organization' AND entity_type = 'activity_link'"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'activity_link' AND field_name = '__create__'"
+        ),
+        1
+    );
+
+    let removed = core
+        .remove_activity_link(&activity.id, "organization", &organization.id)
+        .expect("organization activity link should remove");
+    assert!(removed.deleted_at.is_some());
+    let activity_after_remove = core
+        .get_activity(&activity.id)
+        .expect("activity should load after organization unlink");
+    assert_eq!(activity_after_remove.contact_id, None);
+    assert_eq!(activity_after_remove.deal_id, None);
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'activity' AND field_name IN ('contact_id', 'deal_id')"
+        ),
+        0
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'activity_link' AND field_name = '__delete__'"
+        ),
+        1
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn update_deal_distinguishes_omitted_and_explicit_clears_for_legacy_fields() {
     let (mut core, path) = open_test_core();
 
@@ -2260,6 +2700,167 @@ fn migration_v7_skips_deal_organization_backfill_when_organizations_table_is_mis
             "SELECT COUNT(*) FROM deal_contacts WHERE deal_id = 'deal-1' AND contact_id = 'contact-1' AND is_primary = 1 AND deleted_at IS NULL"
         ),
         1
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn migration_v8_creates_activity_relationship_schema_and_backfills_valid_legacy_links() {
+    let path = std::env::temp_dir().join(format!("900crm-v8-backfill-test-{}", new_uuid()));
+    std::fs::create_dir_all(&path).expect("test dir should be created");
+    let db_path = path.join("900crm.db");
+    {
+        let conn = rusqlite::Connection::open(&db_path).expect("legacy db should open");
+        conn.execute_batch(
+            r#"
+            CREATE TABLE settings (
+                key        TEXT PRIMARY KEY NOT NULL,
+                value      TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE contacts (
+                id         TEXT PRIMARY KEY NOT NULL,
+                deleted_at TEXT
+            );
+            CREATE TABLE deals (
+                id         TEXT PRIMARY KEY NOT NULL,
+                deleted_at TEXT
+            );
+            CREATE TABLE activities (
+                id            TEXT PRIMARY KEY NOT NULL,
+                activity_type TEXT NOT NULL DEFAULT 'task',
+                title         TEXT NOT NULL DEFAULT '',
+                description   TEXT NOT NULL DEFAULT '',
+                due_date      TEXT,
+                completed     INTEGER NOT NULL DEFAULT 0,
+                contact_id    TEXT,
+                deal_id       TEXT,
+                created_at    TEXT NOT NULL,
+                updated_at    TEXT NOT NULL,
+                deleted_at    TEXT,
+                device_id     TEXT NOT NULL DEFAULT ''
+            );
+            INSERT INTO contacts (id, deleted_at) VALUES ('contact-1', NULL);
+            INSERT INTO deals (id, deleted_at) VALUES ('deal-1', NULL);
+            INSERT INTO activities
+                (id, activity_type, title, description, contact_id, deal_id, created_at, updated_at, deleted_at, device_id)
+            VALUES
+                ('activity-1', 'task', 'Follow up', '', 'contact-1', 'deal-1', '2026-06-24T08:00:00Z', '2026-06-24T08:00:00Z', NULL, 'device-a');
+            PRAGMA user_version = 7;
+            "#,
+        )
+        .expect("legacy schema should be created");
+    }
+
+    let core = CrmCore::open(&path).expect("core should open and run v8");
+
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'activity_links'"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_activity_links_active_unique'"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM activity_links WHERE activity_id = 'activity-1' AND entity_type = 'contact' AND entity_id = 'contact-1' AND deleted_at IS NULL"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM activity_links WHERE activity_id = 'activity-1' AND entity_type = 'deal' AND entity_id = 'deal-1' AND deleted_at IS NULL"
+        ),
+        1
+    );
+    assert_eq!(
+        core.db
+            .schema_version()
+            .expect("schema version should read"),
+        8
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn migration_v8_skips_missing_deleted_and_deleted_activity_legacy_links() {
+    let path = std::env::temp_dir().join(format!("900crm-v8-invalid-backfill-test-{}", new_uuid()));
+    std::fs::create_dir_all(&path).expect("test dir should be created");
+    let db_path = path.join("900crm.db");
+    {
+        let conn = rusqlite::Connection::open(&db_path).expect("legacy db should open");
+        conn.execute_batch(
+            r#"
+            CREATE TABLE settings (
+                key        TEXT PRIMARY KEY NOT NULL,
+                value      TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE contacts (
+                id         TEXT PRIMARY KEY NOT NULL,
+                deleted_at TEXT
+            );
+            CREATE TABLE deals (
+                id         TEXT PRIMARY KEY NOT NULL,
+                deleted_at TEXT
+            );
+            CREATE TABLE activities (
+                id            TEXT PRIMARY KEY NOT NULL,
+                activity_type TEXT NOT NULL DEFAULT 'task',
+                title         TEXT NOT NULL DEFAULT '',
+                description   TEXT NOT NULL DEFAULT '',
+                due_date      TEXT,
+                completed     INTEGER NOT NULL DEFAULT 0,
+                contact_id    TEXT,
+                deal_id       TEXT,
+                created_at    TEXT NOT NULL,
+                updated_at    TEXT NOT NULL,
+                deleted_at    TEXT,
+                device_id     TEXT NOT NULL DEFAULT ''
+            );
+            INSERT INTO contacts (id, deleted_at)
+            VALUES
+                ('active-contact', NULL),
+                ('deleted-contact', '2026-06-24T09:00:00Z');
+            INSERT INTO deals (id, deleted_at)
+            VALUES
+                ('active-deal', NULL),
+                ('deleted-deal', '2026-06-24T09:00:00Z');
+            INSERT INTO activities
+                (id, activity_type, title, description, contact_id, deal_id, created_at, updated_at, deleted_at, device_id)
+            VALUES
+                ('missing-contact-activity', 'task', 'Missing contact', '', 'missing-contact', NULL, '2026-06-24T08:00:00Z', '2026-06-24T08:00:00Z', NULL, 'device-a'),
+                ('deleted-contact-activity', 'task', 'Deleted contact', '', 'deleted-contact', NULL, '2026-06-24T08:00:00Z', '2026-06-24T08:00:00Z', NULL, 'device-a'),
+                ('missing-deal-activity', 'task', 'Missing deal', '', NULL, 'missing-deal', '2026-06-24T08:00:00Z', '2026-06-24T08:00:00Z', NULL, 'device-a'),
+                ('deleted-deal-activity', 'task', 'Deleted deal', '', NULL, 'deleted-deal', '2026-06-24T08:00:00Z', '2026-06-24T08:00:00Z', NULL, 'device-a'),
+                ('deleted-activity', 'task', 'Deleted activity', '', 'active-contact', 'active-deal', '2026-06-24T08:00:00Z', '2026-06-24T08:00:00Z', '2026-06-24T09:30:00Z', 'device-a');
+            PRAGMA user_version = 7;
+            "#,
+        )
+        .expect("legacy schema should be created");
+    }
+
+    let core = CrmCore::open(&path).expect("core should open and run v8");
+
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM activity_links WHERE deleted_at IS NULL"
+        ),
+        0
     );
 
     drop(core);

@@ -12,7 +12,7 @@
 //!
 //! Activities support the same soft-delete pattern as contacts and deals.
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 use crate::utils::{
@@ -72,6 +72,53 @@ pub struct ActivityStatsCounts {
     pub completed: i64,
     pub overdue: i64,
     pub due_today: i64,
+}
+
+/// Supported first-class relationship target types for activity links.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActivityLinkEntityType {
+    Contact,
+    Organization,
+    Deal,
+}
+
+impl ActivityLinkEntityType {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Contact => "contact",
+            Self::Organization => "organization",
+            Self::Deal => "deal",
+        }
+    }
+}
+
+impl TryFrom<&str> for ActivityLinkEntityType {
+    type Error = CrmError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value.trim() {
+            "contact" => Ok(Self::Contact),
+            "organization" => Ok(Self::Organization),
+            "deal" => Ok(Self::Deal),
+            other => Err(CrmError::InvalidInput(format!(
+                "Unsupported activity link entity type '{}'",
+                other
+            ))),
+        }
+    }
+}
+
+/// A first-class relationship from an activity to a supported CRM entity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityLink {
+    pub id: String,
+    pub activity_id: String,
+    pub entity_type: ActivityLinkEntityType,
+    pub entity_id: String,
+    pub created_at: String,
+    pub deleted_at: Option<String>,
+    pub device_id: String,
 }
 
 /// Loads aggregate activity counts for dashboard statistics.
@@ -444,6 +491,118 @@ pub fn update_activity(
     get_activity(conn, id)
 }
 
+/// Lists active first-class links for an activity.
+///
+/// # Errors
+///
+/// Returns [`CrmError::Database`] on SQL failure.
+pub fn list_activity_links(conn: &Connection, activity_id: &str) -> CrmResult<Vec<ActivityLink>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, activity_id, entity_type, entity_id, created_at, deleted_at, device_id
+        FROM activity_links
+        WHERE activity_id = ?1 AND deleted_at IS NULL
+        ORDER BY created_at ASC, id ASC
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![activity_id], row_to_activity_link)?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+/// Returns the active link for an exact activity/entity pair, if present.
+pub fn get_active_activity_link(
+    conn: &Connection,
+    activity_id: &str,
+    entity_type: ActivityLinkEntityType,
+    entity_id: &str,
+) -> CrmResult<Option<ActivityLink>> {
+    conn.query_row(
+        r#"
+        SELECT id, activity_id, entity_type, entity_id, created_at, deleted_at, device_id
+        FROM activity_links
+        WHERE activity_id = ?1
+          AND entity_type = ?2
+          AND entity_id = ?3
+          AND deleted_at IS NULL
+        "#,
+        params![activity_id, entity_type.as_str(), entity_id],
+        row_to_activity_link,
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+/// Creates an activity link, returning the existing active link when present.
+///
+/// Reference validation is intentionally done in the service layer so the
+/// storage function can stay focused on persistence and transaction reuse.
+pub fn add_activity_link(
+    conn: &Connection,
+    activity_id: &str,
+    entity_type: ActivityLinkEntityType,
+    entity_id: &str,
+    device_id: &str,
+) -> CrmResult<ActivityLink> {
+    if let Some(link) = get_active_activity_link(conn, activity_id, entity_type, entity_id)? {
+        return Ok(link);
+    }
+
+    let id = new_uuid();
+    let now = now_iso8601();
+    conn.execute(
+        r#"
+        INSERT INTO activity_links
+            (id, activity_id, entity_type, entity_id, created_at, deleted_at, device_id)
+        VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6)
+        "#,
+        params![
+            id,
+            activity_id,
+            entity_type.as_str(),
+            entity_id,
+            now,
+            device_id
+        ],
+    )?;
+
+    get_active_activity_link(conn, activity_id, entity_type, entity_id)?.ok_or_else(|| {
+        CrmError::Database(format!(
+            "Activity link '{}' was inserted but could not be reloaded",
+            id
+        ))
+    })
+}
+
+/// Soft-deletes an active activity link.
+pub fn remove_activity_link(
+    conn: &Connection,
+    activity_id: &str,
+    entity_type: ActivityLinkEntityType,
+    entity_id: &str,
+) -> CrmResult<ActivityLink> {
+    let link =
+        get_active_activity_link(conn, activity_id, entity_type, entity_id)?.ok_or_else(|| {
+            CrmError::NotFound(format!(
+                "Activity link '{}:{}:{}' not found",
+                activity_id,
+                entity_type.as_str(),
+                entity_id
+            ))
+        })?;
+    let now = now_iso8601();
+
+    conn.execute(
+        "UPDATE activity_links SET deleted_at = ?1 WHERE id = ?2 AND deleted_at IS NULL",
+        params![now, link.id],
+    )?;
+
+    Ok(ActivityLink {
+        deleted_at: Some(now),
+        ..link
+    })
+}
+
 /// Soft-deletes an activity.
 ///
 /// # Errors
@@ -488,5 +647,23 @@ fn row_to_activity(row: &rusqlite::Row<'_>) -> rusqlite::Result<Activity> {
         updated_at: row.get(9)?,
         deleted_at: row.get(10)?,
         device_id: row.get(11)?,
+    })
+}
+
+fn row_to_activity_link(row: &rusqlite::Row<'_>) -> rusqlite::Result<ActivityLink> {
+    let raw_entity_type: String = row.get(2)?;
+    let entity_type =
+        ActivityLinkEntityType::try_from(raw_entity_type.as_str()).map_err(|err| {
+            rusqlite::Error::FromSqlConversionFailure(2, rusqlite::types::Type::Text, Box::new(err))
+        })?;
+
+    Ok(ActivityLink {
+        id: row.get(0)?,
+        activity_id: row.get(1)?,
+        entity_type,
+        entity_id: row.get(3)?,
+        created_at: row.get(4)?,
+        deleted_at: row.get(5)?,
+        device_id: row.get(6)?,
     })
 }
