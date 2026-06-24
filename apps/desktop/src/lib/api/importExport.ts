@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 export type ImportExportEntity = 'contacts' | 'deals' | 'organizations';
 export type ImportPreflightEntity = 'contacts' | 'deals' | 'organizations';
+export type ExportFormat = 'csv' | 'json';
 export type ContactImportTargetField =
   | 'first_name'
   | 'last_name'
@@ -74,10 +75,17 @@ const importCommands: Record<ImportExportEntity, string> = {
   organizations: 'import_organizations_csv',
 };
 
-const exportCommands: Record<ImportExportEntity, string> = {
-  contacts: 'export_contacts_csv',
-  deals: 'export_deals_csv',
-  organizations: 'export_organizations_csv',
+const exportCommands: Record<ExportFormat, Record<ImportExportEntity, string>> = {
+  csv: {
+    contacts: 'export_contacts_csv',
+    deals: 'export_deals_csv',
+    organizations: 'export_organizations_csv',
+  },
+  json: {
+    contacts: 'export_contacts_json',
+    deals: 'export_deals_json',
+    organizations: 'export_organizations_json',
+  },
 };
 
 const preflightCommands: Record<ImportPreflightEntity, string> = {
@@ -114,7 +122,11 @@ export async function importContactsCsv(filePath: string): Promise<ImportResult>
 }
 
 export async function exportContactsCsv(filePath: string): Promise<number> {
-  return invoke<number>(exportCommands.contacts, filePathArgs(filePath));
+  return invoke<number>(exportCommands.csv.contacts, filePathArgs(filePath));
+}
+
+export async function exportContactsJson(filePath: string): Promise<number> {
+  return invoke<number>(exportCommands.json.contacts, filePathArgs(filePath));
 }
 
 export async function preflightContactsCsvImport(
@@ -148,7 +160,11 @@ export async function importDealsCsv(filePath: string): Promise<ImportResult> {
 }
 
 export async function exportDealsCsv(filePath: string): Promise<number> {
-  return invoke<number>(exportCommands.deals, filePathArgs(filePath));
+  return invoke<number>(exportCommands.csv.deals, filePathArgs(filePath));
+}
+
+export async function exportDealsJson(filePath: string): Promise<number> {
+  return invoke<number>(exportCommands.json.deals, filePathArgs(filePath));
 }
 
 export async function preflightDealsCsvImport(filePath: string): Promise<ImportPreflightReport> {
@@ -180,7 +196,11 @@ export async function importOrganizationsCsv(filePath: string): Promise<ImportRe
 }
 
 export async function exportOrganizationsCsv(filePath: string): Promise<number> {
-  return invoke<number>(exportCommands.organizations, filePathArgs(filePath));
+  return invoke<number>(exportCommands.csv.organizations, filePathArgs(filePath));
+}
+
+export async function exportOrganizationsJson(filePath: string): Promise<number> {
+  return invoke<number>(exportCommands.json.organizations, filePathArgs(filePath));
 }
 
 export async function preflightOrganizationsCsvImport(
@@ -217,7 +237,19 @@ export async function importCsv(
 }
 
 export async function exportCsv(entity: ImportExportEntity, filePath: string): Promise<number> {
-  return invoke<number>(exportCommands[entity], filePathArgs(filePath));
+  return invoke<number>(exportCommands.csv[entity], filePathArgs(filePath));
+}
+
+export async function exportJson(entity: ImportExportEntity, filePath: string): Promise<number> {
+  return invoke<number>(exportCommands.json[entity], filePathArgs(filePath));
+}
+
+export async function exportData(
+  entity: ImportExportEntity,
+  format: ExportFormat,
+  filePath: string,
+): Promise<number> {
+  return invoke<number>(exportCommands[format][entity], filePathArgs(filePath));
 }
 
 export async function preflightCsv(

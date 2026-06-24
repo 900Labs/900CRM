@@ -10,9 +10,14 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 import {
   exportContactsCsv,
+  exportContactsJson,
   exportCsv,
+  exportData,
   exportDealsCsv,
+  exportDealsJson,
+  exportJson,
   exportOrganizationsCsv,
+  exportOrganizationsJson,
   importContactsCsv,
   importContactsCsvWithMapping,
   importCsv,
@@ -52,6 +57,12 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('export_contacts_csv', {
       file_path: '/tmp/contacts-export.csv',
     });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await expect(exportContactsJson('/tmp/contacts-export.json')).resolves.toBe(2);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_contacts_json', {
+      file_path: '/tmp/contacts-export.json',
+    });
   });
 
   it('maps deal CSV import/export commands', async () => {
@@ -69,6 +80,12 @@ describe('import/export API', () => {
     await expect(exportDealsCsv('/tmp/deals-export.csv')).resolves.toBe(3);
     expect(invokeMock).toHaveBeenLastCalledWith('export_deals_csv', {
       file_path: '/tmp/deals-export.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(3);
+    await expect(exportDealsJson('/tmp/deals-export.json')).resolves.toBe(3);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_deals_json', {
+      file_path: '/tmp/deals-export.json',
     });
   });
 
@@ -88,6 +105,12 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('export_organizations_csv', {
       file_path: '/tmp/organizations-export.csv',
     });
+
+    invokeMock.mockResolvedValueOnce(1);
+    await expect(exportOrganizationsJson('/tmp/organizations-export.json')).resolves.toBe(1);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_organizations_json', {
+      file_path: '/tmp/organizations-export.json',
+    });
   });
 
   it('routes generic CSV helpers by entity', async () => {
@@ -101,6 +124,26 @@ describe('import/export API', () => {
     await exportCsv('organizations', '/tmp/orgs-export.csv');
     expect(invokeMock).toHaveBeenLastCalledWith('export_organizations_csv', {
       file_path: '/tmp/orgs-export.csv',
+    });
+  });
+
+  it('routes generic export helpers by entity and format', async () => {
+    invokeMock.mockResolvedValueOnce(1);
+    await exportJson('organizations', '/tmp/orgs-export.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_organizations_json', {
+      file_path: '/tmp/orgs-export.json',
+    });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await exportData('deals', 'json', '/tmp/deals-export.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_deals_json', {
+      file_path: '/tmp/deals-export.json',
+    });
+
+    invokeMock.mockResolvedValueOnce(3);
+    await exportData('contacts', 'csv', '/tmp/contacts-export.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_contacts_csv', {
+      file_path: '/tmp/contacts-export.csv',
     });
   });
 

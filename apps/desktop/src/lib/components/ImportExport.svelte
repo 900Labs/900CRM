@@ -15,7 +15,7 @@
   } from '$lib/utils/importWizard';
   import { uiStore } from '$lib/stores/ui';
   import {
-    exportCsv,
+    exportData,
     importCsv,
     importContactsCsvWithMapping,
     importDealsCsvWithMapping,
@@ -23,6 +23,7 @@
     preflightContactsCsvImportWithMapping,
     preflightDealsCsvImportWithMapping,
     preflightOrganizationsCsvImportWithMapping,
+    type ExportFormat,
     type ContactImportTargetField,
     type DealImportTargetField,
     type ImportExportEntity,
@@ -59,8 +60,13 @@
   let importSummary = $state<ImportResult | null>(null);
 
   let exportEntity = $state<ImportExportEntity>('contacts');
-  let exportFormat = $state<'csv' | 'json'>('csv');
+  let exportFormat = $state<ExportFormat>('csv');
   let isExporting = $state(false);
+
+  const exportDialogMetadata: Record<ExportFormat, { defaultExtension: string; filterName: string }> = {
+    csv: { defaultExtension: 'csv', filterName: 'CSV' },
+    json: { defaultExtension: 'json', filterName: 'JSON' },
+  };
 
   const previewRows = $derived(parseResult?.rows.slice(0, 5) ?? []);
   const mappedPreviewRows = $derived(applyMapping(previewRows, columnMapping));
@@ -325,24 +331,25 @@
   }
 
   async function handleExport() {
-    if (exportFormat !== 'csv') {
-      uiStore.toastWarning('JSON export is not available yet.');
-      return;
-    }
-
     isExporting = true;
     try {
       const { save } = await import('@tauri-apps/plugin-dialog');
+      const dialogMetadata = exportDialogMetadata[exportFormat];
       const savePath = await save({
-        defaultPath: `${exportEntity}-export.csv`,
-        filters: [{ name: 'CSV', extensions: ['csv'] }],
+        defaultPath: `${exportEntity}-export.${dialogMetadata.defaultExtension}`,
+        filters: [
+          {
+            name: dialogMetadata.filterName,
+            extensions: [dialogMetadata.defaultExtension],
+          },
+        ],
       });
 
       if (typeof savePath !== 'string') {
         return;
       }
 
-      const rows = await exportCsv(exportEntity, savePath);
+      const rows = await exportData(exportEntity, exportFormat, savePath);
       uiStore.toastSuccess(`${t('export.success')} (${rows})`);
     } catch {
       uiStore.toastError(t('export.failed'));
@@ -625,7 +632,7 @@
               <label class="form-label" for="export-format">{t('export.format')}</label>
               <select id="export-format" class="select" bind:value={exportFormat}>
                 <option value="csv">CSV</option>
-                <option value="json">JSON (soon)</option>
+                <option value="json">JSON</option>
               </select>
             </div>
           </div>
