@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { svelteTesting } from '@testing-library/svelte/vite';
 
 // @see https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [sveltekit()],
+  plugins: [sveltekit(), svelteTesting()],
 
   // Prevent vite from obscuring Rust errors
   clearScreen: false,
