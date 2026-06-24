@@ -744,6 +744,172 @@ fn import_organizations_csv_creates_valid_rows_and_skips_blank_names() {
 }
 
 #[test]
+fn preflight_contacts_csv_import_flags_email_and_phone_duplicates_without_writes() {
+    let (mut core, path) = open_test_core();
+
+    let email_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            Some("Lovelace".to_string()),
+            None,
+            Some("ada@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("email fixture contact should be created");
+    let phone_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Grace".to_string()),
+            Some("Hopper".to_string()),
+            None,
+            None,
+            Some("+15550100".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("phone fixture contact should be created");
+
+    let contact_count_before = count(&core, "SELECT COUNT(*) FROM contacts");
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let csv_path = path.join("contacts-preflight.csv");
+    std::fs::write(
+        &csv_path,
+        "first_name,last_name,email,phone\n\
+         Imported,Email,ADA@example.com,\n\
+         Imported,Phone,,+15550100\n",
+    )
+    .expect("contact preflight CSV fixture should write");
+
+    let report = core
+        .preflight_contacts_csv_import(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("contact preflight should succeed");
+
+    assert_eq!(report.entity_type, "contacts");
+    assert_eq!(report.total_rows, 2);
+    assert_eq!(report.duplicate_warning_count, 2);
+    assert_eq!(report.warnings.len(), 2);
+
+    let email_warning = report
+        .warnings
+        .iter()
+        .find(|warning| warning.match_type == "email")
+        .expect("email duplicate warning should exist");
+    assert_eq!(email_warning.row_number, 2);
+    assert_eq!(email_warning.csv_value, "ADA@example.com");
+    assert_eq!(email_warning.existing_entity_type, "contact");
+    assert_eq!(email_warning.existing_entity_id, email_contact.id);
+    assert_eq!(email_warning.existing_display_label, "Ada Lovelace");
+
+    let phone_warning = report
+        .warnings
+        .iter()
+        .find(|warning| warning.match_type == "phone")
+        .expect("phone duplicate warning should exist");
+    assert_eq!(phone_warning.row_number, 3);
+    assert_eq!(phone_warning.csv_value, "+15550100");
+    assert_eq!(phone_warning.existing_entity_type, "contact");
+    assert_eq!(phone_warning.existing_entity_id, phone_contact.id);
+    assert_eq!(phone_warning.existing_display_label, "Grace Hopper");
+
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM contacts"),
+        contact_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn preflight_organizations_csv_import_flags_name_email_and_phone_duplicates_without_writes() {
+    let (mut core, path) = open_test_core();
+
+    let organization = core
+        .create_organization(
+            "Acme Health".to_string(),
+            Some("hello@acme.example".to_string()),
+            Some("+123456".to_string()),
+            None,
+            None,
+            None,
+            Some("Lagos".to_string()),
+            None,
+            Some("NG".to_string()),
+            None,
+            Some("Regional partner".to_string()),
+        )
+        .expect("organization fixture should be created");
+
+    let organization_count_before = count(&core, "SELECT COUNT(*) FROM organizations");
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let csv_path = path.join("organizations-preflight.csv");
+    std::fs::write(
+        &csv_path,
+        "name,email,phone,website,address_line1,address_line2,city,region,country,postal_code,description\n\
+         acme health,HELLO@acme.example,+123456,,,,,,,,\n",
+    )
+    .expect("organization preflight CSV fixture should write");
+
+    let report = core
+        .preflight_organizations_csv_import(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("organization preflight should succeed");
+
+    assert_eq!(report.entity_type, "organizations");
+    assert_eq!(report.total_rows, 1);
+    assert_eq!(report.duplicate_warning_count, 3);
+    assert_eq!(report.warnings.len(), 3);
+
+    for match_type in ["name", "email", "phone"] {
+        let warning = report
+            .warnings
+            .iter()
+            .find(|warning| warning.match_type == match_type)
+            .unwrap_or_else(|| panic!("{match_type} duplicate warning should exist"));
+        assert_eq!(warning.row_number, 2);
+        assert_eq!(warning.existing_entity_type, "organization");
+        assert_eq!(warning.existing_entity_id, organization.id);
+        assert_eq!(warning.existing_display_label, "Acme Health");
+    }
+
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM organizations"),
+        organization_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn export_organizations_csv_writes_optional_fields() {
     let (mut core, path) = open_test_core();
 

@@ -28,7 +28,8 @@ use crate::storage::{
 };
 use crate::utils::{
     csv::{
-        parse_contacts_csv, parse_deals_csv, parse_organizations_csv, write_contacts_csv,
+        parse_contacts_csv, parse_contacts_csv_with_row_numbers, parse_deals_csv,
+        parse_organizations_csv, parse_organizations_csv_with_row_numbers, write_contacts_csv,
         write_deals_csv, write_organizations_csv, ContactCsvRow, DealCsvRow, OrganizationCsvRow,
     },
     datetime::now_iso8601,
@@ -75,6 +76,26 @@ pub struct ImportResult {
     pub created: u32,
     pub skipped: u32,
     pub errors: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportPreflightReport {
+    pub entity_type: String,
+    pub total_rows: u32,
+    pub duplicate_warning_count: u32,
+    pub warnings: Vec<ImportDuplicateWarning>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportDuplicateWarning {
+    pub entity_type: String,
+    pub row_number: u32,
+    pub match_type: String,
+    pub csv_value: String,
+    pub existing_entity_type: String,
+    pub existing_entity_id: String,
+    pub existing_display_label: String,
+    pub reason: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -780,6 +801,53 @@ impl CrmCore {
         })
     }
 
+    pub fn preflight_contacts_csv_import(
+        &self,
+        file_path: &str,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_contacts_csv_with_row_numbers(file_content.as_slice())?;
+        let mut warnings = Vec::new();
+
+        for (row_number, row) in &rows {
+            if let Some(email) = trimmed_optional(&row.email) {
+                for contact in
+                    storage::contacts::find_active_contacts_by_email(&self.db.conn, &email)?
+                {
+                    warnings.push(import_duplicate_warning(
+                        "contacts",
+                        *row_number,
+                        "email",
+                        &email,
+                        "contact",
+                        &contact.id,
+                        &contact_display_label(&contact),
+                        format!("Email '{}' matches existing contact", email),
+                    ));
+                }
+            }
+
+            if let Some(phone) = trimmed_optional(&row.phone) {
+                for contact in
+                    storage::contacts::find_active_contacts_by_phone(&self.db.conn, &phone)?
+                {
+                    warnings.push(import_duplicate_warning(
+                        "contacts",
+                        *row_number,
+                        "phone",
+                        &phone,
+                        "contact",
+                        &contact.id,
+                        &contact_display_label(&contact),
+                        format!("Phone '{}' matches existing contact", phone),
+                    ));
+                }
+            }
+        }
+
+        Ok(import_preflight_report("contacts", rows.len(), warnings))
+    }
+
     pub fn export_contacts_csv(&self, file_path: &str) -> CrmResult<u32> {
         let params = ContactListParams {
             page: 1,
@@ -933,6 +1001,75 @@ impl CrmCore {
         })
     }
 
+    pub fn preflight_organizations_csv_import(
+        &self,
+        file_path: &str,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_organizations_csv_with_row_numbers(file_content.as_slice())?;
+        let mut warnings = Vec::new();
+
+        for (row_number, row) in &rows {
+            let name = row.name.trim().to_string();
+            for organization in
+                storage::organizations::find_active_organizations_by_name(&self.db.conn, &name)?
+            {
+                warnings.push(import_duplicate_warning(
+                    "organizations",
+                    *row_number,
+                    "name",
+                    &name,
+                    "organization",
+                    &organization.id,
+                    &organization_display_label(&organization),
+                    format!("Name '{}' matches existing organization", name),
+                ));
+            }
+
+            if let Some(email) = trimmed_optional(&row.email) {
+                for organization in storage::organizations::find_active_organizations_by_email(
+                    &self.db.conn,
+                    &email,
+                )? {
+                    warnings.push(import_duplicate_warning(
+                        "organizations",
+                        *row_number,
+                        "email",
+                        &email,
+                        "organization",
+                        &organization.id,
+                        &organization_display_label(&organization),
+                        format!("Email '{}' matches existing organization", email),
+                    ));
+                }
+            }
+
+            if let Some(phone) = trimmed_optional(&row.phone) {
+                for organization in storage::organizations::find_active_organizations_by_phone(
+                    &self.db.conn,
+                    &phone,
+                )? {
+                    warnings.push(import_duplicate_warning(
+                        "organizations",
+                        *row_number,
+                        "phone",
+                        &phone,
+                        "organization",
+                        &organization.id,
+                        &organization_display_label(&organization),
+                        format!("Phone '{}' matches existing organization", phone),
+                    ));
+                }
+            }
+        }
+
+        Ok(import_preflight_report(
+            "organizations",
+            rows.len(),
+            warnings,
+        ))
+    }
+
     pub fn export_organizations_csv(&self, file_path: &str) -> CrmResult<u32> {
         let organizations = storage::organizations::list_organizations(&self.db.conn)?;
         let rows: Vec<OrganizationCsvRow> = organizations
@@ -1053,6 +1190,78 @@ fn normalize_optional_string(value: Option<String>) -> Option<String> {
 
 fn normalize_optional_update_string(value: Option<Option<String>>) -> Option<Option<String>> {
     value.map(normalize_optional_string)
+}
+
+fn trimmed_optional(value: &Option<String>) -> Option<String> {
+    value
+        .as_deref()
+        .map(str::trim)
+        .filter(|trimmed| !trimmed.is_empty())
+        .map(str::to_string)
+}
+
+fn import_preflight_report(
+    entity_type: &str,
+    total_rows: usize,
+    warnings: Vec<ImportDuplicateWarning>,
+) -> ImportPreflightReport {
+    ImportPreflightReport {
+        entity_type: entity_type.to_string(),
+        total_rows: total_rows as u32,
+        duplicate_warning_count: warnings.len() as u32,
+        warnings,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn import_duplicate_warning(
+    entity_type: &str,
+    row_number: usize,
+    match_type: &str,
+    csv_value: &str,
+    existing_entity_type: &str,
+    existing_entity_id: &str,
+    existing_display_label: &str,
+    reason: String,
+) -> ImportDuplicateWarning {
+    ImportDuplicateWarning {
+        entity_type: entity_type.to_string(),
+        row_number: row_number as u32,
+        match_type: match_type.to_string(),
+        csv_value: csv_value.to_string(),
+        existing_entity_type: existing_entity_type.to_string(),
+        existing_entity_id: existing_entity_id.to_string(),
+        existing_display_label: existing_display_label.to_string(),
+        reason,
+    }
+}
+
+fn contact_display_label(contact: &storage::contacts::Contact) -> String {
+    let name = [contact.first_name.as_str(), contact.last_name.as_str()]
+        .into_iter()
+        .filter(|part| !part.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    if !name.trim().is_empty() {
+        name
+    } else if !contact.org_name.trim().is_empty() {
+        contact.org_name.clone()
+    } else if !contact.email.trim().is_empty() {
+        contact.email.clone()
+    } else if !contact.phone.trim().is_empty() {
+        contact.phone.clone()
+    } else {
+        contact.id.clone()
+    }
+}
+
+fn organization_display_label(organization: &storage::organizations::Organization) -> String {
+    if organization.name.trim().is_empty() {
+        organization.id.clone()
+    } else {
+        organization.name.clone()
+    }
 }
 
 fn sync_status_from_settings(

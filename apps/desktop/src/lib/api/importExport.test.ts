@@ -17,6 +17,9 @@ import {
   importCsv,
   importDealsCsv,
   importOrganizationsCsv,
+  preflightContactsCsvImport,
+  preflightCsv,
+  preflightOrganizationsCsvImport,
 } from './importExport';
 
 describe('import/export API', () => {
@@ -89,6 +92,60 @@ describe('import/export API', () => {
     await exportCsv('organizations', '/tmp/orgs-export.csv');
     expect(invokeMock).toHaveBeenLastCalledWith('export_organizations_csv', {
       file_path: '/tmp/orgs-export.csv',
+    });
+  });
+
+  it('maps CSV preflight duplicate warning commands', async () => {
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'contacts',
+      total_rows: 2,
+      duplicate_warning_count: 1,
+      warnings: [
+        {
+          entity_type: 'contacts',
+          row_number: 2,
+          match_type: 'email',
+          csv_value: 'ada@example.com',
+          existing_entity_type: 'contact',
+          existing_entity_id: 'contact-1',
+          existing_display_label: 'Ada Lovelace',
+          reason: "Email 'ada@example.com' matches existing contact",
+        },
+      ],
+    });
+    await expect(preflightContactsCsvImport('/tmp/contacts.csv')).resolves.toMatchObject({
+      entity_type: 'contacts',
+      duplicate_warning_count: 1,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_contacts_csv_import', {
+      file_path: '/tmp/contacts.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'organizations',
+      total_rows: 1,
+      duplicate_warning_count: 1,
+      warnings: [],
+    });
+    await expect(preflightOrganizationsCsvImport('/tmp/organizations.csv')).resolves.toMatchObject({
+      entity_type: 'organizations',
+      total_rows: 1,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_organizations_csv_import', {
+      file_path: '/tmp/organizations.csv',
+    });
+  });
+
+  it('routes generic CSV preflight helpers by entity', async () => {
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'organizations',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightCsv('organizations', '/tmp/orgs.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_organizations_csv_import', {
+      file_path: '/tmp/orgs.csv',
     });
   });
 });
