@@ -21,6 +21,7 @@
     importContactsCsvWithMapping,
     importDealsCsvWithMapping,
     importOrganizationsCsvWithMapping,
+    preflightJson,
     preflightContactsCsvImportWithMapping,
     preflightDealsCsvImportWithMapping,
     preflightOrganizationsCsvImportWithMapping,
@@ -84,6 +85,7 @@
   const isCsvImport = $derived(importFormat === 'csv');
   const isJsonImport = $derived(importFormat === 'json');
   const showCsvWizard = $derived(isCsvImport && isMappedImport);
+  const showDuplicateReview = $derived(showCsvWizard || isJsonImport);
   const mappedEntity = $derived(isMappedImport ? (importEntity as MappedImportEntity) : null);
   const importFieldOptions = $derived(mappedEntity ? getImportFieldOptions(mappedEntity) : []);
   const canUseMappedCommands = $derived(Boolean(isCsvImport && fileSource === 'desktop' && selectedImportPath));
@@ -105,6 +107,7 @@
 
       if (isJsonImport) {
         loadSelectedJson(selected, selected);
+        await handleJsonPreflight();
         return;
       }
 
@@ -284,6 +287,26 @@
     }
   }
 
+  async function handleJsonPreflight() {
+    if (!selectedImportPath) {
+      uiStore.toastError(t('import.chooseFile'));
+      return;
+    }
+
+    isPreflighting = true;
+    validationErrors = [];
+    preflightReport = null;
+    try {
+      preflightReport = await preflightJson(importEntity, selectedImportPath);
+      importStep = preflightReport.duplicate_warning_count > 0 ? 'duplicates' : 'confirm';
+    } catch {
+      validationErrors = [t('import.preflightFailed')];
+      uiStore.toastError(t('import.preflightFailed'));
+    } finally {
+      isPreflighting = false;
+    }
+  }
+
   async function handlePreflight() {
     if (!mappedEntity || !validateCurrentMapping()) {
       return;
@@ -384,7 +407,15 @@
   }
 
   function backFromCurrentStep() {
-    if (importStep === 'summary') {
+    if (isJsonImport) {
+      if (importStep === 'summary') {
+        importStep = 'confirm';
+      } else if (importStep === 'confirm') {
+        importStep = (preflightReport?.duplicate_warning_count ?? 0) > 0 ? 'duplicates' : 'select';
+      } else {
+        importStep = 'select';
+      }
+    } else if (importStep === 'summary') {
       importStep = 'confirm';
     } else if (importStep === 'confirm') {
       importStep = 'duplicates';
@@ -520,6 +551,13 @@
                 {#if fallbackImportBlocked}
                   <p class="validation-message">{t('import.desktopPickerRequired')}</p>
                 {/if}
+                {#if validationErrors.length > 0}
+                  <div class="validation-list" role="alert">
+                    {#each validationErrors as error (error)}
+                      <p>{error}</p>
+                    {/each}
+                  </div>
+                {/if}
               </div>
             {/if}
 
@@ -615,7 +653,7 @@
               </div>
             {/if}
 
-            {#if showCsvWizard && importStep === 'duplicates'}
+            {#if showDuplicateReview && importStep === 'duplicates'}
               <div class="duplicate-panel">
                 <p class="import-stats">
                   {t('import.duplicateWarningCount', { count: preflightReport?.duplicate_warning_count ?? 0 })}
@@ -651,7 +689,7 @@
               </div>
             {/if}
 
-            {#if showCsvWizard && importStep === 'confirm'}
+            {#if showDuplicateReview && importStep === 'confirm'}
               <div class="confirm-panel">
                 <p class="import-stats">
                   {t('import.confirmRows', { count: preflightReport?.total_rows ?? parseResult?.count ?? 0 })}
@@ -720,7 +758,7 @@
       </div>
 
       <div class="modal-footer">
-        {#if activeTab === 'import' && showCsvWizard && importStep !== 'select' && importStep !== 'summary'}
+        {#if activeTab === 'import' && showDuplicateReview && importStep !== 'select' && importStep !== 'summary'}
           <button class="btn btn-secondary" onclick={backFromCurrentStep} type="button" disabled={isImporting || isPreflighting}>
             {t('common.back')}
           </button>
@@ -736,14 +774,27 @@
 
         {#if activeTab === 'import'}
           {#if isJsonImport}
-            {#if importStep !== 'summary'}
+            {#if importStep === 'select'}
+              <button
+                class="btn btn-primary"
+                onclick={handleJsonPreflight}
+                disabled={!selectedImportPath || isPreflighting}
+                type="button"
+              >
+                {isPreflighting ? t('import.checking') : t('import.detectDuplicates')}
+              </button>
+            {:else if importStep === 'duplicates'}
+              <button class="btn btn-primary" onclick={() => importStep = 'confirm'} type="button">
+                {t('import.continueDespiteWarnings')}
+              </button>
+            {:else if importStep === 'confirm'}
               <button
                 class="btn btn-primary"
                 onclick={handleJsonImport}
-                disabled={!selectedImportPath || isImporting}
+                disabled={isImporting}
                 type="button"
               >
-                {isImporting ? t('import.importing') : t('import.importButton')}
+                {isImporting ? t('import.importing') : t('import.confirmImport')}
               </button>
             {/if}
           {:else if !isMappedImport}

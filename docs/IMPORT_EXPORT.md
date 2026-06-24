@@ -1,6 +1,6 @@
 # Import And Export
 
-Date: 2026-06-24
+Date: 2026-06-25
 
 This document describes the current import/export behavior in 900CRM. It is
 based on the desktop UI, Tauri command layer, and `crm-core` services as they
@@ -40,15 +40,18 @@ Mapped imports require a desktop-selected file path so the Rust backend can read
 the same CSV file. The browser file-input fallback can preview text, but mapped
 backend import/preflight requires the desktop file picker path.
 
-For JSON contacts, deals, and organizations, the current flow is direct:
+For JSON contacts, deals, and organizations, the current flow is direct but
+still duplicate-gated:
 
 1. Select entity type and JSON format.
 2. Select a local `.json` file.
-3. Run import.
-4. Review the import summary.
+3. Run duplicate preflight checks.
+4. Review duplicate warnings if any are found.
+5. Confirm import.
+6. Review the import summary.
 
-JSON import does not include browser preview, field mapping, duplicate preflight,
-or wizard confirmation steps.
+JSON import does not include browser preview, field mapping, or the CSV
+mapping/preview wizard.
 
 ## CSV Import Parsing
 
@@ -217,9 +220,13 @@ Deal preflight checks active deals for:
 
 - case-insensitive exact title matches after trimming the imported title.
 
-Preflight returns warnings with the CSV row number, match type, CSV value,
-existing record ID, existing display label, and a human-readable reason. JSON
-import does not run duplicate preflight in the current UI.
+Preflight returns warnings with the source row number, match type, source value,
+existing record ID, existing display label, and a human-readable reason. CSV
+imports use CSV data row numbers. JSON imports use the same offset as JSON
+import errors: the first array item is row 2.
+
+Duplicate preflight is read-only. It does not create contacts, deals, or
+organizations, and it does not write audit rows or sync changelog rows.
 
 Preflight warnings do not block import automatically. The UI lets the user
 continue despite warnings. The import then attempts to create each row and
@@ -273,7 +280,7 @@ Before large imports, create a local backup from Settings. See
 
 The following are not implemented in the current import/export surface:
 
-- JSON duplicate preflight, duplicate warning UI, mapping, or browser preview.
+- JSON field mapping or browser preview.
 - Contact or organization duplicate auto-merge during import.
 - Deal duplicate auto-merge during import.
 - Import rollback for a completed multi-row import.
