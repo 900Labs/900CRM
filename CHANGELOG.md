@@ -195,5 +195,5 @@ This project uses [Semantic Versioning](https://semver.org/):
 
 Pre-release versions use a suffix: `1.1.0-alpha.1`, `1.1.0-beta.2`, `1.1.0-rc.1`.
 
-[Unreleased]: https://github.com/900-labs/900crm/commits/main
+[Unreleased]: https://github.com/900Labs/900CRM/commits/main
 [1.0.0]: docs/RELEASE.md

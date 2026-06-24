@@ -9,9 +9,9 @@
 ```
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/900-labs/900crm/ci.yml?branch=main)](https://github.com/900-labs/900crm/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/900Labs/900CRM/ci.yml?branch=main)](https://github.com/900Labs/900CRM/actions)
 [![Release Status: source only](https://img.shields.io/badge/Release%20Status-source%20only-yellow.svg)](docs/RELEASE.md)
-[![Languages: 10](https://img.shields.io/badge/Languages-10-brightgreen.svg)](https://github.com/900-labs/900crm#language-support)
+[![Languages: 10](https://img.shields.io/badge/Languages-10-brightgreen.svg)](https://github.com/900Labs/900CRM#language-support)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 
@@ -180,8 +180,8 @@ That is all. Rust handles the rest.
 **Step 1 — Clone the repository**
 
 ```bash
-git clone https://github.com/900-labs/900crm.git
-cd 900crm
+git clone https://github.com/900Labs/900CRM.git
+cd 900CRM
 ```
 
 **Step 2 — Install Node.js dependencies**
@@ -371,7 +371,7 @@ We welcome contributions from everyone — whether you are fixing a typo, transl
 
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) for full details on how to get started. If you have never contributed to an open-source project before, that document is written especially for you.
 
-**Good First Issues:** Look for issues tagged [`good first issue`](https://github.com/900-labs/900crm/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) on the issue tracker — well-scoped tasks that don't require deep knowledge of the codebase.
+**Good First Issues:** Look for issues tagged [`good first issue`](https://github.com/900Labs/900CRM/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) on the issue tracker — well-scoped tasks that don't require deep knowledge of the codebase.
 
 ---
 
@@ -408,8 +408,8 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for full details on how to get st
 
 ## Community
 
-- **Discussions:** [github.com/900-labs/900crm/discussions](https://github.com/900-labs/900crm/discussions) — ask questions, share ideas, show what you have built
-- **Issue Tracker:** [github.com/900-labs/900crm/issues](https://github.com/900-labs/900crm/issues) — report bugs, request features
+- **Discussions:** [github.com/900Labs/900CRM/discussions](https://github.com/900Labs/900CRM/discussions) — ask questions, share ideas, show what you have built
+- **Issue Tracker:** [github.com/900Labs/900CRM/issues](https://github.com/900Labs/900CRM/issues) — report bugs, request features
 - **Security:** See [SECURITY.md](SECURITY.md) for how to report vulnerabilities privately
 
 ---

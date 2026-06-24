@@ -2,9 +2,9 @@
 
 > **Status: Coming in v2.0**
 >
-> The plugin system is planned for the v2.0 release. The architecture described here is finalised and the API design is in the [discussion phase](https://github.com/900-labs/900crm/discussions). Implementation has not yet started.
+> The plugin system is planned for the v2.0 release. The architecture described here is finalised and the API design is in the [discussion phase](https://github.com/900Labs/900CRM/discussions). Implementation has not yet started.
 >
-> If you are interested in shaping the plugin API before it is built, please open a [discussion](https://github.com/900-labs/900crm/discussions) tagged `plugin-system`. Community input during the design phase is especially valuable — your use case may determine what gets built first.
+> If you are interested in shaping the plugin API before it is built, please open a [discussion](https://github.com/900Labs/900CRM/discussions) tagged `plugin-system`. Community input during the design phase is especially valuable — your use case may determine what gets built first.
 
 ---
 
@@ -334,4 +334,4 @@ The plugin system design is open for discussion. If you have ideas for:
 - Improvements to the manifest format
 - Security concerns with the proposed sandbox model
 
-Please open a [discussion](https://github.com/900-labs/900crm/discussions) tagged `plugin-system`. The API will be shaped by what the community needs.
+Please open a [discussion](https://github.com/900Labs/900CRM/discussions) tagged `plugin-system`. The API will be shaped by what the community needs.
