@@ -131,6 +131,8 @@ pub fn run() {
             commands::import_export::export_contacts_csv,
             commands::import_export::import_deals_csv,
             commands::import_export::export_deals_csv,
+            commands::import_export::import_organizations_csv,
+            commands::import_export::export_organizations_csv,
             commands::settings_commands::get_settings,
             commands::settings_commands::get_setting,
             commands::settings_commands::update_setting,

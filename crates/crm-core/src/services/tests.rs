@@ -684,6 +684,107 @@ fn create_organization_writes_organization_audit_and_sync() {
 }
 
 #[test]
+fn import_organizations_csv_creates_valid_rows_and_skips_blank_names() {
+    let (mut core, path) = open_test_core();
+    let csv_path = path.join("organizations.csv");
+    std::fs::write(
+        &csv_path,
+        "name,email,phone,website,address_line1,address_line2,city,region,country,postal_code,description\n\
+         Acme Health,hello@acme.example,+123456,https://acme.example,Dock 4,Suite 9,Lagos,Lagos State,NG,100001,Regional partner\n\
+         ,blank@example.com,,,,,,,,,\n",
+    )
+    .expect("organization CSV fixture should write");
+
+    let result = core
+        .import_organizations_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("organization CSV import should succeed");
+
+    assert_eq!(result.created, 1);
+    assert_eq!(result.skipped, 0);
+    assert!(result.errors.is_empty());
+
+    let organizations = core
+        .list_organizations()
+        .expect("organizations should list after import");
+    assert_eq!(organizations.len(), 1);
+    assert_eq!(organizations[0].name, "Acme Health");
+    assert_eq!(
+        organizations[0].email.as_deref(),
+        Some("hello@acme.example")
+    );
+    assert_eq!(organizations[0].phone.as_deref(), Some("+123456"));
+    assert_eq!(
+        organizations[0].website.as_deref(),
+        Some("https://acme.example")
+    );
+    assert_eq!(organizations[0].address_line1.as_deref(), Some("Dock 4"));
+    assert_eq!(organizations[0].address_line2.as_deref(), Some("Suite 9"));
+    assert_eq!(organizations[0].city.as_deref(), Some("Lagos"));
+    assert_eq!(organizations[0].region.as_deref(), Some("Lagos State"));
+    assert_eq!(organizations[0].country.as_deref(), Some("NG"));
+    assert_eq!(organizations[0].postal_code.as_deref(), Some("100001"));
+    assert_eq!(
+        organizations[0].description.as_deref(),
+        Some("Regional partner")
+    );
+
+    let import_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE actor_type = 'import' AND action = 'import_row' AND entity_type = 'organization'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("organization import audit count should query");
+    assert_eq!(import_audit_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn export_organizations_csv_writes_optional_fields() {
+    let (mut core, path) = open_test_core();
+
+    core.create_organization(
+        "Acme Health".to_string(),
+        Some("hello@acme.example".to_string()),
+        Some("+123456".to_string()),
+        Some("https://acme.example".to_string()),
+        Some("Dock 4".to_string()),
+        Some("Suite 9".to_string()),
+        Some("Lagos".to_string()),
+        Some("Lagos State".to_string()),
+        Some("NG".to_string()),
+        Some("100001".to_string()),
+        Some("Regional partner".to_string()),
+    )
+    .expect("organization should be created before export");
+
+    let csv_path = path.join("organizations-export.csv");
+    let count = core
+        .export_organizations_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("organization CSV export should succeed");
+
+    assert_eq!(count, 1);
+    let csv = std::fs::read_to_string(&csv_path).expect("organization CSV should read");
+    assert!(csv.contains("name,email,phone,website,address_line1,address_line2,city,region,country,postal_code,description"));
+    assert!(csv.contains("Acme Health"));
+    assert!(csv.contains("hello@acme.example"));
+    assert!(csv.contains("+123456"));
+    assert!(csv.contains("https://acme.example"));
+    assert!(csv.contains("Dock 4"));
+    assert!(csv.contains("Suite 9"));
+    assert!(csv.contains("Lagos State"));
+    assert!(csv.contains("100001"));
+    assert!(csv.contains("Regional partner"));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn update_organization_can_clear_optional_fields() {
     let (mut core, path) = open_test_core();
 
