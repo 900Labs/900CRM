@@ -43,3 +43,4 @@
 | 039 | 2026-06-24 | `codex/mcp-readiness-docs-baseline` | Documentation-only MCP readiness baseline covering placeholder status, active readiness surfaces, non-goals, security gates, and future acceptance checklist | Completed |
 | 040 | 2026-06-24 | `codex/required-docs-baseline` | Documentation-only required public baseline for data model, import/export, and privacy docs with narrow README/architecture links | Completed |
 | 041 | 2026-06-24 | `codex/verification-gates-hardening` | Local verification gate hardening for ESLint 9 flat config and existing Rust Clippy warnings without product behavior changes | Completed |
+| 042 | 2026-06-24 | `codex/pr-ci-foundation` | Initial Ubuntu-only GitHub Actions PR and main-branch CI running the documented frontend and Rust verification gates without release packaging | Completed |

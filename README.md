@@ -332,11 +332,8 @@ Current implementation baselines are documented in [Data Model](docs/DATA_MODEL.
 │   └── BACKUP_RESTORE.md         # Local backup and restore workflow
 ├── .github/
 │   ├── workflows/
-│   │   ├── ci.yml                # CI pipeline
-│   │   └── release.yml           # Automated release builds
-│   └── ISSUE_TEMPLATE/
-│       ├── bug_report.md
-│       └── feature_request.md
+│   │   └── ci.yml                # Ubuntu PR and main-branch verification
+│   └── pull_request_template.md  # Pull request checklist and guardrails
 ├── ARCHITECTURE.md               # Technical architecture guide
 ├── CHANGELOG.md
 ├── CODE_OF_CONDUCT.md
