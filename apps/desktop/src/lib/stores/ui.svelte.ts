@@ -38,7 +38,7 @@ export interface ToastItem {
 /** Global search result. */
 export interface SearchResult {
   id: string;
-  type: 'contact' | 'deal' | 'activity';
+  type: 'contact' | 'organization' | 'deal' | 'activity' | 'note' | 'tag';
   title: string;
   subtitle: string;
 }
