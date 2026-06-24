@@ -12,6 +12,7 @@ import type { Activity, ActivityLink } from '$lib/api/activities';
 import type { Contact } from '$lib/api/contacts';
 import type { Deal } from '$lib/api/deals';
 import type { Organization } from '$lib/api/organizations';
+import { activityStore } from '$lib/stores/activities';
 import {
   ACTIVITY_RELATIONSHIP_CONTACT_PAGE_SIZE,
   addSelectedActivityLinks,
@@ -159,10 +160,36 @@ describe('activity relationship labels', () => {
         },
       ),
     ).toEqual({
-      contactNames: ['Amina Khan'],
-      organizationNames: ['Nairobi Health'],
-      dealNames: ['Clinic expansion'],
+      contacts: [{ id: 'contact-1', label: 'Amina Khan' }],
+      organizations: [{ id: 'org-1', label: 'Nairobi Health' }],
+      deals: [{ id: 'deal-1', label: 'Clinic expansion' }],
     });
+  });
+
+  it('keeps duplicate display labels keyed by distinct entity ids', () => {
+    const duplicateOrganization = {
+      ...organization,
+      id: 'org-2',
+      name: organization.name,
+    };
+
+    expect(
+      deriveActivityRelationshipLabels(
+        activity({}),
+        [
+          link({ id: 'link-org-1', entityType: 'organization', entityId: 'org-1' }),
+          link({ id: 'link-org-2', entityType: 'organization', entityId: 'org-2' }),
+        ],
+        {
+          contacts: [],
+          organizations: [organization, duplicateOrganization],
+          deals: [],
+        },
+      ).organizations,
+    ).toEqual([
+      { id: 'org-1', label: 'Nairobi Health' },
+      { id: 'org-2', label: 'Nairobi Health' },
+    ]);
   });
 
   it('preserves legacy contact and deal fallback labels when links are absent', () => {
@@ -182,9 +209,9 @@ describe('activity relationship labels', () => {
         },
       ),
     ).toEqual({
-      contactNames: ['Legacy Contact'],
-      organizationNames: [],
-      dealNames: ['Legacy Deal'],
+      contacts: [{ id: 'legacy-contact', label: 'Legacy Contact' }],
+      organizations: [],
+      deals: [{ id: 'legacy-deal', label: 'Legacy Deal' }],
     });
   });
 
@@ -222,7 +249,7 @@ describe('activity relationship labels', () => {
         },
       ),
     ).toMatchObject({
-      contactNames: ['Zara Ndlovu'],
+      contacts: [{ id: 'contact-501', label: 'Zara Ndlovu' }],
     });
     expect(invokeMock).toHaveBeenNthCalledWith(1, 'list_contacts', {
       params: expect.objectContaining({
@@ -264,5 +291,15 @@ describe('activity relationship labels', () => {
       entity_type: 'deal',
       entity_id: 'deal-1',
     });
+  });
+});
+
+describe('activity relationship refresh signal', () => {
+  it('increments when activity relationship links change', () => {
+    const before = activityStore.relationshipRefreshVersion;
+
+    activityStore.notifyRelationshipLinksChanged();
+
+    expect(activityStore.relationshipRefreshVersion).toBe(before + 1);
   });
 });

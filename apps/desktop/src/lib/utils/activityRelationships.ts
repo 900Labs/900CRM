@@ -16,10 +16,15 @@ export interface ActivityRelationshipLookups {
   deals: Deal[];
 }
 
+export interface ActivityRelationshipItem {
+  id: string;
+  label: string;
+}
+
 export interface ActivityRelationshipLabels {
-  contactNames: string[];
-  organizationNames: string[];
-  dealNames: string[];
+  contacts: ActivityRelationshipItem[];
+  organizations: ActivityRelationshipItem[];
+  deals: ActivityRelationshipItem[];
 }
 
 export interface ActivityRelationshipSelection {
@@ -59,17 +64,26 @@ export function deriveActivityRelationshipLabels(
   const dealIds = uniqueIds([...linkedIds(links, 'deal'), activity.dealId]);
 
   return {
-    contactNames: contactIds.map((id) => {
+    contacts: contactIds.map((id) => {
       const contact = lookups.contacts.find((candidate) => candidate.id === id);
-      return contact ? contactDisplayName(contact) : activity.contactId === id ? activity.contactName ?? id : id;
+      return {
+        id,
+        label: contact ? contactDisplayName(contact) : activity.contactId === id ? activity.contactName ?? id : id,
+      };
     }),
-    organizationNames: organizationIds.map((id) => {
+    organizations: organizationIds.map((id) => {
       const organization = lookups.organizations.find((candidate) => candidate.id === id);
-      return organization?.name.trim() || id;
+      return {
+        id,
+        label: organization?.name.trim() || id,
+      };
     }),
-    dealNames: dealIds.map((id) => {
+    deals: dealIds.map((id) => {
       const deal = lookups.deals.find((candidate) => candidate.id === id);
-      return deal?.name.trim() || (activity.dealId === id ? activity.dealName ?? id : id);
+      return {
+        id,
+        label: deal?.name.trim() || (activity.dealId === id ? activity.dealName ?? id : id),
+      };
     }),
   };
 }

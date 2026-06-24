@@ -421,6 +421,7 @@
         organizationId: activityOrganizationId || null,
         dealId: activityDealId || null,
       });
+      activityStore.notifyRelationshipLinksChanged();
       await persistCustomFields(activity.id, activityCustomFieldValues);
       uiStore.closeModal();
     } catch (err) {

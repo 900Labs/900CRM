@@ -52,6 +52,7 @@
   let activityLinkIndex = $state<ActivityLinkIndex>({});
   let activityRelationshipsLoading = $state(false);
   let loadedActivityLinkKey = $state('');
+  let loadedActivityRelationshipVersion = $state(0);
 
   // Quick-add form
   let showQuickAdd  = $state(false);
@@ -76,11 +77,16 @@
 
   $effect(() => {
     const activityLinkKey = activityStore.activities.map((activity) => activity.id).join('|');
-    if (activityLinkKey === loadedActivityLinkKey) {
+    const relationshipRefreshVersion = activityStore.relationshipRefreshVersion;
+    if (
+      activityLinkKey === loadedActivityLinkKey
+      && relationshipRefreshVersion === loadedActivityRelationshipVersion
+    ) {
       return;
     }
 
     loadedActivityLinkKey = activityLinkKey;
+    loadedActivityRelationshipVersion = relationshipRefreshVersion;
     void loadActivityLinksForCurrentActivities();
   });
 
@@ -118,6 +124,7 @@
 
   async function refreshActivityLinks() {
     loadedActivityLinkKey = activityStore.activities.map((activity) => activity.id).join('|');
+    loadedActivityRelationshipVersion = activityStore.relationshipRefreshVersion;
     await loadActivityLinksForCurrentActivities();
   }
 
@@ -211,6 +218,7 @@
         organizationId: qaOrganizationId || null,
         dealId: qaDealId || null,
       });
+      activityStore.notifyRelationshipLinksChanged();
       await refreshActivityLinks();
 
       // Reset form
@@ -566,28 +574,28 @@
                     {formatDate(activity.dueDate, settingsStore.dateFormat as 'MMM D, YYYY')}
                   </span>
                 {/if}
-                {#each relationships.contactNames as contactName (contactName)}
+                {#each relationships.contacts as contact (contact.id)}
                   <span class="activity-linked">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                       <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8"/>
                     </svg>
-                    {contactName}
+                    {contact.label}
                   </span>
                 {/each}
-                {#each relationships.organizationNames as organizationName (organizationName)}
+                {#each relationships.organizations as organization (organization.id)}
                   <span class="activity-linked">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                       <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01"/>
                     </svg>
-                    {organizationName}
+                    {organization.label}
                   </span>
                 {/each}
-                {#each relationships.dealNames as dealName (dealName)}
+                {#each relationships.deals as deal (deal.id)}
                   <span class="activity-linked">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                       <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                     </svg>
-                    {dealName}
+                    {deal.label}
                   </span>
                 {/each}
                 <span class="activity-time">{formatRelativeTime(activity.createdAt)}</span>
