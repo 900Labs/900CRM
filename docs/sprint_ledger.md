@@ -37,3 +37,4 @@
 | 033 | 2026-06-24 | `codex/external-clients-api-surface` | Disabled external client placeholder Tauri commands plus typed frontend API wrappers/tests without UI, grants, tokens, MCP, AI, or sync server behavior | Completed |
 | 034 | 2026-06-24 | `codex/external-clients-ui-surface` | Settings Integrations surface for listing and creating disabled external client placeholders through Sprint 033 frontend API wrappers | Completed |
 | 035 | 2026-06-24 | `codex/proposed-actions-decision-api-surface` | Pending-only proposed-action approve/reject core, Tauri, and frontend API foundation with audit entries and no execution/UI/MCP behavior | Completed |
+| 036 | 2026-06-24 | `codex/proposed-actions-decision-ui-surface` | `/pending-actions` approve/reject decision controls using Sprint 035 frontend API wrappers with pending-only refresh/removal and no execution behavior | Completed |
