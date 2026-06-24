@@ -7,7 +7,7 @@
   import { parseCSV } from '$lib/utils/csv';
   import type { ParseCSVResult } from '$lib/utils/csv';
   import { uiStore } from '$lib/stores/ui';
-  import { invoke } from '@tauri-apps/api/core';
+  import { exportCsv, importCsv, type ImportExportEntity } from '$lib/api/importExport';
 
   let {
     open = $bindable(false),
@@ -23,9 +23,9 @@
   let parseResult = $state<ParseCSVResult | null>(null);
   let selectedImportPath = $state<string | null>(null);
   let isImporting = $state(false);
-  let importEntity = $state<'contacts' | 'deals'>('contacts');
+  let importEntity = $state<ImportExportEntity>('contacts');
 
-  let exportEntity = $state<'contacts' | 'deals'>('contacts');
+  let exportEntity = $state<ImportExportEntity>('contacts');
   let exportFormat = $state<'csv' | 'json'>('csv');
   let isExporting = $state(false);
 
@@ -75,10 +75,7 @@
 
     isImporting = true;
     try {
-      const command = importEntity === 'contacts' ? 'import_contacts_csv' : 'import_deals_csv';
-      const result = await invoke<{ created: number; skipped: number; errors: string[] }>(command, {
-        file_path: selectedImportPath,
-      });
+      const result = await importCsv(importEntity, selectedImportPath);
 
       if (result.skipped > 0) {
         uiStore.toastWarning(`${t('import.success')} (${result.created} created, ${result.skipped} skipped)`);
@@ -112,8 +109,7 @@
         return;
       }
 
-      const command = exportEntity === 'contacts' ? 'export_contacts_csv' : 'export_deals_csv';
-      const rows = await invoke<number>(command, { file_path: savePath });
+      const rows = await exportCsv(exportEntity, savePath);
       uiStore.toastSuccess(`${t('export.success')} (${rows})`);
     } catch {
       uiStore.toastError(t('export.failed'));
@@ -167,6 +163,7 @@
               <select id="import-entity" class="select" bind:value={importEntity}>
                 <option value="contacts">{t('contacts.title')}</option>
                 <option value="deals">{t('deals.title')}</option>
+                <option value="organizations">{t('organizations.title')}</option>
               </select>
             </div>
 
@@ -232,6 +229,7 @@
               <select id="export-entity" class="select" bind:value={exportEntity}>
                 <option value="contacts">{t('contacts.title')}</option>
                 <option value="deals">{t('deals.title')}</option>
+                <option value="organizations">{t('organizations.title')}</option>
               </select>
             </div>
 

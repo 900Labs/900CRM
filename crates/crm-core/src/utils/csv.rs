@@ -1,4 +1,4 @@
-//! CSV import and export helpers for contacts and deals.
+//! CSV import and export helpers for contacts, deals, and organizations.
 //!
 //! This module provides utilities for reading and writing CSV files used in the
 //! 900CRM import/export feature. It wraps the [`csv`] crate and maps between
@@ -28,6 +28,22 @@
 //! | `stage`          | no       | Pipeline stage name |
 //! | `expected_close` | no       | YYYY-MM-DD or ISO 8601 |
 //! | `notes`          | no       | |
+
+//! # Organization CSV Format
+//!
+//! | Column          | Required | Notes |
+//! |-----------------|----------|-------|
+//! | `name`          | yes      | |
+//! | `email`         | no       | |
+//! | `phone`         | no       | |
+//! | `website`       | no       | |
+//! | `address_line1` | no       | |
+//! | `address_line2` | no       | |
+//! | `city`          | no       | |
+//! | `region`        | no       | |
+//! | `country`       | no       | |
+//! | `postal_code`   | no       | |
+//! | `description`   | no       | |
 
 use std::io::{Read, Write};
 
@@ -112,6 +128,60 @@ pub struct DealCsvRow {
     /// Freeform notes about the deal.
     #[serde(default)]
     pub notes: Option<String>,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Organization CSV record
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A flat CSV record representing one organization row.
+///
+/// All fields are `Option<String>` except `name` (required). Missing columns in
+/// the CSV are deserialized as `None` via `serde`'s default.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrganizationCsvRow {
+    /// Organization display name. Required.
+    pub name: String,
+
+    /// Primary email address.
+    #[serde(default)]
+    pub email: Option<String>,
+
+    /// Primary phone number.
+    #[serde(default)]
+    pub phone: Option<String>,
+
+    /// Website URL.
+    #[serde(default)]
+    pub website: Option<String>,
+
+    /// Street address line 1.
+    #[serde(default)]
+    pub address_line1: Option<String>,
+
+    /// Street address line 2.
+    #[serde(default)]
+    pub address_line2: Option<String>,
+
+    /// City / locality.
+    #[serde(default)]
+    pub city: Option<String>,
+
+    /// Region / state / province.
+    #[serde(default)]
+    pub region: Option<String>,
+
+    /// Country.
+    #[serde(default)]
+    pub country: Option<String>,
+
+    /// Postal or ZIP code.
+    #[serde(default)]
+    pub postal_code: Option<String>,
+
+    /// Freeform organization description.
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -201,6 +271,42 @@ pub fn parse_deals_csv<R: Read>(reader: R) -> CrmResult<Vec<DealCsvRow>> {
     Ok(rows)
 }
 
+/// Parses CSV data from a byte reader into a `Vec<OrganizationCsvRow>`.
+///
+/// Requires a header row with at minimum a `name` column. Rows where `name` is
+/// blank are skipped.
+///
+/// # Errors
+///
+/// Returns [`CrmError::Csv`] if the CSV is malformed.
+pub fn parse_organizations_csv<R: Read>(reader: R) -> CrmResult<Vec<OrganizationCsvRow>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .trim(csv::Trim::All)
+        .flexible(true)
+        .from_reader(reader);
+
+    let mut rows = Vec::new();
+    for result in rdr.deserialize::<OrganizationCsvRow>() {
+        match result {
+            Ok(row) => {
+                if row.name.trim().is_empty() {
+                    log::debug!("Skipping CSV row with blank name");
+                    continue;
+                }
+                rows.push(row);
+            }
+            Err(e) => {
+                log::error!("CSV parse error: {}", e);
+                return Err(CrmError::Csv(e.to_string()));
+            }
+        }
+    }
+
+    log::info!("Parsed {} organization rows from CSV", rows.len());
+    Ok(rows)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Export helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -256,5 +362,27 @@ pub fn write_deals_csv<W: Write>(writer: W, rows: &[DealCsvRow]) -> CrmResult<()
 
     wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
     log::info!("Wrote {} deal rows to CSV", rows.len());
+    Ok(())
+}
+
+/// Serializes a slice of [`OrganizationCsvRow`] to CSV bytes.
+///
+/// The output always includes a header row.
+///
+/// # Errors
+///
+/// Returns [`CrmError::Csv`] if writing fails.
+pub fn write_organizations_csv<W: Write>(writer: W, rows: &[OrganizationCsvRow]) -> CrmResult<()> {
+    let mut wtr = csv::WriterBuilder::new()
+        .has_headers(true)
+        .from_writer(writer);
+
+    for row in rows {
+        wtr.serialize(row)
+            .map_err(|e| CrmError::Csv(e.to_string()))?;
+    }
+
+    wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
+    log::info!("Wrote {} organization rows to CSV", rows.len());
     Ok(())
 }
