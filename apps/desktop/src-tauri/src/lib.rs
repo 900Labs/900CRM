@@ -127,6 +127,8 @@ pub fn run() {
             commands::search_commands::global_search,
             commands::audit_pending_commands::list_recent_audit_log,
             commands::audit_pending_commands::list_pending_proposed_actions,
+            commands::audit_pending_commands::approve_proposed_action,
+            commands::audit_pending_commands::reject_proposed_action,
             commands::external_client_commands::list_external_clients,
             commands::external_client_commands::create_external_client_placeholder,
             commands::backup_commands::create_local_backup,

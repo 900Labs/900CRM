@@ -1,8 +1,9 @@
 use rusqlite::params;
 
 use super::{CrmCore, TagColorUpdate};
-use crate::utils::{
-    csv::ImportColumnMapping, datetime::now_iso8601, errors::CrmError, uuid::new_uuid,
+use crate::{
+    storage::proposed_actions::ProposedAction,
+    utils::{csv::ImportColumnMapping, datetime::now_iso8601, errors::CrmError, uuid::new_uuid},
 };
 
 fn open_test_core() -> (CrmCore, std::path::PathBuf) {
@@ -23,6 +24,19 @@ fn import_mapping(pairs: &[(&str, Option<&str>)]) -> ImportColumnMapping {
         .iter()
         .map(|(source, target)| ((*source).to_string(), target.map(str::to_string)))
         .collect()
+}
+
+fn create_test_proposed_action(core: &mut CrmCore, title: &str) -> ProposedAction {
+    core.create_external_proposed_action_stub(
+        None,
+        "create_activity".to_string(),
+        "create_activity_draft".to_string(),
+        Some("activity".to_string()),
+        None,
+        format!(r#"{{"title":"{}"}}"#, title),
+        None,
+    )
+    .expect("proposed action should be created")
 }
 
 #[test]
@@ -941,6 +955,210 @@ fn list_pending_proposed_actions_returns_only_pending_actions_in_created_order()
     assert_eq!(pending[0].id, first_pending.id);
     assert_eq!(pending[1].id, second_pending.id);
     assert!(pending.iter().all(|action| action.status == "pending"));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn approve_pending_proposed_action_marks_timestamp_and_audit_without_execution() {
+    let (mut core, path) = open_test_core();
+    let proposed_action = create_test_proposed_action(&mut core, "Approve me");
+
+    let approved = core
+        .approve_proposed_action(proposed_action.id.clone())
+        .expect("pending proposed action should approve");
+
+    assert_eq!(approved.id, proposed_action.id);
+    assert_eq!(approved.status, "approved");
+    assert!(approved.approved_at.is_some());
+    assert_eq!(approved.rejected_at, None);
+    assert_eq!(approved.executed_at, None);
+
+    let stored_executed_at: Option<String> = core
+        .db
+        .conn
+        .query_row(
+            "SELECT executed_at FROM proposed_actions WHERE id = ?1",
+            params![&approved.id],
+            |row| row.get(0),
+        )
+        .expect("executed timestamp should query");
+    assert_eq!(stored_executed_at, None);
+
+    let audit_payloads: (Option<String>, Option<String>) = core
+        .db
+        .conn
+        .query_row(
+            "SELECT before_json, after_json FROM audit_log WHERE actor_type = 'desktop_app' AND action = 'approve_proposed_action' AND entity_type = 'proposed_action' AND entity_id = ?1",
+            params![&approved.id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("approve audit payload should query");
+    assert!(audit_payloads
+        .0
+        .as_deref()
+        .is_some_and(|payload| payload.contains(r#""status":"pending""#)));
+    assert!(audit_payloads
+        .1
+        .as_deref()
+        .is_some_and(|payload| payload.contains(r#""status":"approved""#)));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn reject_pending_proposed_action_marks_timestamp_and_audit_without_execution() {
+    let (mut core, path) = open_test_core();
+    let proposed_action = create_test_proposed_action(&mut core, "Reject me");
+
+    let rejected = core
+        .reject_proposed_action(proposed_action.id.clone())
+        .expect("pending proposed action should reject");
+
+    assert_eq!(rejected.id, proposed_action.id);
+    assert_eq!(rejected.status, "rejected");
+    assert_eq!(rejected.approved_at, None);
+    assert!(rejected.rejected_at.is_some());
+    assert_eq!(rejected.executed_at, None);
+
+    let stored_executed_at: Option<String> = core
+        .db
+        .conn
+        .query_row(
+            "SELECT executed_at FROM proposed_actions WHERE id = ?1",
+            params![&rejected.id],
+            |row| row.get(0),
+        )
+        .expect("executed timestamp should query");
+    assert_eq!(stored_executed_at, None);
+
+    let audit_payloads: (Option<String>, Option<String>) = core
+        .db
+        .conn
+        .query_row(
+            "SELECT before_json, after_json FROM audit_log WHERE actor_type = 'desktop_app' AND action = 'reject_proposed_action' AND entity_type = 'proposed_action' AND entity_id = ?1",
+            params![&rejected.id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("reject audit payload should query");
+    assert!(audit_payloads
+        .0
+        .as_deref()
+        .is_some_and(|payload| payload.contains(r#""status":"pending""#)));
+    assert!(audit_payloads
+        .1
+        .as_deref()
+        .is_some_and(|payload| payload.contains(r#""status":"rejected""#)));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn proposed_action_decisions_reject_unknown_and_already_non_pending_actions() {
+    let (mut core, path) = open_test_core();
+
+    let unknown_err = core
+        .approve_proposed_action("missing-proposed-action".to_string())
+        .expect_err("unknown proposed action should be rejected");
+    match unknown_err {
+        CrmError::NotFound(message) => {
+            assert!(message.contains("missing-proposed-action"));
+        }
+        other => panic!("expected NotFound, got {other:?}"),
+    }
+
+    let approved_action = create_test_proposed_action(&mut core, "Already approved");
+    core.approve_proposed_action(approved_action.id.clone())
+        .expect("first approval should succeed");
+    let approved_again_err = core
+        .approve_proposed_action(approved_action.id.clone())
+        .expect_err("already approved proposed action should be rejected");
+    match approved_again_err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("must be pending"));
+            assert!(message.contains("approved"));
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
+
+    let executed_action = create_test_proposed_action(&mut core, "Already executed");
+    core.db
+        .conn
+        .execute(
+            "UPDATE proposed_actions SET status = 'executed', executed_at = ?1 WHERE id = ?2",
+            params![now_iso8601(), &executed_action.id],
+        )
+        .expect("executed status should update");
+    let executed_err = core
+        .reject_proposed_action(executed_action.id.clone())
+        .expect_err("already executed proposed action should be rejected");
+    match executed_err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("must be pending"));
+            assert!(message.contains("executed"));
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn stale_pending_decision_does_not_succeed_or_write_decision_audit() {
+    let (mut core, path) = open_test_core();
+    let proposed_action = create_test_proposed_action(&mut core, "Stale pending");
+
+    let audit_count_before: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action IN ('approve_proposed_action', 'reject_proposed_action') AND entity_id = ?1",
+            params![&proposed_action.id],
+            |row| row.get(0),
+        )
+        .expect("decision audit count should query before stale decision");
+
+    let err = crate::storage::proposed_actions::approve_proposed_action_after_test_status_change(
+        &core.db.conn,
+        &proposed_action.id,
+        "executed",
+    )
+    .expect_err("stale pending decision should fail");
+    match err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("no longer pending"));
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
+
+    let stored: (String, Option<String>, Option<String>, Option<String>) = core
+        .db
+        .conn
+        .query_row(
+            "SELECT status, approved_at, rejected_at, executed_at FROM proposed_actions WHERE id = ?1",
+            params![&proposed_action.id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .expect("stale proposed action should query");
+    assert_eq!(stored.0, "executed");
+    assert_eq!(stored.1, None);
+    assert_eq!(stored.2, None);
+    assert_eq!(stored.3, None);
+
+    let audit_count_after: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action IN ('approve_proposed_action', 'reject_proposed_action') AND entity_id = ?1",
+            params![&proposed_action.id],
+            |row| row.get(0),
+        )
+        .expect("decision audit count should query after stale decision");
+    assert_eq!(audit_count_after, audit_count_before);
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);
