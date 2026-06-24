@@ -33,3 +33,4 @@
 | 029 | 2026-06-24 | `codex/normalization-migration-readiness-current-main` | Read-only normalization migration readiness preflight for legacy organization contacts, split invalid organization links, backup baseline status, and focused Rust tests without destructive migration | Completed |
 | 030 | 2026-06-24 | `codex/contact-duplicate-merge-ui-surface` | Contact duplicate warning and merge UI using read-only email/phone candidate pairs plus existing audited contact merge behavior | Completed |
 | 031 | 2026-06-24 | `codex/audit-pending-actions-api-surface` | Read-only audit log and pending proposed-action Tauri commands plus typed frontend API wrappers/tests without route or UI work | Completed |
+| 032 | 2026-06-24 | `codex/audit-pending-actions-ui-surface` | Visible read-only Audit Log and Pending Actions UI routes wired into hash routing/sidebar using Sprint 031 frontend API wrappers | Completed |
