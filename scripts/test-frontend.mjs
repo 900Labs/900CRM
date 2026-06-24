@@ -15,11 +15,11 @@ const env = {
 
 try {
   const { binPaths } = verifyFrontendTooling();
-  await runCommand(process.execPath, [binPaths.vitest, 'run', 'src/lib/api', '--passWithNoTests'], {
+  await runCommand(process.execPath, [binPaths.vitest, 'run', 'src/lib', '--passWithNoTests'], {
     cwd: appDir,
     env,
     timeoutMs,
-    label: 'vitest api tests'
+    label: 'vitest lib tests'
   });
 } catch (error) {
   console.error(`Frontend tests failed: ${error.message}`);
