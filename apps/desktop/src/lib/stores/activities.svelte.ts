@@ -51,6 +51,9 @@ class ActivityStore {
   /** Whether a save is in progress. */
   isSaving = $state<boolean>(false);
 
+  /** Monotonic signal for activity relationship writes outside this route. */
+  relationshipRefreshVersion = $state(0);
+
   // ── Actions ─────────────────────────────────────────────────────────────────
 
   /**
@@ -98,6 +101,10 @@ class ActivityStore {
     } finally {
       this.isSaving = false;
     }
+  }
+
+  notifyRelationshipLinksChanged(): void {
+    this.relationshipRefreshVersion += 1;
   }
 
   /**
