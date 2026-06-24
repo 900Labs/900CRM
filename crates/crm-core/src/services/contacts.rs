@@ -3,7 +3,7 @@ use crate::crm_engine::contacts as contact_engine;
 use crate::result::CrmResult;
 use crate::storage::{
     self,
-    contacts::{Contact, ContactListParams, ContactListResult},
+    contacts::{Contact, ContactDuplicateCandidate, ContactListParams, ContactListResult},
 };
 
 use super::{record_audit_json, CrmCore};
@@ -186,6 +186,10 @@ impl CrmCore {
             return Ok(Vec::new());
         }
         storage::contacts::search_contacts(&self.db.conn, query)
+    }
+
+    pub fn list_contact_duplicate_candidates(&self) -> CrmResult<Vec<ContactDuplicateCandidate>> {
+        storage::contacts::find_active_contact_duplicate_candidates(&self.db.conn)
     }
 
     pub fn merge_contacts(&mut self, target_id: &str, source_id: &str) -> CrmResult<Contact> {

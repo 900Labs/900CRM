@@ -148,6 +148,31 @@ pub struct ContactListResult {
     pub per_page: u32,
 }
 
+/// A read-only duplicate contact pair candidate for user-confirmed merges.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactDuplicateCandidate {
+    /// Contact that should be merged into the target by default.
+    pub source_id: String,
+
+    /// Human-readable label for the source contact.
+    pub source_display_label: String,
+
+    /// Contact that should be kept by default.
+    pub target_id: String,
+
+    /// Human-readable label for the target contact.
+    pub target_display_label: String,
+
+    /// Duplicate match type: `"email"` or `"phone"`.
+    pub match_type: String,
+
+    /// Trimmed value that matched.
+    pub matched_value: String,
+
+    /// Human-readable duplicate reason.
+    pub reason: String,
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CRUD
 // ─────────────────────────────────────────────────────────────────────────────
@@ -683,6 +708,116 @@ pub fn find_active_contacts_by_phone(conn: &Connection, phone: &str) -> CrmResul
 
     let rows = stmt.query_map(params![phone], row_to_contact)?;
     Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+/// Finds active contact duplicate pairs by exact trimmed email or phone matches.
+///
+/// The older contact is returned as the default merge target. If a pair matches
+/// by both email and phone, the email candidate is returned once.
+pub fn find_active_contact_duplicate_candidates(
+    conn: &Connection,
+) -> CrmResult<Vec<ContactDuplicateCandidate>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT
+            source.id AS source_id,
+            COALESCE(
+                NULLIF(TRIM(CASE
+                    WHEN source.contact_type = 'organization' THEN source.org_name
+                    ELSE source.first_name || ' ' || source.last_name
+                END), ''),
+                NULLIF(TRIM(source.email), ''),
+                NULLIF(TRIM(source.phone), ''),
+                source.id
+            ) AS source_display_label,
+            target.id AS target_id,
+            COALESCE(
+                NULLIF(TRIM(CASE
+                    WHEN target.contact_type = 'organization' THEN target.org_name
+                    ELSE target.first_name || ' ' || target.last_name
+                END), ''),
+                NULLIF(TRIM(target.email), ''),
+                NULLIF(TRIM(target.phone), ''),
+                target.id
+            ) AS target_display_label,
+            'email' AS match_type,
+            TRIM(source.email) AS matched_value
+        FROM contacts source
+        INNER JOIN contacts target
+            ON TRIM(source.email) = TRIM(target.email)
+           AND (
+                target.created_at < source.created_at
+                OR (target.created_at = source.created_at AND target.id < source.id)
+           )
+        WHERE source.deleted_at IS NULL
+          AND target.deleted_at IS NULL
+          AND TRIM(source.email) <> ''
+
+        UNION ALL
+
+        SELECT
+            source.id AS source_id,
+            COALESCE(
+                NULLIF(TRIM(CASE
+                    WHEN source.contact_type = 'organization' THEN source.org_name
+                    ELSE source.first_name || ' ' || source.last_name
+                END), ''),
+                NULLIF(TRIM(source.email), ''),
+                NULLIF(TRIM(source.phone), ''),
+                source.id
+            ) AS source_display_label,
+            target.id AS target_id,
+            COALESCE(
+                NULLIF(TRIM(CASE
+                    WHEN target.contact_type = 'organization' THEN target.org_name
+                    ELSE target.first_name || ' ' || target.last_name
+                END), ''),
+                NULLIF(TRIM(target.email), ''),
+                NULLIF(TRIM(target.phone), ''),
+                target.id
+            ) AS target_display_label,
+            'phone' AS match_type,
+            TRIM(source.phone) AS matched_value
+        FROM contacts source
+        INNER JOIN contacts target
+            ON TRIM(source.phone) = TRIM(target.phone)
+           AND (
+                target.created_at < source.created_at
+                OR (target.created_at = source.created_at AND target.id < source.id)
+           )
+        WHERE source.deleted_at IS NULL
+          AND target.deleted_at IS NULL
+          AND TRIM(source.phone) <> ''
+          AND NOT (
+              TRIM(source.email) <> ''
+              AND TRIM(source.email) = TRIM(target.email)
+          )
+
+        ORDER BY match_type, matched_value, target_display_label, source_display_label
+        "#,
+    )?;
+
+    let rows = stmt.query_map([], |row| {
+        let match_type: String = row.get(4)?;
+        let matched_value: String = row.get(5)?;
+        let reason = match match_type.as_str() {
+            "email" => format!("Same email address: {}", matched_value),
+            "phone" => format!("Same phone number: {}", matched_value),
+            _ => format!("Same contact field: {}", matched_value),
+        };
+
+        Ok(ContactDuplicateCandidate {
+            source_id: row.get(0)?,
+            source_display_label: row.get(1)?,
+            target_id: row.get(2)?,
+            target_display_label: row.get(3)?,
+            match_type,
+            matched_value,
+            reason,
+        })
+    })?;
+
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 /// Finds active contacts with an exact case-insensitive first/last name match.
