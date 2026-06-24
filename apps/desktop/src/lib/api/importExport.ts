@@ -102,6 +102,12 @@ const preflightCommands: Record<ImportPreflightEntity, string> = {
   organizations: 'preflight_organizations_csv_import',
 };
 
+const preflightJsonCommands: Record<ImportPreflightEntity, string> = {
+  contacts: 'preflight_contacts_json_import',
+  deals: 'preflight_deals_json_import',
+  organizations: 'preflight_organizations_json_import',
+};
+
 const importWithMappingCommands: Record<ImportPreflightEntity, string> = {
   contacts: 'import_contacts_csv_with_mapping',
   deals: 'import_deals_csv_with_mapping',
@@ -147,6 +153,12 @@ export async function preflightContactsCsvImport(
   return invoke<ImportPreflightReport>(preflightCommands.contacts, filePathArgs(filePath));
 }
 
+export async function preflightContactsJsonImport(
+  filePath: string,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(preflightJsonCommands.contacts, filePathArgs(filePath));
+}
+
 export async function importContactsCsvWithMapping(
   filePath: string,
   mapping: ImportColumnMapping<ContactImportTargetField>,
@@ -185,6 +197,10 @@ export async function exportDealsJson(filePath: string): Promise<number> {
 
 export async function preflightDealsCsvImport(filePath: string): Promise<ImportPreflightReport> {
   return invoke<ImportPreflightReport>(preflightCommands.deals, filePathArgs(filePath));
+}
+
+export async function preflightDealsJsonImport(filePath: string): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(preflightJsonCommands.deals, filePathArgs(filePath));
 }
 
 export async function importDealsCsvWithMapping(
@@ -227,6 +243,12 @@ export async function preflightOrganizationsCsvImport(
   filePath: string,
 ): Promise<ImportPreflightReport> {
   return invoke<ImportPreflightReport>(preflightCommands.organizations, filePathArgs(filePath));
+}
+
+export async function preflightOrganizationsJsonImport(
+  filePath: string,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(preflightJsonCommands.organizations, filePathArgs(filePath));
 }
 
 export async function importOrganizationsCsvWithMapping(
@@ -292,6 +314,13 @@ export async function preflightCsv(
   filePath: string,
 ): Promise<ImportPreflightReport> {
   return invoke<ImportPreflightReport>(preflightCommands[entity], filePathArgs(filePath));
+}
+
+export async function preflightJson(
+  entity: ImportPreflightEntity,
+  filePath: string,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(preflightJsonCommands[entity], filePathArgs(filePath));
 }
 
 export async function importCsvWithMapping(

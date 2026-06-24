@@ -33,12 +33,16 @@ import {
   importOrganizationsJson,
   preflightContactsCsvImport,
   preflightContactsCsvImportWithMapping,
+  preflightContactsJsonImport,
   preflightCsv,
   preflightCsvWithMapping,
   preflightDealsCsvImport,
   preflightDealsCsvImportWithMapping,
+  preflightDealsJsonImport,
+  preflightJson,
   preflightOrganizationsCsvImport,
   preflightOrganizationsCsvImportWithMapping,
+  preflightOrganizationsJsonImport,
 } from './importExport';
 
 describe('import/export API', () => {
@@ -276,6 +280,85 @@ describe('import/export API', () => {
     await preflightCsv('deals', '/tmp/deals.csv');
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_deals_csv_import', {
       file_path: '/tmp/deals.csv',
+    });
+  });
+
+  it('maps JSON preflight duplicate warning commands', async () => {
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'contacts',
+      total_rows: 2,
+      duplicate_warning_count: 1,
+      warnings: [
+        {
+          entity_type: 'contacts',
+          row_number: 2,
+          match_type: 'email',
+          csv_value: 'ada@example.com',
+          existing_entity_type: 'contact',
+          existing_entity_id: 'contact-1',
+          existing_display_label: 'Ada Lovelace',
+          reason: "Email 'ada@example.com' matches existing contact",
+        },
+      ],
+    });
+    await expect(preflightContactsJsonImport('/tmp/contacts.json')).resolves.toMatchObject({
+      entity_type: 'contacts',
+      duplicate_warning_count: 1,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_contacts_json_import', {
+      file_path: '/tmp/contacts.json',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'organizations',
+      total_rows: 1,
+      duplicate_warning_count: 1,
+      warnings: [],
+    });
+    await expect(preflightOrganizationsJsonImport('/tmp/organizations.json')).resolves.toMatchObject({
+      entity_type: 'organizations',
+      total_rows: 1,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_organizations_json_import', {
+      file_path: '/tmp/organizations.json',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'deals',
+      total_rows: 1,
+      duplicate_warning_count: 1,
+      warnings: [],
+    });
+    await expect(preflightDealsJsonImport('/tmp/deals.json')).resolves.toMatchObject({
+      entity_type: 'deals',
+      duplicate_warning_count: 1,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_deals_json_import', {
+      file_path: '/tmp/deals.json',
+    });
+  });
+
+  it('routes generic JSON preflight helpers by entity', async () => {
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'organizations',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightJson('organizations', '/tmp/orgs.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_organizations_json_import', {
+      file_path: '/tmp/orgs.json',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'deals',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightJson('deals', '/tmp/deals.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_deals_json_import', {
+      file_path: '/tmp/deals.json',
     });
   });
 
