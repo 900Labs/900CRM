@@ -10,8 +10,14 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 import {
   createExternalClientPlaceholder,
+  evaluateExternalClientDraftPermission,
+  evaluateExternalClientToolReadPermission,
+  listExternalClientPermissions,
   listExternalClients,
+  upsertExternalClientToolPermission,
   type ExternalClient,
+  type ExternalClientPermission,
+  type ToolPermissionEvaluation,
 } from './externalClients';
 
 const backendClient = {
@@ -36,6 +42,42 @@ const client: ExternalClient = {
   updatedAt: '2026-06-24T08:00:00Z',
   deletedAt: null,
   deviceId: 'device-1',
+};
+
+const backendPermission = {
+  id: 'permission-1',
+  client_id: 'client-1',
+  tool_name: 'contacts.search',
+  can_read: true,
+  can_write: false,
+  requires_confirmation: true,
+  created_at: '2026-06-24T08:10:00Z',
+  updated_at: '2026-06-24T08:11:00Z',
+};
+
+const permission: ExternalClientPermission = {
+  id: 'permission-1',
+  clientId: 'client-1',
+  toolName: 'contacts.search',
+  canRead: true,
+  canWrite: false,
+  requiresConfirmation: true,
+  createdAt: '2026-06-24T08:10:00Z',
+  updatedAt: '2026-06-24T08:11:00Z',
+};
+
+const backendEvaluation = {
+  allowed: true,
+  mode: 'read_only',
+  tool_name: 'contacts.search',
+  reason: 'allowed',
+} as const;
+
+const evaluation: ToolPermissionEvaluation = {
+  allowed: true,
+  mode: 'read_only',
+  toolName: 'contacts.search',
+  reason: 'allowed',
 };
 
 describe('external clients API', () => {
@@ -64,5 +106,75 @@ describe('external clients API', () => {
     });
     expect(created.enabled).toBe(false);
     expect(created.permissionMode).toBe('disabled');
+  });
+
+  it('maps listExternalClientPermissions to list_external_client_permissions', async () => {
+    invokeMock.mockResolvedValueOnce([backendPermission]);
+
+    await expect(listExternalClientPermissions('client-1')).resolves.toEqual([permission]);
+
+    expect(invokeMock).toHaveBeenCalledWith('list_external_client_permissions', {
+      client_id: 'client-1',
+    });
+  });
+
+  it('maps upsertExternalClientToolPermission to upsert_external_client_tool_permission', async () => {
+    invokeMock.mockResolvedValueOnce(backendPermission);
+
+    await expect(
+      upsertExternalClientToolPermission({
+        clientId: 'client-1',
+        toolName: 'contacts.search',
+        canRead: true,
+        canWrite: false,
+        requiresConfirmation: true,
+      }),
+    ).resolves.toEqual(permission);
+
+    expect(invokeMock).toHaveBeenCalledWith('upsert_external_client_tool_permission', {
+      client_id: 'client-1',
+      tool_name: 'contacts.search',
+      can_read: true,
+      can_write: false,
+      requires_confirmation: true,
+    });
+  });
+
+  it('maps evaluateExternalClientToolReadPermission to evaluate_external_client_tool_read_permission', async () => {
+    invokeMock.mockResolvedValueOnce(backendEvaluation);
+
+    await expect(
+      evaluateExternalClientToolReadPermission('client-1', 'contacts.search'),
+    ).resolves.toEqual(evaluation);
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      'evaluate_external_client_tool_read_permission',
+      {
+        client_id: 'client-1',
+        tool_name: 'contacts.search',
+      },
+    );
+  });
+
+  it('maps evaluateExternalClientDraftPermission to evaluate_external_client_draft_permission', async () => {
+    const backendDraftEvaluation = {
+      ...backendEvaluation,
+      mode: 'draft_only',
+      tool_name: 'create_activity_draft',
+    } as const;
+    invokeMock.mockResolvedValueOnce(backendDraftEvaluation);
+
+    await expect(
+      evaluateExternalClientDraftPermission('client-1', 'create_activity_draft'),
+    ).resolves.toEqual({
+      ...evaluation,
+      mode: 'draft_only',
+      toolName: 'create_activity_draft',
+    });
+
+    expect(invokeMock).toHaveBeenCalledWith('evaluate_external_client_draft_permission', {
+      client_id: 'client-1',
+      tool_name: 'create_activity_draft',
+    });
   });
 });

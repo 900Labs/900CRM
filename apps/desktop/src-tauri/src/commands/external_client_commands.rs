@@ -1,4 +1,9 @@
-use crm_core::storage::external_clients::ExternalClient;
+use crm_core::{
+    permissions::ToolPermissionEvaluation,
+    storage::{
+        external_client_permissions::ExternalClientPermission, external_clients::ExternalClient,
+    },
+};
 use tauri::State;
 
 use crate::{commands::lock_core, AppState};
@@ -19,5 +24,57 @@ pub async fn create_external_client_placeholder(
 ) -> Result<ExternalClient, String> {
     let mut core = lock_core(&state)?;
     core.create_external_client_placeholder(&name, &client_type)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_external_client_permissions(
+    state: State<'_, AppState>,
+    client_id: String,
+) -> Result<Vec<ExternalClientPermission>, String> {
+    let core = lock_core(&state)?;
+    core.list_external_client_permissions(&client_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn upsert_external_client_tool_permission(
+    state: State<'_, AppState>,
+    client_id: String,
+    tool_name: String,
+    can_read: bool,
+    can_write: bool,
+    requires_confirmation: bool,
+) -> Result<ExternalClientPermission, String> {
+    let mut core = lock_core(&state)?;
+    core.upsert_external_client_tool_permission(
+        &client_id,
+        &tool_name,
+        can_read,
+        can_write,
+        requires_confirmation,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn evaluate_external_client_tool_read_permission(
+    state: State<'_, AppState>,
+    client_id: String,
+    tool_name: String,
+) -> Result<ToolPermissionEvaluation, String> {
+    let core = lock_core(&state)?;
+    core.evaluate_external_client_tool_read_permission(&client_id, &tool_name)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn evaluate_external_client_draft_permission(
+    state: State<'_, AppState>,
+    client_id: String,
+    tool_name: String,
+) -> Result<ToolPermissionEvaluation, String> {
+    let core = lock_core(&state)?;
+    core.evaluate_external_client_draft_permission(&client_id, &tool_name)
         .map_err(|e| e.to_string())
 }
