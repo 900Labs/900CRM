@@ -123,6 +123,7 @@ pub fn run() {
             commands::custom_field_commands::list_custom_field_values_for_type,
             commands::report_commands::get_pipeline_conversion_report,
             commands::report_commands::get_activity_funnel_report,
+            commands::search_commands::global_search,
             commands::backup_commands::create_local_backup,
             commands::backup_commands::validate_local_backup,
             commands::backup_commands::restore_local_backup_to_app_data,

@@ -409,24 +409,36 @@ fn pipeline_age_query_ignores_closed_deals() {
     let _ = std::fs::remove_dir_all(path);
 }
 
-#[test]
-fn unified_search_uses_storage_repositories_for_all_entities() {
-    let (mut core, path) = open_test_core();
-
-    core.create_contact(
-        Some("person".to_string()),
-        Some("Clinic".to_string()),
-        Some("Lead".to_string()),
-        Some("Clinic Partners".to_string()),
-        Some("clinic@example.com".to_string()),
+fn seed_global_search_entities(core: &mut CrmCore) {
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Clinic".to_string()),
+            Some("Lead".to_string()),
+            Some("Clinic Partners".to_string()),
+            Some("clinic@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+    core.create_organization(
+        "Clinic Partners".to_string(),
+        Some("partners@clinic.example".to_string()),
         None,
         None,
         None,
         None,
+        Some("Lagos".to_string()),
         None,
+        Some("Nigeria".to_string()),
         None,
+        Some("Regional clinic group".to_string()),
     )
-    .expect("contact should be created");
+    .expect("organization should be created");
     core.create_deal(
         "Clinic expansion".to_string(),
         Some(2500.0),
@@ -448,12 +460,68 @@ fn unified_search_uses_storage_repositories_for_all_entities() {
         None,
     )
     .expect("activity should be created");
+    let tag = core
+        .create_tag("Clinic Priority".to_string(), None)
+        .expect("tag should be created");
+    core.create_note(
+        "contact".to_string(),
+        contact.id,
+        "Clinic onboarding note".to_string(),
+    )
+    .expect("note should be created");
+    assert_eq!(tag.name, "Clinic Priority");
+}
 
-    let results = crate::crm_engine::search::unified_search(&core.db.conn, "Clinic", 10)
-        .expect("unified search should query");
-    assert!(results.iter().any(|r| r.entity_type == "contact"));
-    assert!(results.iter().any(|r| r.entity_type == "deal"));
-    assert!(results.iter().any(|r| r.entity_type == "activity"));
+#[test]
+fn global_search_returns_all_supported_entity_types() {
+    let (mut core, path) = open_test_core();
+    seed_global_search_entities(&mut core);
+
+    let results = core
+        .global_search("Clinic", Some(20))
+        .expect("global search should query");
+    assert!(results
+        .iter()
+        .any(|r| r.entity_type == crate::search::SearchEntityType::Contact));
+    assert!(results
+        .iter()
+        .any(|r| r.entity_type == crate::search::SearchEntityType::Organization));
+    assert!(results
+        .iter()
+        .any(|r| r.entity_type == crate::search::SearchEntityType::Deal));
+    assert!(results
+        .iter()
+        .any(|r| r.entity_type == crate::search::SearchEntityType::Activity));
+    assert!(results
+        .iter()
+        .any(|r| r.entity_type == crate::search::SearchEntityType::Note));
+    assert!(results
+        .iter()
+        .any(|r| r.entity_type == crate::search::SearchEntityType::Tag));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn global_search_respects_blank_query_and_limit_behavior() {
+    let (mut core, path) = open_test_core();
+    seed_global_search_entities(&mut core);
+
+    let blank = core
+        .global_search("   ", Some(20))
+        .expect("blank global search should succeed");
+    assert!(blank.is_empty());
+
+    let zero = core
+        .global_search("Clinic", Some(0))
+        .expect("zero-limit global search should succeed");
+    assert!(zero.is_empty());
+
+    let limited = core
+        .global_search("Clinic", Some(2))
+        .expect("limited global search should succeed");
+    assert_eq!(limited.len(), 2);
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);
