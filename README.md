@@ -207,6 +207,14 @@ npm run tauri -- dev
 
 This starts the Svelte dev server with hot-reload, compiles the Tauri shell, and opens the 900CRM window from `apps/desktop`. Use `npm run dev` when you only need the frontend dev server, `npm run build` for the frontend production bundle, and `cargo test --workspace` for Rust tests.
 
+**Browser smoke tests**
+
+```bash
+npm run test:e2e
+```
+
+The E2E smoke suite runs the Vite-rendered browser shell with Playwright Chromium and a test-only Tauri IPC shim. It verifies app-shell and hash-route rendering, but it does not automate native Tauri windows, native file dialogs, release packaging, sync transport, MCP runtime, or AI behavior.
+
 ---
 
 ## Download
