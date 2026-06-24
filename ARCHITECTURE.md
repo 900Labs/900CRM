@@ -16,6 +16,7 @@ If you are new to the codebase, read this document before diving into the source
 - [Offline-First Design](#offline-first-design)
 - [Sync Protocol](#sync-protocol)
 - [Database Schema](#database-schema)
+- [Public Baseline Docs](#public-baseline-docs)
 - [Extension Points](#extension-points)
 - [MCP Readiness](#mcp-readiness)
 - [Key Design Decisions](#key-design-decisions)
@@ -85,27 +86,79 @@ apps/desktop/src-tauri/src/
 │   │                          No business logic lives here.
 │   │
 │   ├── contact_commands.rs    create_contact, get_contact, list_contacts,
-│   │                          update_contact, delete_contact, search_contacts
+│   │                          update_contact, delete_contact, restore_contact,
+│   │                          search_contacts, list_contact_duplicate_candidates,
+│   │                          merge_contacts
+│   │
+│   ├── organization_commands.rs
+│   │                          create_organization, get_organization,
+│   │                          list_organizations, update_organization,
+│   │                          delete_organization, link_contact_to_organization
+│   │
+│   ├── note_commands.rs       create_note, get_note, list_notes_for_entity,
+│   │                          update_note, delete_note
+│   │
+│   ├── tag_commands.rs        create_tag, get_tag, list_tags, update_tag,
+│   │                          delete_tag, apply_tag_to_entity,
+│   │                          remove_tag_from_entity, list_tags_for_entity
 │   │
 │   ├── deal_commands.rs       create_deal, get_deal, list_deals, update_deal,
-│   │                          delete_deal, move_deal_to_stage, list_pipeline_stages,
-│   │                          create_pipeline_stage, update_pipeline_stage
+│   │                          list_deals_by_stage, move_deal_stage, delete_deal,
+│   │                          link_deal_to_organization, add_deal_contact,
+│   │                          remove_deal_contact, list_deal_contacts,
+│   │                          get_pipeline_summary
 │   │
 │   ├── activity_commands.rs   create_activity, get_activity, list_activities,
-│   │                          update_activity, delete_activity, complete_activity
+│   │                          list_activities_for_contact,
+│   │                          list_activities_for_deal, list_upcoming_activities,
+│   │                          mark_activity_complete, mark_activity_incomplete,
+│   │                          update_activity, delete_activity,
+│   │                          list_activity_links, add_activity_link,
+│   │                          remove_activity_link
 │   │
 │   ├── import_export.rs       import_contacts_csv, export_contacts_csv,
+│   │                          import_contacts_csv_with_mapping,
+│   │                          preflight_contacts_csv_import,
+│   │                          preflight_contacts_csv_import_with_mapping,
 │   │                          import_deals_csv, export_deals_csv,
-│   │                          export_activities_csv, get_import_preview
+│   │                          import_organizations_csv,
+│   │                          import_organizations_csv_with_mapping,
+│   │                          preflight_organizations_csv_import,
+│   │                          preflight_organizations_csv_import_with_mapping,
+│   │                          export_organizations_csv
 │   │
-│   ├── dashboard_commands.rs  Dashboard metrics and summaries
-│   ├── report_commands.rs     Reporting command handlers
+│   ├── dashboard_commands.rs  get_dashboard_stats
+│   ├── report_commands.rs     get_pipeline_conversion_report,
+│   │                          get_activity_funnel_report
+│   ├── search_commands.rs     global_search
+│   ├── audit_pending_commands.rs
+│   │                          list_recent_audit_log,
+│   │                          list_pending_proposed_actions,
+│   │                          approve_proposed_action,
+│   │                          reject_proposed_action
+│   │
+│   ├── external_client_commands.rs
+│   │                          list_external_clients,
+│   │                          create_external_client_placeholder,
+│   │                          list_external_client_permissions,
+│   │                          upsert_external_client_tool_permission,
+│   │                          evaluate_external_client_tool_read_permission,
+│   │                          evaluate_external_client_draft_permission
+│   │
 │   ├── custom_field_commands.rs
-│   ├── organization_commands.rs
-│   ├── email_commands.rs
-│   ├── sync_commands.rs
-│   ├── backup_commands.rs
-│   └── settings_commands.rs   get_settings, update_settings
+│   │                          list_custom_field_defs,
+│   │                          create_custom_field_def,
+│   │                          update_custom_field_def,
+│   │                          delete_custom_field_def,
+│   │                          set_custom_field_value,
+│   │                          list_custom_field_values,
+│   │                          list_custom_field_values_for_type
+│   │
+│   ├── email_commands.rs      test_email_server_connection
+│   ├── sync_commands.rs       get_sync_status, trigger_sync
+│   ├── backup_commands.rs     create_local_backup, validate_local_backup,
+│   │                          restore_local_backup_to_app_data
+│   └── settings_commands.rs   get_settings, get_setting, update_setting
 ```
 
 ### CRM Core (`crates/crm-core/src/`)
@@ -345,27 +398,22 @@ All reads and writes go to the local SQLite database. There is no "optimistic UI
 
 ### No Network Dependency in the Core
 
-The Rust backend does not make any outbound network calls as part of normal operation. The Tauri `tauri.conf.json` has all network capabilities disabled by default:
+The Rust backend does not make outbound network calls as part of normal CRM
+operation. Optional email endpoint tests are user-initiated and can open TCP
+connections to the SMTP or IMAP host entered by the user. The WebView is
+restricted by the Tauri capability model and a local-first content security
+policy; CRM data access still goes through Tauri IPC and `crm-core`.
 
-```json
-{
-  "app": {
-    "security": {
-      "csp": "default-src 'self'"
-    }
-  }
-}
-```
+### Sync Readiness
 
-### Optional Sync
+Current sync support is a local readiness foundation, not a real multi-device
+sync transport. Mutating service paths write local `sync_changelog` entries, and
+Settings stores `sync_enabled` plus `sync_url` values. The current desktop sync
+commands report local status and trigger-state results, but they do not push to
+or pull from a sync server.
 
-Multi-device sync is an optional, user-initiated feature for teams. It does not change the offline-first guarantees:
-- All writes always go to local SQLite first
-- Sync pushes local changes to a sync server when online
-- Sync pulls remote changes and merges them locally
-- The app works identically whether sync is configured or not
-
-See the [Sync Protocol](#sync-protocol) section for implementation details.
+See the [Sync Protocol](#sync-protocol) section for the implemented boundary and
+future design direction.
 
 ### File Size Rationale
 
@@ -375,197 +423,54 @@ The installer is under 8 MB because 900CRM uses the system's built-in WebView (E
 
 ## Sync Protocol
 
-> **Note:** The sync feature is fully designed but not yet implemented in v1.0. This section documents the planned architecture for v1.1+.
+Real multi-device sync is not implemented in the current app. The implemented
+piece is the local `sync_changelog` table and the service calls that append
+entries after successful mutations.
 
-### Design Goals
+The current changelog stores:
 
-1. Works without any sync configuration (single-device use is the default)
-2. Self-hostable sync server — no vendor lock-in
-3. Tolerates intermittent connectivity: sync when connected, work normally when not
-4. Simple conflict resolution that is correct for CRM use cases
+- entity type and entity ID;
+- field name, including sentinel values such as `__create__` and `__delete__`;
+- old and new values when available;
+- timestamp;
+- originating device ID.
 
-### Changelog Table
-
-Every mutating operation on any entity writes a record to the `changelog` table:
-
-```sql
-CREATE TABLE changelog (
-    id          INTEGER PRIMARY KEY,
-    entity_type TEXT NOT NULL,        -- 'contact', 'deal', 'activity'
-    entity_id   TEXT NOT NULL,        -- UUID of the affected record
-    operation   TEXT NOT NULL,        -- 'insert', 'update', 'delete'
-    field       TEXT,                 -- NULL for insert/delete, field name for update
-    new_value   TEXT,                 -- JSON-encoded new value
-    changed_at  INTEGER NOT NULL,     -- Unix timestamp (milliseconds)
-    device_id   TEXT NOT NULL,        -- UUID assigned to this installation
-    synced      INTEGER NOT NULL DEFAULT 0  -- 0 = pending, 1 = synced
-);
-```
-
-SQLite triggers on each entity table automatically insert changelog records on INSERT, UPDATE, and DELETE.
-
-### Push/Pull Pattern
-
-```
-Device A                    Sync Server                    Device B
-   │                             │                             │
-   │  GET /changelog?since=T     │                             │
-   │────────────────────────────►│                             │
-   │◄────────────────────────────│                             │
-   │  [changelog entries since T]│                             │
-   │                             │                             │
-   │  POST /changelog             │                             │
-   │  [local changes since last  │                             │
-   │   successful push]          │                             │
-   │────────────────────────────►│                             │
-   │◄────────────────────────────│                             │
-   │  200 OK                     │                             │
-   │                             │  GET /changelog?since=T     │
-   │                             │◄────────────────────────────│
-   │                             │────────────────────────────►│
-   │                             │  [merged changelog]         │
-```
-
-### Conflict Resolution
-
-900CRM uses **last-write-wins** at the field level. For each field of each entity, the change with the most recent `changed_at` timestamp wins.
-
-This is appropriate for CRM data because:
-- Most CRM fields are independent (changing a phone number doesn't conflict with changing an address)
-- Field-level LWW handles the common case of one device being offline for hours and then syncing
-- The alternative (three-way merge or CRDTs) adds significant complexity for marginal benefit in this use case
-
-For **delete** operations: a delete always wins over concurrent updates (tombstone semantics). Once a record is deleted, its ID is permanently recorded in a `tombstones` table to prevent resurrection during sync.
-
-### Sync Server
-
-The sync server is a simple HTTP API that stores and serves changelog entries. A reference implementation in Rust is provided in the `sync-server/` directory. The protocol is documented in `sync-server/API.md`. Teams can self-host it on any server with HTTP access.
-
-The sync server does **not** need to be publicly accessible on the internet — it works on a local network (Wi-Fi in an office, hotspot in the field).
+Future sync work should keep the current offline-first guarantee: all writes go
+to local SQLite first, and network transport must be optional. A future sync
+server, conflict-resolution policy, tombstone model, and credential story need
+separate implementation, tests, and public documentation before they are treated
+as supported behavior.
 
 ---
 
 ## Database Schema
 
-The database is located at:
-- **Windows:** `%APPDATA%\900CRM\data.db`
-- **macOS:** `~/Library/Application Support/900CRM/data.db`
-- **Linux:** `~/.local/share/900CRM/data.db`
+The current source-derived data model baseline is documented in
+[Data Model](docs/DATA_MODEL.md). That document is the preferred reference for
+schema version, core entities, migration history, audit/sync readiness, and
+legacy compatibility caveats.
 
-### Schema Version
+At a high level, current local storage includes contacts, organizations, deals,
+activities, notes, tags, custom fields, settings, sync changelog entries, audit
+entries, external-client readiness records, external-client permissions, and
+proposed actions. Schema versioning uses SQLite `PRAGMA user_version`, currently
+version `9`.
 
-The schema version is stored in the `schema_version` table. The migration runner in `storage/schema.rs` applies migrations in sequence on startup.
+## Public Baseline Docs
 
-```sql
-CREATE TABLE schema_version (
-    version     INTEGER PRIMARY KEY,
-    applied_at  INTEGER NOT NULL
-);
-```
+Required public baselines live under `docs/`:
 
-### Core Tables
-
-```sql
--- Contacts (people and organizations)
-CREATE TABLE contacts (
-    id          TEXT PRIMARY KEY,           -- UUID v4
-    name        TEXT NOT NULL,
-    email       TEXT,
-    phone       TEXT,
-    company     TEXT,
-    job_title   TEXT,
-    website     TEXT,
-    address     TEXT,
-    notes       TEXT,
-    created_at  INTEGER NOT NULL,           -- Unix ms
-    updated_at  INTEGER NOT NULL
-);
-
--- Tags associated with contacts
-CREATE TABLE contact_tags (
-    contact_id  TEXT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
-    tag         TEXT NOT NULL,
-    PRIMARY KEY (contact_id, tag)
-);
-
--- Pipeline stages (ordered list)
-CREATE TABLE pipeline_stages (
-    id          TEXT PRIMARY KEY,           -- UUID v4
-    name        TEXT NOT NULL,
-    position    INTEGER NOT NULL,           -- 0-indexed display order
-    color       TEXT,                       -- hex color for kanban column
-    is_won      INTEGER NOT NULL DEFAULT 0, -- treat as "closed won"
-    is_lost     INTEGER NOT NULL DEFAULT 0  -- treat as "closed lost"
-);
-
--- Deals
-CREATE TABLE deals (
-    id              TEXT PRIMARY KEY,       -- UUID v4
-    name            TEXT NOT NULL,
-    value           REAL,                   -- monetary value
-    currency        TEXT DEFAULT 'USD',     -- ISO 4217
-    stage_id        TEXT NOT NULL REFERENCES pipeline_stages(id),
-    contact_id      TEXT REFERENCES contacts(id) ON DELETE SET NULL,
-    expected_close  INTEGER,                -- Unix ms date
-    notes           TEXT,
-    created_at      INTEGER NOT NULL,
-    updated_at      INTEGER NOT NULL
-);
-
--- Activities
-CREATE TABLE activities (
-    id              TEXT PRIMARY KEY,       -- UUID v4
-    type            TEXT NOT NULL,          -- 'task', 'call', 'meeting', 'email', 'note'
-    title           TEXT NOT NULL,
-    notes           TEXT,
-    contact_id      TEXT REFERENCES contacts(id) ON DELETE SET NULL,
-    deal_id         TEXT REFERENCES deals(id) ON DELETE SET NULL,
-    due_at          INTEGER,                -- Unix ms, nullable
-    completed_at    INTEGER,                -- NULL = not complete
-    created_at      INTEGER NOT NULL,
-    updated_at      INTEGER NOT NULL
-);
-
--- Full-text search virtual table (FTS5)
-CREATE VIRTUAL TABLE fts_index USING fts5(
-    entity_type,    -- 'contact', 'deal', 'activity'
-    entity_id,      -- UUID of the indexed entity
-    content,        -- concatenated searchable text
-    tokenize = 'unicode61 remove_diacritics 1'
-);
-
--- Sync changelog (see Sync Protocol section)
-CREATE TABLE changelog (
-    id          INTEGER PRIMARY KEY,
-    entity_type TEXT NOT NULL,
-    entity_id   TEXT NOT NULL,
-    operation   TEXT NOT NULL,
-    field       TEXT,
-    new_value   TEXT,
-    changed_at  INTEGER NOT NULL,
-    device_id   TEXT NOT NULL,
-    synced      INTEGER NOT NULL DEFAULT 0
-);
-
--- User settings (key-value)
-CREATE TABLE settings (
-    key     TEXT PRIMARY KEY,
-    value   TEXT NOT NULL
-);
-```
-
-### Indexes
-
-```sql
-CREATE INDEX idx_contacts_email ON contacts(email);
-CREATE INDEX idx_contacts_updated ON contacts(updated_at DESC);
-CREATE INDEX idx_deals_stage ON deals(stage_id);
-CREATE INDEX idx_deals_contact ON deals(contact_id);
-CREATE INDEX idx_activities_contact ON activities(contact_id);
-CREATE INDEX idx_activities_deal ON activities(deal_id);
-CREATE INDEX idx_activities_due ON activities(due_at);
-CREATE INDEX idx_changelog_synced ON changelog(synced, changed_at);
-```
+- [Data Model](docs/DATA_MODEL.md) documents the current schema/model state,
+  migration versions, audit/sync/proposed-action readiness, and compatibility
+  caveats.
+- [Import and Export](docs/IMPORT_EXPORT.md) documents current CSV import/export
+  behavior, mapped import flow, duplicate preflight, backup relationship, and
+  unimplemented surfaces.
+- [Privacy](docs/PRIVACY.md) documents offline-first behavior, local storage,
+  no telemetry/cloud requirement, optional network touchpoints, MCP/AI
+  non-behavior, and security caveats.
+- [MCP Readiness Baseline](docs/MCP_READINESS.md) documents the current optional
+  MCP boundary and future acceptance checklist.
 
 ---
 

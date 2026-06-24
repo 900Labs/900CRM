@@ -74,7 +74,7 @@ At-a-glance business metrics on every launch: pipeline value, deals by stage, up
 Full-text search across contacts, deals, and activities. Instant results as you type. Filter by entity type, date range, or tag. Works 100% offline — every search query stays on your machine.
 
 ### Import / Export
-Bring your existing data in with one-click CSV import for contacts, deals, and activities. Export any data set to CSV for use in spreadsheets, accounting tools, or data migration. Your data is always portable.
+Bring your existing data in with local CSV import for contacts, deals, and organizations. Export supported data sets to CSV for use in spreadsheets, accounting tools, or data migration. See [Import and Export](docs/IMPORT_EXPORT.md) for the current formats, duplicate preflight behavior, and known gaps.
 
 ### Backup / Restore
 Create local SQLite backups from Settings, validate backup integrity before restore, and restore only after explicit confirmation. See [Backup and Restore](docs/BACKUP_RESTORE.md) for the safety workflow.
@@ -83,7 +83,7 @@ Create local SQLite backups from Settings, validate backup integrity before rest
 The entire interface is localized. Switch languages in settings instantly. Full right-to-left (RTL) layout support for Arabic and future RTL languages. Community translations welcome.
 
 ### Offline-First by Design
-Every single feature works without an internet connection. There is no "offline mode" to enable — offline is the default. Optional sync to a local-network server is available for teams sharing data across devices.
+Every core CRM feature works without an internet connection. There is no "offline mode" to enable because offline is the default. Sync configuration and changelog foundations exist for future team workflows, but real multi-device sync transport is not implemented today.
 
 ### MCP Readiness
 MCP support is not implemented or started by the desktop app today. `crates/crm-mcp` is a placeholder for a future optional package, while current external-client, permission, audit-log, and pending-action surfaces only provide readiness primitives. See [MCP Readiness Baseline](docs/MCP_READINESS.md) for the current boundaries and future acceptance checklist.
@@ -111,7 +111,7 @@ Fixed broadband in Sub-Saharan Africa costs over 20% of per capita income. Mobil
 900CRM fills the gap: a **capable, beautiful CRM that works on a $200 laptop with no internet connection and no server** — and costs nothing to use.
 
 **Your data belongs to you.**
-There is no account to create, no cloud to sync to, no telemetry, no analytics. Your contacts, deals, and business relationships live in a SQLite database on your machine. You can back it up with the Settings data-management tools, copy it to a USB drive, move it to a new computer, or inspect it with any SQLite tool. See [Backup and Restore](docs/BACKUP_RESTORE.md) for the local backup workflow and restore safety checks.
+There is no account to create, no telemetry, and no analytics. Your contacts, deals, and business relationships live in a SQLite database on your machine. You can back it up with the Settings data-management tools, copy it to a USB drive, move it to a new computer, or inspect it with any SQLite tool. See [Privacy](docs/PRIVACY.md) for local-data caveats and [Backup and Restore](docs/BACKUP_RESTORE.md) for the local backup workflow and restore safety checks.
 
 ---
 
@@ -260,7 +260,7 @@ To add a new language or improve an existing translation, see the [Translation G
 │  │                         │  │                        │  │
 │  │  • CRM Engine            │  │  • Dashboard           │  │
 │  │  • Storage (SQLite)      │  │  • Contacts view       │  │
-│  │  • Sync engine           │  │  • Pipeline kanban     │  │
+│  │  • Sync changelog        │  │  • Pipeline kanban     │  │
 │  │  • IPC command server    │  │  • Activities feed     │  │
 │  │  • Import/Export         │  │  • Search              │  │
 │  │  • Backup/Restore        │  │  • Settings            │  │
@@ -274,6 +274,8 @@ To add a new language or improve an existing translation, see the [Translation G
 ```
 
 For a deep dive into the module structure, data flow, sync protocol, and design decisions, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+Current implementation baselines are documented in [Data Model](docs/DATA_MODEL.md), [Import and Export](docs/IMPORT_EXPORT.md), [Privacy](docs/PRIVACY.md), and [MCP Readiness](docs/MCP_READINESS.md).
 
 ---
 
@@ -322,6 +324,12 @@ For a deep dive into the module structure, data flow, sync protocol, and design 
 ├── scripts/                      # Root verification helpers
 ├── plugins/                      # Community plugin directory
 │   └── README.md                 # Plugin development guide
+├── docs/                         # Required public docs and sprint notes
+│   ├── DATA_MODEL.md             # Current local schema/model baseline
+│   ├── IMPORT_EXPORT.md          # Current CSV import/export behavior
+│   ├── PRIVACY.md                # Offline-first privacy and caveats
+│   ├── MCP_READINESS.md          # Current optional-MCP readiness boundary
+│   └── BACKUP_RESTORE.md         # Local backup and restore workflow
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml                # CI pipeline
