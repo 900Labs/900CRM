@@ -61,8 +61,8 @@ pub async fn update_deal(
     currency: Option<String>,
     stage: Option<String>,
     probability: Option<i32>,
-    expected_close: Option<String>,
-    contact_id: Option<String>,
+    expected_close: Option<Option<String>>,
+    contact_id: Option<Option<String>>,
     organization_id: Option<Option<String>>,
     notes: Option<String>,
 ) -> Result<Deal, String> {

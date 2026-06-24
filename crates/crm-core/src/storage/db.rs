@@ -914,27 +914,44 @@ impl Database {
                     AND dc.deleted_at IS NULL
               );
 
-            UPDATE deals
-            SET organization_id = (
-                SELECT c.organization_id
-                FROM contacts c
-                WHERE c.id = deals.contact_id
-                  AND c.deleted_at IS NULL
-                  AND TRIM(COALESCE(c.organization_id, '')) <> ''
-                LIMIT 1
-            )
-            WHERE deleted_at IS NULL
-              AND TRIM(COALESCE(organization_id, '')) = ''
-              AND TRIM(COALESCE(contact_id, '')) <> ''
-              AND EXISTS (
-                  SELECT 1
-                  FROM contacts c
-                  WHERE c.id = deals.contact_id
-                    AND c.deleted_at IS NULL
-                    AND TRIM(COALESCE(c.organization_id, '')) <> ''
-              );
             "#,
             )?;
+
+            if self.table_exists("organizations")? {
+                self.conn.execute_batch(
+                    r#"
+                UPDATE deals
+                SET organization_id = (
+                    SELECT c.organization_id
+                    FROM contacts c
+                    JOIN organizations o
+                      ON o.id = c.organization_id
+                     AND o.deleted_at IS NULL
+                    WHERE c.id = deals.contact_id
+                      AND c.deleted_at IS NULL
+                      AND TRIM(COALESCE(c.organization_id, '')) <> ''
+                    LIMIT 1
+                )
+                WHERE deleted_at IS NULL
+                  AND TRIM(COALESCE(organization_id, '')) = ''
+                  AND TRIM(COALESCE(contact_id, '')) <> ''
+                  AND EXISTS (
+                      SELECT 1
+                      FROM contacts c
+                      JOIN organizations o
+                        ON o.id = c.organization_id
+                       AND o.deleted_at IS NULL
+                      WHERE c.id = deals.contact_id
+                        AND c.deleted_at IS NULL
+                        AND TRIM(COALESCE(c.organization_id, '')) <> ''
+                  );
+                "#,
+                )?;
+            } else {
+                log::warn!(
+                    "Skipping deal organization backfill because table 'organizations' is missing"
+                );
+            }
         } else {
             log::warn!(
                 "Skipping deal relationship backfill because legacy table 'contacts' is missing"

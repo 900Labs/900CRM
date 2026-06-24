@@ -283,10 +283,16 @@ export async function updateDeal(id: string, data: UpdateDealPayload): Promise<D
     currency: data.currency,
     stage: toBackendStage(data.stage),
     probability: data.probability,
-    expected_close: data.expectedCloseDate,
-    contact_id: data.contactId,
     notes: data.description,
   };
+
+  if (hasOwn(data, 'expectedCloseDate') && data.expectedCloseDate !== undefined) {
+    args.expected_close = data.expectedCloseDate;
+  }
+
+  if (hasOwn(data, 'contactId') && data.contactId !== undefined) {
+    args.contact_id = data.contactId;
+  }
 
   if (hasOwn(data, 'organizationId')) {
     args.organization_id = normalizeNullable(data.organizationId);

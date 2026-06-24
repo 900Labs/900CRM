@@ -95,10 +95,10 @@ describe('deal API', () => {
       currency: undefined,
       stage: undefined,
       probability: undefined,
-      expected_close: undefined,
-      contact_id: undefined,
       notes: undefined,
     });
+    expect(invokeMock.mock.calls[0][1]).not.toHaveProperty('expected_close');
+    expect(invokeMock.mock.calls[0][1]).not.toHaveProperty('contact_id');
 
     invokeMock.mockReset();
     invokeMock.mockResolvedValueOnce({ ...backendDeal, organization_id: null });
@@ -112,6 +112,46 @@ describe('deal API', () => {
         organization_id: null,
       }),
     );
+  });
+
+  it('omits absent legacy update fields and sends explicit clears intentionally', async () => {
+    invokeMock.mockResolvedValueOnce(backendDeal);
+
+    await updateDeal('deal-1', { name: 'Clinic expansion' });
+
+    let args = invokeMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(args).not.toHaveProperty('expected_close');
+    expect(args).not.toHaveProperty('contact_id');
+
+    invokeMock.mockReset();
+    invokeMock.mockResolvedValueOnce({ ...backendDeal, expected_close: null, contact_id: null });
+
+    await updateDeal('deal-1', {
+      expectedCloseDate: null,
+      contactId: null,
+    });
+
+    args = invokeMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(args).toMatchObject({
+      id: 'deal-1',
+      expected_close: null,
+      contact_id: null,
+    });
+
+    invokeMock.mockReset();
+    invokeMock.mockResolvedValueOnce({ ...backendDeal, expected_close: null, contact_id: null });
+
+    await updateDeal('deal-1', {
+      expectedCloseDate: '   ',
+      contactId: '   ',
+    });
+
+    args = invokeMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(args).toMatchObject({
+      id: 'deal-1',
+      expected_close: '   ',
+      contact_id: '   ',
+    });
   });
 
   it('maps linkDealToOrganization to link_deal_to_organization', async () => {
