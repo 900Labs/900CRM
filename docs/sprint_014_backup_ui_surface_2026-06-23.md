@@ -30,7 +30,7 @@ Branch: `codex/backup-ui-surface-preserve`
 
 ## Validation
 - `npm run check` -> passed, `svelte-check found 0 errors and 0 warnings`
-- `npm run test` -> passed, `src/lib/api/backup.test.ts` 3 tests passed
+- `npm run test` -> passed, `src/lib/api/backup.test.ts` 4 tests passed
 - `npm run build` -> passed
 - `CARGO_TARGET_DIR=/Volumes/T7/Code/Codex/900CRM-targets/backup-ui-surface-preserve cargo fmt --all -- --check` -> passed
 - `CARGO_TARGET_DIR=/Volumes/T7/Code/Codex/900CRM-targets/backup-ui-surface-preserve cargo check --workspace` -> passed
