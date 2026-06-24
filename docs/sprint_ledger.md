@@ -41,3 +41,4 @@
 | 037 | 2026-06-24 | `codex/external-client-permissions-core-surface` | External-client permission row storage and core evaluation for read/draft access with proposed-action draft gating and no UI/Tauri/MCP behavior | Completed |
 | 038 | 2026-06-24 | `codex/external-client-permissions-api-surface` | Thin Tauri commands and typed frontend API wrappers/tests for external-client permission listing, upsert, and read/draft evaluation without UI work | Completed |
 | 039 | 2026-06-24 | `codex/mcp-readiness-docs-baseline` | Documentation-only MCP readiness baseline covering placeholder status, active readiness surfaces, non-goals, security gates, and future acceptance checklist | Completed |
+| 040 | 2026-06-24 | `codex/required-docs-baseline` | Documentation-only required public baseline for data model, import/export, and privacy docs with narrow README/architecture links | Completed |
