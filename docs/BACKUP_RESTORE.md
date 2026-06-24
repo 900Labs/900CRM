@@ -18,7 +18,12 @@ Backup creation refuses to overwrite an existing `900crm.db` or `metadata.json` 
 3. Select `Create Backup`.
 4. Move the completed backup folder to durable storage, such as an encrypted external drive, if the machine is at risk.
 
-Backups are local files. 900CRM does not upload them, sync them, or send them to any 900 Labs service.
+Backups are local files. 900CRM does not upload them, sync them, send them to
+any 900 Labs service, or encrypt the backup folder.
+
+The Settings Data Management backup panel warns before backup actions that
+local backup folders are unencrypted local files. Store backup folders
+containing sensitive data in a trusted or encrypted location.
 
 ## Validate a backup
 
