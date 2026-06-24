@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global fetch, window, HashChangeEvent, document */
 
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
