@@ -1,8 +1,8 @@
-//! CSV import and export helpers for contacts, deals, and organizations.
+//! Flat import/export row helpers for contacts, deals, and organizations.
 //!
-//! This module provides utilities for reading and writing CSV files used in the
-//! 900CRM import/export feature. It wraps the [`csv`] crate and maps between
-//! CSV rows and the application's domain structs.
+//! This module provides utilities for reading and writing CSV files and parsing
+//! JSON arrays used in the 900CRM import/export feature. It wraps the [`csv`]
+//! crate for CSV operations and reuses the same flat row structs for JSON.
 //!
 //! # Contact CSV Format
 //!
@@ -48,7 +48,8 @@
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::utils::errors::{CrmError, CrmResult};
 
@@ -482,6 +483,99 @@ pub fn parse_organizations_csv_with_mapping<R: Read>(
 
     log::info!("Parsed {} mapped organization rows from CSV", rows.len());
     Ok(rows)
+}
+
+/// Parses contact JSON data from a top-level array of flat row objects.
+///
+/// Row numbers are reported with the same data-row offset as CSV imports:
+/// the first JSON array item is row 2.
+pub fn parse_contacts_json_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, ContactCsvRow)>> {
+    parse_json_rows_with_row_numbers::<ContactCsvRow, _>(
+        parse_json_array_rows(reader)?,
+        "contact",
+        "first_name",
+        |row| row.first_name.trim().is_empty(),
+    )
+}
+
+/// Parses deal JSON data from a top-level array of flat row objects.
+///
+/// Row numbers are reported with the same data-row offset as CSV imports:
+/// the first JSON array item is row 2.
+pub fn parse_deals_json_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, DealCsvRow)>> {
+    parse_json_rows_with_row_numbers::<DealCsvRow, _>(
+        parse_json_array_rows(reader)?,
+        "deal",
+        "title",
+        |row| row.title.trim().is_empty(),
+    )
+}
+
+/// Parses organization JSON data from a top-level array of flat row objects.
+///
+/// Row numbers are reported with the same data-row offset as CSV imports:
+/// the first JSON array item is row 2.
+pub fn parse_organizations_json_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, OrganizationCsvRow)>> {
+    parse_json_rows_with_row_numbers::<OrganizationCsvRow, _>(
+        parse_json_array_rows(reader)?,
+        "organization",
+        "name",
+        |row| row.name.trim().is_empty(),
+    )
+}
+
+fn parse_json_array_rows<R: Read>(reader: R) -> CrmResult<Vec<Value>> {
+    let json: Value = serde_json::from_reader(reader)?;
+    match json {
+        Value::Array(rows) => Ok(rows),
+        _ => Err(CrmError::InvalidInput(
+            "JSON import expects a top-level array of objects".to_string(),
+        )),
+    }
+}
+
+fn parse_json_rows_with_row_numbers<T, F>(
+    rows: Vec<Value>,
+    entity_label: &str,
+    required_field: &str,
+    is_blank_required: F,
+) -> CrmResult<Vec<(usize, T)>>
+where
+    T: DeserializeOwned,
+    F: Fn(&T) -> bool,
+{
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.into_iter().enumerate() {
+        let row_number = index + 2;
+        if !value.is_object() {
+            return Err(CrmError::InvalidInput(format!(
+                "JSON row {} must be an object",
+                row_number
+            )));
+        }
+
+        let row: T = serde_json::from_value(value)
+            .map_err(|e| CrmError::InvalidInput(format!("JSON row {}: {}", row_number, e)))?;
+        if is_blank_required(&row) {
+            log::debug!("Skipping JSON row with blank {}", required_field);
+            continue;
+        }
+        parsed_rows.push((row_number, row));
+    }
+
+    log::info!(
+        "Parsed {} {} rows from JSON",
+        parsed_rows.len(),
+        entity_label
+    );
+    Ok(parsed_rows)
 }
 
 fn validate_import_mapping(

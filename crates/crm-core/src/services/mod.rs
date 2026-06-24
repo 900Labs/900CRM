@@ -29,10 +29,12 @@ use crate::storage::{
 use crate::utils::{
     csv::{
         parse_contacts_csv_with_mapping, parse_contacts_csv_with_row_numbers,
-        parse_deals_csv_with_mapping, parse_deals_csv_with_row_numbers,
+        parse_contacts_json_with_row_numbers, parse_deals_csv_with_mapping,
+        parse_deals_csv_with_row_numbers, parse_deals_json_with_row_numbers,
         parse_organizations_csv_with_mapping, parse_organizations_csv_with_row_numbers,
-        write_contacts_csv, write_deals_csv, write_organizations_csv, ContactCsvRow, DealCsvRow,
-        ImportColumnMapping, OrganizationCsvRow,
+        parse_organizations_json_with_row_numbers, write_contacts_csv, write_deals_csv,
+        write_organizations_csv, ContactCsvRow, DealCsvRow, ImportColumnMapping,
+        OrganizationCsvRow,
     },
     datetime::now_iso8601,
     errors::{CrmError, CrmResult as InternalCrmResult},
@@ -751,6 +753,12 @@ impl CrmCore {
         self.import_contact_rows(rows)
     }
 
+    pub fn import_contacts_json(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_contacts_json_with_row_numbers(file_content.as_slice())?;
+        self.import_contact_rows(rows)
+    }
+
     fn import_contact_rows(
         &mut self,
         rows: Vec<(usize, ContactCsvRow)>,
@@ -925,6 +933,12 @@ impl CrmCore {
         self.import_deal_rows(rows)
     }
 
+    pub fn import_deals_json(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_deals_json_with_row_numbers(file_content.as_slice())?;
+        self.import_deal_rows(rows)
+    }
+
     fn import_deal_rows(&mut self, rows: Vec<(usize, DealCsvRow)>) -> CrmResult<ImportResult> {
         let mut created = 0u32;
         let mut skipped = 0u32;
@@ -1059,6 +1073,12 @@ impl CrmCore {
     ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_organizations_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_organization_rows(rows)
+    }
+
+    pub fn import_organizations_json(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_organizations_json_with_row_numbers(file_content.as_slice())?;
         self.import_organization_rows(rows)
     }
 

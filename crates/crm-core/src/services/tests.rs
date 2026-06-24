@@ -2518,6 +2518,253 @@ fn import_organizations_csv_creates_valid_rows_and_skips_blank_names() {
 }
 
 #[test]
+fn import_contacts_json_creates_rows_skips_blank_first_names_and_reports_row_errors() {
+    let (mut core, path) = open_test_core();
+    let json_path = path.join("contacts.json");
+    std::fs::write(
+        &json_path,
+        r#"[
+  {
+    "first_name": "Ada",
+    "last_name": "Lovelace",
+    "org_name": "Analytical Engines",
+    "email": "ada@example.com",
+    "phone": "+15550123",
+    "address": "1 Example Street",
+    "city": "London",
+    "country": "UK",
+    "notes": "Prefers email"
+  },
+  {
+    "first_name": "   ",
+    "email": "blank@example.com"
+  },
+  {
+    "first_name": "Invalid",
+    "email": "invalid-email"
+  }
+]
+"#,
+    )
+    .expect("contact JSON fixture should write");
+
+    let result = core
+        .import_contacts_json(json_path.to_str().expect("path should be valid UTF-8"))
+        .expect("contact JSON import should complete with row-level errors");
+
+    assert_eq!(result.created, 1);
+    assert_eq!(result.skipped, 1);
+    assert_eq!(result.errors.len(), 1);
+    assert!(result.errors[0].contains("Row 4:"));
+    assert!(result.errors[0].contains("invalid-email"));
+
+    let imported: (
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    ) = core
+        .db
+        .conn
+        .query_row(
+            "SELECT first_name, last_name, org_name, email, phone, address, city, country, notes FROM contacts WHERE email = ?1",
+            params!["ada@example.com"],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
+                    row.get(8)?,
+                ))
+            },
+        )
+        .expect("imported JSON contact should query");
+    assert_eq!(
+        imported,
+        (
+            "Ada".to_string(),
+            "Lovelace".to_string(),
+            "Analytical Engines".to_string(),
+            "ada@example.com".to_string(),
+            "+15550123".to_string(),
+            "1 Example Street".to_string(),
+            "London".to_string(),
+            "UK".to_string(),
+            "Prefers email".to_string(),
+        )
+    );
+
+    let import_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE actor_type = 'import' AND action = 'import_row' AND entity_type = 'contact'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("contact import audit count should query");
+    assert_eq!(import_audit_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_deals_json_creates_valid_rows_and_skips_blank_titles() {
+    let (mut core, path) = open_test_core();
+    let json_path = path.join("deals.json");
+    std::fs::write(
+        &json_path,
+        r#"[
+  {
+    "title": "Acme Renewal",
+    "value": "12500.50",
+    "currency": "EUR",
+    "stage": "Proposal",
+    "expected_close": "2026-09-30",
+    "notes": "Renewal path"
+  },
+  {
+    "title": "  ",
+    "value": "2500",
+    "currency": "USD"
+  }
+]
+"#,
+    )
+    .expect("deal JSON fixture should write");
+
+    let result = core
+        .import_deals_json(json_path.to_str().expect("path should be valid UTF-8"))
+        .expect("deal JSON import should succeed");
+
+    assert_eq!(result.created, 1);
+    assert_eq!(result.skipped, 0);
+    assert!(result.errors.is_empty());
+
+    let deals = core
+        .list_deals()
+        .expect("deals should list after JSON import");
+    assert_eq!(deals.len(), 1);
+    assert_eq!(deals[0].title, "Acme Renewal");
+    assert_eq!(deals[0].value, 12500.50);
+    assert_eq!(deals[0].currency, "EUR");
+    assert_eq!(deals[0].stage, "Proposal");
+    assert_eq!(deals[0].expected_close.as_deref(), Some("2026-09-30"));
+    assert_eq!(deals[0].notes, "Renewal path");
+    assert_eq!(deals[0].contact_id, None);
+    assert_eq!(deals[0].organization_id, None);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_organizations_json_creates_valid_rows_and_skips_blank_names() {
+    let (mut core, path) = open_test_core();
+    let json_path = path.join("organizations.json");
+    std::fs::write(
+        &json_path,
+        r#"[
+  {
+    "name": "Acme Health",
+    "email": "hello@acme.example",
+    "phone": "+123456",
+    "website": "https://acme.example",
+    "address_line1": "Dock 4",
+    "address_line2": "Suite 9",
+    "city": "Lagos",
+    "region": "Lagos State",
+    "country": "NG",
+    "postal_code": "100001",
+    "description": "Regional partner"
+  },
+  {
+    "name": "",
+    "email": "blank@example.com"
+  }
+]
+"#,
+    )
+    .expect("organization JSON fixture should write");
+
+    let result = core
+        .import_organizations_json(json_path.to_str().expect("path should be valid UTF-8"))
+        .expect("organization JSON import should succeed");
+
+    assert_eq!(result.created, 1);
+    assert_eq!(result.skipped, 0);
+    assert!(result.errors.is_empty());
+
+    let organizations = core
+        .list_organizations()
+        .expect("organizations should list after JSON import");
+    assert_eq!(organizations.len(), 1);
+    assert_eq!(organizations[0].name, "Acme Health");
+    assert_eq!(
+        organizations[0].email.as_deref(),
+        Some("hello@acme.example")
+    );
+    assert_eq!(organizations[0].phone.as_deref(), Some("+123456"));
+    assert_eq!(
+        organizations[0].website.as_deref(),
+        Some("https://acme.example")
+    );
+    assert_eq!(organizations[0].address_line1.as_deref(), Some("Dock 4"));
+    assert_eq!(organizations[0].address_line2.as_deref(), Some("Suite 9"));
+    assert_eq!(organizations[0].city.as_deref(), Some("Lagos"));
+    assert_eq!(organizations[0].region.as_deref(), Some("Lagos State"));
+    assert_eq!(organizations[0].country.as_deref(), Some("NG"));
+    assert_eq!(organizations[0].postal_code.as_deref(), Some("100001"));
+    assert_eq!(
+        organizations[0].description.as_deref(),
+        Some("Regional partner")
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_contacts_json_reports_row_number_for_non_object_rows() {
+    let (mut core, path) = open_test_core();
+    let json_path = path.join("contacts-invalid-row.json");
+    std::fs::write(
+        &json_path,
+        r#"[
+  { "first_name": "Ada" },
+  42
+]
+"#,
+    )
+    .expect("invalid contact JSON fixture should write");
+
+    let err = core
+        .import_contacts_json(json_path.to_str().expect("path should be valid UTF-8"))
+        .expect_err("non-object JSON rows should be rejected");
+
+    match err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("JSON row 3 must be an object"));
+        }
+        other => panic!("expected InvalidInput for non-object JSON row, got {other:?}"),
+    }
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn import_contacts_csv_with_mapping_imports_nonstandard_headers() {
     let (mut core, path) = open_test_core();
     let csv_path = path.join("contacts-mapped.csv");

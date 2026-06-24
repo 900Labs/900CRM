@@ -17,6 +17,7 @@
   import {
     exportData,
     importCsv,
+    importData,
     importContactsCsvWithMapping,
     importDealsCsvWithMapping,
     importOrganizationsCsvWithMapping,
@@ -26,6 +27,7 @@
     type ExportFormat,
     type ContactImportTargetField,
     type DealImportTargetField,
+    type ImportFormat,
     type ImportExportEntity,
     type ImportPreflightReport,
     type ImportResult,
@@ -53,6 +55,7 @@
   let isImporting = $state(false);
   let isPreflighting = $state(false);
   let importEntity = $state<ImportExportEntity>('contacts');
+  let importFormat = $state<ImportFormat>('csv');
   let importStep = $state<ImportStep>('select');
   let columnMapping = $state<ColumnMapping>({});
   let validationErrors = $state<string[]>([]);
@@ -62,6 +65,11 @@
   let exportEntity = $state<ImportExportEntity>('contacts');
   let exportFormat = $state<ExportFormat>('csv');
   let isExporting = $state(false);
+
+  const importDialogMetadata: Record<ImportFormat, { extension: string; filterName: string }> = {
+    csv: { extension: 'csv', filterName: 'CSV' },
+    json: { extension: 'json', filterName: 'JSON' },
+  };
 
   const exportDialogMetadata: Record<ExportFormat, { defaultExtension: string; filterName: string }> = {
     csv: { defaultExtension: 'csv', filterName: 'CSV' },
@@ -73,17 +81,21 @@
   const isMappedImport = $derived(
     importEntity === 'contacts' || importEntity === 'deals' || importEntity === 'organizations',
   );
+  const isCsvImport = $derived(importFormat === 'csv');
+  const isJsonImport = $derived(importFormat === 'json');
+  const showCsvWizard = $derived(isCsvImport && isMappedImport);
   const mappedEntity = $derived(isMappedImport ? (importEntity as MappedImportEntity) : null);
   const importFieldOptions = $derived(mappedEntity ? getImportFieldOptions(mappedEntity) : []);
-  const canUseMappedCommands = $derived(Boolean(fileSource === 'desktop' && selectedImportPath));
-  const fallbackImportBlocked = $derived(isMappedImport && fileSource === 'browser');
+  const canUseMappedCommands = $derived(Boolean(isCsvImport && fileSource === 'desktop' && selectedImportPath));
+  const fallbackImportBlocked = $derived(showCsvWizard && fileSource === 'browser');
   const duplicateWarnings = $derived(preflightReport?.warnings ?? []);
 
   async function handleFilePick() {
     try {
       const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
+      const dialogMetadata = importDialogMetadata[importFormat];
       const selected = await openDialog({
-        filters: [{ name: 'CSV', extensions: ['csv'] }],
+        filters: [{ name: dialogMetadata.filterName, extensions: [dialogMetadata.extension] }],
         multiple: false,
       });
 
@@ -91,15 +103,28 @@
         return;
       }
 
+      if (isJsonImport) {
+        loadSelectedJson(selected, selected);
+        return;
+      }
+
       const { readTextFile } = await import('@tauri-apps/plugin-fs');
       const text = await readTextFile(selected);
       loadSelectedCsv(text, selected, selected, 'desktop');
     } catch {
-      document.getElementById('csv-file-input')?.click();
+      if (isCsvImport) {
+        document.getElementById('csv-file-input')?.click();
+      } else {
+        uiStore.toastError(t('import.failed'));
+      }
     }
   }
 
   function handleFileInputChange(e: Event) {
+    if (!isCsvImport) {
+      return;
+    }
+
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) {
       return;
@@ -115,7 +140,12 @@
 
   function handleImportEntityChange(e: Event) {
     importEntity = (e.target as HTMLSelectElement).value as ImportExportEntity;
-    resetImportState({ keepEntity: true });
+    resetImportState({ keepEntity: true, keepFormat: true });
+  }
+
+  function handleImportFormatChange(e: Event) {
+    importFormat = (e.target as HTMLSelectElement).value as ImportFormat;
+    resetImportState({ keepEntity: true, keepFormat: true });
   }
 
   function loadSelectedCsv(text: string, label: string, path: string | null, source: FileSource) {
@@ -136,7 +166,20 @@
     }
   }
 
-  function resetImportState(options: { keepEntity?: boolean } = {}) {
+  function loadSelectedJson(label: string, path: string) {
+    csvText = '';
+    parseResult = null;
+    selectedImportLabel = label;
+    selectedImportPath = path;
+    fileSource = 'desktop';
+    preflightReport = null;
+    importSummary = null;
+    validationErrors = [];
+    columnMapping = {};
+    importStep = 'select';
+  }
+
+  function resetImportState(options: { keepEntity?: boolean; keepFormat?: boolean } = {}) {
     csvText = '';
     parseResult = null;
     selectedImportPath = null;
@@ -152,6 +195,10 @@
 
     if (!options.keepEntity) {
       importEntity = 'contacts';
+    }
+
+    if (!options.keepFormat) {
+      importFormat = 'csv';
     }
   }
 
@@ -206,6 +253,31 @@
 
       close();
     } catch {
+      uiStore.toastError(t('import.failed'));
+    } finally {
+      isImporting = false;
+    }
+  }
+
+  async function handleJsonImport() {
+    if (!selectedImportPath) {
+      uiStore.toastError(t('import.chooseFile'));
+      return;
+    }
+
+    isImporting = true;
+    validationErrors = [];
+    try {
+      importSummary = await importData(importEntity, 'json', selectedImportPath);
+      importStep = 'summary';
+
+      if (importSummary.skipped > 0) {
+        uiStore.toastWarning(`${t('import.success')} (${importSummary.created} created, ${importSummary.skipped} skipped)`);
+      } else {
+        uiStore.toastSuccess(`${t('import.success')} (${importSummary.created})`);
+      }
+    } catch {
+      validationErrors = [t('import.failed')];
       uiStore.toastError(t('import.failed'));
     } finally {
       isImporting = false;
@@ -407,7 +479,15 @@
               </select>
             </div>
 
-            {#if isMappedImport}
+            <div class="form-group">
+              <label class="form-label" for="import-format">{t('export.format')}</label>
+              <select id="import-format" class="select" value={importFormat} onchange={handleImportFormatChange}>
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+              </select>
+            </div>
+
+            {#if showCsvWizard}
               <ol class="wizard-steps" aria-label={t('import.wizardProgress')}>
                 <li class:active={importStep === 'select'} class:complete={importStep !== 'select'}>{t('import.stepSelect')}</li>
                 <li class:active={importStep === 'preview'} class:complete={['mapping', 'duplicates', 'confirm', 'summary'].includes(importStep)}>{t('import.stepPreview')}</li>
@@ -418,7 +498,7 @@
               </ol>
             {/if}
 
-            {#if !isMappedImport || importStep === 'select'}
+            {#if !showCsvWizard || importStep === 'select'}
               <div class="form-group">
                 <label class="form-label" for="import-file-button">{t('import.chooseFile')}</label>
                 <button id="import-file-button" class="btn btn-secondary" onclick={handleFilePick} type="button">
@@ -443,7 +523,7 @@
               </div>
             {/if}
 
-            {#if parseResult && (!isMappedImport || importStep === 'preview')}
+            {#if parseResult && (!showCsvWizard || importStep === 'preview')}
               <p class="import-stats">
                 {t('import.rowCount', { count: parseResult.count })}
                 {#if parseResult.warnings.length > 0}
@@ -478,7 +558,7 @@
               {/if}
             {/if}
 
-            {#if isMappedImport && parseResult && importStep === 'mapping'}
+            {#if showCsvWizard && parseResult && importStep === 'mapping'}
               <div class="mapping-panel">
                 <div class="mapping-header">
                   <span>{t('import.columnMapping')}</span>
@@ -535,7 +615,7 @@
               </div>
             {/if}
 
-            {#if isMappedImport && importStep === 'duplicates'}
+            {#if showCsvWizard && importStep === 'duplicates'}
               <div class="duplicate-panel">
                 <p class="import-stats">
                   {t('import.duplicateWarningCount', { count: preflightReport?.duplicate_warning_count ?? 0 })}
@@ -571,7 +651,7 @@
               </div>
             {/if}
 
-            {#if isMappedImport && importStep === 'confirm'}
+            {#if showCsvWizard && importStep === 'confirm'}
               <div class="confirm-panel">
                 <p class="import-stats">
                   {t('import.confirmRows', { count: preflightReport?.total_rows ?? parseResult?.count ?? 0 })}
@@ -591,7 +671,7 @@
               </div>
             {/if}
 
-            {#if isMappedImport && importStep === 'summary' && importSummary}
+            {#if importStep === 'summary' && importSummary}
               <div class="summary-panel">
                 <div class="summary-grid">
                   <div>
@@ -640,11 +720,11 @@
       </div>
 
       <div class="modal-footer">
-        {#if activeTab === 'import' && isMappedImport && importStep !== 'select' && importStep !== 'summary'}
+        {#if activeTab === 'import' && showCsvWizard && importStep !== 'select' && importStep !== 'summary'}
           <button class="btn btn-secondary" onclick={backFromCurrentStep} type="button" disabled={isImporting || isPreflighting}>
             {t('common.back')}
           </button>
-        {:else if activeTab === 'import' && isMappedImport && importStep === 'summary'}
+        {:else if activeTab === 'import' && importStep === 'summary'}
           <button class="btn btn-secondary" onclick={doneImport} type="button">
             {t('common.close')}
           </button>
@@ -655,7 +735,18 @@
         {/if}
 
         {#if activeTab === 'import'}
-          {#if !isMappedImport}
+          {#if isJsonImport}
+            {#if importStep !== 'summary'}
+              <button
+                class="btn btn-primary"
+                onclick={handleJsonImport}
+                disabled={!selectedImportPath || isImporting}
+                type="button"
+              >
+                {isImporting ? t('import.importing') : t('import.importButton')}
+              </button>
+            {/if}
+          {:else if !isMappedImport}
             <button
               class="btn btn-primary"
               onclick={handleLegacyImport}
