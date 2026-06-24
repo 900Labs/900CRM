@@ -87,7 +87,9 @@ jobs:
         run: npm ci
 
       - name: Build Tauri bundles
-        run: npm run tauri -- build --bundles ${{ matrix.bundles }}
+        env:
+          CI: true
+        run: npm run tauri -- build -- --bundles ${{ matrix.bundles }}
 
       - name: Generate release metadata, checksums, and SBOM
         env:
@@ -97,7 +99,7 @@ jobs:
           release_title="${RELEASE_TITLE:-900CRM ${RELEASE_VERSION}}"
 
           node scripts/generate-release-manifest.mjs \
-            --artifact-dir apps/desktop/src-tauri/target/release/bundle \
+            --artifact-dir target/release/bundle \
             --out-dir release-assets/${{ matrix.platform }} \
             --platform ${{ matrix.platform }} \
             --release-version "$RELEASE_VERSION" \
@@ -112,14 +114,14 @@ jobs:
           name: 900crm-${{ inputs.release_version }}-${{ matrix.platform }}-packages
           if-no-files-found: error
           path: |
-            apps/desktop/src-tauri/target/release/bundle/**/*.msi
-            apps/desktop/src-tauri/target/release/bundle/**/*.exe
-            apps/desktop/src-tauri/target/release/bundle/**/*.dmg
-            apps/desktop/src-tauri/target/release/bundle/**/*.deb
-            apps/desktop/src-tauri/target/release/bundle/**/*.AppImage
-            apps/desktop/src-tauri/target/release/bundle/**/*.rpm
-            apps/desktop/src-tauri/target/release/bundle/**/*.tar.gz
-            apps/desktop/src-tauri/target/release/bundle/**/*.zip
+            target/release/bundle/**/*.msi
+            target/release/bundle/**/*.exe
+            target/release/bundle/**/*.dmg
+            target/release/bundle/**/*.deb
+            target/release/bundle/**/*.AppImage
+            target/release/bundle/**/*.rpm
+            target/release/bundle/**/*.tar.gz
+            target/release/bundle/**/*.zip
 
       - name: Upload release metadata artifacts
         uses: actions/upload-artifact@v7

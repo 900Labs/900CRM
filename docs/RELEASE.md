@@ -87,7 +87,7 @@ by dispatching the `Manual Release Packaging` workflow with:
 The workflow produces two artifact groups for each platform:
 
 - desktop packages built by Tauri under
-  `apps/desktop/src-tauri/target/release/bundle`;
+  `target/release/bundle`;
 - release metadata from `scripts/generate-release-manifest.mjs`, including
   `*-SHA256SUMS.txt`, `*-release-metadata.json`, and `*-sbom.spdx.json`.
 

@@ -6,15 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const defaultArtifactDir = path.join(
-  repoRoot,
-  'apps',
-  'desktop',
-  'src-tauri',
-  'target',
-  'release',
-  'bundle'
-);
+const defaultArtifactDir = path.join(repoRoot, 'target', 'release', 'bundle');
 const releaseArtifactSuffixes = [
   '.msi',
   '.exe',
@@ -25,6 +17,7 @@ const releaseArtifactSuffixes = [
   '.tar.gz',
   '.zip'
 ];
+const ignoredReleaseArtifactPrefixes = ['rw.'];
 
 const args = parseArgs(process.argv.slice(2));
 if (args.has('help') || args.has('h')) {
@@ -187,7 +180,7 @@ Options:
 Examples:
   node scripts/generate-release-manifest.mjs --help
   node scripts/generate-release-manifest.mjs --sample --out-dir /tmp/900crm-release-sample --platform local
-  node scripts/generate-release-manifest.mjs --artifact-dir apps/desktop/src-tauri/target/release/bundle --out-dir release-assets/linux --platform linux --release-version 1.0.0
+  node scripts/generate-release-manifest.mjs --artifact-dir target/release/bundle --out-dir release-assets/linux --platform linux --release-version 1.0.0
 `);
 }
 
@@ -304,6 +297,11 @@ function readFileSystemDir(dirPath) {
 }
 
 function isReleaseArtifact(filePath) {
+  const fileName = path.basename(filePath);
+  if (ignoredReleaseArtifactPrefixes.some((prefix) => fileName.startsWith(prefix))) {
+    return false;
+  }
+
   return releaseArtifactSuffixes.some((suffix) => filePath.endsWith(suffix));
 }
 
