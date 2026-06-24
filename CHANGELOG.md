@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added — 2026-06-24
+- Added release-readiness documentation that states the current verification-only
+  CI status, manual release checklist, required future artifacts, and release
+  packaging boundaries.
+- Added small synthetic contact and organization CSV samples for manual import
+  smoke testing.
+
+### Changed — 2026-06-24
+- Updated public release wording so README and changelog text no longer claim
+  published installers, multi-OS release CI, or automated release builds exist
+  today.
+
 ### Added — 2026-03-05
 - Added a global modal host component that centralizes create flows for contacts, deals, and activities from any route.
 - Wired root layout rendering for global modal support so dashboard, pipeline, contacts, and detail-page quick actions execute consistently.
@@ -68,11 +80,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
-## [1.0.0] — March 2026
+## [1.0.0] — Planned
 
 ### Summary
 
-The initial release of 900CRM — a free, open-source, offline-first desktop CRM built with Tauri v2 (Rust), Svelte 5, and SQLite. Designed for small businesses, NGOs, and sales teams in developing nations who need reliable CRM tooling without cloud dependencies, per-seat subscription costs, or reliable internet access.
+The planned initial release of 900CRM is a free, open-source, offline-first desktop CRM built with Tauri v2 (Rust), Svelte 5, and SQLite. It is designed for small businesses, NGOs, and sales teams that need reliable CRM tooling without cloud dependencies, per-seat subscription costs, or reliable internet access.
+
+As of 2026-06-24, public release installers have not been published. See
+[Release Readiness](docs/RELEASE.md) for the current verification-only CI status
+and the future packaging checklist.
 
 ---
 
@@ -103,7 +119,6 @@ The initial release of 900CRM — a free, open-source, offline-first desktop CRM
 - Activity feed sorted by due date with overdue highlighting
 - Filter activities by type, status (open/complete), contact, or deal
 - Bulk mark activities complete
-- Export activities to CSV
 
 #### Dashboard
 - At-a-glance metrics panel on application launch
@@ -125,7 +140,7 @@ The initial release of 900CRM — a free, open-source, offline-first desktop CRM
 - CSV import for contacts: supports standard exports from Salesforce, HubSpot, Google Contacts, and generic CSV
 - Field mapping interface for non-standard column names
 - Duplicate detection on import (by email address)
-- Export any entity type (contacts, deals, activities) to CSV
+- Export supported CSV entity types: contacts, deals, and organizations
 - All import/export operations run entirely offline
 
 #### Internationalization
@@ -152,17 +167,17 @@ The initial release of 900CRM — a free, open-source, offline-first desktop CRM
 - Memory usage under 80 MB at idle
 - Optimized for hardware from 2015 onward (dual-core, 4 GB RAM)
 
-#### Platform Support
-- Windows 10 and later (x64) — `.msi` installer
-- macOS 11 (Big Sur) and later — Intel x64 and Apple Silicon ARM64 — `.dmg`
-- Linux — `.deb` (Debian/Ubuntu 20.04+) and `.AppImage` (universal)
+#### Platform Support Targets
+- Windows 10 and later (x64) — future `.msi` or `.exe` installer
+- macOS 11 (Big Sur) and later — Intel x64 and Apple Silicon ARM64 — future `.dmg`
+- Linux — future `.deb` (Debian/Ubuntu 20.04+) and `.AppImage` (universal)
 
 #### Developer / Community
 - Full source code under Apache License 2.0
 - Rust backend with complete `///` doc comments on all public APIs
 - Svelte 5 frontend with typed props and component documentation headers
-- GitHub Actions CI pipeline running on Ubuntu, Windows, and macOS
-- Automated release builds on version tags
+- GitHub Actions CI pipeline running verification checks on Ubuntu
+- Automated release builds on version tags are not implemented yet
 - Community issue templates (bug report, feature request)
 - Contributor guide ([CONTRIBUTING.md](CONTRIBUTING.md))
 - Architecture guide ([ARCHITECTURE.md](ARCHITECTURE.md))
@@ -180,5 +195,5 @@ This project uses [Semantic Versioning](https://semver.org/):
 
 Pre-release versions use a suffix: `1.1.0-alpha.1`, `1.1.0-beta.2`, `1.1.0-rc.1`.
 
-[Unreleased]: https://github.com/900-labs/900crm/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/900-labs/900crm/releases/tag/v1.0.0
+[Unreleased]: https://github.com/900-labs/900crm/commits/main
+[1.0.0]: docs/RELEASE.md

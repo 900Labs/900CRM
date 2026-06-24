@@ -10,7 +10,7 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/900-labs/900crm/ci.yml?branch=main)](https://github.com/900-labs/900crm/actions)
-[![Platform: Windows | macOS | Linux](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/900-labs/900crm/releases)
+[![Release Status: source only](https://img.shields.io/badge/Release%20Status-source%20only-yellow.svg)](docs/RELEASE.md)
 [![Languages: 10](https://img.shields.io/badge/Languages-10-brightgreen.svg)](https://github.com/900-labs/900crm#language-support)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
@@ -33,7 +33,7 @@ Learn more at [900labs.com/impact](https://www.900labs.com/impact).
 
 ## What is 900CRM?
 
-900CRM is the second tool from [900 Labs](https://www.900labs.com) — a free, open-source desktop CRM (Customer Relationship Management) application designed to work entirely offline. No internet connection required, ever. Built with [Tauri v2](https://tauri.app/) (Rust) and [Svelte 5](https://svelte.dev/), it runs on Windows, macOS, and Linux with a small installer footprint and low hardware requirements.
+900CRM is the second tool from [900 Labs](https://www.900labs.com) — a free, open-source desktop CRM (Customer Relationship Management) application designed to work entirely offline. No internet connection required, ever. Built with [Tauri v2](https://tauri.app/) (Rust) and [Svelte 5](https://svelte.dev/), it targets Windows, macOS, and Linux with low hardware requirements. Pre-built release installers are not published yet; see [Release Readiness](docs/RELEASE.md) for the current status.
 
 900CRM is built especially for:
 - **Small businesses and entrepreneurs** in regions with unreliable connectivity
@@ -132,7 +132,7 @@ PWAs have limited offline write capabilities, especially on iOS. Service Worker 
 
 ## Quick Start
 
-This section walks you through getting 900CRM running locally for development. To **use** 900CRM, download the installer from the [Releases page](https://github.com/900-labs/900crm/releases).
+This section walks you through getting 900CRM running locally for development. Pre-built installers are not published yet, so current evaluation starts from source. See [Release Readiness](docs/RELEASE.md) for the release checklist and packaging gaps.
 
 ### Prerequisites
 
@@ -217,18 +217,24 @@ The E2E smoke suite runs the Vite-rendered browser shell with Playwright Chromiu
 
 ---
 
-## Download
+## Release Status
 
-Pre-built installers are available on the [Releases page](https://github.com/900-labs/900crm/releases).
+900CRM does not currently publish pre-built installers or GitHub release
+artifacts. Current CI is verification-only and does not build Windows, macOS, or
+Linux packages.
 
-| Platform | Installer | Minimum OS |
+The intended future release artifacts are:
+
+| Platform | Future artifact | Minimum target |
 |---|---|---|
-| **Windows** | `.msi` installer | Windows 10 (1803+) |
+| **Windows** | `.msi` or `.exe` installer | Windows 10 (1803+) |
 | **macOS** | `.dmg` disk image | macOS 11 Big Sur (Intel & Apple Silicon) |
 | **Linux** | `.deb` package | Ubuntu 20.04 / Debian 11 |
 | **Linux** | `.AppImage` | Any modern Linux distribution |
 
-The installer is self-contained and does not require an internet connection to install. You can distribute it on a USB drive.
+See [Release Readiness](docs/RELEASE.md) for the manual verification checklist,
+required future checksums/SBOM/release notes, and the explicit not-yet-implemented
+release-packaging boundaries.
 
 ---
 
@@ -283,7 +289,7 @@ To add a new language or improve an existing translation, see the [Translation G
 
 For a deep dive into the module structure, data flow, sync protocol, and design decisions, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
-Current implementation baselines are documented in [Data Model](docs/DATA_MODEL.md), [Import and Export](docs/IMPORT_EXPORT.md), [Privacy](docs/PRIVACY.md), and [MCP Readiness](docs/MCP_READINESS.md).
+Current implementation baselines are documented in [Data Model](docs/DATA_MODEL.md), [Import and Export](docs/IMPORT_EXPORT.md), [Privacy](docs/PRIVACY.md), [MCP Readiness](docs/MCP_READINESS.md), and [Release Readiness](docs/RELEASE.md).
 
 ---
 
@@ -337,7 +343,9 @@ Current implementation baselines are documented in [Data Model](docs/DATA_MODEL.
 │   ├── IMPORT_EXPORT.md          # Current CSV import/export behavior
 │   ├── PRIVACY.md                # Offline-first privacy and caveats
 │   ├── MCP_READINESS.md          # Current optional-MCP readiness boundary
+│   ├── RELEASE.md                # Current release status and future artifact checklist
 │   └── BACKUP_RESTORE.md         # Local backup and restore workflow
+├── samples/                      # Synthetic CSV data for manual import smoke tests
 ├── .github/
 │   ├── workflows/
 │   │   └── ci.yml                # Ubuntu PR and main-branch verification
@@ -369,7 +377,7 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for full details on how to get st
 
 ## Roadmap
 
-### v1.0.0 — Initial Release (March 2026)
+### Current Implementation Baseline
 - [x] Contacts management with custom fields and tags
 - [x] Visual kanban pipeline with drag-and-drop
 - [x] Activities: tasks, calls, meetings
@@ -377,9 +385,9 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for full details on how to get st
 - [x] Full-text search across all entities
 - [x] CSV import and export
 - [x] 10 languages (EN, FR, ES, AR, SW, HI, PT, VI, HA, BN)
-- [x] Windows, macOS, Linux installers
+- [ ] Windows, macOS, Linux release installers
 
-### v1.1.0 — Planned
+### Completed App Foundations
 - [x] Custom fields on any entity type
 - [x] Reports and conversion funnels
 - [x] Desktop reminders and notifications
@@ -413,7 +421,7 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for full details on how to get st
 | Tool | Description | Status |
 |---|---|---|
 | [900PDF](https://github.com/900-labs/900pdf) | Offline-first PDF viewer and editor | Released |
-| **900CRM** | Offline-first CRM for developing nations | Released |
+| **900CRM** | Offline-first CRM for developing nations | Release readiness in progress |
 | More coming | Accounting, invoicing, inventory — and more | Planned |
 
 Every tool in the 900 Labs suite shares the same principles: offline-first, local data, permissive license, no cloud dependency.
