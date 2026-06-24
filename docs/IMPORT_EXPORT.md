@@ -180,6 +180,10 @@ Exported files are plain CSV. They may contain personal, customer, sales, and
 business data. 900CRM does not encrypt exported files, upload them, or apply
 access controls after they are written.
 
+The Settings Data Management export action displays this disclosure before the
+user opens the export flow. Store exported CSV files containing sensitive data
+in a trusted or encrypted location.
+
 ## Relationship To Backups
 
 CSV import/export is not a backup system.

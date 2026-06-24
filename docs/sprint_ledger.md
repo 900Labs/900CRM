@@ -48,3 +48,4 @@
 | 044 | 2026-06-24 | `codex/release-readiness-truth-baseline` | Release-readiness truth baseline with verification-only CI docs, future artifact checklist, and synthetic CSV import samples without packaging automation | Completed |
 | 045 | 2026-06-24 | `codex/public-doc-local-path-scrub` | Documentation-only public-readiness scrub removing local-machine path examples from historical sprint notes while preserving verification evidence | Completed |
 | 046 | 2026-06-24 | `codex/e2e-workflow-smoke-coverage` | Playwright browser-smoke workflow coverage for creating contacts, organizations, deals, activities, and mocked global search with a narrow modal lifecycle testability fix and no native Tauri automation | Completed |
+| 047 | 2026-06-24 | `codex/unencrypted-export-backup-warning` | Settings Data Management warnings and docs for unencrypted local CSV exports and backup folders without backend or encryption behavior changes | Completed |

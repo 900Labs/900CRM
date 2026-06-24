@@ -1194,6 +1194,7 @@
             <div class="data-action-info">
               <span class="data-action-label">{t('settings.exportAll')}</span>
               <span class="data-action-desc">{t('export.title')}</span>
+              <span class="data-action-warning">{t('settings.exportUnencryptedWarning')}</span>
             </div>
             <button
               class="btn btn-secondary btn-sm"
@@ -1229,6 +1230,7 @@
               <div class="data-action-info">
                 <span class="data-action-label">{t('settings.backupRestore')}</span>
                 <span class="data-action-desc">{t('settings.backupRestoreDesc')}</span>
+                <span class="data-action-warning">{t('settings.backupUnencryptedWarning')}</span>
               </div>
               <button
                 class="btn btn-secondary btn-sm"
@@ -1747,6 +1749,11 @@
   .data-action-desc {
     font-size: var(--text-xs);
     color: var(--text-secondary);
+  }
+
+  .data-action-warning {
+    font-size: var(--text-xs);
+    color: var(--text-warning);
   }
 
   /* ── Integrations ───────────────────────────────────────────────────────── */
