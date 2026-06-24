@@ -25,3 +25,4 @@
 | 021 | 2026-06-24 | `codex/activity-relationships-core-surface` | Activity contact, organization, and deal core/API relationship foundation with schema v8, legacy contact/deal mirror preservation, and no activity relationship UI | Completed |
 | 022 | 2026-06-24 | `codex/activity-relationships-ui-surface` | Activity create controls and activity list relationship labels for contact, organization, and deal links using existing frontend APIs without backend changes | Completed |
 | 023 | 2026-06-24 | `codex/global-search-core-surface` | Global search core/Tauri/frontend API surface for contacts, organizations, deals, activities, notes, and tags without SearchBar UI changes | Completed |
+| 024 | 2026-06-24 | `codex/global-search-ui-surface` | Visible SearchBar integration with global search results across contacts, organizations, deals, activities, notes, and tags without backend changes | Completed |
