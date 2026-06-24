@@ -22,7 +22,8 @@ The intended call path is:
 2. MCP package validates the client, requested tool, and configured mode.
 3. MCP package calls explicit `crm-core` services.
 4. `crm-core` applies normal domain validation and records audit evidence.
-5. Any write-like request creates a proposed action for user review unless a future sprint explicitly implements and approves a stricter execution path.
+5. Write-like external-client requests create proposed actions for user review unless a narrow reviewed execution path explicitly supports the action.
+6. The current reviewed execution path is limited to core approval of `create_activity_draft` proposed actions; it does not add an MCP runtime.
 
 ## Active Readiness Surfaces
 
@@ -36,8 +37,40 @@ The following data and API surfaces exist today:
 - Pending Actions UI for reviewing proposed actions.
 - Audit Log UI for inspecting recorded activity.
 - Proposed action approve/reject APIs and UI controls.
+- Core approval execution for pending proposed actions where `tool_name` or
+  `action_type` is `create_activity_draft`.
 
-Approving a proposed action only changes its decision state. It does not execute the requested action, mutate CRM records, or run MCP/client code.
+Approving a supported `create_activity_draft` proposed action creates an activity
+through the normal `crm-core` service/storage path and marks the proposed action
+`executed`. The permission-keyed `tool_name` must be `create_activity_draft`;
+`action_type` may be either `create_activity_draft` or the compatible legacy
+category value `create_activity`. Mismatched tool/action identities remain
+pending and return an explicit invalid-input error when approval is attempted.
+Rejection remains decision-only. Approval still does not run MCP/client code.
+
+The supported draft input JSON shape is:
+
+```json
+{
+  "title": "Call Amina",
+  "activity_type": "call",
+  "description": "Confirm next steps",
+  "due_at": "2026-06-25T09:00:00Z",
+  "linked_entities": [
+    { "entity_type": "contact", "entity_id": "contact-id" },
+    { "entity_type": "organization", "entity_id": "organization-id" },
+    { "entity_type": "deal", "entity_id": "deal-id" }
+  ]
+}
+```
+
+`title` is required. `activity_type` defaults to `task` when omitted.
+`description`, `due_at`, and `linked_entities` are optional. `due_at` maps to
+the existing activity `due_date` field. Linked entity types are limited to
+`contact`, `organization`, and `deal`; the current core path supports at most one
+linked contact and one linked deal because those preserve the existing legacy
+activity mirror fields, while organization links use the first-class activity
+link table.
 
 ## Permission Modes
 
@@ -64,7 +97,8 @@ The current codebase intentionally does not include:
 - Raw SQL access for MCP clients.
 - File-system or shell tools.
 - Permission-grant UI.
-- Direct execution of approved proposed actions.
+- General direct execution of approved proposed actions beyond the supported
+  `create_activity_draft` core path.
 
 ## Required Security Gates For Future MCP Work
 
@@ -78,7 +112,7 @@ Future MCP implementation work must include these gates before acceptance:
 - Do not expose raw SQL, arbitrary file, process, or shell execution tools.
 - Treat CRM content as untrusted input at the prompt-injection boundary.
 - Audit every client access attempt and every allowed read, draft, decision, and future execution event.
-- Keep write-like operations in `draft_only` proposed-action flow until a separate reviewed sprint implements execution semantics.
+- Keep write-like external-client operations in `draft_only` proposed-action flow unless they are handled by a reviewed, narrow core execution path such as `create_activity_draft`.
 - Store no tokens or secrets unless a dedicated security design covers creation, storage, rotation, revocation, and auditability.
 
 ## Future MCP Acceptance Checklist
@@ -95,7 +129,7 @@ A future MCP implementation should not be accepted until all of the following ar
 - [ ] Only `disabled`, `read_only`, and `draft_only` are active unless a future sprint implements broader modes with tests and docs.
 - [ ] Read access is audited with enough context to identify client, tool, entity scope, and result status.
 - [ ] Draft proposed actions are audited and visible in Pending Actions.
-- [ ] Approved proposed actions still do not execute unless an execution sprint adds a reviewed execution path.
+- [ ] Approved proposed actions execute only when a reviewed, supported core execution path exists; unsupported actions remain pending with explicit errors.
 - [ ] Prompt-injection boundaries are documented and tested with CRM content treated as untrusted.
 - [ ] Security documentation covers credential handling if tokens or secrets are introduced.
 - [ ] Verification includes unit tests, integration tests, no raw SQL boundary regressions, no direct Svelte `invoke()` regressions, and a clean `git fsck`.

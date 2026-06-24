@@ -1,11 +1,22 @@
 use crate::audit::ACTOR_DESKTOP_APP;
 use crate::result::CrmResult;
-use crate::storage::{self, external_clients::ExternalClient, proposed_actions::ProposedAction};
+use crate::storage::{
+    self,
+    activities::{Activity, ActivityLinkEntityType},
+    external_clients::ExternalClient,
+    proposed_actions::ProposedAction,
+};
+use crate::utils::errors::CrmError;
+use serde::Deserialize;
 
+use super::activity_relationships::add_activity_link_in_transaction;
 use super::external_client_permissions::{
     ensure_external_client_draft_permission, required_external_client_field,
 };
-use super::{record_audit_json, CrmCore};
+use super::{create_activity_in_transaction, record_audit_json, CrmCore};
+
+const CREATE_ACTIVITY_DRAFT_TOOL: &str = "create_activity_draft";
+const CREATE_ACTIVITY_COMPATIBLE_ACTION_TYPE: &str = "create_activity";
 
 impl CrmCore {
     pub fn list_pending_proposed_actions(&self) -> CrmResult<Vec<ProposedAction>> {
@@ -101,7 +112,28 @@ impl CrmCore {
         let before = storage::proposed_actions::get_proposed_action(&tx, &id)?;
         let proposed_action = match decision {
             ProposedActionDecision::Approve => {
-                storage::proposed_actions::approve_proposed_action(&tx, &id)?
+                let before_action = before.as_ref().ok_or_else(|| {
+                    CrmError::NotFound(format!("Proposed action '{}' was not found", id))
+                })?;
+                if before_action.status != "pending" {
+                    return Err(CrmError::InvalidInput(format!(
+                        "Proposed action '{}' must be pending before it can be approved or rejected; current status is '{}'",
+                        id, before_action.status
+                    )));
+                }
+                execute_create_activity_draft(&tx, before_action, &device_id)?;
+                let executed = storage::proposed_actions::execute_proposed_action(&tx, &id)?;
+                record_audit_json(
+                    &tx,
+                    ACTOR_DESKTOP_APP,
+                    "execute_proposed_action",
+                    Some("proposed_action"),
+                    Some(&executed.id),
+                    before.as_ref(),
+                    Some(&executed),
+                    &device_id,
+                )?;
+                executed
             }
             ProposedActionDecision::Reject => {
                 storage::proposed_actions::reject_proposed_action(&tx, &id)?
@@ -120,6 +152,147 @@ impl CrmCore {
         tx.commit()?;
         Ok(proposed_action)
     }
+}
+
+fn execute_create_activity_draft(
+    conn: &rusqlite::Connection,
+    proposed_action: &ProposedAction,
+    device_id: &str,
+) -> CrmResult<Activity> {
+    validate_create_activity_draft_identity(proposed_action)?;
+
+    let draft = CreateActivityDraftExecution::try_from(proposed_action)?;
+    let activity = create_activity_in_transaction(
+        conn,
+        device_id,
+        &draft.activity_type,
+        &draft.title,
+        draft.description.as_deref(),
+        draft.due_date.as_deref(),
+        draft.contact_id.as_deref(),
+        draft.deal_id.as_deref(),
+    )?;
+    for organization_id in draft.organization_ids {
+        add_activity_link_in_transaction(
+            conn,
+            &activity.id,
+            ActivityLinkEntityType::Organization,
+            &organization_id,
+            device_id,
+        )?;
+    }
+    Ok(activity)
+}
+
+fn validate_create_activity_draft_identity(proposed_action: &ProposedAction) -> CrmResult<()> {
+    if proposed_action.tool_name != CREATE_ACTIVITY_DRAFT_TOOL {
+        return Err(CrmError::InvalidInput(format!(
+            "Unsupported proposed action tool for approval execution: tool_name='{}', action_type='{}'",
+            proposed_action.tool_name, proposed_action.action_type
+        )));
+    }
+
+    match proposed_action.action_type.as_str() {
+        CREATE_ACTIVITY_DRAFT_TOOL | CREATE_ACTIVITY_COMPATIBLE_ACTION_TYPE => Ok(()),
+        other => Err(CrmError::InvalidInput(format!(
+            "Unsupported proposed action action_type '{}' for tool '{}'; expected '{}' or compatible '{}'",
+            other,
+            proposed_action.tool_name,
+            CREATE_ACTIVITY_DRAFT_TOOL,
+            CREATE_ACTIVITY_COMPATIBLE_ACTION_TYPE
+        ))),
+    }
+}
+
+#[derive(Debug)]
+struct CreateActivityDraftExecution {
+    title: String,
+    activity_type: String,
+    description: Option<String>,
+    due_date: Option<String>,
+    contact_id: Option<String>,
+    deal_id: Option<String>,
+    organization_ids: Vec<String>,
+}
+
+impl TryFrom<&ProposedAction> for CreateActivityDraftExecution {
+    type Error = CrmError;
+
+    fn try_from(proposed_action: &ProposedAction) -> Result<Self, Self::Error> {
+        let input: CreateActivityDraftInput = serde_json::from_str(&proposed_action.input_json)?;
+        let title = required_json_string("title", input.title.as_deref())?;
+        let activity_type = optional_json_string(input.activity_type.as_deref())
+            .unwrap_or_else(|| "task".to_string());
+        let description = optional_json_string(input.description.as_deref());
+        let due_date = optional_json_string(input.due_at.as_deref());
+
+        let mut contact_id = None;
+        let mut deal_id = None;
+        let mut organization_ids = Vec::new();
+        for linked_entity in input.linked_entities {
+            let entity_type = ActivityLinkEntityType::try_from(linked_entity.entity_type.as_str())?;
+            let entity_id = required_json_string(
+                "linked_entities[].entity_id",
+                Some(&linked_entity.entity_id),
+            )?;
+            match entity_type {
+                ActivityLinkEntityType::Contact => {
+                    if contact_id.replace(entity_id).is_some() {
+                        return Err(CrmError::InvalidInput(
+                            "create_activity_draft supports at most one linked contact".to_string(),
+                        ));
+                    }
+                }
+                ActivityLinkEntityType::Deal => {
+                    if deal_id.replace(entity_id).is_some() {
+                        return Err(CrmError::InvalidInput(
+                            "create_activity_draft supports at most one linked deal".to_string(),
+                        ));
+                    }
+                }
+                ActivityLinkEntityType::Organization => organization_ids.push(entity_id),
+            }
+        }
+
+        Ok(Self {
+            title,
+            activity_type,
+            description,
+            due_date,
+            contact_id,
+            deal_id,
+            organization_ids,
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateActivityDraftInput {
+    title: Option<String>,
+    activity_type: Option<String>,
+    description: Option<String>,
+    due_at: Option<String>,
+    #[serde(default)]
+    linked_entities: Vec<CreateActivityDraftLinkedEntityInput>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateActivityDraftLinkedEntityInput {
+    entity_type: String,
+    entity_id: String,
+}
+
+fn required_json_string(field: &str, value: Option<&str>) -> CrmResult<String> {
+    optional_json_string(value).ok_or_else(|| {
+        CrmError::InvalidInput(format!("create_activity_draft {} is required", field))
+    })
+}
+
+fn optional_json_string(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|trimmed| !trimmed.is_empty())
+        .map(str::to_string)
 }
 
 #[derive(Debug, Clone, Copy)]
