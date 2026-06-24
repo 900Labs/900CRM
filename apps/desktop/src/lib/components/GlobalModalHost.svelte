@@ -8,7 +8,7 @@
   import { activityStore } from '$lib/stores/activities';
   import { settingsStore } from '$lib/stores/settings';
   import { DEAL_STAGES } from '$lib/api/deals';
-  import type { DealStage } from '$lib/api/deals';
+  import type { Deal, DealStage } from '$lib/api/deals';
   import type { Contact } from '$lib/api/contacts';
   import type { ActivityType } from '$lib/api/activities';
   import type { Organization } from '$lib/api/organizations';
@@ -17,6 +17,10 @@
     contactDisplayName,
     loadDealRelationshipLookups,
   } from '$lib/utils/dealRelationships';
+  import {
+    addSelectedActivityLinks,
+    loadActivityRelationshipLookups,
+  } from '$lib/utils/activityRelationships';
   import {
     listCustomFieldDefinitions,
     setCustomFieldValue,
@@ -52,6 +56,13 @@
   let activityType = $state<ActivityType>('task');
   let activityDueDate = $state('');
   let activityNotes = $state('');
+  let activityContactId = $state('');
+  let activityOrganizationId = $state('');
+  let activityDealId = $state('');
+  let activityRelationshipContacts = $state<Contact[]>([]);
+  let activityRelationshipOrganizations = $state<Organization[]>([]);
+  let activityRelationshipDeals = $state<Deal[]>([]);
+  let loadingActivityRelationships = $state(false);
 
   let contactCustomFieldDefs = $state<CustomFieldDefinition[]>([]);
   let contactCustomFieldValues = $state<Record<string, string>>({});
@@ -87,6 +98,39 @@
       return dealRelationshipOrganizations;
     }
     return [selected, ...dealRelationshipOrganizations];
+  });
+
+  const activityContactOptions = $derived.by(() => {
+    const selected = contactStore.selectedContact;
+    if (!selected || selected.id !== activityContactId) {
+      return activityRelationshipContacts;
+    }
+    if (activityRelationshipContacts.some((contact) => contact.id === selected.id)) {
+      return activityRelationshipContacts;
+    }
+    return [selected, ...activityRelationshipContacts];
+  });
+
+  const activityOrganizationOptions = $derived.by(() => {
+    const selected = organizationStore.selectedOrganization;
+    if (!selected || selected.id !== activityOrganizationId) {
+      return activityRelationshipOrganizations;
+    }
+    if (activityRelationshipOrganizations.some((organization) => organization.id === selected.id)) {
+      return activityRelationshipOrganizations;
+    }
+    return [selected, ...activityRelationshipOrganizations];
+  });
+
+  const activityDealOptions = $derived.by(() => {
+    const selected = dealStore.selectedDeal;
+    if (!selected || selected.id !== activityDealId) {
+      return activityRelationshipDeals;
+    }
+    if (activityRelationshipDeals.some((deal) => deal.id === selected.id)) {
+      return activityRelationshipDeals;
+    }
+    return [selected, ...activityRelationshipDeals];
   });
 
   function modalDataString(key: string): string {
@@ -153,6 +197,9 @@
     activityType = 'task';
     activityDueDate = '';
     activityNotes = '';
+    activityContactId = modalDataString('contactId');
+    activityOrganizationId = modalDataString('organizationId');
+    activityDealId = modalDataString('dealId');
   }
 
   function updateCustomFieldValue(
@@ -231,6 +278,21 @@
     }
   }
 
+  async function prepareActivityRelationships() {
+    loadingActivityRelationships = true;
+    try {
+      const lookups = await loadActivityRelationshipLookups();
+      activityRelationshipContacts = lookups.contacts;
+      activityRelationshipOrganizations = lookups.organizations;
+      activityRelationshipDeals = lookups.deals;
+    } catch (err) {
+      console.error('[GlobalModalHost] Failed to load activity relationships:', err);
+      uiStore.toastError('Failed to load activity relationships.');
+    } finally {
+      loadingActivityRelationships = false;
+    }
+  }
+
   async function persistCustomFields(
     entityId: string,
     values: Record<string, string>,
@@ -274,6 +336,7 @@
     if (modal === 'addActivity') {
       resetActivityForm();
       void prepareActivityCustomFields();
+      void prepareActivityRelationships();
     }
   });
 
@@ -350,8 +413,13 @@
         type: activityType,
         dueDate: activityDueDate || null,
         notes: activityNotes.trim() || null,
-        contactId: modalDataString('contactId') || null,
-        dealId: modalDataString('dealId') || null,
+        contactId: activityContactId || null,
+        dealId: activityDealId || null,
+      });
+      await addSelectedActivityLinks(activity.id, {
+        contactId: activityContactId || null,
+        organizationId: activityOrganizationId || null,
+        dealId: activityDealId || null,
       });
       await persistCustomFields(activity.id, activityCustomFieldValues);
       uiStore.closeModal();
@@ -538,6 +606,60 @@
           <label class="form-label" for="modal-activity-due-date">{t('activities.dueDate')}</label>
           <input id="modal-activity-due-date" class="input" type="date" bind:value={activityDueDate} />
         </div>
+        <div class="form-group">
+          <label class="form-label" for="modal-activity-contact">{t('deals.contact')}</label>
+          <select
+            id="modal-activity-contact"
+            class="select"
+            bind:value={activityContactId}
+            disabled={loadingActivityRelationships || isSavingActivity}
+            aria-busy={loadingActivityRelationships}
+          >
+            {#if loadingActivityRelationships && activityContactId}
+              <option value={activityContactId}>{t('common.loading')}</option>
+            {/if}
+            <option value="">{loadingActivityRelationships ? t('common.loading') : t('common.none')}</option>
+            {#each activityContactOptions as contact (contact.id)}
+              <option value={contact.id}>{contactDisplayName(contact)}</option>
+            {/each}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="modal-activity-organization">{t('contacts.organization')}</label>
+          <select
+            id="modal-activity-organization"
+            class="select"
+            bind:value={activityOrganizationId}
+            disabled={loadingActivityRelationships || isSavingActivity}
+            aria-busy={loadingActivityRelationships}
+          >
+            {#if loadingActivityRelationships && activityOrganizationId}
+              <option value={activityOrganizationId}>{t('common.loading')}</option>
+            {/if}
+            <option value="">{loadingActivityRelationships ? t('common.loading') : t('common.none')}</option>
+            {#each activityOrganizationOptions as organization (organization.id)}
+              <option value={organization.id}>{organization.name}</option>
+            {/each}
+          </select>
+        </div>
+        <div class="form-group form-group--full">
+          <label class="form-label" for="modal-activity-deal">{t('deals.title')}</label>
+          <select
+            id="modal-activity-deal"
+            class="select"
+            bind:value={activityDealId}
+            disabled={loadingActivityRelationships || isSavingActivity}
+            aria-busy={loadingActivityRelationships}
+          >
+            {#if loadingActivityRelationships && activityDealId}
+              <option value={activityDealId}>{t('common.loading')}</option>
+            {/if}
+            <option value="">{loadingActivityRelationships ? t('common.loading') : t('common.none')}</option>
+            {#each activityDealOptions as deal (deal.id)}
+              <option value={deal.id}>{deal.name}</option>
+            {/each}
+          </select>
+        </div>
         <div class="form-group form-group--full">
           <label class="form-label" for="modal-activity-notes">{t('common.notes')}</label>
           <textarea id="modal-activity-notes" class="input textarea" rows="3" bind:value={activityNotes}></textarea>
@@ -556,7 +678,7 @@
     {/snippet}
     {#snippet footer()}
       <button class="btn btn-secondary" type="button" onclick={() => uiStore.closeModal()}>{t('common.cancel')}</button>
-      <button class="btn btn-primary" type="button" onclick={submitActivity} disabled={isSavingActivity}>
+      <button class="btn btn-primary" type="button" onclick={submitActivity} disabled={isSavingActivity || loadingActivityRelationships}>
         {isSavingActivity ? t('common.loading') : t('common.save')}
       </button>
     {/snippet}
