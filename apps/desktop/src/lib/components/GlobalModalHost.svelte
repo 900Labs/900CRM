@@ -3,6 +3,7 @@
   import { t } from '$lib/i18n';
   import { uiStore } from '$lib/stores/ui';
   import { contactStore } from '$lib/stores/contacts';
+  import { organizationStore } from '$lib/stores/organizations';
   import { dealStore } from '$lib/stores/deals';
   import { activityStore } from '$lib/stores/activities';
   import { settingsStore } from '$lib/stores/settings';
@@ -10,6 +11,7 @@
   import type { DealStage } from '$lib/api/deals';
   import type { ActivityType } from '$lib/api/activities';
   import { normalizeCurrencyCode } from '$lib/utils/currency';
+  import { contactDisplayName } from '$lib/utils/dealRelationships';
   import {
     listCustomFieldDefinitions,
     setCustomFieldValue,
@@ -33,6 +35,8 @@
   let dealStage = $state<DealStage>('lead');
   let dealProbability = $state<number>(10);
   let dealExpectedCloseDate = $state('');
+  let dealContactId = $state('');
+  let dealOrganizationId = $state('');
   let dealDescription = $state('');
 
   let isSavingActivity = $state(false);
@@ -54,6 +58,28 @@
   let loadingActivityCustomFields = $state(false);
 
   let lastModal = $state<string | null>(null);
+
+  const dealContactOptions = $derived.by(() => {
+    const selected = contactStore.selectedContact;
+    if (!selected || selected.id !== dealContactId) {
+      return contactStore.contacts;
+    }
+    if (contactStore.contacts.some((contact) => contact.id === selected.id)) {
+      return contactStore.contacts;
+    }
+    return [selected, ...contactStore.contacts];
+  });
+
+  const dealOrganizationOptions = $derived.by(() => {
+    const selected = organizationStore.selectedOrganization;
+    if (!selected || selected.id !== dealOrganizationId) {
+      return organizationStore.organizations;
+    }
+    if (organizationStore.organizations.some((organization) => organization.id === selected.id)) {
+      return organizationStore.organizations;
+    }
+    return [selected, ...organizationStore.organizations];
+  });
 
   function modalDataString(key: string): string {
     const value = uiStore.modalData?.[key];
@@ -104,6 +130,8 @@
     dealStage = normalizeStage(modalDataString('stage'));
     dealProbability = defaultProbability(dealStage);
     dealExpectedCloseDate = '';
+    dealContactId = modalDataString('contactId');
+    dealOrganizationId = modalDataString('organizationId');
     dealDescription = '';
   }
 
@@ -171,6 +199,20 @@
     }
   }
 
+  async function prepareDealRelationships() {
+    try {
+      await Promise.all([
+        contactStore.contacts.length > 0 ? Promise.resolve() : contactStore.loadContacts(),
+        organizationStore.organizations.length > 0
+          ? Promise.resolve()
+          : organizationStore.loadOrganizations(),
+      ]);
+    } catch (err) {
+      console.error('[GlobalModalHost] Failed to load deal relationships:', err);
+      uiStore.toastError('Failed to load deal relationships.');
+    }
+  }
+
   async function prepareActivityCustomFields() {
     loadingActivityCustomFields = true;
     try {
@@ -218,6 +260,7 @@
     if (modal === 'addDeal') {
       resetDealForm();
       void prepareDealCustomFields();
+      void prepareDealRelationships();
     }
 
     if (modal === 'addActivity') {
@@ -271,7 +314,8 @@
         stage: dealStage,
         probability: dealProbability,
         expectedCloseDate: dealExpectedCloseDate || null,
-        contactId: modalDataString('contactId') || null,
+        contactId: dealContactId || null,
+        organizationId: dealOrganizationId || null,
         description: dealDescription.trim() || null,
         tags: [],
       });
@@ -403,6 +447,24 @@
         <div class="form-group form-group--full">
           <label class="form-label" for="modal-deal-close-date">{t('deals.expectedClose')}</label>
           <input id="modal-deal-close-date" class="input" type="date" bind:value={dealExpectedCloseDate} />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="modal-deal-organization">{t('contacts.organization')}</label>
+          <select id="modal-deal-organization" class="select" bind:value={dealOrganizationId}>
+            <option value="">{t('common.none')}</option>
+            {#each dealOrganizationOptions as organization (organization.id)}
+              <option value={organization.id}>{organization.name}</option>
+            {/each}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="modal-deal-contact">{t('deals.contact')}</label>
+          <select id="modal-deal-contact" class="select" bind:value={dealContactId}>
+            <option value="">{t('common.none')}</option>
+            {#each dealContactOptions as contact (contact.id)}
+              <option value={contact.id}>{contactDisplayName(contact)}</option>
+            {/each}
+          </select>
         </div>
         <div class="form-group form-group--full">
           <label class="form-label" for="modal-deal-description">{t('deals.description')}</label>

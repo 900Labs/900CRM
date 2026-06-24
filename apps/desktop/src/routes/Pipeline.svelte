@@ -13,6 +13,8 @@
   import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
   import { dealStore } from '$lib/stores/deals';
+  import { contactStore } from '$lib/stores/contacts';
+  import { organizationStore } from '$lib/stores/organizations';
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
   import type { DealStage, Deal } from '$lib/api/deals';
@@ -25,6 +27,7 @@
   } from '$lib/api/customFields';
   import { formatCurrency } from '$lib/utils/formatters';
   import { sumByCurrency } from '$lib/utils/currency';
+  import { deriveDealRelationshipLabels } from '$lib/utils/dealRelationships';
   import DealCard from '$lib/components/DealCard.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
@@ -48,6 +51,7 @@
   onMount(async () => {
     await Promise.all([
       dealStore.loadPipelineBoard(),
+      ensureRelationshipLookups(),
       loadCustomFieldDefinitions(),
     ]);
   });
@@ -90,6 +94,15 @@
    */
   function openAddDeal(stage: DealStage) {
     uiStore.openModal('addDeal', { stage });
+  }
+
+  async function ensureRelationshipLookups() {
+    await Promise.all([
+      contactStore.contacts.length > 0 ? Promise.resolve() : contactStore.loadContacts(),
+      organizationStore.organizations.length > 0
+        ? Promise.resolve()
+        : organizationStore.loadOrganizations(),
+    ]);
   }
 
   async function loadCustomFieldDefinitions() {
@@ -314,6 +327,11 @@
               </div>
             {:else}
               {#each col.deals as deal (deal.id)}
+                {@const relationships = deriveDealRelationshipLabels(
+                  deal,
+                  contactStore.contacts,
+                  organizationStore.organizations,
+                )}
                 <div
                   class="card-wrapper"
                   class:card-wrapper--dragging={draggingId === deal.id}
@@ -322,7 +340,11 @@
                   ondragend={handleDragEnd}
                   role="listitem"
                 >
-                  <DealCard {deal} />
+                  <DealCard
+                    {deal}
+                    primaryContactName={relationships.primaryContactName}
+                    organizationName={relationships.organizationName}
+                  />
                 </div>
               {/each}
             {/if}
