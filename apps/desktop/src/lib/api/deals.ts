@@ -161,6 +161,24 @@ function hasOwn<T extends object, K extends PropertyKey>(
   return Object.prototype.hasOwnProperty.call(object, key);
 }
 
+function assignNullableUpdate(
+  args: Record<string, unknown>,
+  valueKey: string,
+  resetKey: string,
+  value: string | null | undefined,
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  const normalized = normalizeNullable(value);
+  if (normalized === null) {
+    args[resetKey] = true;
+  } else {
+    args[valueKey] = normalized;
+  }
+}
+
 function mapDeal(deal: BackendDeal): Deal {
   return {
     id: deal.id,
@@ -287,15 +305,25 @@ export async function updateDeal(id: string, data: UpdateDealPayload): Promise<D
   };
 
   if (hasOwn(data, 'expectedCloseDate') && data.expectedCloseDate !== undefined) {
-    args.expected_close = data.expectedCloseDate;
+    assignNullableUpdate(
+      args,
+      'expected_close',
+      'reset_expected_close',
+      data.expectedCloseDate,
+    );
   }
 
   if (hasOwn(data, 'contactId') && data.contactId !== undefined) {
-    args.contact_id = data.contactId;
+    assignNullableUpdate(args, 'contact_id', 'reset_contact_id', data.contactId);
   }
 
   if (hasOwn(data, 'organizationId')) {
-    args.organization_id = normalizeNullable(data.organizationId);
+    assignNullableUpdate(
+      args,
+      'organization_id',
+      'reset_organization_id',
+      data.organizationId,
+    );
   }
 
   const deal = await invoke<BackendDeal>('update_deal', args);

@@ -109,49 +109,94 @@ describe('deal API', () => {
       'update_deal',
       expect.objectContaining({
         id: 'deal-1',
-        organization_id: null,
+        reset_organization_id: true,
       }),
     );
   });
 
-  it('omits absent legacy update fields and sends explicit clears intentionally', async () => {
+  it('omits absent nullable update fields and sends explicit reset flags intentionally', async () => {
     invokeMock.mockResolvedValueOnce(backendDeal);
 
     await updateDeal('deal-1', { name: 'Clinic expansion' });
 
     let args = invokeMock.mock.calls[0][1] as Record<string, unknown>;
     expect(args).not.toHaveProperty('expected_close');
+    expect(args).not.toHaveProperty('reset_expected_close');
     expect(args).not.toHaveProperty('contact_id');
+    expect(args).not.toHaveProperty('reset_contact_id');
+    expect(args).not.toHaveProperty('organization_id');
+    expect(args).not.toHaveProperty('reset_organization_id');
 
     invokeMock.mockReset();
-    invokeMock.mockResolvedValueOnce({ ...backendDeal, expected_close: null, contact_id: null });
+    invokeMock.mockResolvedValueOnce({
+      ...backendDeal,
+      expected_close: null,
+      contact_id: null,
+      organization_id: null,
+    });
 
     await updateDeal('deal-1', {
       expectedCloseDate: null,
       contactId: null,
+      organizationId: null,
     });
 
     args = invokeMock.mock.calls[0][1] as Record<string, unknown>;
     expect(args).toMatchObject({
       id: 'deal-1',
-      expected_close: null,
-      contact_id: null,
+      reset_expected_close: true,
+      reset_contact_id: true,
+      reset_organization_id: true,
     });
+    expect(args).not.toHaveProperty('expected_close');
+    expect(args).not.toHaveProperty('contact_id');
+    expect(args).not.toHaveProperty('organization_id');
 
     invokeMock.mockReset();
-    invokeMock.mockResolvedValueOnce({ ...backendDeal, expected_close: null, contact_id: null });
+    invokeMock.mockResolvedValueOnce({
+      ...backendDeal,
+      expected_close: null,
+      contact_id: null,
+      organization_id: null,
+    });
 
     await updateDeal('deal-1', {
       expectedCloseDate: '   ',
       contactId: '   ',
+      organizationId: '   ',
     });
 
     args = invokeMock.mock.calls[0][1] as Record<string, unknown>;
     expect(args).toMatchObject({
       id: 'deal-1',
-      expected_close: '   ',
-      contact_id: '   ',
+      reset_expected_close: true,
+      reset_contact_id: true,
+      reset_organization_id: true,
     });
+    expect(args).not.toHaveProperty('expected_close');
+    expect(args).not.toHaveProperty('contact_id');
+    expect(args).not.toHaveProperty('organization_id');
+  });
+
+  it('maps nullable update field sets without reset flags', async () => {
+    invokeMock.mockResolvedValueOnce(backendDeal);
+
+    await updateDeal('deal-1', {
+      expectedCloseDate: ' 2026-08-01 ',
+      contactId: ' contact-2 ',
+      organizationId: ' org-2 ',
+    });
+
+    const args = invokeMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(args).toMatchObject({
+      id: 'deal-1',
+      expected_close: '2026-08-01',
+      contact_id: 'contact-2',
+      organization_id: 'org-2',
+    });
+    expect(args).not.toHaveProperty('reset_expected_close');
+    expect(args).not.toHaveProperty('reset_contact_id');
+    expect(args).not.toHaveProperty('reset_organization_id');
   });
 
   it('maps linkDealToOrganization to link_deal_to_organization', async () => {
