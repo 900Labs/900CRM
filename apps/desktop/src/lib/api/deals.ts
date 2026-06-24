@@ -31,6 +31,7 @@ export interface Deal {
   probability: number;
   expectedCloseDate: string | null;
   contactId: string | null;
+  organizationId: string | null;
   contactName: string | null;
   description: string | null;
   tags: string[];
@@ -38,8 +39,29 @@ export interface Deal {
   updatedAt: string;
 }
 
-export type CreateDealPayload = Omit<Deal, 'id' | 'createdAt' | 'updatedAt' | 'contactName'>;
+export type CreateDealPayload = Omit<
+  Deal,
+  'id' | 'createdAt' | 'updatedAt' | 'contactName' | 'organizationId'
+> & {
+  organizationId?: string | null;
+};
 export type UpdateDealPayload = Partial<CreateDealPayload>;
+
+export interface DealContact {
+  id: string;
+  dealId: string;
+  contactId: string;
+  role: string | null;
+  isPrimary: boolean;
+  createdAt: string;
+  deletedAt: string | null;
+  deviceId: string;
+}
+
+export interface AddDealContactPayload {
+  role?: string | null;
+  isPrimary?: boolean;
+}
 
 export interface ListDealsParams {
   stage?: DealStage;
@@ -67,9 +89,21 @@ interface BackendDeal {
   probability: number;
   expected_close: string | null;
   contact_id: string | null;
+  organization_id?: string | null;
   notes: string;
   created_at: string;
   updated_at: string;
+}
+
+interface BackendDealContact {
+  id: string;
+  deal_id: string;
+  contact_id: string;
+  role: string | null;
+  is_primary: boolean;
+  created_at: string;
+  deleted_at: string | null;
+  device_id: string;
 }
 
 interface BackendPipelineSummary {
@@ -111,6 +145,40 @@ function toBackendStage(stage: DealStage | undefined): string | undefined {
   return BACKEND_STAGE_MAP[stage];
 }
 
+function normalizeNullable(value: string | null | undefined): string | null {
+  if (value == null) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function hasOwn<T extends object, K extends PropertyKey>(
+  object: T,
+  key: K,
+): object is T & Record<K, unknown> {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function assignNullableUpdate(
+  args: Record<string, unknown>,
+  valueKey: string,
+  resetKey: string,
+  value: string | null | undefined,
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  const normalized = normalizeNullable(value);
+  if (normalized === null) {
+    args[resetKey] = true;
+  } else {
+    args[valueKey] = normalized;
+  }
+}
+
 function mapDeal(deal: BackendDeal): Deal {
   return {
     id: deal.id,
@@ -121,11 +189,25 @@ function mapDeal(deal: BackendDeal): Deal {
     probability: deal.probability ?? 0,
     expectedCloseDate: deal.expected_close,
     contactId: deal.contact_id,
+    organizationId: deal.organization_id ?? null,
     contactName: null,
     description: deal.notes?.trim() ? deal.notes : null,
     tags: [],
     createdAt: deal.created_at,
     updatedAt: deal.updated_at,
+  };
+}
+
+function mapDealContact(dealContact: BackendDealContact): DealContact {
+  return {
+    id: dealContact.id,
+    dealId: dealContact.deal_id,
+    contactId: dealContact.contact_id,
+    role: dealContact.role ?? null,
+    isPrimary: dealContact.is_primary,
+    createdAt: dealContact.created_at,
+    deletedAt: dealContact.deleted_at ?? null,
+    deviceId: dealContact.device_id,
   };
 }
 
@@ -163,6 +245,7 @@ export async function createDeal(data: CreateDealPayload): Promise<Deal> {
     probability: data.probability,
     expected_close: data.expectedCloseDate,
     contact_id: data.contactId,
+    organization_id: normalizeNullable(data.organizationId),
     notes: data.description ?? '',
   });
 
@@ -211,17 +294,39 @@ export async function listDealsByStage(): Promise<DealsByStage> {
 }
 
 export async function updateDeal(id: string, data: UpdateDealPayload): Promise<Deal> {
-  const deal = await invoke<BackendDeal>('update_deal', {
+  const args: Record<string, unknown> = {
     id,
     title: data.name,
     value: data.value,
     currency: data.currency,
     stage: toBackendStage(data.stage),
     probability: data.probability,
-    expected_close: data.expectedCloseDate,
-    contact_id: data.contactId,
     notes: data.description,
-  });
+  };
+
+  if (hasOwn(data, 'expectedCloseDate') && data.expectedCloseDate !== undefined) {
+    assignNullableUpdate(
+      args,
+      'expected_close',
+      'reset_expected_close',
+      data.expectedCloseDate,
+    );
+  }
+
+  if (hasOwn(data, 'contactId') && data.contactId !== undefined) {
+    assignNullableUpdate(args, 'contact_id', 'reset_contact_id', data.contactId);
+  }
+
+  if (hasOwn(data, 'organizationId')) {
+    assignNullableUpdate(
+      args,
+      'organization_id',
+      'reset_organization_id',
+      data.organizationId,
+    );
+  }
+
+  const deal = await invoke<BackendDeal>('update_deal', args);
 
   return mapDeal(deal);
 }
@@ -237,6 +342,53 @@ export async function moveDealStage(id: string, stage: DealStage): Promise<Deal>
 
 export async function deleteDeal(id: string): Promise<void> {
   await invoke<void>('delete_deal', { id });
+}
+
+export async function linkDealToOrganization(
+  dealId: string,
+  organizationId: string | null,
+): Promise<Deal> {
+  const deal = await invoke<BackendDeal>('link_deal_to_organization', {
+    deal_id: dealId,
+    organization_id: normalizeNullable(organizationId),
+  });
+
+  return mapDeal(deal);
+}
+
+export async function addDealContact(
+  dealId: string,
+  contactId: string,
+  data: AddDealContactPayload = {},
+): Promise<DealContact> {
+  const dealContact = await invoke<BackendDealContact>('add_deal_contact', {
+    deal_id: dealId,
+    contact_id: contactId,
+    role: normalizeNullable(data.role),
+    is_primary: data.isPrimary ?? false,
+  });
+
+  return mapDealContact(dealContact);
+}
+
+export async function removeDealContact(
+  dealId: string,
+  contactId: string,
+): Promise<DealContact> {
+  const dealContact = await invoke<BackendDealContact>('remove_deal_contact', {
+    deal_id: dealId,
+    contact_id: contactId,
+  });
+
+  return mapDealContact(dealContact);
+}
+
+export async function listDealContacts(dealId: string): Promise<DealContact[]> {
+  const dealContacts = await invoke<BackendDealContact[]>('list_deal_contacts', {
+    deal_id: dealId,
+  });
+
+  return dealContacts.map(mapDealContact);
 }
 
 export async function getPipelineSummary(): Promise<PipelineSummary> {
