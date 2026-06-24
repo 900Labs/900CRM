@@ -3646,7 +3646,11 @@ fn normalization_migration_preflight_reports_clean_migrated_database() {
 
     assert_eq!(report.legacy_organization_contacts, 0);
     assert_eq!(report.contacts_with_org_id_missing_organization_id, 0);
-    assert_eq!(report.contacts_with_invalid_organization_links, 0);
+    assert_eq!(report.contacts_with_invalid_legacy_org_id_links, 0);
+    assert_eq!(
+        report.contacts_with_invalid_normalized_organization_id_links,
+        0
+    );
     assert!(report.backup_restore_baseline_available);
 
     drop(core);
@@ -3687,7 +3691,11 @@ fn normalization_migration_preflight_counts_legacy_and_invalid_links() {
 
     assert_eq!(report.legacy_organization_contacts, 1);
     assert_eq!(report.contacts_with_org_id_missing_organization_id, 2);
-    assert_eq!(report.contacts_with_invalid_organization_links, 2);
+    assert_eq!(report.contacts_with_invalid_legacy_org_id_links, 1);
+    assert_eq!(
+        report.contacts_with_invalid_normalized_organization_id_links,
+        1
+    );
     assert!(report.backup_restore_baseline_available);
 
     drop(core);
