@@ -4,7 +4,7 @@ Welcome, and thank you for considering a contribution to 900CRM. Every contribut
 
 This project exists to serve people everywhere: developers in communities with limited connectivity, beginners new to open source, and experienced engineers who want to build something meaningful. **You belong here.** If you have never contributed to an open-source project before, this guide is written especially for you. We will walk you through everything.
 
-If you get stuck at any point, please open a [discussion](https://github.com/900-labs/900crm/discussions) and ask. There are no dumb questions.
+If you get stuck at any point, please open a [discussion](https://github.com/900Labs/900CRM/discussions) and ask. There are no dumb questions.
 
 ---
 
@@ -54,7 +54,7 @@ cd 900crm
 ### 3. Add the upstream remote
 
 ```bash
-git remote add upstream https://github.com/900-labs/900crm.git
+git remote add upstream https://github.com/900Labs/900CRM.git
 git remote -v
 # You should see both origin (your fork) and upstream (the main repo)
 ```
@@ -527,7 +527,7 @@ All PRs must pass:
 
 ### Bug Reports
 
-If you find a bug, [open an issue](https://github.com/900-labs/900crm/issues/new?template=bug_report.md) using the bug report template. Include:
+If you find a bug, [open an issue](https://github.com/900Labs/900CRM/issues/new?template=bug_report.md) using the bug report template. Include:
 
 - What you expected to happen
 - What actually happened
@@ -537,7 +537,7 @@ If you find a bug, [open an issue](https://github.com/900-labs/900crm/issues/new
 
 ### Feature Requests
 
-Have an idea for something 900CRM should do? [Open a feature request](https://github.com/900-labs/900crm/issues/new?template=feature_request.md). Describe the problem you are solving, how you imagine the feature working, and why it would be useful — especially in low-connectivity contexts.
+Have an idea for something 900CRM should do? [Open a feature request](https://github.com/900Labs/900CRM/issues/new?template=feature_request.md). Describe the problem you are solving, how you imagine the feature working, and why it would be useful — especially in low-connectivity contexts.
 
 ### Code Contributions
 
@@ -669,7 +669,7 @@ If you find a translation that is incorrect, unclear, or outdated:
 
 See [plugins/README.md](plugins/README.md) for the full specification of the planned plugin system, including the manifest format, available extension points, and an example plugin skeleton.
 
-If you are interested in shaping the plugin API design before it is implemented, open a [discussion](https://github.com/900-labs/900crm/discussions) tagged `plugin-system`. Community input during the design phase is especially valuable.
+If you are interested in shaping the plugin API design before it is implemented, open a [discussion](https://github.com/900Labs/900CRM/discussions) tagged `plugin-system`. Community input during the design phase is especially valuable.
 
 ---
 
@@ -677,7 +677,7 @@ If you are interested in shaping the plugin API design before it is implemented,
 
 ### Bug Reports
 
-Use the [bug report template](https://github.com/900-labs/900crm/issues/new?template=bug_report.md). A good bug report includes:
+Use the [bug report template](https://github.com/900Labs/900CRM/issues/new?template=bug_report.md). A good bug report includes:
 
 1. **Clear title** — describe the problem in one sentence (e.g., "App crashes when importing CSV with Arabic characters")
 2. **Steps to reproduce** — numbered steps, as specific as possible
@@ -690,7 +690,7 @@ The more specific your report, the faster we can diagnose and fix the issue.
 
 ### Feature Requests
 
-Use the [feature request template](https://github.com/900-labs/900crm/issues/new?template=feature_request.md). A good feature request explains:
+Use the [feature request template](https://github.com/900Labs/900CRM/issues/new?template=feature_request.md). A good feature request explains:
 
 1. **The problem** — what are you currently unable to do?
 2. **Your proposed solution** — how you imagine the feature working
@@ -745,7 +745,7 @@ Current ADRs:
 - Does not require deep knowledge of the whole system
 
 **Where to find them:**
-Look for the [`good first issue`](https://github.com/900-labs/900crm/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) label on the issue tracker.
+Look for the [`good first issue`](https://github.com/900Labs/900CRM/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) label on the issue tracker.
 
 **Claiming an issue:**
 Comment on the issue that you would like to work on it. A maintainer will assign it.
