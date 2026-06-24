@@ -53,3 +53,4 @@
 | 049 | 2026-06-24 | `codex/readme-screenshot-baseline` | README screenshot baseline with committed browser-shell assets and an opt-in capture helper without product/runtime or release-packaging changes | Completed |
 | 050 | 2026-06-24 | `codex/canonical-repository-url-alignment` | Canonical public self-repository URL alignment across README badges/links, package metadata, Cargo metadata, and the app-visible Settings GitHub link | Completed |
 | 051 | 2026-06-24 | `codex/proposed-action-execution-core` | First safe core execution path for approved `create_activity_draft` proposed actions through existing activity service/storage behavior without MCP runtime, UI, token, permission-mode, or sync-server changes | Completed |
+| 052 | 2026-06-24 | `codex/global-search-fts5-parity` | Global search FTS5 parity for organizations, deals, activities, notes, and tags with schema v10, active-row backfills, maintenance triggers, and storage-owned text fallback | Completed |
