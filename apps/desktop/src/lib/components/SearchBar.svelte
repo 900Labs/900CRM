@@ -36,6 +36,13 @@
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
+  function invalidatePendingSearch() {
+    searchRequestId += 1;
+    clearTimeout(debounceTimer);
+    debounceTimer = undefined;
+    uiStore.isSearching = false;
+  }
+
   function handleInput(e: Event) {
     const query = (e.target as HTMLInputElement).value;
     uiStore.setSearchQuery(query);
@@ -43,7 +50,7 @@
     clearTimeout(debounceTimer);
 
     if (!query.trim()) {
-      searchRequestId += 1;
+      invalidatePendingSearch();
       uiStore.clearSearch();
       return;
     }
@@ -69,6 +76,7 @@
   }
 
   function handleSelect(result: SearchResult) {
+    invalidatePendingSearch();
     onselectresult?.(result);
     uiStore.clearSearch();
     if (inputEl) inputEl.value = '';
@@ -81,12 +89,14 @@
 
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
+      invalidatePendingSearch();
       uiStore.closeSearch();
       inputEl?.blur();
     }
   }
 
   function handleBlur() {
+    invalidatePendingSearch();
     setTimeout(() => uiStore.closeSearch(), 200);
   }
 
