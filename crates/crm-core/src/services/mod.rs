@@ -45,6 +45,7 @@ mod migration_readiness;
 mod notes_tags;
 mod organizations;
 mod proposed_actions;
+mod search;
 mod settings;
 
 pub use backup::{LocalBackup, LocalBackupMetadata, LocalBackupValidation, LocalRestoreResult};

@@ -20,6 +20,7 @@ pub struct DealSearchRecord {
     pub stage: String,
     pub value: f64,
     pub currency: String,
+    pub match_field: String,
 }
 
 #[derive(Debug, Clone)]
@@ -28,6 +29,35 @@ pub struct ActivitySearchRecord {
     pub title: String,
     pub activity_type: String,
     pub due_date: Option<String>,
+    pub match_field: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct OrganizationSearchRecord {
+    pub id: String,
+    pub name: String,
+    pub email: Option<String>,
+    pub website: Option<String>,
+    pub city: Option<String>,
+    pub country: Option<String>,
+    pub match_field: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct NoteSearchRecord {
+    pub id: String,
+    pub content: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub match_field: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct TagSearchRecord {
+    pub id: String,
+    pub name: String,
+    pub color: String,
+    pub match_field: String,
 }
 
 pub fn search_contacts_full_text(
@@ -105,7 +135,12 @@ pub fn search_deals_text(
     let pattern = format!("%{}%", query.trim());
     let mut stmt = conn.prepare(
         r#"
-        SELECT id, title, stage, value, currency
+        SELECT id, title, stage, value, currency,
+               CASE
+                   WHEN title LIKE ?1 THEN 'title'
+                   WHEN notes LIKE ?1 THEN 'notes'
+                   ELSE 'text'
+               END AS match_field
         FROM deals
         WHERE deleted_at IS NULL
           AND (title LIKE ?1 OR notes LIKE ?1)
@@ -121,6 +156,7 @@ pub fn search_deals_text(
             stage: row.get(2)?,
             value: row.get(3)?,
             currency: row.get(4)?,
+            match_field: row.get(5)?,
         })
     })?;
 
@@ -135,10 +171,16 @@ pub fn search_activities_text(
     let pattern = format!("%{}%", query.trim());
     let mut stmt = conn.prepare(
         r#"
-        SELECT id, title, activity_type, due_date
+        SELECT id, title, activity_type, due_date,
+               CASE
+                   WHEN title LIKE ?1 THEN 'title'
+                   WHEN activity_type LIKE ?1 THEN 'activity_type'
+                   WHEN description LIKE ?1 THEN 'description'
+                   ELSE 'text'
+               END AS match_field
         FROM activities
         WHERE deleted_at IS NULL
-          AND (title LIKE ?1 OR description LIKE ?1)
+          AND (title LIKE ?1 OR activity_type LIKE ?1 OR description LIKE ?1)
         ORDER BY due_date ASC NULLS LAST
         LIMIT ?2
         "#,
@@ -150,6 +192,127 @@ pub fn search_activities_text(
             title: row.get(1)?,
             activity_type: row.get(2)?,
             due_date: row.get(3)?,
+            match_field: row.get(4)?,
+        })
+    })?;
+
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+pub fn search_organizations_text(
+    conn: &Connection,
+    query: &str,
+    limit: i64,
+) -> CrmResult<Vec<OrganizationSearchRecord>> {
+    let pattern = format!("%{}%", query.trim());
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, name, email, website, city, country,
+               CASE
+                   WHEN name LIKE ?1 THEN 'name'
+                   WHEN COALESCE(email, '') LIKE ?1 THEN 'email'
+                   WHEN COALESCE(website, '') LIKE ?1 THEN 'website'
+                   WHEN COALESCE(description, '') LIKE ?1 THEN 'description'
+                   WHEN COALESCE(city, '') LIKE ?1 THEN 'city'
+                   WHEN COALESCE(country, '') LIKE ?1 THEN 'country'
+                   ELSE 'text'
+               END AS match_field
+        FROM organizations
+        WHERE deleted_at IS NULL
+          AND (
+              name LIKE ?1
+              OR COALESCE(email, '') LIKE ?1
+              OR COALESCE(phone, '') LIKE ?1
+              OR COALESCE(website, '') LIKE ?1
+              OR COALESCE(description, '') LIKE ?1
+              OR COALESCE(city, '') LIKE ?1
+              OR COALESCE(country, '') LIKE ?1
+          )
+        ORDER BY updated_at DESC
+        LIMIT ?2
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![pattern, limit], |row| {
+        Ok(OrganizationSearchRecord {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            email: row.get(2)?,
+            website: row.get(3)?,
+            city: row.get(4)?,
+            country: row.get(5)?,
+            match_field: row.get(6)?,
+        })
+    })?;
+
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+pub fn search_notes_text(
+    conn: &Connection,
+    query: &str,
+    limit: i64,
+) -> CrmResult<Vec<NoteSearchRecord>> {
+    let pattern = format!("%{}%", query.trim());
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id,
+               COALESCE(NULLIF(body, ''), content) AS search_content,
+               entity_type,
+               entity_id,
+               CASE
+                   WHEN COALESCE(NULLIF(body, ''), content) LIKE ?1 THEN 'content'
+                   ELSE 'text'
+               END AS match_field
+        FROM notes
+        WHERE deleted_at IS NULL
+          AND COALESCE(NULLIF(body, ''), content) LIKE ?1
+        ORDER BY updated_at DESC
+        LIMIT ?2
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![pattern, limit], |row| {
+        Ok(NoteSearchRecord {
+            id: row.get(0)?,
+            content: row.get(1)?,
+            entity_type: row.get(2)?,
+            entity_id: row.get(3)?,
+            match_field: row.get(4)?,
+        })
+    })?;
+
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+pub fn search_tags_text(
+    conn: &Connection,
+    query: &str,
+    limit: i64,
+) -> CrmResult<Vec<TagSearchRecord>> {
+    let pattern = format!("%{}%", query.trim());
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, name, color,
+               CASE
+                   WHEN name LIKE ?1 THEN 'name'
+                   WHEN color LIKE ?1 THEN 'color'
+                   ELSE 'text'
+               END AS match_field
+        FROM tags
+        WHERE deleted_at IS NULL
+          AND (name LIKE ?1 OR color LIKE ?1)
+        ORDER BY name ASC
+        LIMIT ?2
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![pattern, limit], |row| {
+        Ok(TagSearchRecord {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            color: row.get(2)?,
+            match_field: row.get(3)?,
         })
     })?;
 
