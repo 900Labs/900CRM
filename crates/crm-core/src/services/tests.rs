@@ -1,6 +1,6 @@
 use rusqlite::params;
 
-use super::CrmCore;
+use super::{CrmCore, TagColorUpdate};
 use crate::utils::{datetime::now_iso8601, uuid::new_uuid};
 
 fn open_test_core() -> (CrmCore, std::path::PathBuf) {
@@ -988,7 +988,7 @@ fn tag_lifecycle_writes_tag_audit_sync_and_soft_deletes() {
         .update_tag(
             &tag.id,
             Some("Priority".to_string()),
-            Some("#0f766e".to_string()),
+            Some(TagColorUpdate::Set("#0f766e".to_string())),
         )
         .expect("tag should update");
     assert_eq!(updated.name, "Priority");
@@ -1024,6 +1024,57 @@ fn tag_lifecycle_writes_tag_audit_sync_and_soft_deletes() {
         )
         .expect("tag delete sync count should query");
     assert_eq!(delete_sync_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn update_tag_distinguishes_omitted_color_from_explicit_reset() {
+    let (mut core, path) = open_test_core();
+
+    let tag = core
+        .create_tag("Warm".to_string(), Some("#ef4444".to_string()))
+        .expect("tag should be created");
+
+    let renamed = core
+        .update_tag(&tag.id, Some("Hot".to_string()), None)
+        .expect("tag name should update without changing color");
+    assert_eq!(renamed.name, "Hot");
+    assert_eq!(renamed.color, "#ef4444");
+
+    let reset_from_flag = core
+        .update_tag(&tag.id, None, Some(TagColorUpdate::Reset))
+        .expect("explicit reset should reset color");
+    assert_eq!(
+        reset_from_flag.color,
+        crate::storage::tags::DEFAULT_TAG_COLOR
+    );
+
+    let recolored = core
+        .update_tag(
+            &tag.id,
+            None,
+            Some(TagColorUpdate::Set(" #0f766e ".to_string())),
+        )
+        .expect("explicit color should trim and update");
+    assert_eq!(recolored.color, "#0f766e");
+
+    let reset_from_blank = core
+        .update_tag(&tag.id, None, Some(TagColorUpdate::Set("   ".to_string())))
+        .expect("blank color should reset");
+    assert_eq!(
+        reset_from_blank.color,
+        crate::storage::tags::DEFAULT_TAG_COLOR
+    );
+
+    let existing = core
+        .create_tag("Existing".to_string(), None)
+        .expect("second tag should be created");
+    let err = core
+        .update_tag(&tag.id, Some(existing.name), None)
+        .expect_err("duplicate tag name should be rejected");
+    assert!(err.to_string().contains("already exists"));
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);
@@ -1142,6 +1193,136 @@ fn tag_apply_remove_mirrors_legacy_and_target_links_with_audit_sync() {
         )
         .expect("target active tag_links count should query");
     assert_eq!(target_active_count, 0);
+
+    let target_soft_deleted_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM tag_links WHERE entity_type = 'organization' AND entity_id = ?1 AND tag_id = ?2 AND deleted_at IS NOT NULL",
+            params![organization.id, tag.id],
+            |row| row.get(0),
+        )
+        .expect("target soft-deleted tag_links count should query");
+    assert_eq!(target_soft_deleted_count, 1);
+
+    let remove_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'remove_tag' AND entity_type = 'organization' AND entity_id = ?1",
+            params![organization.id],
+            |row| row.get(0),
+        )
+        .expect("remove tag audit count should query");
+    assert_eq!(remove_audit_count, 1);
+
+    let remove_sync_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'organization' AND entity_id = ?1 AND field_name = 'tags' AND old_value = ?2",
+            params![organization.id, tag.id],
+            |row| row.get(0),
+        )
+        .expect("remove tag sync count should query");
+    assert_eq!(remove_sync_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn duplicate_tag_apply_and_remove_do_not_record_extra_audit_or_sync_entries() {
+    let (mut core, path) = open_test_core();
+
+    let organization = core
+        .create_organization(
+            "Noiseless Links".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("organization should be created");
+    let tag = core
+        .create_tag("Quiet".to_string(), None)
+        .expect("tag should be created");
+
+    core.apply_tag_to_entity(
+        "organization".to_string(),
+        organization.id.clone(),
+        tag.id.clone(),
+    )
+    .expect("first apply should create link");
+    core.apply_tag_to_entity(
+        "organization".to_string(),
+        organization.id.clone(),
+        tag.id.clone(),
+    )
+    .expect("duplicate apply should be idempotent");
+
+    let legacy_link_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM entity_tags WHERE entity_type = 'organization' AND entity_id = ?1 AND tag_id = ?2",
+            params![organization.id, tag.id],
+            |row| row.get(0),
+        )
+        .expect("legacy entity_tags count should query");
+    assert_eq!(legacy_link_count, 1);
+
+    let target_active_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM tag_links WHERE entity_type = 'organization' AND entity_id = ?1 AND tag_id = ?2 AND deleted_at IS NULL",
+            params![organization.id, tag.id],
+            |row| row.get(0),
+        )
+        .expect("target active tag_links count should query");
+    assert_eq!(target_active_count, 1);
+
+    let apply_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'apply_tag' AND entity_type = 'organization' AND entity_id = ?1",
+            params![organization.id],
+            |row| row.get(0),
+        )
+        .expect("apply tag audit count should query");
+    assert_eq!(apply_audit_count, 1);
+
+    let apply_sync_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'organization' AND entity_id = ?1 AND field_name = 'tags' AND new_value = ?2",
+            params![organization.id, tag.id],
+            |row| row.get(0),
+        )
+        .expect("apply tag sync count should query");
+    assert_eq!(apply_sync_count, 1);
+
+    core.remove_tag_from_entity(
+        "organization".to_string(),
+        organization.id.clone(),
+        tag.id.clone(),
+    )
+    .expect("first remove should remove link");
+    core.remove_tag_from_entity(
+        "organization".to_string(),
+        organization.id.clone(),
+        tag.id.clone(),
+    )
+    .expect("duplicate remove should be idempotent");
 
     let target_soft_deleted_count: i64 = core
         .db

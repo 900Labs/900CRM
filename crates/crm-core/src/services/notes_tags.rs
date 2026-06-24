@@ -8,6 +8,12 @@ use crate::utils::errors::CrmError;
 
 use super::{record_audit_json, CrmCore};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TagColorUpdate {
+    Set(String),
+    Reset,
+}
+
 impl CrmCore {
     pub fn create_note(
         &mut self,
@@ -151,17 +157,14 @@ impl CrmCore {
         &mut self,
         id: &str,
         name: Option<String>,
-        color: Option<String>,
+        color: Option<TagColorUpdate>,
     ) -> CrmResult<Tag> {
         let before = storage::tags::get_tag(&self.db.conn, id)?;
         let name = match name {
             Some(value) => Some(normalize_required(&value, "Tag name")?),
             None => None,
         };
-        let color = color.and_then(|value| {
-            let trimmed = value.trim().to_string();
-            (!trimmed.is_empty()).then_some(trimmed)
-        });
+        let color = normalize_color_update(color);
 
         let device_id = self.device_id.clone();
         let tx = self.db.conn.unchecked_transaction()?;
@@ -220,26 +223,29 @@ impl CrmCore {
 
         let device_id = self.device_id.clone();
         let tx = self.db.conn.unchecked_transaction()?;
-        storage::tags::add_tag_to_entity(&tx, entity_type, &entity_id, &tag_id, &device_id)?;
-        storage::sync::record_change(
-            &tx,
-            entity_type,
-            &entity_id,
-            "tags",
-            None,
-            Some(&tag_id),
-            &device_id,
-        )?;
-        record_audit_json(
-            &tx,
-            ACTOR_DESKTOP_APP,
-            "apply_tag",
-            Some(entity_type),
-            Some(&entity_id),
-            None::<&()>,
-            Some(&change),
-            &device_id,
-        )?;
+        let changed =
+            storage::tags::add_tag_to_entity(&tx, entity_type, &entity_id, &tag_id, &device_id)?;
+        if changed {
+            storage::sync::record_change(
+                &tx,
+                entity_type,
+                &entity_id,
+                "tags",
+                None,
+                Some(&tag_id),
+                &device_id,
+            )?;
+            record_audit_json(
+                &tx,
+                ACTOR_DESKTOP_APP,
+                "apply_tag",
+                Some(entity_type),
+                Some(&entity_id),
+                None::<&()>,
+                Some(&change),
+                &device_id,
+            )?;
+        }
         tx.commit()?;
         Ok(())
     }
@@ -263,26 +269,28 @@ impl CrmCore {
 
         let device_id = self.device_id.clone();
         let tx = self.db.conn.unchecked_transaction()?;
-        storage::tags::remove_tag_from_entity(&tx, entity_type, &entity_id, &tag_id)?;
-        storage::sync::record_change(
-            &tx,
-            entity_type,
-            &entity_id,
-            "tags",
-            Some(&tag_id),
-            None,
-            &device_id,
-        )?;
-        record_audit_json(
-            &tx,
-            ACTOR_DESKTOP_APP,
-            "remove_tag",
-            Some(entity_type),
-            Some(&entity_id),
-            Some(&change),
-            Option::<&TagEntityChange<'_>>::None,
-            &device_id,
-        )?;
+        let changed = storage::tags::remove_tag_from_entity(&tx, entity_type, &entity_id, &tag_id)?;
+        if changed {
+            storage::sync::record_change(
+                &tx,
+                entity_type,
+                &entity_id,
+                "tags",
+                Some(&tag_id),
+                None,
+                &device_id,
+            )?;
+            record_audit_json(
+                &tx,
+                ACTOR_DESKTOP_APP,
+                "remove_tag",
+                Some(entity_type),
+                Some(&entity_id),
+                Some(&change),
+                Option::<&TagEntityChange<'_>>::None,
+                &device_id,
+            )?;
+        }
         tx.commit()?;
         Ok(())
     }
@@ -341,7 +349,14 @@ fn normalize_color(color: Option<String>) -> String {
             let trimmed = value.trim().to_string();
             (!trimmed.is_empty()).then_some(trimmed)
         })
-        .unwrap_or_else(|| "#6366f1".to_string())
+        .unwrap_or_else(|| storage::tags::DEFAULT_TAG_COLOR.to_string())
+}
+
+fn normalize_color_update(color: Option<TagColorUpdate>) -> Option<String> {
+    color.map(|update| match update {
+        TagColorUpdate::Set(value) => normalize_color(Some(value)),
+        TagColorUpdate::Reset => storage::tags::DEFAULT_TAG_COLOR.to_string(),
+    })
 }
 
 fn ensure_entity_exists(conn: &Connection, entity_type: &str, entity_id: &str) -> CrmResult<()> {

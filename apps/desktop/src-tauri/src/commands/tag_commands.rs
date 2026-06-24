@@ -1,4 +1,4 @@
-use crm_core::storage::tags::Tag;
+use crm_core::{services::TagColorUpdate, storage::tags::Tag};
 use tauri::State;
 
 use crate::{commands::lock_core, AppState};
@@ -31,9 +31,28 @@ pub async fn update_tag(
     id: String,
     name: Option<String>,
     color: Option<String>,
+    reset_color: Option<bool>,
 ) -> Result<Tag, String> {
     let mut core = lock_core(&state)?;
-    core.update_tag(&id, name, color).map_err(|e| e.to_string())
+    core.update_tag(&id, name, color_update_from_args(color, reset_color))
+        .map_err(|e| e.to_string())
+}
+
+pub(crate) fn color_update_from_args(
+    color: Option<String>,
+    reset_color: Option<bool>,
+) -> Option<TagColorUpdate> {
+    if reset_color.unwrap_or(false) {
+        return Some(TagColorUpdate::Reset);
+    }
+
+    color.map(|value| {
+        if value.trim().is_empty() {
+            TagColorUpdate::Reset
+        } else {
+            TagColorUpdate::Set(value)
+        }
+    })
 }
 
 #[tauri::command]
@@ -75,4 +94,30 @@ pub async fn list_tags_for_entity(
     let core = lock_core(&state)?;
     core.list_tags_for_entity(entity_type, entity_id)
         .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{color_update_from_args, TagColorUpdate};
+
+    #[test]
+    fn color_update_from_args_distinguishes_no_change_reset_and_set() {
+        assert_eq!(color_update_from_args(None, None), None);
+        assert_eq!(
+            color_update_from_args(None, Some(true)),
+            Some(TagColorUpdate::Reset)
+        );
+        assert_eq!(
+            color_update_from_args(Some("   ".to_string()), None),
+            Some(TagColorUpdate::Reset)
+        );
+        assert_eq!(
+            color_update_from_args(Some("#0f766e".to_string()), None),
+            Some(TagColorUpdate::Set("#0f766e".to_string()))
+        );
+        assert_eq!(
+            color_update_from_args(Some("#0f766e".to_string()), Some(true)),
+            Some(TagColorUpdate::Reset)
+        );
+    }
 }
