@@ -85,6 +85,9 @@ The entire interface is localized. Switch languages in settings instantly. Full 
 ### Offline-First by Design
 Every single feature works without an internet connection. There is no "offline mode" to enable — offline is the default. Optional sync to a local-network server is available for teams sharing data across devices.
 
+### MCP Readiness
+MCP support is not implemented or started by the desktop app today. `crates/crm-mcp` is a placeholder for a future optional package, while current external-client, permission, audit-log, and pending-action surfaces only provide readiness primitives. See [MCP Readiness Baseline](docs/MCP_READINESS.md) for the current boundaries and future acceptance checklist.
+
 ---
 
 ## Why 900CRM?
@@ -314,7 +317,7 @@ For a deep dive into the module structure, data flow, sync protocol, and design 
 │   │       ├── services/         # Application services
 │   │       ├── search/           # Search support
 │   │       └── import_export/    # CSV import/export support
-│   ├── crm-mcp/                  # MCP integration placeholder
+│   ├── crm-mcp/                  # MCP integration placeholder; not implemented
 │   └── crm-sdk/                  # SDK placeholder
 ├── scripts/                      # Root verification helpers
 ├── plugins/                      # Community plugin directory
