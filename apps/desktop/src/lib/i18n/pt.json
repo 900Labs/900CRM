@@ -71,7 +71,28 @@
     "website": "Site",
     "address": "Endereço",
     "created": "Criado",
-    "updated": "Última atualização"
+    "updated": "Última atualização",
+    "legacyTags": "Tags legadas",
+    "legacyNotes": "Notas legadas"
+  },
+  "entityNotes": {
+    "title": "Notas",
+    "newPlaceholder": "Nova nota",
+    "add": "Adicionar nota",
+    "empty": "Ainda sem notas",
+    "confirmDelete": "Excluir esta nota?",
+    "loadFailed": "Falha ao carregar notas",
+    "saveFailed": "Falha ao salvar nota",
+    "deleteFailed": "Falha ao excluir nota"
+  },
+  "entityTags": {
+    "title": "Tags",
+    "inputPlaceholder": "Adicionar ou buscar tag",
+    "add": "Adicionar tag",
+    "empty": "Ainda sem tags",
+    "loadFailed": "Falha ao carregar tags",
+    "saveFailed": "Falha ao salvar tag",
+    "removeFailed": "Falha ao remover tag"
   },
   "deals": {
     "title": "Pipeline",
@@ -312,6 +333,8 @@
     "linkContactDesc": "Informe um ID de contato existente para vincular ou limpar sua referência de organização.",
     "linkCreated": "Contato vinculado à organização",
     "linkCleared": "Vínculo de organização do contato removido",
-    "linkContactRequired": "O ID do contato é obrigatório"
+    "linkContactRequired": "O ID do contato é obrigatório",
+    "manageNotesTags": "Notas e tags",
+    "notesTagsTitle": "Notas e tags: {name}"
   }
 }

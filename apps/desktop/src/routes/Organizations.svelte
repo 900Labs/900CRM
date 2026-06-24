@@ -11,6 +11,8 @@
   import { formatDate } from '$lib/utils/formatters';
   import { settingsStore } from '$lib/stores/settings';
   import Modal from '$lib/components/Modal.svelte';
+  import EntityNotesPanel from '$lib/components/EntityNotesPanel.svelte';
+  import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
 
   interface OrganizationFormState {
     name: string;
@@ -29,8 +31,10 @@
   let searchQuery = $state('');
   let formOpen = $state(false);
   let linkOpen = $state(false);
+  let notesTagsOpen = $state(false);
   let editingOrganization = $state<Organization | null>(null);
   let linkOrganization = $state<Organization | null>(null);
+  let notesTagsOrganization = $state<Organization | null>(null);
   let linkContactId = $state('');
   let form = $state<OrganizationFormState>(emptyOrganizationForm());
 
@@ -155,6 +159,16 @@
     await organizationStore.deleteOrganization(organization.id);
   }
 
+  function openNotesTags(organization: Organization) {
+    notesTagsOrganization = organization;
+    notesTagsOpen = true;
+  }
+
+  function closeNotesTags() {
+    notesTagsOpen = false;
+    notesTagsOrganization = null;
+  }
+
   function openLinkContact(organization: Organization) {
     linkOrganization = organization;
     linkContactId = '';
@@ -265,6 +279,9 @@
                     <button class="btn btn-ghost btn-sm" type="button" onclick={() => openEditForm(organization)}>
                       {t('common.edit')}
                     </button>
+                    <button class="btn btn-ghost btn-sm" type="button" onclick={() => openNotesTags(organization)}>
+                      {t('organizations.manageNotesTags')}
+                    </button>
                     <button class="btn btn-ghost btn-sm" type="button" onclick={() => openLinkContact(organization)}>
                       {t('organizations.linkContact')}
                     </button>
@@ -343,6 +360,27 @@
       </button>
     </div>
   </form>
+</Modal>
+
+<Modal
+  bind:open={notesTagsOpen}
+  title={notesTagsOrganization ? t('organizations.notesTagsTitle', { name: notesTagsOrganization.name }) : t('organizations.manageNotesTags')}
+  size="lg"
+  onclose={closeNotesTags}
+>
+  {#if notesTagsOrganization}
+    <div class="organization-entity-panels">
+      <section class="organization-entity-section" aria-labelledby="organization-tags-heading">
+        <h2 class="modal-section-title" id="organization-tags-heading">{t('entityTags.title')}</h2>
+        <EntityTagsPanel entityType="organization" entityId={notesTagsOrganization.id} />
+      </section>
+
+      <section class="organization-entity-section" aria-labelledby="organization-notes-heading">
+        <h2 class="modal-section-title" id="organization-notes-heading">{t('entityNotes.title')}</h2>
+        <EntityNotesPanel entityType="organization" entityId={notesTagsOrganization.id} />
+      </section>
+    </div>
+  {/if}
 </Modal>
 
 <Modal
@@ -525,6 +563,32 @@
     justify-content: flex-end;
     gap: var(--space-3);
     flex-wrap: wrap;
+  }
+
+  .organization-entity-panels {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+  }
+
+  .organization-entity-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding-block-end: var(--space-8);
+    border-block-end: var(--border-width) solid var(--border-subtle);
+  }
+
+  .organization-entity-section:last-child {
+    padding-block-end: 0;
+    border-block-end: none;
+  }
+
+  .modal-section-title {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
   }
 
   .link-description {

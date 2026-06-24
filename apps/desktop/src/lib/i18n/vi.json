@@ -71,7 +71,28 @@
     "website": "Website",
     "address": "Địa chỉ",
     "created": "Đã tạo",
-    "updated": "Cập nhật lần cuối"
+    "updated": "Cập nhật lần cuối",
+    "legacyTags": "Thẻ cũ",
+    "legacyNotes": "Ghi chú cũ"
+  },
+  "entityNotes": {
+    "title": "Ghi chú",
+    "newPlaceholder": "Ghi chú mới",
+    "add": "Thêm ghi chú",
+    "empty": "Chưa có ghi chú",
+    "confirmDelete": "Xóa ghi chú này?",
+    "loadFailed": "Không tải được ghi chú",
+    "saveFailed": "Không lưu được ghi chú",
+    "deleteFailed": "Không xóa được ghi chú"
+  },
+  "entityTags": {
+    "title": "Thẻ",
+    "inputPlaceholder": "Thêm hoặc tìm thẻ",
+    "add": "Thêm thẻ",
+    "empty": "Chưa có thẻ",
+    "loadFailed": "Không tải được thẻ",
+    "saveFailed": "Không lưu được thẻ",
+    "removeFailed": "Không gỡ được thẻ"
   },
   "deals": {
     "title": "Pipeline",
@@ -312,6 +333,8 @@
     "linkContactDesc": "Nhập ID liên hệ hiện có để liên kết hoặc xóa tham chiếu tổ chức.",
     "linkCreated": "Đã liên kết liên hệ với tổ chức",
     "linkCleared": "Đã xóa liên kết tổ chức của liên hệ",
-    "linkContactRequired": "Cần có ID liên hệ"
+    "linkContactRequired": "Cần có ID liên hệ",
+    "manageNotesTags": "Ghi chú & Thẻ",
+    "notesTagsTitle": "Ghi chú & Thẻ: {name}"
   }
 }

@@ -71,7 +71,28 @@
     "website": "الموقع الإلكتروني",
     "address": "العنوان",
     "created": "تاريخ الإنشاء",
-    "updated": "آخر تحديث"
+    "updated": "آخر تحديث",
+    "legacyTags": "الوسوم القديمة",
+    "legacyNotes": "الملاحظات القديمة"
+  },
+  "entityNotes": {
+    "title": "الملاحظات",
+    "newPlaceholder": "ملاحظة جديدة",
+    "add": "إضافة ملاحظة",
+    "empty": "لا توجد ملاحظات بعد",
+    "confirmDelete": "حذف هذه الملاحظة؟",
+    "loadFailed": "فشل تحميل الملاحظات",
+    "saveFailed": "فشل حفظ الملاحظة",
+    "deleteFailed": "فشل حذف الملاحظة"
+  },
+  "entityTags": {
+    "title": "الوسوم",
+    "inputPlaceholder": "أضف أو ابحث عن وسم",
+    "add": "إضافة وسم",
+    "empty": "لا توجد وسوم بعد",
+    "loadFailed": "فشل تحميل الوسوم",
+    "saveFailed": "فشل حفظ الوسم",
+    "removeFailed": "فشل إزالة الوسم"
   },
   "deals": {
     "title": "خط المبيعات",
@@ -312,6 +333,8 @@
     "linkContactDesc": "أدخل معرّف جهة اتصال موجودة لربط مرجع المؤسسة أو مسحه.",
     "linkCreated": "تم ربط جهة الاتصال بالمؤسسة",
     "linkCleared": "تم مسح ربط المؤسسة من جهة الاتصال",
-    "linkContactRequired": "معرّف جهة الاتصال مطلوب"
+    "linkContactRequired": "معرّف جهة الاتصال مطلوب",
+    "manageNotesTags": "الملاحظات والوسوم",
+    "notesTagsTitle": "الملاحظات والوسوم: {name}"
   }
 }
