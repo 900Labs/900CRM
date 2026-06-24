@@ -207,8 +207,12 @@ logic.
 fields include client ID, action type, tool name, optional target entity, input
 JSON, proposed output JSON, status timestamps, and `device_id`.
 
-Current approve/reject behavior records the decision state and audit evidence.
-Approval does not execute CRM mutations, run MCP code, or call a model/provider.
+Reject behavior records only the decision state and audit evidence. Approval of
+a supported `create_activity_draft` proposed action creates an activity through
+the normal core activity path, sets `approved_at` and `executed_at`, and records
+approval/execution audit evidence. Unsupported proposed-action tool/action types
+remain pending with an explicit invalid-input error. Approval does not run MCP
+code or call a model/provider.
 
 ## Backups
 

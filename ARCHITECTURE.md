@@ -517,7 +517,7 @@ See [plugins/README.md](plugins/README.md) for the current specification.
 
 MCP is a future optional package boundary, not a current runtime dependency. The desktop app and `crm-core` do not include a built-in AI agent, do not start an MCP server, do not bind a localhost listener, and do not require internet access, cloud services, or model providers.
 
-The current codebase has external-client records, per-tool permission rows, proposed actions, audit logging, and Pending Actions/Audit Log UI surfaces that can support a future MCP implementation. The active permission modes are limited to `disabled`, `read_only`, and `draft_only`; broader schema-reserved modes are inactive. Approved proposed actions only record approval state and do not execute CRM mutations.
+The current codebase has external-client records, per-tool permission rows, proposed actions, audit logging, Pending Actions/Audit Log UI surfaces, and one narrow core execution path for approved `create_activity_draft` proposed actions. The active permission modes are limited to `disabled`, `read_only`, and `draft_only`; broader schema-reserved modes are inactive. Approval does not run MCP/client code, and unsupported proposed-action tool/action types remain pending with explicit errors.
 
 See [MCP Readiness Baseline](docs/MCP_READINESS.md) for the current status, non-goals, security gates, and future implementation acceptance checklist.
 

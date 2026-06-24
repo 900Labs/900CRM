@@ -342,43 +342,17 @@ impl CrmCore {
         activity_engine::validate_activity_for_create(&title, &activity_type)?;
         let contact_id = normalize_optional_string(contact_id);
         let deal_id = normalize_optional_string(deal_id);
-        if let Some(contact_id) = contact_id.as_deref() {
-            storage::contacts::get_contact(&self.db.conn, contact_id)?;
-        }
-        if let Some(deal_id) = deal_id.as_deref() {
-            storage::deals::get_deal(&self.db.conn, deal_id)?;
-        }
         let device_id = self.device_id.clone();
         let tx = self.db.conn.unchecked_transaction()?;
-        let activity = storage::activities::create_activity(
+        let activity = create_activity_in_transaction(
             &tx,
+            &device_id,
             &activity_type,
             &title,
-            description.as_deref().unwrap_or(""),
+            description.as_deref(),
             due_date.as_deref(),
             contact_id.as_deref(),
             deal_id.as_deref(),
-            &device_id,
-        )?;
-        create_activity_links_for_legacy_mirrors(&tx, &activity, &device_id)?;
-        storage::sync::record_change(
-            &tx,
-            "activity",
-            &activity.id,
-            "__create__",
-            None,
-            Some(&activity.id),
-            &device_id,
-        )?;
-        record_audit_json(
-            &tx,
-            ACTOR_DESKTOP_APP,
-            "create",
-            Some("activity"),
-            Some(&activity.id),
-            None::<&()>,
-            Some(&activity),
-            &device_id,
         )?;
         tx.commit()?;
         Ok(activity)
@@ -1268,6 +1242,58 @@ fn normalize_optional_string(value: Option<String>) -> Option<String> {
 
 fn normalize_optional_update_string(value: Option<Option<String>>) -> Option<Option<String>> {
     value.map(normalize_optional_string)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn create_activity_in_transaction(
+    conn: &Connection,
+    device_id: &str,
+    activity_type: &str,
+    title: &str,
+    description: Option<&str>,
+    due_date: Option<&str>,
+    contact_id: Option<&str>,
+    deal_id: Option<&str>,
+) -> CrmResult<Activity> {
+    activity_engine::validate_activity_for_create(title, activity_type)?;
+    if let Some(contact_id) = contact_id {
+        storage::contacts::get_contact(conn, contact_id)?;
+    }
+    if let Some(deal_id) = deal_id {
+        storage::deals::get_deal(conn, deal_id)?;
+    }
+
+    let activity = storage::activities::create_activity(
+        conn,
+        activity_type,
+        title,
+        description.unwrap_or(""),
+        due_date,
+        contact_id,
+        deal_id,
+        device_id,
+    )?;
+    create_activity_links_for_legacy_mirrors(conn, &activity, device_id)?;
+    storage::sync::record_change(
+        conn,
+        "activity",
+        &activity.id,
+        "__create__",
+        None,
+        Some(&activity.id),
+        device_id,
+    )?;
+    record_audit_json(
+        conn,
+        ACTOR_DESKTOP_APP,
+        "create",
+        Some("activity"),
+        Some(&activity.id),
+        None::<&()>,
+        Some(&activity),
+        device_id,
+    )?;
+    Ok(activity)
 }
 
 fn trimmed_optional(value: &Option<String>) -> Option<String> {

@@ -240,6 +240,30 @@ pub(super) fn sync_activity_links_after_mirror_update(
     )
 }
 
+pub(super) fn add_activity_link_in_transaction(
+    conn: &rusqlite::Connection,
+    activity_id: &str,
+    entity_type: ActivityLinkEntityType,
+    entity_id: &str,
+    device_id: &str,
+) -> CrmResult<ActivityLink> {
+    storage::activities::get_activity(conn, activity_id)?;
+    validate_activity_link_reference(conn, entity_type, entity_id)?;
+    let before_link =
+        storage::activities::get_active_activity_link(conn, activity_id, entity_type, entity_id)?;
+    let link = storage::activities::add_activity_link(
+        conn,
+        activity_id,
+        entity_type,
+        entity_id,
+        device_id,
+    )?;
+    if before_link.is_none() {
+        record_activity_link_create_change(conn, &link, device_id)?;
+    }
+    Ok(link)
+}
+
 // Legacy mirror sync needs both relationship endpoints and the mirrored field name.
 #[allow(clippy::too_many_arguments)]
 fn sync_one_legacy_mirror(
