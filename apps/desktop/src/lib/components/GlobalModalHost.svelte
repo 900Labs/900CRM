@@ -9,9 +9,14 @@
   import { settingsStore } from '$lib/stores/settings';
   import { DEAL_STAGES } from '$lib/api/deals';
   import type { DealStage } from '$lib/api/deals';
+  import type { Contact } from '$lib/api/contacts';
   import type { ActivityType } from '$lib/api/activities';
+  import type { Organization } from '$lib/api/organizations';
   import { normalizeCurrencyCode } from '$lib/utils/currency';
-  import { contactDisplayName } from '$lib/utils/dealRelationships';
+  import {
+    contactDisplayName,
+    loadDealRelationshipLookups,
+  } from '$lib/utils/dealRelationships';
   import {
     listCustomFieldDefinitions,
     setCustomFieldValue,
@@ -38,6 +43,9 @@
   let dealContactId = $state('');
   let dealOrganizationId = $state('');
   let dealDescription = $state('');
+  let dealRelationshipContacts = $state<Contact[]>([]);
+  let dealRelationshipOrganizations = $state<Organization[]>([]);
+  let loadingDealRelationships = $state(false);
 
   let isSavingActivity = $state(false);
   let activitySubject = $state('');
@@ -62,23 +70,23 @@
   const dealContactOptions = $derived.by(() => {
     const selected = contactStore.selectedContact;
     if (!selected || selected.id !== dealContactId) {
-      return contactStore.contacts;
+      return dealRelationshipContacts;
     }
-    if (contactStore.contacts.some((contact) => contact.id === selected.id)) {
-      return contactStore.contacts;
+    if (dealRelationshipContacts.some((contact) => contact.id === selected.id)) {
+      return dealRelationshipContacts;
     }
-    return [selected, ...contactStore.contacts];
+    return [selected, ...dealRelationshipContacts];
   });
 
   const dealOrganizationOptions = $derived.by(() => {
     const selected = organizationStore.selectedOrganization;
     if (!selected || selected.id !== dealOrganizationId) {
-      return organizationStore.organizations;
+      return dealRelationshipOrganizations;
     }
-    if (organizationStore.organizations.some((organization) => organization.id === selected.id)) {
-      return organizationStore.organizations;
+    if (dealRelationshipOrganizations.some((organization) => organization.id === selected.id)) {
+      return dealRelationshipOrganizations;
     }
-    return [selected, ...organizationStore.organizations];
+    return [selected, ...dealRelationshipOrganizations];
   });
 
   function modalDataString(key: string): string {
@@ -200,16 +208,16 @@
   }
 
   async function prepareDealRelationships() {
+    loadingDealRelationships = true;
     try {
-      await Promise.all([
-        contactStore.contacts.length > 0 ? Promise.resolve() : contactStore.loadContacts(),
-        organizationStore.organizations.length > 0
-          ? Promise.resolve()
-          : organizationStore.loadOrganizations(),
-      ]);
+      const lookups = await loadDealRelationshipLookups();
+      dealRelationshipContacts = lookups.contacts;
+      dealRelationshipOrganizations = lookups.organizations;
     } catch (err) {
       console.error('[GlobalModalHost] Failed to load deal relationships:', err);
       uiStore.toastError('Failed to load deal relationships.');
+    } finally {
+      loadingDealRelationships = false;
     }
   }
 
@@ -450,8 +458,17 @@
         </div>
         <div class="form-group">
           <label class="form-label" for="modal-deal-organization">{t('contacts.organization')}</label>
-          <select id="modal-deal-organization" class="select" bind:value={dealOrganizationId}>
-            <option value="">{t('common.none')}</option>
+          <select
+            id="modal-deal-organization"
+            class="select"
+            bind:value={dealOrganizationId}
+            disabled={loadingDealRelationships || isSavingDeal}
+            aria-busy={loadingDealRelationships}
+          >
+            {#if loadingDealRelationships && dealOrganizationId}
+              <option value={dealOrganizationId}>{t('common.loading')}</option>
+            {/if}
+            <option value="">{loadingDealRelationships ? t('common.loading') : t('common.none')}</option>
             {#each dealOrganizationOptions as organization (organization.id)}
               <option value={organization.id}>{organization.name}</option>
             {/each}
@@ -459,8 +476,17 @@
         </div>
         <div class="form-group">
           <label class="form-label" for="modal-deal-contact">{t('deals.contact')}</label>
-          <select id="modal-deal-contact" class="select" bind:value={dealContactId}>
-            <option value="">{t('common.none')}</option>
+          <select
+            id="modal-deal-contact"
+            class="select"
+            bind:value={dealContactId}
+            disabled={loadingDealRelationships || isSavingDeal}
+            aria-busy={loadingDealRelationships}
+          >
+            {#if loadingDealRelationships && dealContactId}
+              <option value={dealContactId}>{t('common.loading')}</option>
+            {/if}
+            <option value="">{loadingDealRelationships ? t('common.loading') : t('common.none')}</option>
             {#each dealContactOptions as contact (contact.id)}
               <option value={contact.id}>{contactDisplayName(contact)}</option>
             {/each}
@@ -484,7 +510,7 @@
     {/snippet}
     {#snippet footer()}
       <button class="btn btn-secondary" type="button" onclick={() => uiStore.closeModal()}>{t('common.cancel')}</button>
-      <button class="btn btn-primary" type="button" onclick={submitDeal} disabled={isSavingDeal}>
+      <button class="btn btn-primary" type="button" onclick={submitDeal} disabled={isSavingDeal || loadingDealRelationships}>
         {isSavingDeal ? t('common.loading') : t('common.save')}
       </button>
     {/snippet}

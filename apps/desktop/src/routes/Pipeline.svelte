@@ -13,12 +13,12 @@
   import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
   import { dealStore } from '$lib/stores/deals';
-  import { contactStore } from '$lib/stores/contacts';
-  import { organizationStore } from '$lib/stores/organizations';
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
-  import type { DealStage, Deal } from '$lib/api/deals';
+  import type { Contact } from '$lib/api/contacts';
+  import type { DealStage } from '$lib/api/deals';
   import { DEAL_STAGES } from '$lib/api/deals';
+  import type { Organization } from '$lib/api/organizations';
   import {
     listCustomFieldDefinitions,
     listCustomFieldValuesForEntityType,
@@ -27,7 +27,10 @@
   } from '$lib/api/customFields';
   import { formatCurrency } from '$lib/utils/formatters';
   import { sumByCurrency } from '$lib/utils/currency';
-  import { deriveDealRelationshipLabels } from '$lib/utils/dealRelationships';
+  import {
+    deriveDealRelationshipLabels,
+    loadDealRelationshipLookups,
+  } from '$lib/utils/dealRelationships';
   import DealCard from '$lib/components/DealCard.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
@@ -45,6 +48,8 @@
   let customFieldValuesLoading = $state(false);
   let customFieldFilterError = $state<string | null>(null);
   let customFieldValueIndex = $state<Record<string, Record<string, string>>>({});
+  let relationshipContacts = $state<Contact[]>([]);
+  let relationshipOrganizations = $state<Organization[]>([]);
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -97,12 +102,14 @@
   }
 
   async function ensureRelationshipLookups() {
-    await Promise.all([
-      contactStore.contacts.length > 0 ? Promise.resolve() : contactStore.loadContacts(),
-      organizationStore.organizations.length > 0
-        ? Promise.resolve()
-        : organizationStore.loadOrganizations(),
-    ]);
+    try {
+      const lookups = await loadDealRelationshipLookups();
+      relationshipContacts = lookups.contacts;
+      relationshipOrganizations = lookups.organizations;
+    } catch (err) {
+      console.error('[Pipeline] Failed to load deal relationship lookups:', err);
+      uiStore.toastError('Failed to load deal relationships.');
+    }
   }
 
   async function loadCustomFieldDefinitions() {
@@ -329,8 +336,8 @@
               {#each col.deals as deal (deal.id)}
                 {@const relationships = deriveDealRelationshipLabels(
                   deal,
-                  contactStore.contacts,
-                  organizationStore.organizations,
+                  relationshipContacts,
+                  relationshipOrganizations,
                 )}
                 <div
                   class="card-wrapper"

@@ -1,6 +1,15 @@
 import type { Contact } from '$lib/api/contacts';
+import { listContacts } from '$lib/api/contacts';
 import type { Deal } from '$lib/api/deals';
 import type { Organization } from '$lib/api/organizations';
+import { listOrganizations } from '$lib/api/organizations';
+
+export const DEAL_RELATIONSHIP_CONTACT_PAGE_SIZE = 500;
+
+export interface DealRelationshipLookups {
+  contacts: Contact[];
+  organizations: Organization[];
+}
 
 export interface DealRelationshipLabels {
   primaryContactName: string | null;
@@ -32,4 +41,41 @@ export function deriveDealRelationshipLabels(
     primaryContactName: contact ? contactDisplayName(contact) : deal.contactName,
     organizationName: organization?.name.trim() || null,
   };
+}
+
+export async function loadDealRelationshipContacts(): Promise<Contact[]> {
+  const contacts: Contact[] = [];
+  let page = 1;
+  let total = 0;
+
+  do {
+    const result = await listContacts({
+      page,
+      pageSize: DEAL_RELATIONSHIP_CONTACT_PAGE_SIZE,
+      sortBy: 'name',
+      sortDir: 'asc',
+    });
+
+    contacts.push(...result.contacts);
+    total = result.total;
+
+    if (result.contacts.length === 0) {
+      break;
+    }
+
+    page += 1;
+  } while (contacts.length < total);
+
+  return contacts;
+}
+
+export async function loadDealRelationshipLookups(): Promise<DealRelationshipLookups> {
+  // Pipeline labels and add-deal selectors need relationship lookup coverage
+  // without mutating the paginated Contacts route store state.
+  const [contacts, organizations] = await Promise.all([
+    loadDealRelationshipContacts(),
+    listOrganizations(),
+  ]);
+
+  return { contacts, organizations };
 }
