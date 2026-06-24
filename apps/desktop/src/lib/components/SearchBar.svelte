@@ -8,8 +8,13 @@
 
   import { t } from '$lib/i18n';
   import { uiStore } from '$lib/stores/ui';
-  import { searchContacts } from '$lib/api/contacts';
+  import { globalSearch } from '$lib/api/search';
   import type { SearchResult } from '$lib/stores/ui';
+  import {
+    mapGlobalSearchResultToSearchResult,
+    searchResultBadgeClass,
+    searchResultTypeLabel,
+  } from '$lib/utils/searchResults';
 
   // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -25,6 +30,9 @@
 
   let inputEl: HTMLInputElement | undefined;
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let searchRequestId = 0;
+
+  const SEARCH_RESULT_LIMIT = 8;
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -35,26 +43,27 @@
     clearTimeout(debounceTimer);
 
     if (!query.trim()) {
+      searchRequestId += 1;
       uiStore.clearSearch();
       return;
     }
 
     uiStore.isSearching = true;
-    debounceTimer = setTimeout(() => performSearch(query), 300);
+    const requestId = ++searchRequestId;
+    debounceTimer = setTimeout(() => performSearch(query, requestId), 300);
   }
 
-  async function performSearch(query: string) {
+  async function performSearch(query: string, requestId: number) {
     try {
-      // Search contacts (expand to deals/activities as needed)
-      const contacts = await searchContacts(query);
-      const results: SearchResult[] = contacts.slice(0, 8).map((c) => ({
-        id: c.id,
-        type: 'contact' as const,
-        title: [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown',
-        subtitle: c.email || c.organization || '',
-      }));
+      const globalResults = await globalSearch(query, SEARCH_RESULT_LIMIT);
+
+      if (requestId !== searchRequestId) return;
+
+      const results: SearchResult[] = globalResults.map(mapGlobalSearchResultToSearchResult);
       uiStore.setSearchResults(results);
     } catch {
+      if (requestId !== searchRequestId) return;
+
       uiStore.setSearchResults([]);
     }
   }
@@ -81,22 +90,12 @@
     setTimeout(() => uiStore.closeSearch(), 200);
   }
 
-  function typeLabel(type: string): string {
-    const map: Record<string, string> = {
-      contact:  t('contacts.title'),
-      deal:     t('deals.title'),
-      activity: t('activities.title'),
-    };
-    return map[type] ?? type;
+  function typeLabel(type: SearchResult['type']): string {
+    return searchResultTypeLabel(type, t);
   }
 
-  function typeBadgeClass(type: string): string {
-    const map: Record<string, string> = {
-      contact:  'badge-primary',
-      deal:     'badge-success',
-      activity: 'badge-warning',
-    };
-    return map[type] ?? 'badge-neutral';
+  function typeBadgeClass(type: SearchResult['type']): string {
+    return searchResultBadgeClass(type);
   }
 </script>
 
@@ -130,7 +129,7 @@
   <!-- Results dropdown -->
   {#if uiStore.searchOpen && uiStore.searchResults.length > 0}
     <ul class="search-results" role="listbox" aria-label={t('common.search') + ' results'}>
-      {#each uiStore.searchResults as result (result.id)}
+      {#each uiStore.searchResults as result (`${result.type}:${result.id}`)}
         <li
           class="search-result-item"
           role="option"
