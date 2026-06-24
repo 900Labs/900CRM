@@ -71,7 +71,28 @@
     "website": "Site web",
     "address": "Adresse",
     "created": "Créé le",
-    "updated": "Dernière mise à jour"
+    "updated": "Dernière mise à jour",
+    "legacyTags": "Étiquettes héritées",
+    "legacyNotes": "Notes héritées"
+  },
+  "entityNotes": {
+    "title": "Notes",
+    "newPlaceholder": "Nouvelle note",
+    "add": "Ajouter une note",
+    "empty": "Aucune note",
+    "confirmDelete": "Supprimer cette note ?",
+    "loadFailed": "Échec du chargement des notes",
+    "saveFailed": "Échec de l’enregistrement de la note",
+    "deleteFailed": "Échec de la suppression de la note"
+  },
+  "entityTags": {
+    "title": "Étiquettes",
+    "inputPlaceholder": "Ajouter ou trouver une étiquette",
+    "add": "Ajouter une étiquette",
+    "empty": "Aucune étiquette",
+    "loadFailed": "Échec du chargement des étiquettes",
+    "saveFailed": "Échec de l’enregistrement de l’étiquette",
+    "removeFailed": "Échec du retrait de l’étiquette"
   },
   "deals": {
     "title": "Pipeline",
@@ -312,6 +333,8 @@
     "linkContactDesc": "Saisissez un ID de contact existant pour lier ou effacer sa référence d’organisation.",
     "linkCreated": "Contact lié à l’organisation",
     "linkCleared": "Lien d’organisation du contact effacé",
-    "linkContactRequired": "L’ID du contact est requis"
+    "linkContactRequired": "L’ID du contact est requis",
+    "manageNotesTags": "Notes et étiquettes",
+    "notesTagsTitle": "Notes et étiquettes : {name}"
   }
 }

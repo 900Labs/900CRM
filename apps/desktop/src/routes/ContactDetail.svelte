@@ -33,6 +33,8 @@
   import { validateEmail, validateUrl } from '$lib/utils/validators';
   import NoteEditor from '$lib/components/NoteEditor.svelte';
   import TagPicker from '$lib/components/TagPicker.svelte';
+  import EntityNotesPanel from '$lib/components/EntityNotesPanel.svelte';
+  import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
   import Modal from '$lib/components/Modal.svelte';
@@ -421,7 +423,7 @@
     <!-- ── Main content grid ─────────────────────────────────────────────────── -->
     <div class="detail-grid">
 
-      <!-- LEFT COLUMN: editable fields + notes + tags -->
+      <!-- LEFT COLUMN: editable fields + generic notes/tags + legacy notes/tags -->
       <div class="detail-main">
 
         <!-- Core fields card -->
@@ -593,10 +595,30 @@
           </div>
         </section>
 
-        <!-- Tags card -->
-        <section class="card detail-tags" aria-labelledby="tags-heading">
+        <!-- Generic tags card -->
+        <section class="card detail-entity-tags" aria-labelledby="entity-tags-heading">
           <div class="card-header">
-            <h2 class="section-title" id="tags-heading">{t('contacts.tags')}</h2>
+            <h2 class="section-title" id="entity-tags-heading">{t('contacts.tags')}</h2>
+          </div>
+          <div class="card-body">
+            <EntityTagsPanel entityType="contact" entityId={contact.id} />
+          </div>
+        </section>
+
+        <!-- Generic notes card -->
+        <section class="card detail-entity-notes" aria-labelledby="entity-notes-heading">
+          <div class="card-header">
+            <h2 class="section-title" id="entity-notes-heading">{t('contacts.notes')}</h2>
+          </div>
+          <div class="card-body">
+            <EntityNotesPanel entityType="contact" entityId={contact.id} />
+          </div>
+        </section>
+
+        <!-- Legacy tags card -->
+        <section class="card detail-tags" aria-labelledby="legacy-tags-heading">
+          <div class="card-header">
+            <h2 class="section-title" id="legacy-tags-heading">{t('contacts.legacyTags')}</h2>
           </div>
           <div class="card-body">
             <TagPicker
@@ -606,10 +628,10 @@
           </div>
         </section>
 
-        <!-- Notes card -->
-        <section class="card detail-notes" aria-labelledby="notes-heading">
+        <!-- Legacy notes card -->
+        <section class="card detail-notes" aria-labelledby="legacy-notes-heading">
           <div class="card-header">
-            <h2 class="section-title" id="notes-heading">{t('contacts.notes')}</h2>
+            <h2 class="section-title" id="legacy-notes-heading">{t('contacts.legacyNotes')}</h2>
           </div>
           <div class="card-body">
             <NoteEditor

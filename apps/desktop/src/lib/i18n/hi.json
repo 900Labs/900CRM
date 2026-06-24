@@ -71,7 +71,28 @@
     "website": "वेबसाइट",
     "address": "पता",
     "created": "बनाया गया",
-    "updated": "अंतिम अपडेट"
+    "updated": "अंतिम अपडेट",
+    "legacyTags": "पुराने टैग",
+    "legacyNotes": "पुराने नोट्स"
+  },
+  "entityNotes": {
+    "title": "नोट्स",
+    "newPlaceholder": "नया नोट",
+    "add": "नोट जोड़ें",
+    "empty": "अभी कोई नोट नहीं",
+    "confirmDelete": "यह नोट हटाएँ?",
+    "loadFailed": "नोट्स लोड नहीं हो सके",
+    "saveFailed": "नोट सहेजा नहीं जा सका",
+    "deleteFailed": "नोट हटाया नहीं जा सका"
+  },
+  "entityTags": {
+    "title": "टैग",
+    "inputPlaceholder": "टैग जोड़ें या खोजें",
+    "add": "टैग जोड़ें",
+    "empty": "अभी कोई टैग नहीं",
+    "loadFailed": "टैग लोड नहीं हो सके",
+    "saveFailed": "टैग सहेजा नहीं जा सका",
+    "removeFailed": "टैग हटाया नहीं जा सका"
   },
   "deals": {
     "title": "पाइपलाइन",
@@ -312,6 +333,8 @@
     "linkContactDesc": "पहले दर्ज संगठन संदर्भ को लिंक या साफ़ करने के लिए मौजूदा संपर्क ID दर्ज करें।",
     "linkCreated": "संपर्क संगठन से लिंक हुआ",
     "linkCleared": "संपर्क का संगठन लिंक साफ़ हुआ",
-    "linkContactRequired": "संपर्क ID आवश्यक है"
+    "linkContactRequired": "संपर्क ID आवश्यक है",
+    "manageNotesTags": "नोट्स और टैग",
+    "notesTagsTitle": "नोट्स और टैग: {name}"
   }
 }

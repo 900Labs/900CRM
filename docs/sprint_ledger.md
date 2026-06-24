@@ -19,3 +19,4 @@
 | 015 | 2026-06-24 | `codex/organization-ui-surface-preserve` | Organization frontend API, store, route, navigation, i18n, and focused invoke-mapping tests while preserving contact organization text | Completed |
 | 016 | 2026-06-24 | `codex/notes-tags-core-surface-preserve` | Generic notes/tags `crm-core` services, Tauri commands, frontend API wrappers, compatibility mirroring, and focused tests without route/UI work | Completed |
 | 017 | 2026-06-24 | `codex/notes-tags-contract-hardening` | Notes/tags contract hardening for idempotent tag link audit/sync semantics and explicit tag color reset behavior without UI work | Completed |
+| 018 | 2026-06-24 | `codex/notes-tags-ui-surface` | Reusable generic notes/tags Svelte panels integrated for contacts and organizations while preserving legacy contact notes/tags | Completed |

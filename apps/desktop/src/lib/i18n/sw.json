@@ -71,7 +71,28 @@
     "website": "Tovuti",
     "address": "Anwani ya Makazi",
     "created": "Iliundwa",
-    "updated": "Ilisasishwa Mwisho"
+    "updated": "Ilisasishwa Mwisho",
+    "legacyTags": "Tagi za awali",
+    "legacyNotes": "Madokezo ya awali"
+  },
+  "entityNotes": {
+    "title": "Madokezo",
+    "newPlaceholder": "Dokezo jipya",
+    "add": "Ongeza dokezo",
+    "empty": "Hakuna madokezo bado",
+    "confirmDelete": "Ufute dokezo hili?",
+    "loadFailed": "Imeshindwa kupakia madokezo",
+    "saveFailed": "Imeshindwa kuhifadhi dokezo",
+    "deleteFailed": "Imeshindwa kufuta dokezo"
+  },
+  "entityTags": {
+    "title": "Tagi",
+    "inputPlaceholder": "Ongeza au tafuta tagi",
+    "add": "Ongeza tagi",
+    "empty": "Hakuna tagi bado",
+    "loadFailed": "Imeshindwa kupakia tagi",
+    "saveFailed": "Imeshindwa kuhifadhi tagi",
+    "removeFailed": "Imeshindwa kuondoa tagi"
   },
   "deals": {
     "title": "Mtiririko",
@@ -312,6 +333,8 @@
     "linkContactDesc": "Weka ID ya anwani iliyopo ili kuunganisha au kufuta rejea yake ya shirika.",
     "linkCreated": "Anwani imeunganishwa na shirika",
     "linkCleared": "Kiungo cha shirika cha anwani kimefutwa",
-    "linkContactRequired": "ID ya anwani inahitajika"
+    "linkContactRequired": "ID ya anwani inahitajika",
+    "manageNotesTags": "Madokezo na Tagi",
+    "notesTagsTitle": "Madokezo na Tagi: {name}"
   }
 }

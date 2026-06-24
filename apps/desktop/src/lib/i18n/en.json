@@ -71,7 +71,28 @@
     "website": "Website",
     "address": "Address",
     "created": "Created",
-    "updated": "Last Updated"
+    "updated": "Last Updated",
+    "legacyTags": "Legacy Tags",
+    "legacyNotes": "Legacy Notes"
+  },
+  "entityNotes": {
+    "title": "Notes",
+    "newPlaceholder": "New note",
+    "add": "Add Note",
+    "empty": "No notes yet",
+    "confirmDelete": "Delete this note?",
+    "loadFailed": "Failed to load notes",
+    "saveFailed": "Failed to save note",
+    "deleteFailed": "Failed to delete note"
+  },
+  "entityTags": {
+    "title": "Tags",
+    "inputPlaceholder": "Add or find tag",
+    "add": "Add Tag",
+    "empty": "No tags yet",
+    "loadFailed": "Failed to load tags",
+    "saveFailed": "Failed to save tag",
+    "removeFailed": "Failed to remove tag"
   },
   "deals": {
     "title": "Pipeline",
@@ -312,6 +333,8 @@
     "linkContactDesc": "Enter an existing contact ID to link or clear its first-class organization reference.",
     "linkCreated": "Contact linked to organization",
     "linkCleared": "Contact organization link cleared",
-    "linkContactRequired": "Contact ID is required"
+    "linkContactRequired": "Contact ID is required",
+    "manageNotesTags": "Notes & Tags",
+    "notesTagsTitle": "Notes & Tags: {name}"
   }
 }
