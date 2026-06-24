@@ -2,7 +2,8 @@ use rusqlite::params;
 
 use super::{CrmCore, TagColorUpdate};
 use crate::{
-    storage::proposed_actions::ProposedAction,
+    permissions::ToolPermissionDecisionReason,
+    storage::{external_clients::ExternalClient, proposed_actions::ProposedAction},
     utils::{csv::ImportColumnMapping, datetime::now_iso8601, errors::CrmError, uuid::new_uuid},
 };
 
@@ -37,6 +38,87 @@ fn create_test_proposed_action(core: &mut CrmCore, title: &str) -> ProposedActio
         None,
     )
     .expect("proposed action should be created")
+}
+
+fn create_test_external_client_with_mode(
+    core: &mut CrmCore,
+    permission_mode: &str,
+) -> ExternalClient {
+    let client = core
+        .create_external_client_placeholder("Test MCP Client", "mcp")
+        .expect("external client placeholder should be created");
+    core.db
+        .conn
+        .execute(
+            "UPDATE external_clients SET permission_mode = ?1, enabled = 1, updated_at = ?2 WHERE id = ?3",
+            params![permission_mode, now_iso8601(), &client.id],
+        )
+        .expect("external client permission mode should update");
+
+    ExternalClient {
+        permission_mode: permission_mode.to_string(),
+        enabled: true,
+        ..client
+    }
+}
+
+fn create_client_proposed_action(
+    core: &mut CrmCore,
+    client_id: &str,
+    tool_name: &str,
+) -> ProposedAction {
+    core.create_external_proposed_action_stub(
+        Some(client_id.to_string()),
+        "create_activity".to_string(),
+        tool_name.to_string(),
+        Some("activity".to_string()),
+        None,
+        r#"{"title":"External draft"}"#.to_string(),
+        None,
+    )
+    .expect("client proposed action should be created")
+}
+
+fn count_permission_rows(core: &CrmCore, client_id: &str, tool_name: &str) -> i64 {
+    core.db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM external_client_permissions WHERE client_id = ?1 AND tool_name = ?2",
+            params![client_id, tool_name],
+            |row| row.get(0),
+        )
+        .expect("permission row count should query")
+}
+
+fn count_permission_audit_rows(core: &CrmCore, permission_id: &str) -> i64 {
+    core.db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'upsert_external_client_permission' AND entity_type = 'external_client_permission' AND entity_id = ?1",
+            params![permission_id],
+            |row| row.get(0),
+        )
+        .expect("permission audit row count should query")
+}
+
+fn count_permission_sync_rows(core: &CrmCore, permission_id: &str) -> i64 {
+    core.db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'external_client_permission' AND entity_id = ?1",
+            params![permission_id],
+            |row| row.get(0),
+        )
+        .expect("permission sync row count should query")
+}
+
+fn assert_permission_denial(error: CrmError, reason: &str) {
+    match error {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains(reason), "{message}");
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
 }
 
 #[test]
@@ -885,6 +967,432 @@ fn create_proposed_action_writes_proposed_action_and_audit() {
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_client_permission_default_denies_without_rows() {
+    let (mut core, path) = open_test_core();
+    let client = create_test_external_client_with_mode(&mut core, "disabled");
+
+    let permissions = core
+        .list_external_client_permissions(&client.id)
+        .expect("disabled client permissions should list");
+    assert!(permissions.is_empty());
+
+    let read = core
+        .evaluate_external_client_tool_read_permission(&client.id, "contacts.search")
+        .expect("disabled client read evaluation should succeed");
+    assert!(!read.allowed);
+    assert_eq!(read.reason, ToolPermissionDecisionReason::ClientDisabled);
+
+    let draft = core
+        .evaluate_external_client_draft_permission(&client.id, "create_activity_draft")
+        .expect("disabled client draft evaluation should succeed");
+    assert!(!draft.allowed);
+    assert_eq!(draft.reason, ToolPermissionDecisionReason::ClientDisabled);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn read_only_external_client_can_read_allowed_tool_but_cannot_create_draft() {
+    let (mut core, path) = open_test_core();
+    let client = create_test_external_client_with_mode(&mut core, "read_only");
+
+    core.upsert_external_client_tool_permission(&client.id, "contacts.search", true, false, true)
+        .expect("read-only tool permission should upsert");
+
+    let read = core
+        .evaluate_external_client_tool_read_permission(&client.id, "contacts.search")
+        .expect("read-only client read evaluation should succeed");
+    assert!(read.allowed);
+
+    let draft = core
+        .evaluate_external_client_draft_permission(&client.id, "contacts.search")
+        .expect("read-only client draft evaluation should succeed");
+    assert!(!draft.allowed);
+    assert_eq!(draft.reason, ToolPermissionDecisionReason::WriteNotAllowed);
+
+    let err = core
+        .create_external_proposed_action_stub(
+            Some(client.id.clone()),
+            "create_activity".to_string(),
+            "contacts.search".to_string(),
+            Some("activity".to_string()),
+            None,
+            r#"{"title":"Blocked"}"#.to_string(),
+            None,
+        )
+        .expect_err("read-only client should not create proposed action");
+    match err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("write_not_allowed"));
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn draft_only_external_client_requires_matching_confirmed_write_permission() {
+    let (mut core, path) = open_test_core();
+    let client = create_test_external_client_with_mode(&mut core, "draft_only");
+
+    let missing = core
+        .evaluate_external_client_draft_permission(&client.id, "create_activity_draft")
+        .expect("draft-only missing permission evaluation should succeed");
+    assert!(!missing.allowed);
+    assert_eq!(
+        missing.reason,
+        ToolPermissionDecisionReason::MissingToolPermission
+    );
+
+    core.upsert_external_client_tool_permission(
+        &client.id,
+        "create_activity_draft",
+        false,
+        true,
+        true,
+    )
+    .expect("draft permission should upsert");
+
+    let allowed = core
+        .evaluate_external_client_draft_permission(&client.id, "create_activity_draft")
+        .expect("draft-only write permission evaluation should succeed");
+    assert!(allowed.allowed);
+
+    let proposed_action =
+        create_client_proposed_action(&mut core, &client.id, "create_activity_draft");
+    assert_eq!(
+        proposed_action.client_id.as_deref(),
+        Some(client.id.as_str())
+    );
+    assert_eq!(proposed_action.status, "pending");
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_client_permission_methods_reject_unknown_and_deleted_clients() {
+    let (mut core, path) = open_test_core();
+
+    let unknown_list = core
+        .list_external_client_permissions("missing-client")
+        .expect_err("unknown client permission list should fail");
+    assert!(matches!(unknown_list, CrmError::NotFound(_)));
+
+    let unknown_upsert = core
+        .upsert_external_client_tool_permission(
+            "missing-client",
+            "contacts.search",
+            true,
+            false,
+            true,
+        )
+        .expect_err("unknown client permission upsert should fail");
+    assert!(matches!(unknown_upsert, CrmError::NotFound(_)));
+
+    let unknown_eval = core
+        .evaluate_external_client_tool_read_permission("missing-client", "contacts.search")
+        .expect_err("unknown client permission evaluation should fail");
+    assert!(matches!(unknown_eval, CrmError::NotFound(_)));
+
+    let client = create_test_external_client_with_mode(&mut core, "read_only");
+    core.db
+        .conn
+        .execute(
+            "UPDATE external_clients SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
+            params![now_iso8601(), &client.id],
+        )
+        .expect("external client should be marked deleted");
+
+    let deleted_list = core
+        .list_external_client_permissions(&client.id)
+        .expect_err("deleted client permission list should fail");
+    assert!(matches!(deleted_list, CrmError::NotFound(_)));
+
+    let deleted_upsert = core
+        .upsert_external_client_tool_permission(&client.id, "contacts.search", true, false, true)
+        .expect_err("deleted client permission upsert should fail");
+    assert!(matches!(deleted_upsert, CrmError::NotFound(_)));
+
+    let deleted_proposal = core
+        .create_external_proposed_action_stub(
+            Some(client.id.clone()),
+            "create_activity".to_string(),
+            "create_activity_draft".to_string(),
+            Some("activity".to_string()),
+            None,
+            r#"{"title":"Blocked"}"#.to_string(),
+            None,
+        )
+        .expect_err("deleted client proposed action should fail");
+    assert!(matches!(deleted_proposal, CrmError::NotFound(_)));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_client_permission_upsert_is_idempotent_and_audits_changes() {
+    let (mut core, path) = open_test_core();
+    let client = create_test_external_client_with_mode(&mut core, "draft_only");
+
+    let inserted = core
+        .upsert_external_client_tool_permission(
+            &client.id,
+            "create_activity_draft",
+            true,
+            false,
+            true,
+        )
+        .expect("permission should insert");
+    assert_eq!(
+        count_permission_rows(&core, &client.id, "create_activity_draft"),
+        1
+    );
+    assert_eq!(count_permission_audit_rows(&core, &inserted.id), 1);
+    assert_eq!(count_permission_sync_rows(&core, &inserted.id), 1);
+
+    let same = core
+        .upsert_external_client_tool_permission(
+            &client.id,
+            "create_activity_draft",
+            true,
+            false,
+            true,
+        )
+        .expect("same permission should be idempotent");
+    assert_eq!(same.id, inserted.id);
+    assert_eq!(same.updated_at, inserted.updated_at);
+    assert_eq!(
+        count_permission_rows(&core, &client.id, "create_activity_draft"),
+        1
+    );
+    assert_eq!(count_permission_audit_rows(&core, &inserted.id), 1);
+    assert_eq!(count_permission_sync_rows(&core, &inserted.id), 1);
+
+    let updated = core
+        .upsert_external_client_tool_permission(
+            &client.id,
+            "create_activity_draft",
+            true,
+            true,
+            true,
+        )
+        .expect("permission should update");
+    assert_eq!(updated.id, inserted.id);
+    assert!(updated.can_write);
+    assert_eq!(
+        count_permission_rows(&core, &client.id, "create_activity_draft"),
+        1
+    );
+    assert_eq!(count_permission_audit_rows(&core, &inserted.id), 2);
+    assert_eq!(count_permission_sync_rows(&core, &inserted.id), 2);
+
+    let direct_write_err = core
+        .upsert_external_client_tool_permission(
+            &client.id,
+            "create_activity_draft",
+            true,
+            true,
+            false,
+        )
+        .expect_err("direct write permission should be rejected");
+    match direct_write_err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("must require confirmation"));
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn create_external_proposed_action_enforces_client_permissions() {
+    let (mut core, path) = open_test_core();
+
+    let internal = core
+        .create_external_proposed_action_stub(
+            None,
+            "create_activity".to_string(),
+            "create_activity_draft".to_string(),
+            Some("activity".to_string()),
+            None,
+            r#"{"title":"Internal draft"}"#.to_string(),
+            None,
+        )
+        .expect("internal proposed action should still be allowed");
+    assert_eq!(internal.client_id, None);
+
+    let disabled_client = create_test_external_client_with_mode(&mut core, "disabled");
+    core.upsert_external_client_tool_permission(
+        &disabled_client.id,
+        "create_activity_draft",
+        true,
+        true,
+        true,
+    )
+    .expect("disabled client permission row can be configured but should not grant access");
+    let disabled_err = core
+        .create_external_proposed_action_stub(
+            Some(disabled_client.id.clone()),
+            "create_activity".to_string(),
+            "create_activity_draft".to_string(),
+            Some("activity".to_string()),
+            None,
+            r#"{"title":"Blocked"}"#.to_string(),
+            None,
+        )
+        .expect_err("disabled client proposed action should fail");
+    assert_permission_denial(disabled_err, "client_disabled");
+
+    let read_only_client = create_test_external_client_with_mode(&mut core, "read_only");
+    core.upsert_external_client_tool_permission(
+        &read_only_client.id,
+        "create_activity_draft",
+        true,
+        true,
+        true,
+    )
+    .expect("read-only client permission row can be configured but should not grant draft access");
+    let read_only_err = core
+        .create_external_proposed_action_stub(
+            Some(read_only_client.id.clone()),
+            "create_activity".to_string(),
+            "create_activity_draft".to_string(),
+            Some("activity".to_string()),
+            None,
+            r#"{"title":"Blocked"}"#.to_string(),
+            None,
+        )
+        .expect_err("read-only client proposed action should fail");
+    assert_permission_denial(read_only_err, "write_not_allowed");
+
+    let draft_without_row = create_test_external_client_with_mode(&mut core, "draft_only");
+    let missing_err = core
+        .create_external_proposed_action_stub(
+            Some(draft_without_row.id.clone()),
+            "create_activity".to_string(),
+            "create_activity_draft".to_string(),
+            Some("activity".to_string()),
+            None,
+            r#"{"title":"Blocked"}"#.to_string(),
+            None,
+        )
+        .expect_err("draft-only client without permission row should fail");
+    assert_permission_denial(missing_err, "missing_tool_permission");
+
+    let draft_without_confirmation = create_test_external_client_with_mode(&mut core, "draft_only");
+    let now = now_iso8601();
+    core.db
+        .conn
+        .execute(
+            r#"
+            INSERT INTO external_client_permissions
+                (id, client_id, tool_name, can_read, can_write,
+                 requires_confirmation, created_at, updated_at)
+            VALUES (?1, ?2, ?3, 1, 1, 0, ?4, ?4)
+            "#,
+            params![
+                new_uuid(),
+                &draft_without_confirmation.id,
+                "create_activity_draft",
+                now
+            ],
+        )
+        .expect("unsafe permission row should insert for enforcement regression");
+    let no_confirmation_err = core
+        .create_external_proposed_action_stub(
+            Some(draft_without_confirmation.id.clone()),
+            "create_activity".to_string(),
+            "create_activity_draft".to_string(),
+            Some("activity".to_string()),
+            None,
+            r#"{"title":"Blocked"}"#.to_string(),
+            None,
+        )
+        .expect_err("draft permission without confirmation should fail");
+    assert_permission_denial(no_confirmation_err, "confirmation_not_required");
+
+    let allowed_client = create_test_external_client_with_mode(&mut core, "draft_only");
+    core.upsert_external_client_tool_permission(
+        &allowed_client.id,
+        "create_activity_draft",
+        true,
+        true,
+        true,
+    )
+    .expect("confirmed draft permission should upsert");
+    let allowed =
+        create_client_proposed_action(&mut core, &allowed_client.id, "create_activity_draft");
+    assert_eq!(
+        allowed.client_id.as_deref(),
+        Some(allowed_client.id.as_str())
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn future_external_client_permission_modes_cannot_read_draft_or_upsert_grants() {
+    for mode in ["write_with_confirmation", "write_allowed"] {
+        let (mut core, path) = open_test_core();
+        let client = create_test_external_client_with_mode(&mut core, mode);
+
+        let now = now_iso8601();
+        core.db
+            .conn
+            .execute(
+                r#"
+                INSERT INTO external_client_permissions
+                    (id, client_id, tool_name, can_read, can_write,
+                     requires_confirmation, created_at, updated_at)
+                VALUES (?1, ?2, 'future.tool', 1, 1, 1, ?3, ?3)
+                "#,
+                params![new_uuid(), &client.id, now],
+            )
+            .expect("future-mode permission row should insert for denial regression");
+
+        let read = core
+            .evaluate_external_client_tool_read_permission(&client.id, "future.tool")
+            .expect("future mode read evaluation should succeed");
+        assert!(!read.allowed, "mode {mode} should not allow reads");
+        assert_eq!(
+            read.reason,
+            ToolPermissionDecisionReason::UnsupportedClientMode
+        );
+
+        let draft = core
+            .evaluate_external_client_draft_permission(&client.id, "future.tool")
+            .expect("future mode draft evaluation should succeed");
+        assert!(!draft.allowed, "mode {mode} should not allow drafts");
+        assert_eq!(
+            draft.reason,
+            ToolPermissionDecisionReason::UnsupportedClientMode
+        );
+
+        let upsert = core
+            .upsert_external_client_tool_permission(&client.id, "future.tool", true, true, true)
+            .expect_err("future mode client grants should not be configurable yet");
+        match upsert {
+            CrmError::InvalidInput(message) => {
+                assert!(message.contains("future permission mode"), "{message}");
+                assert!(message.contains(mode), "{message}");
+            }
+            other => panic!("expected InvalidInput, got {other:?}"),
+        }
+
+        drop(core);
+        let _ = std::fs::remove_dir_all(path);
+    }
 }
 
 #[test]
@@ -4111,7 +4619,7 @@ fn migration_v8_creates_activity_relationship_schema_and_backfills_valid_legacy_
         core.db
             .schema_version()
             .expect("schema version should read"),
-        8
+        crate::storage::Database::current_schema_version()
     );
 
     drop(core);
@@ -4185,6 +4693,150 @@ fn migration_v8_skips_missing_deleted_and_deleted_activity_legacy_links() {
         ),
         0
     );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn migration_v9_deduplicates_external_client_permissions_and_upsert_keeps_unique_pair() {
+    let path = std::env::temp_dir().join(format!("900crm-v9-permission-test-{}", new_uuid()));
+    std::fs::create_dir_all(&path).expect("test dir should be created");
+    let db_path = path.join("900crm.db");
+    {
+        let conn = rusqlite::Connection::open(&db_path).expect("legacy db should open");
+        conn.execute_batch(
+            r#"
+            CREATE TABLE settings (
+                key        TEXT PRIMARY KEY NOT NULL,
+                value      TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE external_clients (
+                id              TEXT PRIMARY KEY,
+                name            TEXT NOT NULL,
+                client_type     TEXT NOT NULL,
+                permission_mode TEXT NOT NULL DEFAULT 'disabled',
+                enabled         INTEGER NOT NULL DEFAULT 0,
+                created_at      TEXT NOT NULL,
+                updated_at      TEXT NOT NULL,
+                deleted_at      TEXT,
+                device_id       TEXT NOT NULL
+            );
+            CREATE TABLE external_client_permissions (
+                id                    TEXT PRIMARY KEY,
+                client_id             TEXT NOT NULL,
+                tool_name             TEXT NOT NULL,
+                can_read              INTEGER NOT NULL DEFAULT 0,
+                can_write             INTEGER NOT NULL DEFAULT 0,
+                requires_confirmation INTEGER NOT NULL DEFAULT 1,
+                created_at            TEXT NOT NULL,
+                updated_at            TEXT NOT NULL
+            );
+            CREATE TABLE sync_changelog (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_type TEXT NOT NULL,
+                entity_id   TEXT NOT NULL,
+                field_name  TEXT NOT NULL,
+                old_value   TEXT,
+                new_value   TEXT,
+                timestamp   TEXT NOT NULL,
+                device_id   TEXT NOT NULL,
+                operation   TEXT NOT NULL DEFAULT 'update',
+                synced_at   TEXT
+            );
+            CREATE TABLE audit_log (
+                id          TEXT PRIMARY KEY,
+                actor_type  TEXT NOT NULL,
+                actor_id    TEXT,
+                action      TEXT NOT NULL,
+                entity_type TEXT,
+                entity_id   TEXT,
+                before_json TEXT,
+                after_json  TEXT,
+                created_at  TEXT NOT NULL,
+                device_id   TEXT NOT NULL
+            );
+            CREATE INDEX idx_external_client_permissions_client
+                ON external_client_permissions (client_id);
+            INSERT INTO external_clients
+                (id, name, client_type, permission_mode, enabled, created_at, updated_at, device_id)
+            VALUES
+                ('client-1', 'Legacy Client', 'mcp', 'draft_only', 1,
+                 '2026-06-24T08:00:00Z', '2026-06-24T08:00:00Z', 'device-a');
+            INSERT INTO external_client_permissions
+                (id, client_id, tool_name, can_read, can_write,
+                 requires_confirmation, created_at, updated_at)
+            VALUES
+                ('permission-old', 'client-1', 'activity.create', 1, 0, 1,
+                 '2026-06-24T08:00:00Z', '2026-06-24T08:00:00Z'),
+                ('permission-new', 'client-1', 'activity.create', 0, 0, 1,
+                 '2026-06-24T09:00:00Z', '2026-06-24T09:00:00Z');
+            PRAGMA user_version = 8;
+            "#,
+        )
+        .expect("v8 permission schema should be created");
+    }
+
+    let mut core = CrmCore::open(&path).expect("core should open and run v9");
+
+    assert_eq!(
+        core.db
+            .schema_version()
+            .expect("schema version should read"),
+        crate::storage::Database::current_schema_version()
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_external_client_permissions_client_tool'"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM external_client_permissions WHERE client_id = 'client-1' AND tool_name = 'activity.create'"
+        ),
+        1
+    );
+
+    let migrated: (String, bool, bool) = core
+        .db
+        .conn
+        .query_row(
+            "SELECT id, can_read, can_write FROM external_client_permissions WHERE client_id = 'client-1' AND tool_name = 'activity.create'",
+            [],
+            |row| {
+                let can_read: i64 = row.get(1)?;
+                let can_write: i64 = row.get(2)?;
+                Ok((row.get(0)?, can_read != 0, can_write != 0))
+            },
+        )
+        .expect("deduplicated permission should query");
+    assert_eq!(migrated.0, "permission-new");
+    assert!(!migrated.1);
+    assert!(!migrated.2);
+
+    let updated = core
+        .upsert_external_client_tool_permission("client-1", "activity.create", true, true, true)
+        .expect("upsert should update the single effective permission row");
+    assert_eq!(updated.id, "permission-new");
+    assert!(updated.can_read);
+    assert!(updated.can_write);
+    assert!(updated.requires_confirmation);
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM external_client_permissions WHERE client_id = 'client-1' AND tool_name = 'activity.create'"
+        ),
+        1
+    );
+
+    let draft = core
+        .evaluate_external_client_draft_permission("client-1", "activity.create")
+        .expect("deduplicated updated permission should evaluate");
+    assert!(draft.allowed);
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);

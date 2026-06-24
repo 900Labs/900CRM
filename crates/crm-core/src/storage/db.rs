@@ -42,7 +42,7 @@ use rusqlite::{params, Connection};
 use crate::utils::errors::{CrmError, CrmResult};
 
 /// The current schema version. Increment whenever a new migration is added.
-const CURRENT_SCHEMA_VERSION: u32 = 8;
+const CURRENT_SCHEMA_VERSION: u32 = 9;
 const DATABASE_FILENAME: &str = "900crm.db";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -236,6 +236,10 @@ impl Database {
 
         if current_version < 8 {
             self.migrate_v8_activity_relationships_core_surface()?;
+        }
+
+        if current_version < 9 {
+            self.migrate_v9_external_client_permission_uniqueness()?;
         }
 
         self.conn.execute_batch(&format!(
@@ -687,6 +691,8 @@ impl Database {
 
             CREATE INDEX IF NOT EXISTS idx_external_client_permissions_client
                 ON external_client_permissions (client_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_external_client_permissions_client_tool
+                ON external_client_permissions (client_id, tool_name);
 
             CREATE TABLE IF NOT EXISTS proposed_actions (
                 id                   TEXT PRIMARY KEY,
@@ -1079,6 +1085,42 @@ impl Database {
         }
 
         log::info!("Migration v8 activity relationships complete");
+        Ok(())
+    }
+
+    fn migrate_v9_external_client_permission_uniqueness(&mut self) -> CrmResult<()> {
+        log::info!("Running database migration v9 external client permission uniqueness");
+
+        if !self.table_exists("external_client_permissions")? {
+            log::warn!(
+                "Skipping external client permission uniqueness migration because table 'external_client_permissions' is missing"
+            );
+            return Ok(());
+        }
+
+        self.conn.execute_batch(
+            r#"
+            DELETE FROM external_client_permissions
+            WHERE id NOT IN (
+                SELECT id
+                FROM (
+                    SELECT
+                        id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY client_id, tool_name
+                            ORDER BY updated_at DESC, created_at DESC, id DESC
+                        ) AS row_rank
+                    FROM external_client_permissions
+                )
+                WHERE row_rank = 1
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_external_client_permissions_client_tool
+                ON external_client_permissions (client_id, tool_name);
+            "#,
+        )?;
+
+        log::info!("Migration v9 external client permission uniqueness complete");
         Ok(())
     }
 

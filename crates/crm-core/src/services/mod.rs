@@ -43,6 +43,7 @@ mod audit;
 mod backup;
 mod contacts;
 mod deal_relationships;
+mod external_client_permissions;
 mod migration_readiness;
 mod notes_tags;
 mod organizations;
