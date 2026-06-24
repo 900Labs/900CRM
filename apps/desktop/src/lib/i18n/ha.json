@@ -71,7 +71,28 @@
     "website": "Yanar Gizo",
     "address": "Adireshi",
     "created": "An Kirkira",
-    "updated": "An Sabunta Na Karshe"
+    "updated": "An Sabunta Na Karshe",
+    "legacyTags": "Tsoffin tambari",
+    "legacyNotes": "Tsoffin bayanan kula"
+  },
+  "entityNotes": {
+    "title": "Bayanan kula",
+    "newPlaceholder": "Sabon bayanin kula",
+    "add": "Kara bayani",
+    "empty": "Babu bayanai tukuna",
+    "confirmDelete": "A share wannan bayani?",
+    "loadFailed": "An kasa loda bayanai",
+    "saveFailed": "An kasa adana bayani",
+    "deleteFailed": "An kasa share bayani"
+  },
+  "entityTags": {
+    "title": "Tambari",
+    "inputPlaceholder": "Kara ko nemo tambari",
+    "add": "Kara tambari",
+    "empty": "Babu tambari tukuna",
+    "loadFailed": "An kasa loda tambari",
+    "saveFailed": "An kasa adana tambari",
+    "removeFailed": "An kasa cire tambari"
   },
   "deals": {
     "title": "Pipeline",
@@ -312,6 +333,8 @@
     "linkContactDesc": "Shigar da ID na lamba don hada ko goge alakar kungiya.",
     "linkCreated": "An hada lamba da kungiya",
     "linkCleared": "An goge alakar kungiya daga lamba",
-    "linkContactRequired": "Ana bukatar ID na lamba"
+    "linkContactRequired": "Ana bukatar ID na lamba",
+    "manageNotesTags": "Bayanan kula da Tambari",
+    "notesTagsTitle": "Bayanan kula da Tambari: {name}"
   }
 }

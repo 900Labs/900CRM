@@ -71,7 +71,28 @@
     "website": "ওয়েবসাইট",
     "address": "ঠিকানা",
     "created": "তৈরি হয়েছে",
-    "updated": "সর্বশেষ আপডেট"
+    "updated": "সর্বশেষ আপডেট",
+    "legacyTags": "লিগেসি ট্যাগ",
+    "legacyNotes": "লিগেসি নোট"
+  },
+  "entityNotes": {
+    "title": "নোট",
+    "newPlaceholder": "নতুন নোট",
+    "add": "নোট যোগ করুন",
+    "empty": "এখনও কোনো নোট নেই",
+    "confirmDelete": "এই নোট মুছবেন?",
+    "loadFailed": "নোট লোড করা যায়নি",
+    "saveFailed": "নোট সংরক্ষণ করা যায়নি",
+    "deleteFailed": "নোট মুছে ফেলা যায়নি"
+  },
+  "entityTags": {
+    "title": "ট্যাগ",
+    "inputPlaceholder": "ট্যাগ যোগ করুন বা খুঁজুন",
+    "add": "ট্যাগ যোগ করুন",
+    "empty": "এখনও কোনো ট্যাগ নেই",
+    "loadFailed": "ট্যাগ লোড করা যায়নি",
+    "saveFailed": "ট্যাগ সংরক্ষণ করা যায়নি",
+    "removeFailed": "ট্যাগ সরানো যায়নি"
   },
   "deals": {
     "title": "পাইপলাইন",
@@ -312,6 +333,8 @@
     "linkContactDesc": "প্রথম-শ্রেণির সংস্থা রেফারেন্স যুক্ত বা মুছতে বিদ্যমান যোগাযোগ ID লিখুন।",
     "linkCreated": "যোগাযোগ সংস্থার সাথে যুক্ত হয়েছে",
     "linkCleared": "যোগাযোগের সংস্থা লিংক মুছে গেছে",
-    "linkContactRequired": "যোগাযোগ ID প্রয়োজন"
+    "linkContactRequired": "যোগাযোগ ID প্রয়োজন",
+    "manageNotesTags": "নোট ও ট্যাগ",
+    "notesTagsTitle": "নোট ও ট্যাগ: {name}"
   }
 }
