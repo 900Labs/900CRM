@@ -425,8 +425,10 @@
 
     backupBusy = 'restore';
     clearBackupFeedback();
+    let restoreRevalidationComplete = false;
     try {
       const validation = await validateSelectedBackup(backupDir);
+      restoreRevalidationComplete = true;
       const confirmed = window.confirm(t('settings.backupRestoreConfirm'));
       if (!confirmed) {
         backupMessage = t('settings.backupRestoreCancelled');
@@ -437,6 +439,9 @@
       backupMessage = t('settings.backupRestored', { path: result.database_path });
       uiStore.toastSuccess(t('settings.backupRestored', { path: result.database_path }));
     } catch (err) {
+      if (!restoreRevalidationComplete) {
+        lastBackupValidation = null;
+      }
       backupError = backupErrorMessage(err);
       uiStore.toastError(`${t('settings.backupFailed')}: ${backupError}`);
     } finally {

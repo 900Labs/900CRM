@@ -78,4 +78,20 @@ describe('backup API', () => {
       confirm_destructive_restore: true,
     });
   });
+
+  it('rejects restoreLocalBackupToAppData without exactly true destructive confirmation', async () => {
+    const restoreWithRuntimeConfirmation = restoreLocalBackupToAppData as unknown as (
+      backupDir: string,
+      confirmDestructiveRestore?: boolean,
+    ) => Promise<LocalRestoreResult>;
+
+    await expect(restoreWithRuntimeConfirmation('/tmp/backup', false)).rejects.toThrow(
+      'Local restore requires explicit destructive confirmation.',
+    );
+    await expect(restoreWithRuntimeConfirmation('/tmp/backup')).rejects.toThrow(
+      'Local restore requires explicit destructive confirmation.',
+    );
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
 });
