@@ -1,7 +1,7 @@
 //! Notes CRUD operations for 900CRM.
 //!
 //! Notes are freeform text records attached to any entity type (`contact`,
-//! `deal`, `activity`). They use the same entity polymorphism pattern:
+//! `organization`, `deal`, `activity`). They use the same entity polymorphism pattern:
 //! `entity_type` + `entity_id` identify the parent record.
 //!
 //! # Soft Delete
@@ -59,7 +59,7 @@ pub struct Note {
 ///
 /// - `conn` — SQLite connection.
 /// - `content` — Note body (markdown or plain text).
-/// - `entity_type` — `"contact"`, `"deal"`, or `"activity"`.
+/// - `entity_type` — `"contact"`, `"organization"`, `"deal"`, or `"activity"`.
 /// - `entity_id` — UUID of the parent entity.
 /// - `device_id` — Originating device UUID.
 ///
@@ -78,8 +78,9 @@ pub fn create_note(
 
     conn.execute(
         r#"
-        INSERT INTO notes (id, content, entity_type, entity_id, created_at, updated_at, device_id)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        INSERT INTO notes
+            (id, content, body, entity_type, entity_id, created_at, updated_at, device_id)
+        VALUES (?1, ?2, ?2, ?3, ?4, ?5, ?6, ?7)
         "#,
         params![id, content, entity_type, entity_id, now, now, device_id],
     )?;
@@ -97,7 +98,8 @@ pub fn create_note(
 pub fn get_note(conn: &Connection, id: &str) -> CrmResult<Note> {
     conn.query_row(
         r#"
-        SELECT id, content, entity_type, entity_id, created_at, updated_at, deleted_at, device_id
+        SELECT id, COALESCE(NULLIF(body, ''), content), entity_type, entity_id,
+               created_at, updated_at, deleted_at, device_id
         FROM notes
         WHERE id = ?1 AND deleted_at IS NULL
         "#,
@@ -126,7 +128,8 @@ pub fn get_notes_for_entity(
 ) -> CrmResult<Vec<Note>> {
     let mut stmt = conn.prepare(
         r#"
-        SELECT id, content, entity_type, entity_id, created_at, updated_at, deleted_at, device_id
+        SELECT id, COALESCE(NULLIF(body, ''), content), entity_type, entity_id,
+               created_at, updated_at, deleted_at, device_id
         FROM notes
         WHERE entity_type = ?1 AND entity_id = ?2 AND deleted_at IS NULL
         ORDER BY created_at DESC
@@ -154,7 +157,7 @@ pub fn get_notes_for_entity(
 pub fn update_note(conn: &Connection, id: &str, content: &str) -> CrmResult<Note> {
     let now = now_iso8601();
     let changed = conn.execute(
-        "UPDATE notes SET content = ?1, updated_at = ?2 WHERE id = ?3 AND deleted_at IS NULL",
+        "UPDATE notes SET content = ?1, body = ?1, updated_at = ?2 WHERE id = ?3 AND deleted_at IS NULL",
         params![content, now, id],
     )?;
 
