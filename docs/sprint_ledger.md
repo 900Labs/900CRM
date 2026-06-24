@@ -28,3 +28,4 @@
 | 024 | 2026-06-24 | `codex/global-search-ui-surface` | Visible SearchBar integration with global search results across contacts, organizations, deals, activities, notes, and tags without backend changes | Completed |
 | 025 | 2026-06-24 | `codex/import-export-api-organization-csv-foundation` | Organization CSV import/export foundation and typed frontend Import/Export API wrappers without mapping wizard or duplicate-warning UI | Completed |
 | 026 | 2026-06-24 | `codex/import-preflight-duplicate-detection-foundation` | Read-only CSV import preflight duplicate warning foundation for contacts and organizations across core, Tauri, and frontend API layers without wizard UI changes | Completed |
+| 027 | 2026-06-24 | `codex/import-field-mapping-core-surface` | Field-mapped CSV import/preflight core, Tauri, and frontend API foundation for contacts and organizations without Import Wizard UI | Completed |
