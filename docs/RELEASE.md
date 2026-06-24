@@ -9,15 +9,22 @@ checks required before publishing a public release.
 
 900CRM is not published as a packaged public desktop release yet.
 
-Current CI is verification-only:
+Current CI is verification-only, and release packaging is intentionally
+separate:
 
 - it runs on `ubuntu-latest`;
 - it verifies frontend linting, type checks, unit tests, production build, and
   browser smoke tests;
 - it verifies Rust formatting, Clippy, workspace checks, and workspace tests;
-- it does not build release installers;
-- it does not sign, notarize, checksum, attach, or publish release artifacts;
-- it does not run cross-platform packaging jobs for Windows, macOS, or Linux.
+- it does not build or publish release installers.
+
+Manual release packaging now lives in
+[`.github/workflows/release.yml`](../.github/workflows/release.yml). It must be
+started with `workflow_dispatch`, builds Windows, macOS, and Linux Tauri
+bundles, uploads workflow artifacts, and generates per-platform SHA-256
+checksums, release metadata, and an SPDX-shaped dependency inventory. The
+workflow does not publish a GitHub Release unless `publish_github_release` is
+explicitly enabled for a matching `v`-prefixed tag ref.
 
 The current repository can be built and tested locally by contributors, but the
 presence of source code, CI checks, or Tauri configuration is not a release
@@ -51,7 +58,7 @@ the following checks from a clean checkout:
   and changelog docs still describe only implemented behavior.
 - [ ] Confirm the release notes list known gaps and deferred systems clearly.
 
-## Required Future Release Artifacts
+## Release Artifacts and Metadata
 
 A public desktop release should include, at minimum:
 
@@ -65,20 +72,46 @@ A public desktop release should include, at minimum:
 - License and third-party notice material where required by dependencies.
 - Platform-specific signing and notarization evidence where applicable.
 
-## Not Yet Implemented
+## Manual Packaging Workflow
 
-The following release systems are intentionally not implemented in the current
-repository state:
+Maintainers can create unsigned release-candidate packages from a clean checkout
+by dispatching the `Manual Release Packaging` workflow with:
 
-- automated release packaging workflow;
-- automated Windows installer build;
-- automated macOS DMG build;
-- automated Linux `.deb` or `.AppImage` build;
+- `release_version`: the version label recorded in artifact metadata.
+- `release_title`: optional human-readable release title.
+- `release_tag`: required only when attaching artifacts to a GitHub Release.
+- `publish_github_release`: default `false`; set to `true` only from the
+  matching `refs/tags/v...` workflow ref.
+- `release_draft`: default `true` for guarded GitHub Release creation.
+
+The workflow produces two artifact groups for each platform:
+
+- desktop packages built by Tauri under
+  `target/release/bundle`;
+- release metadata from `scripts/generate-release-manifest.mjs`, including
+  `*-SHA256SUMS.txt`, `*-release-metadata.json`, and `*-sbom.spdx.json`.
+
+The manifest script is also locally runnable for validation:
+
+```bash
+node scripts/generate-release-manifest.mjs --help
+node scripts/generate-release-manifest.mjs --sample --out-dir /tmp/900crm-release-sample --platform local
+```
+
+If real release artifacts are not present and `--sample` is not used, the script
+fails with a message naming the missing artifact directory or expected package
+suffixes.
+
+## Still Not Implemented
+
+The following release systems remain intentionally not implemented in the
+current repository state:
+
 - artifact signing;
 - macOS notarization;
-- checksum generation and publishing;
-- SBOM generation and publishing;
-- GitHub release creation or attachment automation;
+- automatic publishing by default;
+- release attachment automation without an explicit `publish_github_release`
+  dispatch input and matching `refs/tags/v...` guard;
 - upgrade/update channel;
 - release telemetry or crash reporting.
 
