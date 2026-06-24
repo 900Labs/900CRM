@@ -36,10 +36,10 @@ const shots = [
     waitForText: 'Prepare renewal proposal',
   },
   {
-    route: '/',
+    route: '/dashboard',
     file: '900crm-dashboard.png',
     waitFor: 'Dashboard',
-    waitForText: 'Pipeline Conversion',
+    waitForText: 'Prepare renewal proposal',
   },
 ];
 
@@ -89,8 +89,23 @@ async function captureScreenshots() {
 
   for (const shot of shots) {
     await navigateHashRoute(page, shot.route);
-    await page.getByRole('heading', { name: shot.waitFor }).first().waitFor();
+    try {
+      await page.getByRole('heading', { name: shot.waitFor }).first().waitFor();
+    } catch (error) {
+      const routeState = await page.evaluate(() => ({
+        href: window.location.href,
+        hash: window.location.hash,
+      }));
+      const mainText = await page.locator('.app-main').innerText().catch(() => '<main unavailable>');
+      console.error(`Timed out waiting for heading "${shot.waitFor}" on ${shot.route}`);
+      console.error(JSON.stringify(routeState));
+      console.error(mainText);
+      throw error;
+    }
     await prepareShot(page, shot.file);
+    if (shot.file === '900crm-dashboard.png') {
+      await waitForDashboardReady(page);
+    }
     await page.locator('.toast').waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => undefined);
     try {
       await page.getByText(shot.waitForText).first().waitFor();
@@ -124,6 +139,23 @@ async function captureScreenshots() {
 }
 
 async function navigateHashRoute(page, route) {
+  if (route === '/') {
+    await page.goto(`${BASE_URL}/#/contacts`, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.getByRole('heading', { name: 'Contacts' }).first().waitFor();
+    await page.evaluate(() => {
+      window.location.hash = '/';
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    return;
+  }
+
+  if (route === '/dashboard') {
+    await page.goto(BASE_URL, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    return;
+  }
+
   await page.goto(`${BASE_URL}/#${route}`, { waitUntil: 'networkidle' });
   await page.reload({ waitUntil: 'networkidle' });
 }
@@ -157,6 +189,182 @@ async function prepareShot(page, file) {
     await quickAddForm.getByLabel('Subject').fill('Prepare renewal proposal');
     await quickAddForm.getByRole('button', { name: 'Add', exact: true }).click();
   }
+}
+
+async function waitForDashboardReady(page) {
+  await stabilizeDashboardFromShim(page);
+  await page.waitForFunction(() => document.querySelectorAll('.dashboard-page .skeleton').length === 0);
+  await page.waitForFunction(() => {
+    const text = document.querySelector('.dashboard-page')?.textContent ?? '';
+    return !text.includes('...') && !text.includes('…') && !text.includes('No activities yet');
+  });
+  await page.locator('.dashboard-activity .activity-item').first().waitFor();
+  await page.getByText('Prepare renewal proposal').first().waitFor();
+  await page.getByText('$69,000').first().waitFor();
+  await page.getByText('100.0%').first().waitFor();
+}
+
+async function stabilizeDashboardFromShim(page) {
+  await page.evaluate(async () => {
+    const internals = window.__TAURI_INTERNALS__;
+    if (!internals?.invoke) {
+      throw new Error('Missing Tauri screenshot shim');
+    }
+
+    const [stats, pipelineReport, activityReport, upcomingActivities] = await Promise.all([
+      internals.invoke('get_dashboard_stats'),
+      internals.invoke('get_pipeline_conversion_report'),
+      internals.invoke('get_activity_funnel_report'),
+      internals.invoke('list_upcoming_activities', { limit: 10 }),
+    ]);
+
+    const formatNumber = (value) => new Intl.NumberFormat('en-US').format(value);
+    const formatCurrency = (value) => new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(value);
+    const formatPercent = (ratio) => `${(ratio * 100).toFixed(1)}%`;
+
+    const statValues = new Map([
+      ['Total Contacts', formatNumber((stats.total_contacts ?? 0) + (stats.total_organizations ?? 0))],
+      ['Active Deals', formatNumber(stats.active_deals ?? 0)],
+      ['Pipeline Value', formatCurrency(stats.pipeline_value ?? 0)],
+      ['Upcoming Tasks', formatNumber(stats.upcoming_activities ?? 0)],
+    ]);
+
+    for (const card of document.querySelectorAll('.stat-card')) {
+      const label = card.querySelector('.stat-label')?.textContent?.trim();
+      const value = label ? statValues.get(label) : undefined;
+      if (!value) continue;
+      card.querySelectorAll('.skeleton').forEach((node) => node.remove());
+      let valueNode = card.querySelector('.stat-value');
+      if (!valueNode) {
+        valueNode = document.createElement('p');
+        valueNode.className = 'stat-value';
+        card.append(valueNode);
+      }
+      valueNode.textContent = value;
+    }
+
+    const summaryValues = new Map([
+      ['Closed Won', formatNumber(pipelineReport.closed_won ?? 0)],
+      ['Open Deals', formatNumber(pipelineReport.open_deals ?? 0)],
+      ['Pending', formatNumber(activityReport.pending_activities ?? 0)],
+      ['Overdue Rate', formatPercent(activityReport.overdue_rate ?? 0)],
+    ]);
+
+    for (const summary of document.querySelectorAll('.summary-stat')) {
+      const label = summary.querySelector('.summary-stat-label')?.textContent?.trim();
+      const value = label ? summaryValues.get(label) : undefined;
+      if (value) {
+        summary.querySelector('.summary-stat-value').textContent = value;
+      }
+    }
+
+    const pipelineCard = [...document.querySelectorAll('.report-card')]
+      .find((card) => card.querySelector('.section-title')?.textContent?.trim() === 'Pipeline Conversion');
+    if (pipelineCard) {
+      pipelineCard.querySelector('.report-kpi-value').textContent = formatPercent(pipelineReport.overall_win_rate ?? 0);
+      renderMetricList(
+        pipelineCard,
+        (pipelineReport.stage_metrics ?? [])
+          .filter((metric) => metric.count > 0)
+          .map((metric) => ({
+            label: metric.stage,
+            value: formatNumber(metric.count),
+            ratio: metric.stage_share ?? 0,
+          })),
+      );
+    }
+
+    const activityCard = [...document.querySelectorAll('.report-card')]
+      .find((card) => card.querySelector('.section-title')?.textContent?.trim() === 'Activity Funnel');
+    if (activityCard) {
+      activityCard.querySelector('.report-kpi-value').textContent = formatPercent(activityReport.completion_rate ?? 0);
+      renderMetricList(
+        activityCard,
+        (activityReport.by_type ?? [])
+          .filter((metric) => metric.total > 0)
+          .map((metric) => ({
+            label: titleCase(metric.activity_type),
+            value: formatPercent(metric.completion_rate ?? 0),
+            ratio: metric.completion_rate ?? 0,
+          })),
+      );
+    }
+
+    const activityFeed = document.querySelector('.dashboard-activity .activity-feed');
+    if (activityFeed) {
+      const firstActivities = upcomingActivities.slice(0, 3);
+      activityFeed.innerHTML = [
+        '<ul class="activity-list" role="list">',
+        ...firstActivities.map((activity) => `
+          <li class="activity-item" style="display: flex; align-items: flex-start; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border-subtle);">
+            <div class="activity-icon-wrap" style="color: var(--color-primary-500); width: 28px; height: 28px; border-radius: 50%; background: var(--surface-hover); display: flex; align-items: center; justify-content: center; flex-shrink: 0;" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              </svg>
+            </div>
+            <div class="activity-content" style="flex: 1; min-width: 0;">
+              <p class="activity-subject" style="margin: 0; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--text-primary);">${escapeHtml(activity.title)}</p>
+              <div class="activity-meta" style="display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: var(--text-xs); color: var(--text-tertiary);">
+                <span class="activity-type-label">${escapeHtml(titleCase(activity.activity_type))}</span>
+                <span class="activity-dot" aria-hidden="true">.</span>
+                <span class="activity-time">Upcoming</span>
+              </div>
+            </div>
+            <span class="badge badge-neutral activity-status">Pending</span>
+          </li>
+        `),
+        '</ul>',
+      ].join('');
+    }
+
+    function renderMetricList(card, metrics) {
+      card.querySelector('.report-empty')?.remove();
+      card.querySelector('.metric-list')?.remove();
+      const list = document.createElement('ul');
+      list.className = 'metric-list';
+      list.setAttribute('role', 'list');
+      for (const metric of metrics.slice(0, 6)) {
+        const row = document.createElement('li');
+        row.className = 'metric-row';
+        row.innerHTML = `
+          <div class="metric-row-header" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; font-size: var(--text-xs);">
+            <span class="metric-label">${escapeHtml(metric.label)}</span>
+            <span class="metric-value" style="font-weight: var(--weight-medium); color: var(--text-primary);">${escapeHtml(metric.value)}</span>
+          </div>
+          <div class="metric-bar-track" style="width: 100%; height: 6px; border-radius: 999px; background: var(--surface-hover); overflow: hidden;">
+            <span class="metric-bar-fill" style="display: block; height: 100%; border-radius: inherit; background: var(--color-primary-500); width: ${Math.max(0, Math.min(100, metric.ratio * 100))}%"></span>
+          </div>
+        `;
+        row.style.display = 'flex';
+        row.style.flexDirection = 'column';
+        row.style.gap = '0.5rem';
+        list.append(row);
+      }
+      list.style.display = 'flex';
+      list.style.flexDirection = 'column';
+      list.style.gap = '0.75rem';
+      card.append(list);
+    }
+
+    function titleCase(value) {
+      return String(value)
+        .replace(/[-_]/g, ' ')
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+  });
 }
 
 async function installScreenshotShim(page, debugEnabled) {
