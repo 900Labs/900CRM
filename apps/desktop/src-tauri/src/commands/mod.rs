@@ -7,6 +7,7 @@ use tauri::State;
 use crate::AppState;
 
 pub mod activity_commands;
+pub mod audit_pending_commands;
 pub mod backup_commands;
 pub mod contact_commands;
 pub mod custom_field_commands;
