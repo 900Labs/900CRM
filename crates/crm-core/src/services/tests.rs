@@ -892,6 +892,347 @@ fn global_search_respects_blank_query_and_limit_behavior() {
 }
 
 #[test]
+fn migration_v10_creates_global_search_fts_tables() {
+    let (core, path) = open_test_core();
+
+    for table_name in [
+        "organizations_fts",
+        "deals_fts",
+        "activities_fts",
+        "notes_fts",
+        "tags_fts",
+    ] {
+        let sql = format!(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '{}'",
+            table_name
+        );
+        assert_eq!(count(&core, &sql), 1, "{table_name} should exist");
+    }
+
+    assert_eq!(
+        core.db
+            .schema_version()
+            .expect("schema version should read"),
+        crate::storage::Database::current_schema_version()
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn global_search_uses_fts_for_non_contact_entities() {
+    let (mut core, path) = open_test_core();
+
+    let organization = core
+        .create_organization(
+            "HelioVector Partners".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("orbital clinics".to_string()),
+        )
+        .expect("organization should create");
+    let deal = core
+        .create_deal(
+            "NeuroHarbor rollout".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("specialized expansion".to_string()),
+        )
+        .expect("deal should create");
+    let activity = core
+        .create_activity(
+            "call".to_string(),
+            "CalderaSignal planning".to_string(),
+            Some("coordinate launch".to_string()),
+            None,
+            None,
+            None,
+        )
+        .expect("activity should create");
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Fiona".to_string()),
+            Some("Search".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should create");
+    let note = core
+        .create_note(
+            "contact".to_string(),
+            contact.id,
+            "QuasarLedger onboarding note".to_string(),
+        )
+        .expect("note should create");
+    let tag = core
+        .create_tag("ZenithRoute".to_string(), None)
+        .expect("tag should create");
+
+    assert_fts_result(
+        &core,
+        "HelioVector",
+        crate::search::SearchEntityType::Organization,
+        &organization.id,
+    );
+    assert_fts_result(
+        &core,
+        "NeuroHarbor",
+        crate::search::SearchEntityType::Deal,
+        &deal.id,
+    );
+    assert_fts_result(
+        &core,
+        "CalderaSignal",
+        crate::search::SearchEntityType::Activity,
+        &activity.id,
+    );
+    assert_fts_result(
+        &core,
+        "QuasarLedger",
+        crate::search::SearchEntityType::Note,
+        &note.id,
+    );
+    assert_fts_result(
+        &core,
+        "ZenithRoute",
+        crate::search::SearchEntityType::Tag,
+        &tag.id,
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn global_search_fts_updates_and_soft_deletes_stay_current() {
+    let (mut core, path) = open_test_core();
+
+    let organization = core
+        .create_organization(
+            "OldOrbit Health".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("organization should create");
+    let deal = core
+        .create_deal(
+            "OldOrbit deal".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("deal should create");
+    let activity = core
+        .create_activity(
+            "task".to_string(),
+            "OldOrbit task".to_string(),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("activity should create");
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Update".to_string()),
+            Some("Target".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should create");
+    let note = core
+        .create_note(
+            "contact".to_string(),
+            contact.id,
+            "OldOrbit note".to_string(),
+        )
+        .expect("note should create");
+    let tag = core
+        .create_tag("OldOrbit Tag".to_string(), None)
+        .expect("tag should create");
+
+    core.update_organization(
+        &organization.id,
+        Some("NewOrbit Health".to_string()),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("organization should update");
+    core.update_deal(
+        &deal.id,
+        Some("NewOrbit deal".to_string()),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("deal should update");
+    core.update_activity(
+        &activity.id,
+        None,
+        Some("NewOrbit task".to_string()),
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("activity should update");
+    core.update_note(&note.id, "NewOrbit note".to_string())
+        .expect("note should update");
+    core.update_tag(&tag.id, Some("NewOrbit Tag".to_string()), None)
+        .expect("tag should update");
+
+    let old_results = core
+        .global_search("OldOrbit", Some(20))
+        .expect("old query should search");
+    assert!(old_results.is_empty());
+
+    assert_fts_result(
+        &core,
+        "NewOrbit",
+        crate::search::SearchEntityType::Organization,
+        &organization.id,
+    );
+    assert_fts_result(
+        &core,
+        "NewOrbit",
+        crate::search::SearchEntityType::Deal,
+        &deal.id,
+    );
+    assert_fts_result(
+        &core,
+        "NewOrbit",
+        crate::search::SearchEntityType::Activity,
+        &activity.id,
+    );
+    assert_fts_result(
+        &core,
+        "NewOrbit",
+        crate::search::SearchEntityType::Note,
+        &note.id,
+    );
+    assert_fts_result(
+        &core,
+        "NewOrbit",
+        crate::search::SearchEntityType::Tag,
+        &tag.id,
+    );
+
+    core.delete_organization(&organization.id)
+        .expect("organization should delete");
+    core.delete_deal(&deal.id).expect("deal should delete");
+    core.delete_activity(&activity.id)
+        .expect("activity should delete");
+    core.delete_note(&note.id).expect("note should delete");
+    core.delete_tag(&tag.id).expect("tag should delete");
+
+    let deleted_results = core
+        .global_search("NewOrbit", Some(20))
+        .expect("deleted query should search");
+    assert!(deleted_results.is_empty());
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn global_search_uses_text_fallback_when_fts_table_is_missing() {
+    let (mut core, path) = open_test_core();
+
+    let tag = core
+        .create_tag("FallbackOnly".to_string(), None)
+        .expect("tag should create");
+    core.db
+        .conn
+        .execute("DROP TABLE tags_fts", [])
+        .expect("tags fts table should drop for fallback test");
+
+    let results = core
+        .global_search("FallbackOnly", Some(20))
+        .expect("fallback query should search");
+    assert!(results.iter().any(|result| {
+        result.entity_type == crate::search::SearchEntityType::Tag
+            && result.entity_id == tag.id
+            && result.match_field == "name"
+    }));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+fn assert_fts_result(
+    core: &CrmCore,
+    query: &str,
+    entity_type: crate::search::SearchEntityType,
+    entity_id: &str,
+) {
+    let results = core
+        .global_search(query, Some(20))
+        .expect("global search should query");
+    assert!(
+        results.iter().any(|result| {
+            result.entity_type == entity_type
+                && result.entity_id == entity_id
+                && result.match_field == "fts"
+        }),
+        "expected fts result for {entity_type:?} {entity_id} in {results:?}"
+    );
+}
+
+#[test]
 fn create_contact_writes_contact_audit_and_sync() {
     let (mut core, path) = open_test_core();
 

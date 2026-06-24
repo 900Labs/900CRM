@@ -7,11 +7,8 @@
 //! # Search Strategy
 //!
 //! - Contacts use the storage full-text repository first.
-//! - Organizations use the storage text repository over profile fields.
-//! - Deals use the storage text repository over title and notes.
-//! - Activities use the storage text repository over title and description.
-//! - Notes use the storage text repository over note content.
-//! - Tags use the storage text repository over name and color.
+//! - Organizations, deals, activities, notes, and tags use storage FTS
+//!   repositories first with storage-owned text fallback.
 //!
 //! Results from all sources are combined in stable entity order.
 
@@ -98,23 +95,23 @@ pub fn unified_search(conn: &Connection, query: &str, limit: u32) -> CrmResult<V
         results.extend(fallback.into_iter().map(contact_record_to_result));
     }
 
-    let organization_results = search_storage::search_organizations_text(conn, q, clamped_limit)?;
+    let organization_results = search_storage::search_organizations(conn, q, clamped_limit)?;
     results.extend(
         organization_results
             .into_iter()
             .map(organization_record_to_result),
     );
 
-    let deal_results = search_storage::search_deals_text(conn, q, clamped_limit)?;
+    let deal_results = search_storage::search_deals(conn, q, clamped_limit)?;
     results.extend(deal_results.into_iter().map(deal_record_to_result));
 
-    let activity_results = search_storage::search_activities_text(conn, q, clamped_limit)?;
+    let activity_results = search_storage::search_activities(conn, q, clamped_limit)?;
     results.extend(activity_results.into_iter().map(activity_record_to_result));
 
-    let note_results = search_storage::search_notes_text(conn, q, clamped_limit)?;
+    let note_results = search_storage::search_notes(conn, q, clamped_limit)?;
     results.extend(note_results.into_iter().map(note_record_to_result));
 
-    let tag_results = search_storage::search_tags_text(conn, q, clamped_limit)?;
+    let tag_results = search_storage::search_tags(conn, q, clamped_limit)?;
     results.extend(tag_results.into_iter().map(tag_record_to_result));
 
     results.truncate(clamped_limit as usize);
