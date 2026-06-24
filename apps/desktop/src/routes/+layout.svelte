@@ -52,6 +52,12 @@
       icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zm8 2a2 2 0 100-4 2 2 0 000 4zm4 8v-2a4 4 0 00-3-3.87',
     },
     {
+      id: 'organizations',
+      label: () => t('nav.organizations'),
+      href: '/organizations',
+      icon: 'M3 21h18M5 21V7l8-4v18M19 21V11l-6-3M9 9h1m-1 4h1m-1 4h1m4-6h1m-1 4h1',
+    },
+    {
       id: 'pipeline',
       label: () => t('nav.pipeline'),
       href: '/pipeline',

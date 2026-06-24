@@ -14,7 +14,8 @@
     "contacts": "Contacts",
     "pipeline": "Pipeline",
     "activities": "Activités",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "organizations": "Organisations"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -278,5 +279,39 @@
     "exporting": "Exportation…",
     "success": "Exportation terminée",
     "failed": "Échec de l'exportation"
+  },
+  "organizations": {
+    "title": "Organisations",
+    "addOrganization": "Ajouter une organisation",
+    "editOrganization": "Modifier l’organisation",
+    "deleteOrganization": "Supprimer l’organisation",
+    "search": "Rechercher des organisations...",
+    "name": "Nom",
+    "email": "E-mail",
+    "phone": "Téléphone",
+    "website": "Site web",
+    "location": "Lieu",
+    "addressLine1": "Adresse ligne 1",
+    "addressLine2": "Adresse ligne 2",
+    "city": "Ville",
+    "region": "Région",
+    "country": "Pays",
+    "postalCode": "Code postal",
+    "description": "Description",
+    "created": "Créé",
+    "updated": "Mis à jour",
+    "noOrganizations": "Aucune organisation pour le moment",
+    "noOrganizationsDesc": "Créez une fiche organisation sans modifier le texte d’organisation existant des contacts.",
+    "createOrganization": "Créer l’organisation",
+    "updateOrganization": "Mettre à jour l’organisation",
+    "confirmDelete": "Supprimer {name} ? Les contacts liés ne seront pas supprimés.",
+    "contactLink": "Lier un contact à une organisation",
+    "contactId": "ID du contact",
+    "linkContact": "Lier le contact",
+    "clearContactLink": "Effacer le lien",
+    "linkContactDesc": "Saisissez un ID de contact existant pour lier ou effacer sa référence d’organisation.",
+    "linkCreated": "Contact lié à l’organisation",
+    "linkCleared": "Lien d’organisation du contact effacé",
+    "linkContactRequired": "L’ID du contact est requis"
   }
 }
