@@ -28,7 +28,8 @@ use crate::storage::{
 };
 use crate::utils::{
     csv::{
-        parse_contacts_csv_with_mapping, parse_contacts_csv_with_row_numbers, parse_deals_csv,
+        parse_contacts_csv_with_mapping, parse_contacts_csv_with_row_numbers,
+        parse_deals_csv_with_mapping, parse_deals_csv_with_row_numbers,
         parse_organizations_csv_with_mapping, parse_organizations_csv_with_row_numbers,
         write_contacts_csv, write_deals_csv, write_organizations_csv, ContactCsvRow, DealCsvRow,
         ImportColumnMapping, OrganizationCsvRow,
@@ -899,16 +900,30 @@ impl CrmCore {
 
     pub fn import_deals_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_deals_csv(file_content.as_slice())?;
+        let rows = parse_deals_csv_with_row_numbers(file_content.as_slice())?;
+        self.import_deal_rows(rows)
+    }
+
+    pub fn import_deals_csv_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_deals_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_deal_rows(rows)
+    }
+
+    fn import_deal_rows(&mut self, rows: Vec<(usize, DealCsvRow)>) -> CrmResult<ImportResult> {
         let mut created = 0u32;
         let mut skipped = 0u32;
         let mut errors = Vec::new();
 
-        for (i, row) in rows.iter().enumerate() {
+        for (row_number, row) in rows {
             let value = row
                 .value
                 .as_deref()
-                .and_then(|v| v.parse().ok())
+                .and_then(|v| v.trim().parse().ok())
                 .unwrap_or(0.0);
             match self.create_deal(
                 row.title.clone(),
@@ -936,7 +951,7 @@ impl CrmCore {
                     created += 1;
                 }
                 Err(e) => {
-                    errors.push(format!("Row {}: {} ({})", i + 2, e, row.title));
+                    errors.push(format!("Row {}: {} ({})", row_number, e, row.title));
                     skipped += 1;
                 }
             }
@@ -947,6 +962,47 @@ impl CrmCore {
             skipped,
             errors,
         })
+    }
+
+    pub fn preflight_deals_csv_import(&self, file_path: &str) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_deals_csv_with_row_numbers(file_content.as_slice())?;
+        self.preflight_deal_rows(rows)
+    }
+
+    pub fn preflight_deals_csv_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_deals_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.preflight_deal_rows(rows)
+    }
+
+    fn preflight_deal_rows(
+        &self,
+        rows: Vec<(usize, DealCsvRow)>,
+    ) -> CrmResult<ImportPreflightReport> {
+        let mut warnings = Vec::new();
+
+        for (row_number, row) in &rows {
+            let title = row.title.trim().to_string();
+            for deal in storage::deals::find_active_deals_by_title(&self.db.conn, &title)? {
+                warnings.push(import_duplicate_warning(
+                    "deals",
+                    *row_number,
+                    "title",
+                    &title,
+                    "deal",
+                    &deal.id,
+                    &deal_display_label(&deal),
+                    format!("Title '{}' matches existing deal", title),
+                ));
+            }
+        }
+
+        Ok(import_preflight_report("deals", rows.len(), warnings))
     }
 
     pub fn export_deals_csv(&self, file_path: &str) -> CrmResult<u32> {
@@ -1365,6 +1421,14 @@ fn organization_display_label(organization: &storage::organizations::Organizatio
         organization.id.clone()
     } else {
         organization.name.clone()
+    }
+}
+
+fn deal_display_label(deal: &storage::deals::Deal) -> String {
+    if deal.title.trim().is_empty() {
+        deal.id.clone()
+    } else {
+        deal.title.clone()
     }
 }
 

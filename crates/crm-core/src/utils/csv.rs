@@ -84,6 +84,15 @@ const ORGANIZATION_IMPORT_TARGET_FIELDS: &[&str] = &[
     "description",
 ];
 
+const DEAL_IMPORT_TARGET_FIELDS: &[&str] = &[
+    "title",
+    "value",
+    "currency",
+    "stage",
+    "expected_close",
+    "notes",
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Contact CSV record
 // ─────────────────────────────────────────────────────────────────────────────
@@ -322,6 +331,15 @@ pub fn parse_contacts_csv_with_mapping<R: Read>(
 ///
 /// Returns [`CrmError::Csv`] if the CSV is malformed.
 pub fn parse_deals_csv<R: Read>(reader: R) -> CrmResult<Vec<DealCsvRow>> {
+    Ok(parse_deals_csv_with_row_numbers(reader)?
+        .into_iter()
+        .map(|(_, row)| row)
+        .collect())
+}
+
+/// Parses deal CSV data and preserves the original 1-based source row number,
+/// including the header row offset.
+pub fn parse_deals_csv_with_row_numbers<R: Read>(reader: R) -> CrmResult<Vec<(usize, DealCsvRow)>> {
     let mut rdr = csv::ReaderBuilder::new()
         .has_headers(true)
         .trim(csv::Trim::All)
@@ -329,14 +347,15 @@ pub fn parse_deals_csv<R: Read>(reader: R) -> CrmResult<Vec<DealCsvRow>> {
         .from_reader(reader);
 
     let mut rows = Vec::new();
-    for result in rdr.deserialize::<DealCsvRow>() {
+    for (index, result) in rdr.deserialize::<DealCsvRow>().enumerate() {
+        let row_number = index + 2;
         match result {
             Ok(row) => {
                 if row.title.trim().is_empty() {
                     log::debug!("Skipping CSV row with blank title");
                     continue;
                 }
-                rows.push(row);
+                rows.push((row_number, row));
             }
             Err(e) => {
                 log::error!("CSV parse error: {}", e);
@@ -346,6 +365,39 @@ pub fn parse_deals_csv<R: Read>(reader: R) -> CrmResult<Vec<DealCsvRow>> {
     }
 
     log::info!("Parsed {} deal rows from CSV", rows.len());
+    Ok(rows)
+}
+
+/// Parses arbitrary-header deal CSV data with a frontend-provided mapping.
+///
+/// Rows where the mapped `title` is blank are skipped, matching the standard
+/// deal CSV import behavior.
+pub fn parse_deals_csv_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, DealCsvRow)>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .trim(csv::Trim::All)
+        .flexible(true)
+        .from_reader(reader);
+
+    let headers = rdr.headers()?.clone();
+    let assignments = validate_import_mapping(&headers, mapping, DEAL_IMPORT_TARGET_FIELDS)?;
+
+    let mut rows = Vec::new();
+    for (index, result) in rdr.records().enumerate() {
+        let row_number = index + 2;
+        let record = result.map_err(|e| CrmError::Csv(e.to_string()))?;
+        let row = deal_row_from_mapped_record(&record, &assignments);
+        if row.title.trim().is_empty() {
+            log::debug!("Skipping CSV row with blank title");
+            continue;
+        }
+        rows.push((row_number, row));
+    }
+
+    log::info!("Parsed {} mapped deal rows from CSV", rows.len());
     Ok(rows)
 }
 
@@ -553,6 +605,38 @@ fn organization_row_from_mapped_record(
             "country" => row.country = optional_csv_value(value),
             "postal_code" => row.postal_code = optional_csv_value(value),
             "description" => row.description = optional_csv_value(value),
+            _ => {}
+        }
+    }
+
+    row
+}
+
+fn deal_row_from_mapped_record(
+    record: &csv::StringRecord,
+    assignments: &[Option<String>],
+) -> DealCsvRow {
+    let mut row = DealCsvRow {
+        title: String::new(),
+        value: None,
+        currency: None,
+        stage: None,
+        expected_close: None,
+        notes: None,
+    };
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = record.get(index).unwrap_or_default().trim();
+        match target {
+            "title" => row.title = value.to_string(),
+            "value" => row.value = optional_csv_value(value),
+            "currency" => row.currency = optional_csv_value(value),
+            "stage" => row.stage = optional_csv_value(value),
+            "expected_close" => row.expected_close = optional_csv_value(value),
+            "notes" => row.notes = optional_csv_value(value),
             _ => {}
         }
     }

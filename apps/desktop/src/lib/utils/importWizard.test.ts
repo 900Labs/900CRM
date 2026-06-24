@@ -37,6 +37,24 @@ describe('import wizard helpers', () => {
     });
   });
 
+  it('suggests deal mappings from common CSV headers', () => {
+    expect(
+      suggestImportMapping('deals', [
+        'Opportunity Name',
+        'Amount',
+        'Pipeline Stage',
+        'Close Date',
+        'Memo',
+      ]),
+    ).toEqual({
+      'Opportunity Name': 'title',
+      Amount: 'value',
+      'Pipeline Stage': 'stage',
+      'Close Date': 'expected_close',
+      Memo: 'notes',
+    });
+  });
+
   it('blocks missing required contact fields and duplicate targets', () => {
     const result = validateImportMapping('contacts', {
       Email: 'email',
@@ -47,6 +65,18 @@ describe('import wizard helpers', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('First name is required.');
     expect(result.errors).toContain('Email is mapped more than once: Email, Email 2.');
+  });
+
+  it('blocks missing required deal title and duplicate deal targets', () => {
+    const result = validateImportMapping('deals', {
+      Amount: 'value',
+      Total: 'value',
+      Notes: null,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Title is required.');
+    expect(result.errors).toContain('Value is mapped more than once: Amount, Total.');
   });
 
   it('accepts valid organization mappings with skipped columns', () => {

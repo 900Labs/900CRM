@@ -1,6 +1,7 @@
 import { mapColumns, type ColumnMapping } from './csv';
 import type {
   ContactImportTargetField,
+  DealImportTargetField,
   ImportColumnMapping,
   ImportPreflightEntity,
   ImportTargetField,
@@ -44,6 +45,15 @@ export const ORGANIZATION_IMPORT_FIELDS: ImportFieldOption<OrganizationImportTar
   { value: 'country', label: 'Country' },
   { value: 'postal_code', label: 'Postal code' },
   { value: 'description', label: 'Description' },
+];
+
+export const DEAL_IMPORT_FIELDS: ImportFieldOption<DealImportTargetField>[] = [
+  { value: 'title', label: 'Title', required: true },
+  { value: 'value', label: 'Value' },
+  { value: 'currency', label: 'Currency' },
+  { value: 'stage', label: 'Stage' },
+  { value: 'expected_close', label: 'Expected close' },
+  { value: 'notes', label: 'Notes' },
 ];
 
 const CONTACT_ALIASES: Record<string, ContactImportTargetField> = {
@@ -107,14 +117,45 @@ const ORGANIZATION_ALIASES: Record<string, OrganizationImportTargetField> = {
   notes: 'description',
 };
 
+const DEAL_ALIASES: Record<string, DealImportTargetField> = {
+  title: 'title',
+  deal: 'title',
+  dealname: 'title',
+  opportunity: 'title',
+  opportunityname: 'title',
+  value: 'value',
+  amount: 'value',
+  dealvalue: 'value',
+  currency: 'currency',
+  curr: 'currency',
+  stage: 'stage',
+  pipelinestage: 'stage',
+  status: 'stage',
+  expectedclose: 'expected_close',
+  expectedclosedate: 'expected_close',
+  closedate: 'expected_close',
+  close: 'expected_close',
+  notes: 'notes',
+  note: 'notes',
+  memo: 'notes',
+};
+
 export function getImportFieldOptions(entity: MappedImportEntity): ImportFieldOption[] {
-  return entity === 'contacts' ? CONTACT_IMPORT_FIELDS : ORGANIZATION_IMPORT_FIELDS;
+  if (entity === 'contacts') {
+    return CONTACT_IMPORT_FIELDS;
+  }
+
+  if (entity === 'deals') {
+    return DEAL_IMPORT_FIELDS;
+  }
+
+  return ORGANIZATION_IMPORT_FIELDS;
 }
 
 export function suggestImportMapping(entity: MappedImportEntity, headers: string[]): ColumnMapping {
   const fields = getImportFieldOptions(entity).map((field) => field.value);
   const suggested = mapColumns(headers, fields);
-  const aliases = entity === 'contacts' ? CONTACT_ALIASES : ORGANIZATION_ALIASES;
+  const aliases = getImportAliases(entity);
 
   for (const header of headers) {
     const alias = aliases[normalizeHeader(header)];
@@ -124,6 +165,18 @@ export function suggestImportMapping(entity: MappedImportEntity, headers: string
   }
 
   return suggested;
+}
+
+function getImportAliases(entity: MappedImportEntity): Record<string, ImportTargetField> {
+  if (entity === 'contacts') {
+    return CONTACT_ALIASES;
+  }
+
+  if (entity === 'deals') {
+    return DEAL_ALIASES;
+  }
+
+  return ORGANIZATION_ALIASES;
 }
 
 export function validateImportMapping(
