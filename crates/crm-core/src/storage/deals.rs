@@ -13,7 +13,7 @@
 //! Deals are never physically deleted. `soft_delete_deal` sets `deleted_at`
 //! and all list queries exclude deleted records by default.
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 use crate::utils::{
@@ -53,6 +53,9 @@ pub struct Deal {
     /// Optional associated contact UUID.
     pub contact_id: Option<String>,
 
+    /// Optional associated organization UUID.
+    pub organization_id: Option<String>,
+
     /// Freeform notes about the deal.
     pub notes: String,
 
@@ -85,6 +88,34 @@ pub struct PipelineSummary {
     pub weighted_value: f64,
 }
 
+/// Join record linking a contact to a deal.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DealContact {
+    /// UUID v4 primary key.
+    pub id: String,
+
+    /// Linked deal UUID.
+    pub deal_id: String,
+
+    /// Linked contact UUID.
+    pub contact_id: String,
+
+    /// Optional relationship role, such as "decision maker".
+    pub role: Option<String>,
+
+    /// Whether this contact is the primary deal contact.
+    pub is_primary: bool,
+
+    /// ISO 8601 creation timestamp.
+    pub created_at: String,
+
+    /// ISO 8601 soft-delete timestamp (`None` = active).
+    pub deleted_at: Option<String>,
+
+    /// ID of the device that created or last modified this record.
+    pub device_id: String,
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CRUD
 // ─────────────────────────────────────────────────────────────────────────────
@@ -106,6 +137,7 @@ pub fn create_deal(
     probability: i32,
     expected_close: Option<&str>,
     contact_id: Option<&str>,
+    organization_id: Option<&str>,
     notes: &str,
     device_id: &str,
 ) -> CrmResult<Deal> {
@@ -116,8 +148,8 @@ pub fn create_deal(
         r#"
         INSERT INTO deals
             (id, title, value, currency, stage, probability, expected_close,
-             contact_id, notes, created_at, updated_at, device_id)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+             contact_id, organization_id, notes, created_at, updated_at, device_id)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
         "#,
         params![
             id,
@@ -128,6 +160,7 @@ pub fn create_deal(
             probability,
             expected_close,
             contact_id,
+            organization_id,
             notes,
             now,
             now,
@@ -149,7 +182,7 @@ pub fn get_deal(conn: &Connection, id: &str) -> CrmResult<Deal> {
     conn.query_row(
         r#"
         SELECT id, title, value, currency, stage, probability, expected_close,
-               contact_id, notes, created_at, updated_at, deleted_at, device_id
+               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id
         FROM deals
         WHERE id = ?1 AND deleted_at IS NULL
         "#,
@@ -173,7 +206,7 @@ pub fn list_deals(conn: &Connection) -> CrmResult<Vec<Deal>> {
     let mut stmt = conn.prepare(
         r#"
         SELECT id, title, value, currency, stage, probability, expected_close,
-               contact_id, notes, created_at, updated_at, deleted_at, device_id
+               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id
         FROM deals
         WHERE deleted_at IS NULL
         ORDER BY created_at DESC
@@ -196,7 +229,7 @@ pub fn list_deals_by_stage(conn: &Connection, stage: &str) -> CrmResult<Vec<Deal
     let mut stmt = conn.prepare(
         r#"
         SELECT id, title, value, currency, stage, probability, expected_close,
-               contact_id, notes, created_at, updated_at, deleted_at, device_id
+               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id
         FROM deals
         WHERE stage = ?1 AND deleted_at IS NULL
         ORDER BY updated_at DESC
@@ -233,6 +266,7 @@ pub fn update_deal(
     probability: Option<i32>,
     expected_close: Option<Option<&str>>,
     contact_id: Option<Option<&str>>,
+    organization_id: Option<Option<&str>>,
     notes: Option<&str>,
 ) -> CrmResult<Deal> {
     let current = get_deal(conn, id)?;
@@ -248,9 +282,10 @@ pub fn update_deal(
             probability    = ?5,
             expected_close = ?6,
             contact_id     = ?7,
-            notes          = ?8,
-            updated_at     = ?9
-        WHERE id = ?10 AND deleted_at IS NULL
+            organization_id = ?8,
+            notes          = ?9,
+            updated_at     = ?10
+        WHERE id = ?11 AND deleted_at IS NULL
         "#,
         params![
             title.unwrap_or(&current.title),
@@ -260,6 +295,7 @@ pub fn update_deal(
             probability.unwrap_or(current.probability),
             expected_close.unwrap_or(current.expected_close.as_deref()),
             contact_id.unwrap_or(current.contact_id.as_deref()),
+            organization_id.unwrap_or(current.organization_id.as_deref()),
             notes.unwrap_or(&current.notes),
             now,
             id
@@ -329,6 +365,128 @@ pub fn soft_delete_deal(conn: &Connection, id: &str) -> CrmResult<()> {
 
     log::info!("Soft-deleted deal id={}", id);
     Ok(())
+}
+
+/// Lists active contact links for a deal.
+pub fn list_deal_contacts(conn: &Connection, deal_id: &str) -> CrmResult<Vec<DealContact>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, deal_id, contact_id, role, is_primary, created_at, deleted_at, device_id
+        FROM deal_contacts
+        WHERE deal_id = ?1 AND deleted_at IS NULL
+        ORDER BY is_primary DESC, created_at ASC, id ASC
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![deal_id], row_to_deal_contact)?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+/// Adds or updates an active deal-contact link.
+pub fn add_deal_contact(
+    conn: &Connection,
+    deal_id: &str,
+    contact_id: &str,
+    role: Option<&str>,
+    is_primary: bool,
+    device_id: &str,
+) -> CrmResult<DealContact> {
+    if is_primary {
+        clear_active_primary_deal_contacts(conn, deal_id)?;
+    }
+
+    if let Some(existing_id) = active_deal_contact_id(conn, deal_id, contact_id)? {
+        conn.execute(
+            r#"
+            UPDATE deal_contacts
+            SET role = ?1,
+                is_primary = CASE WHEN ?2 THEN 1 ELSE is_primary END,
+                device_id = ?3
+            WHERE id = ?4 AND deleted_at IS NULL
+            "#,
+            params![role, is_primary, device_id, existing_id],
+        )?;
+
+        if is_primary {
+            set_deal_primary_contact_mirror(conn, deal_id, Some(contact_id))?;
+        }
+
+        return get_deal_contact_including_deleted(conn, &existing_id);
+    }
+
+    let id = new_uuid();
+    let now = now_iso8601();
+    conn.execute(
+        r#"
+        INSERT INTO deal_contacts
+            (id, deal_id, contact_id, role, is_primary, created_at, device_id)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        "#,
+        params![id, deal_id, contact_id, role, is_primary, now, device_id],
+    )?;
+
+    if is_primary {
+        set_deal_primary_contact_mirror(conn, deal_id, Some(contact_id))?;
+    }
+
+    get_deal_contact_including_deleted(conn, &id)
+}
+
+/// Soft-deletes an active deal-contact link.
+pub fn remove_deal_contact(
+    conn: &Connection,
+    deal_id: &str,
+    contact_id: &str,
+) -> CrmResult<DealContact> {
+    let id = active_deal_contact_id(conn, deal_id, contact_id)?.ok_or_else(|| {
+        CrmError::NotFound(format!(
+            "Deal contact link deal='{}' contact='{}' not found",
+            deal_id, contact_id
+        ))
+    })?;
+    let before = get_deal_contact_including_deleted(conn, &id)?;
+    let now = now_iso8601();
+
+    conn.execute(
+        r#"
+        UPDATE deal_contacts
+        SET deleted_at = ?1
+        WHERE id = ?2 AND deleted_at IS NULL
+        "#,
+        params![now, id],
+    )?;
+
+    let deal = get_deal(conn, deal_id)?;
+    if before.is_primary || deal.contact_id.as_deref() == Some(contact_id) {
+        let next_primary = next_active_primary_contact_id(conn, deal_id)?;
+        set_deal_primary_contact_mirror(conn, deal_id, next_primary.as_deref())?;
+    }
+
+    get_deal_contact_including_deleted(conn, &id)
+}
+
+/// Links or unlinks a deal to a normalized organization.
+pub fn link_deal_to_organization(
+    conn: &Connection,
+    deal_id: &str,
+    organization_id: Option<&str>,
+) -> CrmResult<Deal> {
+    let now = now_iso8601();
+    let changed = conn.execute(
+        r#"
+        UPDATE deals
+        SET organization_id = ?1,
+            updated_at = ?2
+        WHERE id = ?3 AND deleted_at IS NULL
+        "#,
+        params![organization_id, now, deal_id],
+    )?;
+
+    if changed == 0 {
+        return Err(CrmError::NotFound(format!("Deal '{}' not found", deal_id)));
+    }
+
+    get_deal(conn, deal_id)
 }
 
 /// Returns a [`PipelineSummary`] for each pipeline stage.
@@ -413,12 +571,115 @@ fn row_to_deal(row: &rusqlite::Row<'_>) -> rusqlite::Result<Deal> {
         probability: row.get(5)?,
         expected_close: row.get(6)?,
         contact_id: row.get(7)?,
-        notes: row.get(8)?,
-        created_at: row.get(9)?,
-        updated_at: row.get(10)?,
-        deleted_at: row.get(11)?,
-        device_id: row.get(12)?,
+        organization_id: row.get(8)?,
+        notes: row.get(9)?,
+        created_at: row.get(10)?,
+        updated_at: row.get(11)?,
+        deleted_at: row.get(12)?,
+        device_id: row.get(13)?,
     })
+}
+
+fn row_to_deal_contact(row: &rusqlite::Row<'_>) -> rusqlite::Result<DealContact> {
+    Ok(DealContact {
+        id: row.get(0)?,
+        deal_id: row.get(1)?,
+        contact_id: row.get(2)?,
+        role: row.get(3)?,
+        is_primary: row.get(4)?,
+        created_at: row.get(5)?,
+        deleted_at: row.get(6)?,
+        device_id: row.get(7)?,
+    })
+}
+
+fn get_deal_contact_including_deleted(conn: &Connection, id: &str) -> CrmResult<DealContact> {
+    conn.query_row(
+        r#"
+        SELECT id, deal_id, contact_id, role, is_primary, created_at, deleted_at, device_id
+        FROM deal_contacts
+        WHERE id = ?1
+        "#,
+        params![id],
+        row_to_deal_contact,
+    )
+    .map_err(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => {
+            CrmError::NotFound(format!("Deal contact link '{}' not found", id))
+        }
+        other => CrmError::Database(other.to_string()),
+    })
+}
+
+fn active_deal_contact_id(
+    conn: &Connection,
+    deal_id: &str,
+    contact_id: &str,
+) -> CrmResult<Option<String>> {
+    conn.query_row(
+        r#"
+        SELECT id
+        FROM deal_contacts
+        WHERE deal_id = ?1 AND contact_id = ?2 AND deleted_at IS NULL
+        ORDER BY created_at ASC, id ASC
+        LIMIT 1
+        "#,
+        params![deal_id, contact_id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+fn clear_active_primary_deal_contacts(conn: &Connection, deal_id: &str) -> CrmResult<()> {
+    conn.execute(
+        r#"
+        UPDATE deal_contacts
+        SET is_primary = 0
+        WHERE deal_id = ?1 AND deleted_at IS NULL AND is_primary = 1
+        "#,
+        params![deal_id],
+    )?;
+    Ok(())
+}
+
+fn next_active_primary_contact_id(conn: &Connection, deal_id: &str) -> CrmResult<Option<String>> {
+    conn.query_row(
+        r#"
+        SELECT contact_id
+        FROM deal_contacts
+        WHERE deal_id = ?1 AND deleted_at IS NULL AND is_primary = 1
+        ORDER BY created_at ASC, id ASC
+        LIMIT 1
+        "#,
+        params![deal_id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+fn set_deal_primary_contact_mirror(
+    conn: &Connection,
+    deal_id: &str,
+    contact_id: Option<&str>,
+) -> CrmResult<()> {
+    let now = now_iso8601();
+    let changed = conn.execute(
+        r#"
+        UPDATE deals
+        SET contact_id = ?1,
+            updated_at = ?2
+        WHERE id = ?3 AND deleted_at IS NULL
+        "#,
+        params![contact_id, now, deal_id],
+    )?;
+
+    if changed == 0 {
+        return Err(CrmError::NotFound(format!("Deal '{}' not found", deal_id)));
+    }
+
+    Ok(())
 }
 
 /// Returns the default win probability (0–100) for a given pipeline stage.

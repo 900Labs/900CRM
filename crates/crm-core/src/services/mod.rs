@@ -33,6 +33,7 @@ use crate::utils::{
 mod audit;
 mod backup;
 mod contacts;
+mod deal_relationships;
 mod migration_readiness;
 mod notes_tags;
 mod organizations;
@@ -111,8 +112,11 @@ impl CrmCore {
         probability: Option<i32>,
         expected_close: Option<String>,
         contact_id: Option<String>,
+        organization_id: Option<String>,
         notes: Option<String>,
     ) -> CrmResult<Deal> {
+        let contact_id = normalize_optional_string(contact_id);
+        let organization_id = normalize_optional_string(organization_id);
         let input = deal_engine::DealInput {
             title: Some(title.clone()),
             value,
@@ -124,6 +128,12 @@ impl CrmCore {
             notes: notes.clone(),
         };
         deal_engine::validate_deal_for_create(&input)?;
+        if let Some(contact_id) = contact_id.as_deref() {
+            storage::contacts::get_contact(&self.db.conn, contact_id)?;
+        }
+        if let Some(organization_id) = organization_id.as_deref() {
+            storage::organizations::get_organization(&self.db.conn, organization_id)?;
+        }
 
         let prob = probability.unwrap_or_else(|| {
             let stage_name = stage.as_deref().unwrap_or("Lead");
@@ -140,6 +150,7 @@ impl CrmCore {
             prob,
             expected_close.as_deref(),
             contact_id.as_deref(),
+            organization_id.as_deref(),
             notes.as_deref().unwrap_or(""),
             &device_id,
         )?;
@@ -188,8 +199,17 @@ impl CrmCore {
         probability: Option<i32>,
         expected_close: Option<String>,
         contact_id: Option<String>,
+        organization_id: Option<Option<String>>,
         notes: Option<String>,
     ) -> CrmResult<Deal> {
+        let contact_id = normalize_optional_string(contact_id);
+        let organization_id = organization_id.map(normalize_optional_string);
+        if let Some(contact_id) = contact_id.as_deref() {
+            storage::contacts::get_contact(&self.db.conn, contact_id)?;
+        }
+        if let Some(Some(organization_id)) = organization_id.as_ref() {
+            storage::organizations::get_organization(&self.db.conn, organization_id)?;
+        }
         let before = storage::deals::get_deal(&self.db.conn, id)?;
         let device_id = self.device_id.clone();
         let tx = self.db.conn.unchecked_transaction()?;
@@ -203,6 +223,7 @@ impl CrmCore {
             probability,
             Some(expected_close.as_deref()),
             Some(contact_id.as_deref()),
+            organization_id.as_ref().map(|value| value.as_deref()),
             notes.as_deref(),
         )?;
         storage::sync::record_change(&tx, "deal", id, "__update__", None, Some(id), &device_id)?;
@@ -780,6 +801,7 @@ impl CrmCore {
                 Some(0),
                 row.expected_close.clone(),
                 None,
+                None,
                 row.notes.clone(),
             ) {
                 Ok(deal) => {
@@ -915,6 +937,12 @@ where
 
 fn parse_bool(value: Option<&str>) -> bool {
     matches!(value, Some("true") | Some("1"))
+}
+
+fn normalize_optional_string(value: Option<String>) -> Option<String> {
+    value
+        .map(|raw| raw.trim().to_string())
+        .filter(|trimmed| !trimmed.is_empty())
 }
 
 fn sync_status_from_settings(

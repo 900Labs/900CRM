@@ -1,4 +1,4 @@
-use crm_core::storage::deals::{Deal, PipelineSummary};
+use crm_core::storage::deals::{Deal, DealContact, PipelineSummary};
 use tauri::State;
 
 use crate::AppState;
@@ -13,6 +13,7 @@ pub async fn create_deal(
     probability: Option<i32>,
     expected_close: Option<String>,
     contact_id: Option<String>,
+    organization_id: Option<String>,
     notes: Option<String>,
 ) -> Result<Deal, String> {
     let mut core = super::lock_core(&state)?;
@@ -24,6 +25,7 @@ pub async fn create_deal(
         probability,
         expected_close,
         contact_id,
+        organization_id,
         notes,
     )
     .map_err(|e| e.to_string())
@@ -61,6 +63,7 @@ pub async fn update_deal(
     probability: Option<i32>,
     expected_close: Option<String>,
     contact_id: Option<String>,
+    organization_id: Option<Option<String>>,
     notes: Option<String>,
 ) -> Result<Deal, String> {
     let mut core = super::lock_core(&state)?;
@@ -73,6 +76,7 @@ pub async fn update_deal(
         probability,
         expected_close,
         contact_id,
+        organization_id,
         notes,
     )
     .map_err(|e| e.to_string())
@@ -94,6 +98,50 @@ pub async fn move_deal_stage(
 pub async fn delete_deal(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let mut core = super::lock_core(&state)?;
     core.delete_deal(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn link_deal_to_organization(
+    state: State<'_, AppState>,
+    deal_id: String,
+    organization_id: Option<String>,
+) -> Result<Deal, String> {
+    let mut core = super::lock_core(&state)?;
+    core.link_deal_to_organization(&deal_id, organization_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn add_deal_contact(
+    state: State<'_, AppState>,
+    deal_id: String,
+    contact_id: String,
+    role: Option<String>,
+    is_primary: bool,
+) -> Result<DealContact, String> {
+    let mut core = super::lock_core(&state)?;
+    core.add_deal_contact(&deal_id, &contact_id, role, is_primary)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn remove_deal_contact(
+    state: State<'_, AppState>,
+    deal_id: String,
+    contact_id: String,
+) -> Result<DealContact, String> {
+    let mut core = super::lock_core(&state)?;
+    core.remove_deal_contact(&deal_id, &contact_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_deal_contacts(
+    state: State<'_, AppState>,
+    deal_id: String,
+) -> Result<Vec<DealContact>, String> {
+    let core = super::lock_core(&state)?;
+    core.list_deal_contacts(&deal_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

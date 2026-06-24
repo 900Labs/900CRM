@@ -368,6 +368,7 @@ fn pipeline_age_query_ignores_closed_deals() {
             None,
             None,
             None,
+            None,
         )
         .expect("active deal should be created");
     let closed = core
@@ -376,6 +377,7 @@ fn pipeline_age_query_ignores_closed_deals() {
             Some(100.0),
             None,
             Some("Closed Won".to_string()),
+            None,
             None,
             None,
             None,
@@ -430,6 +432,7 @@ fn unified_search_uses_storage_repositories_for_all_entities() {
         Some(2500.0),
         None,
         Some("Proposal".to_string()),
+        None,
         None,
         None,
         None,
@@ -753,6 +756,233 @@ fn link_contact_to_organization_writes_contact_audit_and_sync() {
         )
         .expect("sync count should query");
     assert_eq!(sync_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn deal_contact_link_unlink_writes_audit_sync_and_updates_legacy_mirror() {
+    let (mut core, path) = open_test_core();
+
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Amina".to_string()),
+            Some("Diallo".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+    let deal = core
+        .create_deal(
+            "Clinic expansion".to_string(),
+            Some(2500.0),
+            None,
+            Some("Proposal".to_string()),
+            None,
+            None,
+            None,
+            None,
+            Some("Expansion project".to_string()),
+        )
+        .expect("deal should be created");
+
+    let deal_contact = core
+        .add_deal_contact(
+            &deal.id,
+            &contact.id,
+            Some(" Decision maker ".to_string()),
+            true,
+        )
+        .expect("deal contact should link");
+    assert_eq!(deal_contact.deal_id, deal.id);
+    assert_eq!(deal_contact.contact_id, contact.id);
+    assert_eq!(deal_contact.role.as_deref(), Some("Decision maker"));
+    assert!(deal_contact.is_primary);
+    assert_eq!(
+        core.get_deal(&deal.id)
+            .expect("deal should load")
+            .contact_id
+            .as_deref(),
+        Some(contact.id.as_str())
+    );
+
+    let active_links = core
+        .list_deal_contacts(&deal.id)
+        .expect("deal contacts should list");
+    assert_eq!(active_links.len(), 1);
+
+    let link_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'link_contact' AND entity_type = 'deal_contact' AND entity_id = ?1",
+            params![deal_contact.id],
+            |row| row.get(0),
+        )
+        .expect("link audit count should query");
+    assert_eq!(link_audit_count, 1);
+
+    let link_sync_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'deal_contact' AND entity_id = ?1 AND field_name = '__create__'",
+            params![deal_contact.id],
+            |row| row.get(0),
+        )
+        .expect("link sync count should query");
+    assert_eq!(link_sync_count, 1);
+
+    let deal_contact_mirror_sync_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'deal' AND entity_id = ?1 AND field_name = 'contact_id'",
+            params![deal.id],
+            |row| row.get(0),
+        )
+        .expect("deal mirror sync count should query");
+    assert_eq!(deal_contact_mirror_sync_count, 1);
+
+    let removed = core
+        .remove_deal_contact(&deal.id, &contact.id)
+        .expect("deal contact should unlink");
+    assert_eq!(removed.id, deal_contact.id);
+    assert!(removed.deleted_at.is_some());
+    assert_eq!(
+        core.get_deal(&deal.id)
+            .expect("deal should load after unlink")
+            .contact_id,
+        None
+    );
+    assert!(core
+        .list_deal_contacts(&deal.id)
+        .expect("deal contacts should list after unlink")
+        .is_empty());
+
+    let unlink_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'unlink_contact' AND entity_type = 'deal_contact' AND entity_id = ?1",
+            params![deal_contact.id],
+            |row| row.get(0),
+        )
+        .expect("unlink audit count should query");
+    assert_eq!(unlink_audit_count, 1);
+
+    let unlink_sync_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'deal_contact' AND entity_id = ?1 AND field_name = '__delete__'",
+            params![deal_contact.id],
+            |row| row.get(0),
+        )
+        .expect("unlink sync count should query");
+    assert_eq!(unlink_sync_count, 1);
+
+    let deal_contact_mirror_sync_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'deal' AND entity_id = ?1 AND field_name = 'contact_id'",
+            params![deal.id],
+            |row| row.get(0),
+        )
+        .expect("deal mirror sync count should query after unlink");
+    assert_eq!(deal_contact_mirror_sync_count, 2);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn deal_organization_link_unlink_writes_audit_and_sync() {
+    let (mut core, path) = open_test_core();
+
+    let organization = core
+        .create_organization(
+            "Acme Health".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("organization should be created");
+    let deal = core
+        .create_deal(
+            "Clinic expansion".to_string(),
+            Some(2500.0),
+            None,
+            Some("Proposal".to_string()),
+            None,
+            None,
+            None,
+            None,
+            Some("Expansion project".to_string()),
+        )
+        .expect("deal should be created");
+
+    let linked = core
+        .link_deal_to_organization(&deal.id, Some(organization.id.clone()))
+        .expect("deal should link to organization");
+    assert_eq!(
+        linked.organization_id.as_deref(),
+        Some(organization.id.as_str())
+    );
+
+    let unlinked = core
+        .link_deal_to_organization(&deal.id, None)
+        .expect("deal should unlink from organization");
+    assert_eq!(unlinked.organization_id, None);
+
+    let link_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'link_organization' AND entity_type = 'deal' AND entity_id = ?1",
+            params![deal.id],
+            |row| row.get(0),
+        )
+        .expect("link organization audit count should query");
+    assert_eq!(link_audit_count, 1);
+
+    let unlink_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'unlink_organization' AND entity_type = 'deal' AND entity_id = ?1",
+            params![deal.id],
+            |row| row.get(0),
+        )
+        .expect("unlink organization audit count should query");
+    assert_eq!(unlink_audit_count, 1);
+
+    let sync_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'deal' AND entity_id = ?1 AND field_name = 'organization_id'",
+            params![deal.id],
+            |row| row.get(0),
+        )
+        .expect("deal organization sync count should query");
+    assert_eq!(sync_count, 2);
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);
@@ -1417,6 +1647,132 @@ fn external_clients_default_to_disabled() {
         )
         .expect("external client count should query");
     assert_eq!(disabled_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn migration_v7_creates_deal_relationship_schema() {
+    let path = std::env::temp_dir().join(format!("900crm-v7-schema-test-{}", new_uuid()));
+    std::fs::create_dir_all(&path).expect("test dir should be created");
+    let db_path = path.join("900crm.db");
+    {
+        let conn = rusqlite::Connection::open(&db_path).expect("legacy db should open");
+        conn.execute_batch(
+            r#"
+            CREATE TABLE settings (
+                key        TEXT PRIMARY KEY NOT NULL,
+                value      TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE contacts (
+                id              TEXT PRIMARY KEY NOT NULL,
+                organization_id TEXT,
+                deleted_at      TEXT
+            );
+            CREATE TABLE deals (
+                id          TEXT PRIMARY KEY NOT NULL,
+                contact_id  TEXT,
+                created_at  TEXT NOT NULL,
+                updated_at  TEXT NOT NULL,
+                deleted_at  TEXT,
+                device_id   TEXT NOT NULL DEFAULT ''
+            );
+            PRAGMA user_version = 6;
+            "#,
+        )
+        .expect("legacy schema should be created");
+    }
+
+    let core = CrmCore::open(&path).expect("core should open and run v7");
+
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM pragma_table_info('deals') WHERE name = 'organization_id'"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'deal_contacts'"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_deal_contacts_active_primary'"
+        ),
+        1
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn migration_v7_backfills_legacy_deal_contact_and_organization_link() {
+    let path = std::env::temp_dir().join(format!("900crm-v7-backfill-test-{}", new_uuid()));
+    std::fs::create_dir_all(&path).expect("test dir should be created");
+    let db_path = path.join("900crm.db");
+    {
+        let conn = rusqlite::Connection::open(&db_path).expect("legacy db should open");
+        conn.execute_batch(
+            r#"
+            CREATE TABLE settings (
+                key        TEXT PRIMARY KEY NOT NULL,
+                value      TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE contacts (
+                id              TEXT PRIMARY KEY NOT NULL,
+                organization_id TEXT,
+                deleted_at      TEXT
+            );
+            CREATE TABLE deals (
+                id          TEXT PRIMARY KEY NOT NULL,
+                contact_id  TEXT,
+                created_at  TEXT NOT NULL,
+                updated_at  TEXT NOT NULL,
+                deleted_at  TEXT,
+                device_id   TEXT NOT NULL DEFAULT ''
+            );
+            INSERT INTO contacts (id, organization_id, deleted_at)
+            VALUES ('contact-1', 'org-1', NULL);
+            INSERT INTO deals (id, contact_id, created_at, updated_at, deleted_at, device_id)
+            VALUES ('deal-1', 'contact-1', '2026-06-24T08:00:00Z', '2026-06-24T08:00:00Z', NULL, 'device-a');
+            PRAGMA user_version = 6;
+            "#,
+        )
+        .expect("legacy schema should be created");
+    }
+
+    let core = CrmCore::open(&path).expect("core should open and backfill v7");
+
+    let backfilled_link_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM deal_contacts WHERE deal_id = 'deal-1' AND contact_id = 'contact-1' AND is_primary = 1 AND deleted_at IS NULL",
+            [],
+            |row| row.get(0),
+        )
+        .expect("deal contact backfill count should query");
+    assert_eq!(backfilled_link_count, 1);
+
+    let organization_id: Option<String> = core
+        .db
+        .conn
+        .query_row(
+            "SELECT organization_id FROM deals WHERE id = 'deal-1'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("deal organization backfill should query");
+    assert_eq!(organization_id.as_deref(), Some("org-1"));
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);

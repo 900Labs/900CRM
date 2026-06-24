@@ -42,7 +42,7 @@ use rusqlite::{params, Connection};
 use crate::utils::errors::{CrmError, CrmResult};
 
 /// The current schema version. Increment whenever a new migration is added.
-const CURRENT_SCHEMA_VERSION: u32 = 6;
+const CURRENT_SCHEMA_VERSION: u32 = 7;
 const DATABASE_FILENAME: &str = "900crm.db";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -228,6 +228,10 @@ impl Database {
 
         if current_version < 6 {
             self.migrate_v6_schema_normalization_bridge()?;
+        }
+
+        if current_version < 7 {
+            self.migrate_v7_deal_relationships_core_surface()?;
         }
 
         self.conn.execute_batch(&format!(
@@ -828,19 +832,136 @@ impl Database {
         Ok(())
     }
 
+    /// Schema v7 migration - additive deal relationship foundation.
+    ///
+    /// This keeps the legacy `deals.contact_id` primary-contact mirror while
+    /// adding first-class deal-to-organization and deal-to-contact surfaces.
+    fn migrate_v7_deal_relationships_core_surface(&mut self) -> CrmResult<()> {
+        log::info!("Running database migration v7 deal relationships");
+
+        if !self.table_exists("deals")? {
+            log::warn!(
+                "Skipping deal relationship migration because legacy table 'deals' is missing"
+            );
+            return Ok(());
+        }
+
+        self.add_column_if_missing("deals", "organization_id", "organization_id TEXT")?;
+
+        self.conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS deal_contacts (
+                id         TEXT PRIMARY KEY,
+                deal_id    TEXT NOT NULL,
+                contact_id TEXT NOT NULL,
+                role       TEXT,
+                is_primary INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                deleted_at TEXT,
+                device_id  TEXT NOT NULL,
+                FOREIGN KEY (deal_id) REFERENCES deals(id),
+                FOREIGN KEY (contact_id) REFERENCES contacts(id),
+                CHECK (is_primary IN (0, 1))
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_deals_organization_id
+                ON deals (organization_id);
+            CREATE INDEX IF NOT EXISTS idx_deal_contacts_deal_id
+                ON deal_contacts (deal_id);
+            CREATE INDEX IF NOT EXISTS idx_deal_contacts_contact_id
+                ON deal_contacts (contact_id);
+            CREATE INDEX IF NOT EXISTS idx_deal_contacts_active_deal
+                ON deal_contacts (deal_id)
+                WHERE deleted_at IS NULL;
+            CREATE INDEX IF NOT EXISTS idx_deal_contacts_active_contact
+                ON deal_contacts (contact_id)
+                WHERE deleted_at IS NULL;
+            CREATE INDEX IF NOT EXISTS idx_deal_contacts_active_primary
+                ON deal_contacts (deal_id, contact_id)
+                WHERE deleted_at IS NULL AND is_primary = 1;
+            "#,
+        )?;
+
+        if self.table_exists("contacts")? {
+            self.conn.execute_batch(
+                r#"
+
+            INSERT INTO deal_contacts
+                (id, deal_id, contact_id, role, is_primary, created_at, deleted_at, device_id)
+            SELECT
+                'legacy-primary:' || d.id || ':' || d.contact_id,
+                d.id,
+                d.contact_id,
+                NULL,
+                1,
+                COALESCE(NULLIF(TRIM(d.created_at), ''), datetime('now')),
+                NULL,
+                COALESCE(NULLIF(TRIM(d.device_id), ''), 'migration')
+            FROM deals d
+            WHERE d.deleted_at IS NULL
+              AND TRIM(COALESCE(d.contact_id, '')) <> ''
+              AND EXISTS (
+                  SELECT 1
+                  FROM contacts c
+                  WHERE c.id = d.contact_id
+                    AND c.deleted_at IS NULL
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM deal_contacts dc
+                  WHERE dc.deal_id = d.id
+                    AND dc.contact_id = d.contact_id
+                    AND dc.deleted_at IS NULL
+              );
+
+            UPDATE deals
+            SET organization_id = (
+                SELECT c.organization_id
+                FROM contacts c
+                WHERE c.id = deals.contact_id
+                  AND c.deleted_at IS NULL
+                  AND TRIM(COALESCE(c.organization_id, '')) <> ''
+                LIMIT 1
+            )
+            WHERE deleted_at IS NULL
+              AND TRIM(COALESCE(organization_id, '')) = ''
+              AND TRIM(COALESCE(contact_id, '')) <> ''
+              AND EXISTS (
+                  SELECT 1
+                  FROM contacts c
+                  WHERE c.id = deals.contact_id
+                    AND c.deleted_at IS NULL
+                    AND TRIM(COALESCE(c.organization_id, '')) <> ''
+              );
+            "#,
+            )?;
+        } else {
+            log::warn!(
+                "Skipping deal relationship backfill because legacy table 'contacts' is missing"
+            );
+        }
+
+        log::info!("Migration v7 deal relationships complete");
+        Ok(())
+    }
+
+    fn table_exists(&self, table_name: &str) -> CrmResult<bool> {
+        let table_count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+            params![table_name],
+            |row| row.get(0),
+        )?;
+
+        Ok(table_count != 0)
+    }
+
     fn add_column_if_missing(
         &mut self,
         table_name: &str,
         column_name: &str,
         column_definition: &str,
     ) -> CrmResult<()> {
-        let table_exists: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
-            params![table_name],
-            |row| row.get(0),
-        )?;
-
-        if table_exists == 0 {
+        if !self.table_exists(table_name)? {
             log::warn!(
                 "Skipping column migration for missing legacy table '{}'",
                 table_name
