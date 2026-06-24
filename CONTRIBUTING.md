@@ -160,7 +160,7 @@ npm run test
 # Build the frontend production bundle
 npm run build
 
-# Build desktop installers
+# Manual desktop package build (not CI release automation)
 npm run tauri -- build
 ```
 
@@ -506,6 +506,9 @@ Fill in all sections of the PR template:
 Initial GitHub Actions CI runs on `ubuntu-latest` for pull requests and pushes
 to `main`. It is a verification workflow only; release installers and
 cross-platform packaging are not built by CI yet.
+
+See [Release Readiness](docs/RELEASE.md) for the current release status, manual
+verification checklist, and future packaging artifacts.
 
 All PRs must pass:
 - `npm run lint` — ESLint for JavaScript repo tooling/config files
