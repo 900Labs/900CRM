@@ -28,6 +28,9 @@ impl CrmCore {
             entity_type,
             entity_id,
         )?;
+        if let Some(link) = before_link {
+            return Ok(link);
+        }
 
         let device_id = self.device_id.clone();
         let tx = self.db.conn.unchecked_transaction()?;
@@ -39,9 +42,7 @@ impl CrmCore {
             &device_id,
         )?;
 
-        if before_link.is_none() {
-            record_activity_link_create_change(&tx, &link, &device_id)?;
-        }
+        record_activity_link_create_change(&tx, &link, &device_id)?;
 
         match entity_type {
             ActivityLinkEntityType::Contact => {

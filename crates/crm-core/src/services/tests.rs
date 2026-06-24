@@ -1230,6 +1230,129 @@ fn create_activity_with_contact_and_deal_creates_activity_links_audit_and_sync()
 }
 
 #[test]
+fn duplicate_contact_and_deal_activity_links_do_not_rewrite_activity_or_audit_sync() {
+    let (mut core, path) = open_test_core();
+
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Amina".to_string()),
+            Some("Diallo".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+    let deal = core
+        .create_deal(
+            "Clinic expansion".to_string(),
+            Some(2500.0),
+            None,
+            Some("Proposal".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("deal should be created");
+    let activity = core
+        .create_activity(
+            "task".to_string(),
+            "Follow up".to_string(),
+            None,
+            None,
+            Some(contact.id.clone()),
+            Some(deal.id.clone()),
+        )
+        .expect("activity should be created");
+
+    let links_before = core
+        .list_activity_links(&activity.id)
+        .expect("activity links should list before duplicate adds");
+    let contact_link_id = links_before
+        .iter()
+        .find(|link| {
+            link.entity_type == crate::storage::activities::ActivityLinkEntityType::Contact
+                && link.entity_id == contact.id
+        })
+        .expect("contact link should exist")
+        .id
+        .clone();
+    let deal_link_id = links_before
+        .iter()
+        .find(|link| {
+            link.entity_type == crate::storage::activities::ActivityLinkEntityType::Deal
+                && link.entity_id == deal.id
+        })
+        .expect("deal link should exist")
+        .id
+        .clone();
+
+    let sentinel_updated_at = "2026-06-24T09:15:00Z";
+    core.db
+        .conn
+        .execute(
+            "UPDATE activities SET updated_at = ?1 WHERE id = ?2",
+            params![sentinel_updated_at, activity.id.as_str()],
+        )
+        .expect("activity updated_at should be pinned");
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let duplicate_contact_link = core
+        .add_activity_link(&activity.id, "contact", &contact.id)
+        .expect("duplicate contact activity link should be a no-op");
+    let duplicate_deal_link = core
+        .add_activity_link(&activity.id, "deal", &deal.id)
+        .expect("duplicate deal activity link should be a no-op");
+
+    assert_eq!(duplicate_contact_link.id, contact_link_id);
+    assert_eq!(duplicate_deal_link.id, deal_link_id);
+    let activity_after_duplicates = core
+        .get_activity(&activity.id)
+        .expect("activity should load after duplicate adds");
+    assert_eq!(
+        activity_after_duplicates.updated_at.as_str(),
+        sentinel_updated_at
+    );
+    assert_eq!(
+        activity_after_duplicates.contact_id.as_deref(),
+        Some(contact.id.as_str())
+    );
+    assert_eq!(
+        activity_after_duplicates.deal_id.as_deref(),
+        Some(deal.id.as_str())
+    );
+    let active_link_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM activity_links WHERE activity_id = ?1 AND deleted_at IS NULL",
+            params![activity.id],
+            |row| row.get(0),
+        )
+        .expect("active activity link count should query");
+    assert_eq!(active_link_count, 2);
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn update_activity_changing_and_clearing_contact_deal_keeps_links_and_mirrors_aligned() {
     let (mut core, path) = open_test_core();
 
