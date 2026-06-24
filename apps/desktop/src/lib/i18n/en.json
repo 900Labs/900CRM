@@ -14,7 +14,8 @@
     "contacts": "Contacts",
     "pipeline": "Pipeline",
     "activities": "Activities",
-    "settings": "Settings"
+    "settings": "Settings",
+    "organizations": "Organizations"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -278,5 +279,39 @@
     "exporting": "Exporting…",
     "success": "Export complete",
     "failed": "Export failed"
+  },
+  "organizations": {
+    "title": "Organizations",
+    "addOrganization": "Add Organization",
+    "editOrganization": "Edit Organization",
+    "deleteOrganization": "Delete Organization",
+    "search": "Search organizations...",
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "website": "Website",
+    "location": "Location",
+    "addressLine1": "Address Line 1",
+    "addressLine2": "Address Line 2",
+    "city": "City",
+    "region": "Region",
+    "country": "Country",
+    "postalCode": "Postal Code",
+    "description": "Description",
+    "created": "Created",
+    "updated": "Updated",
+    "noOrganizations": "No organizations yet",
+    "noOrganizationsDesc": "Create an organization record without changing existing contact organization text.",
+    "createOrganization": "Create Organization",
+    "updateOrganization": "Update Organization",
+    "confirmDelete": "Delete {name}? This does not remove linked contacts.",
+    "contactLink": "Link Contact to Organization",
+    "contactId": "Contact ID",
+    "linkContact": "Link Contact",
+    "clearContactLink": "Clear Contact Link",
+    "linkContactDesc": "Enter an existing contact ID to link or clear its first-class organization reference.",
+    "linkCreated": "Contact linked to organization",
+    "linkCleared": "Contact organization link cleared",
+    "linkContactRequired": "Contact ID is required"
   }
 }

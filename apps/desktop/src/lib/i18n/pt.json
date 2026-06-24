@@ -14,7 +14,8 @@
     "contacts": "Contatos",
     "pipeline": "Pipeline",
     "activities": "Atividades",
-    "settings": "Configurações"
+    "settings": "Configurações",
+    "organizations": "Organizações"
   },
   "dashboard": {
     "title": "Painel",
@@ -278,5 +279,39 @@
     "exporting": "Exportando…",
     "success": "Exportação concluída",
     "failed": "Falha na exportação"
+  },
+  "organizations": {
+    "title": "Organizações",
+    "addOrganization": "Adicionar organização",
+    "editOrganization": "Editar organização",
+    "deleteOrganization": "Excluir organização",
+    "search": "Pesquisar organizações...",
+    "name": "Nome",
+    "email": "E-mail",
+    "phone": "Telefone",
+    "website": "Site",
+    "location": "Localização",
+    "addressLine1": "Endereço linha 1",
+    "addressLine2": "Endereço linha 2",
+    "city": "Cidade",
+    "region": "Região",
+    "country": "País",
+    "postalCode": "CEP",
+    "description": "Descrição",
+    "created": "Criado",
+    "updated": "Atualizado",
+    "noOrganizations": "Ainda não há organizações",
+    "noOrganizationsDesc": "Crie um registro de organização sem alterar o texto de organização existente dos contatos.",
+    "createOrganization": "Criar organização",
+    "updateOrganization": "Atualizar organização",
+    "confirmDelete": "Excluir {name}? Isso não remove contatos vinculados.",
+    "contactLink": "Vincular contato à organização",
+    "contactId": "ID do contato",
+    "linkContact": "Vincular contato",
+    "clearContactLink": "Limpar vínculo",
+    "linkContactDesc": "Informe um ID de contato existente para vincular ou limpar sua referência de organização.",
+    "linkCreated": "Contato vinculado à organização",
+    "linkCleared": "Vínculo de organização do contato removido",
+    "linkContactRequired": "O ID do contato é obrigatório"
   }
 }

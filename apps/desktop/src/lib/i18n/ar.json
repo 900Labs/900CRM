@@ -14,7 +14,8 @@
     "contacts": "جهات الاتصال",
     "pipeline": "خط المبيعات",
     "activities": "الأنشطة",
-    "settings": "الإعدادات"
+    "settings": "الإعدادات",
+    "organizations": "المؤسسات"
   },
   "dashboard": {
     "title": "لوحة التحكم",
@@ -278,5 +279,39 @@
     "exporting": "جارٍ التصدير…",
     "success": "اكتمل التصدير",
     "failed": "فشل التصدير"
+  },
+  "organizations": {
+    "title": "المؤسسات",
+    "addOrganization": "إضافة مؤسسة",
+    "editOrganization": "تعديل المؤسسة",
+    "deleteOrganization": "حذف المؤسسة",
+    "search": "ابحث في المؤسسات...",
+    "name": "الاسم",
+    "email": "البريد الإلكتروني",
+    "phone": "الهاتف",
+    "website": "الموقع الإلكتروني",
+    "location": "الموقع",
+    "addressLine1": "العنوان 1",
+    "addressLine2": "العنوان 2",
+    "city": "المدينة",
+    "region": "المنطقة",
+    "country": "البلد",
+    "postalCode": "الرمز البريدي",
+    "description": "الوصف",
+    "created": "تم الإنشاء",
+    "updated": "تم التحديث",
+    "noOrganizations": "لا توجد مؤسسات بعد",
+    "noOrganizationsDesc": "أنشئ سجل مؤسسة دون تغيير نص المؤسسة الحالي في جهات الاتصال.",
+    "createOrganization": "إنشاء مؤسسة",
+    "updateOrganization": "تحديث المؤسسة",
+    "confirmDelete": "حذف {name}؟ لن يؤدي هذا إلى حذف جهات الاتصال المرتبطة.",
+    "contactLink": "ربط جهة اتصال بمؤسسة",
+    "contactId": "معرّف جهة الاتصال",
+    "linkContact": "ربط جهة الاتصال",
+    "clearContactLink": "مسح الربط",
+    "linkContactDesc": "أدخل معرّف جهة اتصال موجودة لربط مرجع المؤسسة أو مسحه.",
+    "linkCreated": "تم ربط جهة الاتصال بالمؤسسة",
+    "linkCleared": "تم مسح ربط المؤسسة من جهة الاتصال",
+    "linkContactRequired": "معرّف جهة الاتصال مطلوب"
   }
 }

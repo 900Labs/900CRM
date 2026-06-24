@@ -14,7 +14,8 @@
     "contacts": "Liên hệ",
     "pipeline": "Pipeline",
     "activities": "Hoạt động",
-    "settings": "Cài đặt"
+    "settings": "Cài đặt",
+    "organizations": "Tổ chức"
   },
   "dashboard": {
     "title": "Bảng điều khiển",
@@ -278,5 +279,39 @@
     "exporting": "Đang xuất…",
     "success": "Xuất hoàn tất",
     "failed": "Xuất thất bại"
+  },
+  "organizations": {
+    "title": "Tổ chức",
+    "addOrganization": "Thêm tổ chức",
+    "editOrganization": "Sửa tổ chức",
+    "deleteOrganization": "Xóa tổ chức",
+    "search": "Tìm tổ chức...",
+    "name": "Tên",
+    "email": "Email",
+    "phone": "Điện thoại",
+    "website": "Website",
+    "location": "Vị trí",
+    "addressLine1": "Địa chỉ dòng 1",
+    "addressLine2": "Địa chỉ dòng 2",
+    "city": "Thành phố",
+    "region": "Khu vực",
+    "country": "Quốc gia",
+    "postalCode": "Mã bưu chính",
+    "description": "Mô tả",
+    "created": "Đã tạo",
+    "updated": "Đã cập nhật",
+    "noOrganizations": "Chưa có tổ chức",
+    "noOrganizationsDesc": "Tạo bản ghi tổ chức mà không thay đổi văn bản tổ chức hiện có của liên hệ.",
+    "createOrganization": "Tạo tổ chức",
+    "updateOrganization": "Cập nhật tổ chức",
+    "confirmDelete": "Xóa {name}? Thao tác này không xóa các liên hệ đã liên kết.",
+    "contactLink": "Liên kết liên hệ với tổ chức",
+    "contactId": "ID liên hệ",
+    "linkContact": "Liên kết liên hệ",
+    "clearContactLink": "Xóa liên kết",
+    "linkContactDesc": "Nhập ID liên hệ hiện có để liên kết hoặc xóa tham chiếu tổ chức.",
+    "linkCreated": "Đã liên kết liên hệ với tổ chức",
+    "linkCleared": "Đã xóa liên kết tổ chức của liên hệ",
+    "linkContactRequired": "Cần có ID liên hệ"
   }
 }

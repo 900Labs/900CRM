@@ -14,7 +14,8 @@
     "contacts": "যোগাযোগ",
     "pipeline": "পাইপলাইন",
     "activities": "কার্যক্রম",
-    "settings": "সেটিংস"
+    "settings": "সেটিংস",
+    "organizations": "সংস্থা"
   },
   "dashboard": {
     "title": "ড্যাশবোর্ড",
@@ -278,5 +279,39 @@
     "exporting": "এক্সপোর্ট হচ্ছে…",
     "success": "এক্সপোর্ট সম্পন্ন",
     "failed": "এক্সপোর্ট ব্যর্থ"
+  },
+  "organizations": {
+    "title": "সংস্থা",
+    "addOrganization": "সংস্থা যোগ করুন",
+    "editOrganization": "সংস্থা সম্পাদনা",
+    "deleteOrganization": "সংস্থা মুছুন",
+    "search": "সংস্থা খুঁজুন...",
+    "name": "নাম",
+    "email": "ইমেল",
+    "phone": "ফোন",
+    "website": "ওয়েবসাইট",
+    "location": "অবস্থান",
+    "addressLine1": "ঠিকানা লাইন ১",
+    "addressLine2": "ঠিকানা লাইন ২",
+    "city": "শহর",
+    "region": "অঞ্চল",
+    "country": "দেশ",
+    "postalCode": "পোস্টাল কোড",
+    "description": "বিবরণ",
+    "created": "তৈরি হয়েছে",
+    "updated": "আপডেট হয়েছে",
+    "noOrganizations": "এখনও কোনো সংস্থা নেই",
+    "noOrganizationsDesc": "বিদ্যমান যোগাযোগের সংস্থার লেখা না বদলে সংস্থার রেকর্ড তৈরি করুন।",
+    "createOrganization": "সংস্থা তৈরি করুন",
+    "updateOrganization": "সংস্থা আপডেট করুন",
+    "confirmDelete": "{name} মুছবেন? এতে যুক্ত যোগাযোগ মুছে যাবে না।",
+    "contactLink": "যোগাযোগকে সংস্থার সাথে যুক্ত করুন",
+    "contactId": "যোগাযোগ ID",
+    "linkContact": "যোগাযোগ যুক্ত করুন",
+    "clearContactLink": "যোগাযোগ লিংক মুছুন",
+    "linkContactDesc": "প্রথম-শ্রেণির সংস্থা রেফারেন্স যুক্ত বা মুছতে বিদ্যমান যোগাযোগ ID লিখুন।",
+    "linkCreated": "যোগাযোগ সংস্থার সাথে যুক্ত হয়েছে",
+    "linkCleared": "যোগাযোগের সংস্থা লিংক মুছে গেছে",
+    "linkContactRequired": "যোগাযোগ ID প্রয়োজন"
   }
 }

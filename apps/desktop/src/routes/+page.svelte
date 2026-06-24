@@ -6,6 +6,7 @@
   import { onMount } from 'svelte';
   import Dashboard from './Dashboard.svelte';
   import Contacts from './Contacts.svelte';
+  import Organizations from './Organizations.svelte';
   import Pipeline from './Pipeline.svelte';
   import Activities from './Activities.svelte';
   import Settings from './Settings.svelte';
@@ -28,6 +29,12 @@
       const id = normalized.split('/')[2] ?? '';
       route = '/contacts/:id';
       contactId = id || null;
+      return;
+    }
+
+    if (normalized === '/organizations') {
+      route = '/organizations';
+      contactId = null;
       return;
     }
 
@@ -72,6 +79,8 @@
   <ContactDetail {contactId} />
 {:else if route === '/contacts'}
   <Contacts />
+{:else if route === '/organizations'}
+  <Organizations />
 {:else if route === '/pipeline'}
   <Pipeline />
 {:else if route === '/activities'}
