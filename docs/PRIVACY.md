@@ -80,8 +80,11 @@ listener, expose MCP tools/resources/prompts, manage MCP tokens, or call a
 model provider.
 
 External-client records, permissions, proposed actions, and audit entries are
-readiness primitives only. Approving a proposed action records a decision; it
-does not execute the proposed CRM mutation or run MCP/client code.
+local readiness primitives. Approving a supported `create_activity_draft`
+proposed action can create a local activity through `crm-core` and record local
+audit evidence. Rejection remains decision-only, unsupported proposed-action
+types remain pending with an explicit error, and approval does not run MCP/client
+code.
 
 See [MCP Readiness Baseline](MCP_READINESS.md) for the detailed current MCP
 boundary.

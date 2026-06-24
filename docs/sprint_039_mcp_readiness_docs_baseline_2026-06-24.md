@@ -20,6 +20,13 @@ Scope: Documentation-only MCP readiness baseline for the current placeholder and
 - No localhost listener, prompt/resource/tool implementation, permission grant UI, or direct action execution was added.
 - Wording is intended to be public/open-source safe.
 
+## Supersession Note
+
+Sprint 051 later added a narrow `crm-core` execution path for supported
+`create_activity_draft` proposed actions. This Sprint 039 note remains
+historical context for the MCP readiness baseline before that execution path
+existed.
+
 ## Validation
 
 Validation was run after the docs-only changes:

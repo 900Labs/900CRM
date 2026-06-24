@@ -28,13 +28,20 @@ fn import_mapping(pairs: &[(&str, Option<&str>)]) -> ImportColumnMapping {
 }
 
 fn create_test_proposed_action(core: &mut CrmCore, title: &str) -> ProposedAction {
+    create_test_proposed_action_with_input(core, format!(r#"{{"title":"{}"}}"#, title))
+}
+
+fn create_test_proposed_action_with_input(
+    core: &mut CrmCore,
+    input_json: String,
+) -> ProposedAction {
     core.create_external_proposed_action_stub(
         None,
         "create_activity".to_string(),
         "create_activity_draft".to_string(),
         Some("activity".to_string()),
         None,
-        format!(r#"{{"title":"{}"}}"#, title),
+        input_json,
         None,
     )
     .expect("proposed action should be created")
@@ -1469,30 +1476,113 @@ fn list_pending_proposed_actions_returns_only_pending_actions_in_created_order()
 }
 
 #[test]
-fn approve_pending_proposed_action_marks_timestamp_and_audit_without_execution() {
+fn approve_create_activity_draft_executes_activity_and_marks_proposed_action_executed() {
     let (mut core, path) = open_test_core();
-    let proposed_action = create_test_proposed_action(&mut core, "Approve me");
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Amina".to_string()),
+            Some("Diallo".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+    let organization = core
+        .create_organization(
+            "Nine Hundred Labs".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("organization should be created");
+    let deal = core
+        .create_deal(
+            "Clinic expansion".to_string(),
+            Some(2500.0),
+            None,
+            Some("Proposal".to_string()),
+            None,
+            None,
+            None,
+            Some(organization.id.clone()),
+            None,
+        )
+        .expect("deal should be created");
+    let input_json = serde_json::json!({
+        "title": "Approve me",
+        "activity_type": "call",
+        "description": "Confirm next steps",
+        "due_at": "2026-06-25T09:00:00Z",
+        "linked_entities": [
+            { "entity_type": "contact", "entity_id": contact.id.clone() },
+            { "entity_type": "organization", "entity_id": organization.id.clone() },
+            { "entity_type": "deal", "entity_id": deal.id.clone() }
+        ]
+    })
+    .to_string();
+    let proposed_action = create_test_proposed_action_with_input(&mut core, input_json);
 
     let approved = core
         .approve_proposed_action(proposed_action.id.clone())
-        .expect("pending proposed action should approve");
+        .expect("pending proposed action should approve and execute");
 
     assert_eq!(approved.id, proposed_action.id);
-    assert_eq!(approved.status, "approved");
+    assert_eq!(approved.status, "executed");
     assert!(approved.approved_at.is_some());
     assert_eq!(approved.rejected_at, None);
-    assert_eq!(approved.executed_at, None);
+    assert!(approved.executed_at.is_some());
 
-    let stored_executed_at: Option<String> = core
+    let stored_activity: (
+        String,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    ) = core
         .db
         .conn
         .query_row(
-            "SELECT executed_at FROM proposed_actions WHERE id = ?1",
-            params![&approved.id],
-            |row| row.get(0),
+            "SELECT id, activity_type, title, due_date, contact_id, deal_id FROM activities WHERE title = 'Approve me'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
         )
-        .expect("executed timestamp should query");
-    assert_eq!(stored_executed_at, None);
+        .expect("created activity should query");
+    assert_eq!(stored_activity.1, "call");
+    assert_eq!(stored_activity.2, "Approve me");
+    assert_eq!(stored_activity.3.as_deref(), Some("2026-06-25T09:00:00Z"));
+    assert_eq!(stored_activity.4.as_deref(), Some(contact.id.as_str()));
+    assert_eq!(stored_activity.5.as_deref(), Some(deal.id.as_str()));
+
+    let links = core
+        .list_activity_links(&stored_activity.0)
+        .expect("created activity links should list");
+    assert_eq!(links.len(), 3);
+    assert!(links.iter().any(|link| {
+        link.entity_type == crate::storage::activities::ActivityLinkEntityType::Contact
+            && link.entity_id == contact.id
+    }));
+    assert!(links.iter().any(|link| {
+        link.entity_type == crate::storage::activities::ActivityLinkEntityType::Organization
+            && link.entity_id == organization.id
+    }));
+    assert!(links.iter().any(|link| {
+        link.entity_type == crate::storage::activities::ActivityLinkEntityType::Deal
+            && link.entity_id == deal.id
+    }));
 
     let audit_payloads: (Option<String>, Option<String>) = core
         .db
@@ -1510,7 +1600,117 @@ fn approve_pending_proposed_action_marks_timestamp_and_audit_without_execution()
     assert!(audit_payloads
         .1
         .as_deref()
-        .is_some_and(|payload| payload.contains(r#""status":"approved""#)));
+        .is_some_and(|payload| payload.contains(r#""status":"executed""#)));
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'execute_proposed_action' AND entity_type = 'proposed_action'"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'create' AND entity_type = 'activity'"
+        ),
+        1
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn approve_create_activity_draft_invalid_input_rolls_back_pending_without_audit_or_activity() {
+    let (mut core, path) = open_test_core();
+    let proposed_action = create_test_proposed_action_with_input(
+        &mut core,
+        r#"{"activity_type":"task","description":"missing title"}"#.to_string(),
+    );
+
+    let err = core
+        .approve_proposed_action(proposed_action.id.clone())
+        .expect_err("invalid draft input should not approve");
+    match err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("title"));
+            assert!(message.contains("required"));
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
+
+    let stored: (String, Option<String>, Option<String>) = core
+        .db
+        .conn
+        .query_row(
+            "SELECT status, approved_at, executed_at FROM proposed_actions WHERE id = ?1",
+            params![&proposed_action.id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("proposed action should query after failed approval");
+    assert_eq!(stored.0, "pending");
+    assert_eq!(stored.1, None);
+    assert_eq!(stored.2, None);
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM activities"), 0);
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM audit_log WHERE action IN ('approve_proposed_action', 'execute_proposed_action')"
+        ),
+        0
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn approve_unsupported_proposed_action_stays_pending_without_audit_or_activity() {
+    let (mut core, path) = open_test_core();
+    let proposed_action = core
+        .create_external_proposed_action_stub(
+            None,
+            "send_email".to_string(),
+            "send_email_draft".to_string(),
+            Some("activity".to_string()),
+            None,
+            r#"{"title":"Unsupported"}"#.to_string(),
+            None,
+        )
+        .expect("unsupported proposed action should be created as pending");
+
+    let err = core
+        .approve_proposed_action(proposed_action.id.clone())
+        .expect_err("unsupported proposed action should not approve");
+    match err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("Unsupported proposed action"));
+            assert!(message.contains("send_email_draft"));
+            assert!(message.contains("send_email"));
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
+
+    let stored: (String, Option<String>, Option<String>) = core
+        .db
+        .conn
+        .query_row(
+            "SELECT status, approved_at, executed_at FROM proposed_actions WHERE id = ?1",
+            params![&proposed_action.id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("unsupported proposed action should query after failed approval");
+    assert_eq!(stored.0, "pending");
+    assert_eq!(stored.1, None);
+    assert_eq!(stored.2, None);
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM activities"), 0);
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM audit_log WHERE action IN ('approve_proposed_action', 'execute_proposed_action')"
+        ),
+        0
+    );
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);
@@ -1530,6 +1730,7 @@ fn reject_pending_proposed_action_marks_timestamp_and_audit_without_execution() 
     assert_eq!(rejected.approved_at, None);
     assert!(rejected.rejected_at.is_some());
     assert_eq!(rejected.executed_at, None);
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM activities"), 0);
 
     let stored_executed_at: Option<String> = core
         .db
@@ -1578,16 +1779,16 @@ fn proposed_action_decisions_reject_unknown_and_already_non_pending_actions() {
         other => panic!("expected NotFound, got {other:?}"),
     }
 
-    let approved_action = create_test_proposed_action(&mut core, "Already approved");
+    let approved_action = create_test_proposed_action(&mut core, "Already executed");
     core.approve_proposed_action(approved_action.id.clone())
-        .expect("first approval should succeed");
+        .expect("first approval should execute");
     let approved_again_err = core
         .approve_proposed_action(approved_action.id.clone())
-        .expect_err("already approved proposed action should be rejected");
+        .expect_err("already executed proposed action should be rejected");
     match approved_again_err {
         CrmError::InvalidInput(message) => {
             assert!(message.contains("must be pending"));
-            assert!(message.contains("approved"));
+            assert!(message.contains("executed"));
         }
         other => panic!("expected InvalidInput, got {other:?}"),
     }

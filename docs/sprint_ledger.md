@@ -52,3 +52,4 @@
 | 048 | 2026-06-24 | `codex/component-test-harness-foundation` | Svelte component-render Vitest harness with jsdom-backed Modal and EmptyState tests while preserving existing API/util test coverage | Completed |
 | 049 | 2026-06-24 | `codex/readme-screenshot-baseline` | README screenshot baseline with committed browser-shell assets and an opt-in capture helper without product/runtime or release-packaging changes | Completed |
 | 050 | 2026-06-24 | `codex/canonical-repository-url-alignment` | Canonical public self-repository URL alignment across README badges/links, package metadata, Cargo metadata, and the app-visible Settings GitHub link | Completed |
+| 051 | 2026-06-24 | `codex/proposed-action-execution-core` | First safe core execution path for approved `create_activity_draft` proposed actions through existing activity service/storage behavior without MCP runtime, UI, token, permission-mode, or sync-server changes | Completed |

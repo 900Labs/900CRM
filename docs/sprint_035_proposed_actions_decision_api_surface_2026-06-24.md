@@ -24,6 +24,12 @@ Scope: Narrow backend, desktop, and frontend API foundation for approving or rej
 - No raw SQL was added to Tauri commands or `crm_engine`.
 - Frontend access goes through typed API wrappers; no direct Svelte `invoke()` calls were added.
 
+## Supersession Note
+
+Sprint 051 later added a narrow `crm-core` execution path for supported
+`create_activity_draft` proposed actions. The Sprint 035 no-execution behavior
+remains historical context for the initial decision-only API surface.
+
 ## Validation
 
 - [x] `npm run check`

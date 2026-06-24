@@ -121,6 +121,40 @@ pub fn reject_proposed_action(conn: &Connection, id: &str) -> CrmResult<Proposed
     decide_proposed_action(conn, id, ProposedActionDecision::Reject, |_, _| Ok(()))
 }
 
+pub fn execute_proposed_action(conn: &Connection, id: &str) -> CrmResult<ProposedAction> {
+    let current = get_proposed_action(conn, id)?
+        .ok_or_else(|| CrmError::NotFound(format!("Proposed action '{}' was not found", id)))?;
+    if current.status != "pending" {
+        return Err(CrmError::InvalidInput(format!(
+            "Proposed action '{}' must be pending before it can be executed; current status is '{}'",
+            id, current.status
+        )));
+    }
+
+    let executed_at = now_iso8601();
+    let updated_rows = conn.execute(
+        r#"
+            UPDATE proposed_actions
+            SET status = 'executed', approved_at = ?1, executed_at = ?1
+            WHERE id = ?2 AND status = 'pending'
+            "#,
+        params![executed_at, id],
+    )?;
+    if updated_rows != 1 {
+        return Err(CrmError::InvalidInput(format!(
+            "Proposed action '{}' was no longer pending before execution could be recorded",
+            id
+        )));
+    }
+
+    get_proposed_action(conn, id)?.ok_or_else(|| {
+        CrmError::NotFound(format!(
+            "Proposed action '{}' was not found after execution",
+            id
+        ))
+    })
+}
+
 #[cfg(test)]
 pub(crate) fn approve_proposed_action_after_test_status_change(
     conn: &Connection,
