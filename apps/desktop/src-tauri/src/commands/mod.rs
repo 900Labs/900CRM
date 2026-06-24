@@ -17,6 +17,7 @@ pub mod import_export;
 pub mod note_commands;
 pub mod organization_commands;
 pub mod report_commands;
+pub mod search_commands;
 pub mod settings_commands;
 pub mod sync_commands;
 pub mod tag_commands;
