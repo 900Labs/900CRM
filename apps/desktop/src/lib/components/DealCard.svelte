@@ -18,11 +18,15 @@
     draggable = true,
     onclick,
     ondragstart,
+    primaryContactName = deal.contactName,
+    organizationName = null,
   }: {
     deal: Deal;
     draggable?: boolean;
     onclick?: (deal: Deal) => void;
     ondragstart?: (e: DragEvent, deal: Deal) => void;
+    primaryContactName?: string | null;
+    organizationName?: string | null;
   } = $props();
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -76,12 +80,22 @@
   <p class="deal-value">{formattedValue}</p>
 
   <!-- Contact -->
-  {#if deal.contactName}
+  {#if primaryContactName}
     <div class="deal-meta">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/>
       </svg>
-      <span>{deal.contactName}</span>
+      <span>{primaryContactName}</span>
+    </div>
+  {/if}
+
+  <!-- Organization -->
+  {#if organizationName}
+    <div class="deal-meta">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M3 21h18M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1"/>
+      </svg>
+      <span>{organizationName}</span>
     </div>
   {/if}
 

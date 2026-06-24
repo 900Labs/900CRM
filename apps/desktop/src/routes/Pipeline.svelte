@@ -15,8 +15,10 @@
   import { dealStore } from '$lib/stores/deals';
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
-  import type { DealStage, Deal } from '$lib/api/deals';
+  import type { Contact } from '$lib/api/contacts';
+  import type { DealStage } from '$lib/api/deals';
   import { DEAL_STAGES } from '$lib/api/deals';
+  import type { Organization } from '$lib/api/organizations';
   import {
     listCustomFieldDefinitions,
     listCustomFieldValuesForEntityType,
@@ -25,6 +27,10 @@
   } from '$lib/api/customFields';
   import { formatCurrency } from '$lib/utils/formatters';
   import { sumByCurrency } from '$lib/utils/currency';
+  import {
+    deriveDealRelationshipLabels,
+    loadDealRelationshipLookups,
+  } from '$lib/utils/dealRelationships';
   import DealCard from '$lib/components/DealCard.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
@@ -42,12 +48,15 @@
   let customFieldValuesLoading = $state(false);
   let customFieldFilterError = $state<string | null>(null);
   let customFieldValueIndex = $state<Record<string, Record<string, string>>>({});
+  let relationshipContacts = $state<Contact[]>([]);
+  let relationshipOrganizations = $state<Organization[]>([]);
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
   onMount(async () => {
     await Promise.all([
       dealStore.loadPipelineBoard(),
+      ensureRelationshipLookups(),
       loadCustomFieldDefinitions(),
     ]);
   });
@@ -90,6 +99,17 @@
    */
   function openAddDeal(stage: DealStage) {
     uiStore.openModal('addDeal', { stage });
+  }
+
+  async function ensureRelationshipLookups() {
+    try {
+      const lookups = await loadDealRelationshipLookups();
+      relationshipContacts = lookups.contacts;
+      relationshipOrganizations = lookups.organizations;
+    } catch (err) {
+      console.error('[Pipeline] Failed to load deal relationship lookups:', err);
+      uiStore.toastError('Failed to load deal relationships.');
+    }
   }
 
   async function loadCustomFieldDefinitions() {
@@ -314,6 +334,11 @@
               </div>
             {:else}
               {#each col.deals as deal (deal.id)}
+                {@const relationships = deriveDealRelationshipLabels(
+                  deal,
+                  relationshipContacts,
+                  relationshipOrganizations,
+                )}
                 <div
                   class="card-wrapper"
                   class:card-wrapper--dragging={draggingId === deal.id}
@@ -322,7 +347,11 @@
                   ondragend={handleDragEnd}
                   role="listitem"
                 >
-                  <DealCard {deal} />
+                  <DealCard
+                    {deal}
+                    primaryContactName={relationships.primaryContactName}
+                    organizationName={relationships.organizationName}
+                  />
                 </div>
               {/each}
             {/if}
