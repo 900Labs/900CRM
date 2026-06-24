@@ -23,6 +23,12 @@
   import { availableLocales } from '$lib/i18n';
   import { uiStore } from '$lib/stores/ui';
   import type { AppSettings } from '$lib/api/settings';
+  import {
+    createLocalBackup,
+    restoreLocalBackupToAppData,
+    validateLocalBackup,
+    type LocalBackupValidation,
+  } from '$lib/api/backup';
   import { testEmailServerConnection } from '$lib/api/email';
   import ImportExport from '$lib/components/ImportExport.svelte';
 
@@ -90,6 +96,11 @@
   let imapTestMessage = $state<string | null>(null);
 
   let showImportExport = $state(false);
+  let backupDirLocal = $state('');
+  let backupBusy = $state<null | 'select' | 'create' | 'validate' | 'restore'>(null);
+  let backupMessage = $state<string | null>(null);
+  let backupError = $state<string | null>(null);
+  let lastBackupValidation = $state<LocalBackupValidation | null>(null);
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -299,6 +310,143 @@
 
   function handleImportData() {
     showImportExport = true;
+  }
+
+  function selectedBackupIsValidated() {
+    return backupDirLocal.trim() !== '' && lastBackupValidation?.backup_dir === backupDirLocal;
+  }
+
+  function clearBackupFeedback() {
+    backupMessage = null;
+    backupError = null;
+  }
+
+  function setSelectedBackupDir(path: string) {
+    backupDirLocal = path;
+    lastBackupValidation = null;
+    clearBackupFeedback();
+  }
+
+  function selectedDialogPath(value: string | string[] | null): string | null {
+    if (Array.isArray(value)) {
+      return value[0] ?? null;
+    }
+    return value;
+  }
+
+  function requireBackupDir(): string | null {
+    const path = backupDirLocal.trim();
+    if (!path) {
+      backupError = t('settings.backupMissingFolder');
+      uiStore.toastError(t('settings.backupMissingFolder'));
+      return null;
+    }
+    return path;
+  }
+
+  function backupErrorMessage(err: unknown): string {
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
+    }
+    if (typeof err === 'string' && err.trim()) {
+      return err;
+    }
+    return t('settings.backupFailed');
+  }
+
+  async function handleChooseBackupFolder() {
+    backupBusy = 'select';
+    try {
+      const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
+      const selected = selectedDialogPath(await openDialog({
+        directory: true,
+        multiple: false,
+        title: t('settings.backupDirectoryPickerTitle'),
+      }));
+
+      if (selected) {
+        setSelectedBackupDir(selected);
+      }
+    } catch (err) {
+      backupError = backupErrorMessage(err);
+      uiStore.toastError(`${t('settings.backupFailed')}: ${backupError}`);
+    } finally {
+      backupBusy = null;
+    }
+  }
+
+  async function handleCreateBackup() {
+    const backupDir = requireBackupDir();
+    if (!backupDir) return;
+
+    backupBusy = 'create';
+    clearBackupFeedback();
+    lastBackupValidation = null;
+    try {
+      const backup = await createLocalBackup(backupDir);
+      backupMessage = t('settings.backupCreated', { path: backup.backup_dir });
+      uiStore.toastSuccess(t('settings.backupCreated', { path: backup.backup_dir }));
+    } catch (err) {
+      backupError = backupErrorMessage(err);
+      uiStore.toastError(`${t('settings.backupFailed')}: ${backupError}`);
+    } finally {
+      backupBusy = null;
+    }
+  }
+
+  async function validateSelectedBackup(backupDir: string): Promise<LocalBackupValidation> {
+    const validation = await validateLocalBackup(backupDir);
+    lastBackupValidation = validation;
+    backupMessage = t('settings.backupValidated', { path: validation.backup_dir });
+    return validation;
+  }
+
+  async function handleValidateBackup() {
+    const backupDir = requireBackupDir();
+    if (!backupDir) return;
+
+    backupBusy = 'validate';
+    clearBackupFeedback();
+    try {
+      const validation = await validateSelectedBackup(backupDir);
+      uiStore.toastSuccess(t('settings.backupValidated', { path: validation.backup_dir }));
+    } catch (err) {
+      lastBackupValidation = null;
+      backupError = backupErrorMessage(err);
+      uiStore.toastError(`${t('settings.backupFailed')}: ${backupError}`);
+    } finally {
+      backupBusy = null;
+    }
+  }
+
+  async function handleRestoreBackup() {
+    const backupDir = requireBackupDir();
+    if (!backupDir) return;
+
+    backupBusy = 'restore';
+    clearBackupFeedback();
+    let restoreRevalidationComplete = false;
+    try {
+      const validation = await validateSelectedBackup(backupDir);
+      restoreRevalidationComplete = true;
+      const confirmed = window.confirm(t('settings.backupRestoreConfirm'));
+      if (!confirmed) {
+        backupMessage = t('settings.backupRestoreCancelled');
+        return;
+      }
+
+      const result = await restoreLocalBackupToAppData(validation.backup_dir, true);
+      backupMessage = t('settings.backupRestored', { path: result.database_path });
+      uiStore.toastSuccess(t('settings.backupRestored', { path: result.database_path }));
+    } catch (err) {
+      if (!restoreRevalidationComplete) {
+        lastBackupValidation = null;
+      }
+      backupError = backupErrorMessage(err);
+      uiStore.toastError(`${t('settings.backupFailed')}: ${backupError}`);
+    } finally {
+      backupBusy = null;
+    }
   }
 </script>
 
@@ -866,6 +1014,86 @@
               {t('settings.importData')}
             </button>
           </div>
+
+          <div class="backup-panel" aria-live="polite">
+            <div class="backup-panel-header">
+              <div class="data-action-info">
+                <span class="data-action-label">{t('settings.backupRestore')}</span>
+                <span class="data-action-desc">{t('settings.backupRestoreDesc')}</span>
+              </div>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick={handleChooseBackupFolder}
+                type="button"
+                disabled={backupBusy !== null}
+              >
+                {backupBusy === 'select' ? t('common.loading') : t('settings.backupChooseFolder')}
+              </button>
+            </div>
+
+            <div class="backup-folder">
+              <span class="field-label">{t('settings.backupSelectedFolder')}</span>
+              <span class="backup-path">{backupDirLocal || t('settings.backupNoFolder')}</span>
+            </div>
+
+            <div class="backup-actions">
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick={handleCreateBackup}
+                type="button"
+                disabled={!backupDirLocal || backupBusy !== null}
+                title={t('settings.backupCreateDesc')}
+              >
+                {backupBusy === 'create' ? t('common.loading') : t('settings.backupCreate')}
+              </button>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick={handleValidateBackup}
+                type="button"
+                disabled={!backupDirLocal || backupBusy !== null}
+                title={t('settings.backupValidateDesc')}
+              >
+                {backupBusy === 'validate' ? t('common.loading') : t('settings.backupValidate')}
+              </button>
+              <button
+                class="btn btn-secondary btn-sm btn-danger-soft"
+                onclick={handleRestoreBackup}
+                type="button"
+                disabled={!selectedBackupIsValidated() || backupBusy !== null}
+                title={t('settings.backupRestoreActionDesc')}
+              >
+                {backupBusy === 'restore' ? t('common.loading') : t('settings.backupRestoreAction')}
+              </button>
+            </div>
+
+            {#if lastBackupValidation}
+              <dl class="backup-metadata" aria-label={t('settings.backupMetadata')}>
+                <div>
+                  <dt>{t('settings.backupCreatedAt')}</dt>
+                  <dd>{lastBackupValidation.metadata.created_at}</dd>
+                </div>
+                <div>
+                  <dt>{t('settings.backupSchemaVersion')}</dt>
+                  <dd>{lastBackupValidation.metadata.schema_version}</dd>
+                </div>
+                <div>
+                  <dt>{t('settings.backupAppVersion')}</dt>
+                  <dd>{lastBackupValidation.metadata.app_version}</dd>
+                </div>
+                <div>
+                  <dt>{t('settings.backupDeviceId')}</dt>
+                  <dd>{lastBackupValidation.metadata.device_id}</dd>
+                </div>
+              </dl>
+            {/if}
+
+            {#if backupMessage}
+              <p class="backup-status backup-status--success">{backupMessage}</p>
+            {/if}
+            {#if backupError}
+              <p class="backup-status backup-status--error">{backupError}</p>
+            {/if}
+          </div>
         </div>
       </section>
     </div>
@@ -1312,6 +1540,94 @@
     color: var(--text-secondary);
   }
 
+  .backup-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    border: var(--border-width) solid var(--border-default);
+    background-color: var(--surface-raised);
+  }
+
+  .backup-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+
+  .backup-folder {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .backup-path {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+  }
+
+  .backup-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .btn-danger-soft {
+    color: var(--color-danger-600);
+    border-color: var(--color-danger-500);
+  }
+
+  .btn-danger-soft:hover:not(:disabled) {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+  }
+
+  .backup-metadata {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+    margin: 0;
+    padding: var(--space-3);
+    border-radius: var(--radius-sm);
+    background-color: var(--surface-default);
+  }
+
+  .backup-metadata div {
+    min-width: 0;
+  }
+
+  .backup-metadata dt {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--text-tertiary);
+  }
+
+  .backup-metadata dd {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+  }
+
+  .backup-status {
+    margin: 0;
+    font-size: var(--text-xs);
+    overflow-wrap: anywhere;
+  }
+
+  .backup-status--success {
+    color: var(--color-success-600);
+  }
+
+  .backup-status--error {
+    color: var(--color-danger-600);
+  }
+
   @media (max-width: 900px) {
     .email-grid {
       grid-template-columns: 1fr;
@@ -1320,6 +1636,14 @@
     .field-row--wide,
     .email-test-row {
       grid-column: span 1;
+    }
+
+    .backup-panel-header {
+      flex-direction: column;
+    }
+
+    .backup-metadata {
+      grid-template-columns: 1fr;
     }
   }
 </style>
