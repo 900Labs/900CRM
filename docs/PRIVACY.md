@@ -50,6 +50,10 @@ Store backups and exports only in locations appropriate for the sensitivity of
 the data. Use operating-system disk encryption or encrypted external storage
 when local data at rest needs stronger protection.
 
+The desktop Settings Data Management surface displays this disclosure before
+export and backup actions. The warning is informational only; it does not add
+encryption or block the local workflows.
+
 ## Optional Network Touchpoints
 
 The core CRM workflow has no cloud dependency. A few optional or development
