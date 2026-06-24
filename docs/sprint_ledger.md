@@ -44,3 +44,4 @@
 | 040 | 2026-06-24 | `codex/required-docs-baseline` | Documentation-only required public baseline for data model, import/export, and privacy docs with narrow README/architecture links | Completed |
 | 041 | 2026-06-24 | `codex/verification-gates-hardening` | Local verification gate hardening for ESLint 9 flat config and existing Rust Clippy warnings without product behavior changes | Completed |
 | 042 | 2026-06-24 | `codex/pr-ci-foundation` | Initial Ubuntu-only GitHub Actions PR and main-branch CI running the documented frontend and Rust verification gates without release packaging | Completed |
+| 043 | 2026-06-24 | `codex/e2e-smoke-foundation` | Playwright Chromium browser-smoke foundation for the Vite-rendered app shell and key hash routes without native Tauri automation | Completed |

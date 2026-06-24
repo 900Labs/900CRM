@@ -4,6 +4,7 @@
    */
 
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import Dashboard from './Dashboard.svelte';
   import Contacts from './Contacts.svelte';
   import Organizations from './Organizations.svelte';
@@ -14,64 +15,69 @@
   import AuditLog from './AuditLog.svelte';
   import PendingActions from './PendingActions.svelte';
 
-  let route = $state('/');
-  let contactId = $state<string | null>(null);
+  interface ParsedRoute {
+    route: string;
+    contactId: string | null;
+  }
 
-  function parseRoute(path: string) {
+  function parseRoutePath(path: string): ParsedRoute {
     const clean = path.startsWith('/') ? path : `/${path}`;
     const normalized = clean.replace(/\/+$/, '') || '/';
 
     if (normalized === '/contacts') {
-      route = '/contacts';
-      contactId = null;
-      return;
+      return { route: '/contacts', contactId: null };
     }
 
     if (normalized.startsWith('/contacts/')) {
       const id = normalized.split('/')[2] ?? '';
-      route = '/contacts/:id';
-      contactId = id || null;
-      return;
+      return { route: '/contacts/:id', contactId: id || null };
     }
 
     if (normalized === '/organizations') {
-      route = '/organizations';
-      contactId = null;
-      return;
+      return { route: '/organizations', contactId: null };
     }
 
     if (normalized === '/pipeline') {
-      route = '/pipeline';
-      contactId = null;
-      return;
+      return { route: '/pipeline', contactId: null };
     }
 
     if (normalized === '/activities') {
-      route = '/activities';
-      contactId = null;
-      return;
+      return { route: '/activities', contactId: null };
     }
 
     if (normalized === '/settings') {
-      route = '/settings';
-      contactId = null;
-      return;
+      return { route: '/settings', contactId: null };
     }
 
     if (normalized === '/audit-log') {
-      route = '/audit-log';
-      contactId = null;
-      return;
+      return { route: '/audit-log', contactId: null };
     }
 
     if (normalized === '/pending-actions') {
-      route = '/pending-actions';
-      contactId = null;
-      return;
+      return { route: '/pending-actions', contactId: null };
     }
 
-    route = '/';
-    contactId = null;
+    return { route: '/', contactId: null };
+  }
+
+  function readHashRoute(): ParsedRoute {
+    if (!browser) {
+      return { route: '/', contactId: null };
+    }
+
+    const hashPath = window.location.hash.replace(/^#/, '') || '/';
+    return parseRoutePath(hashPath);
+  }
+
+  const initialRoute = readHashRoute();
+
+  let route = $state(initialRoute.route);
+  let contactId = $state<string | null>(initialRoute.contactId);
+
+  function parseRoute(path: string) {
+    const parsed = parseRoutePath(path);
+    route = parsed.route;
+    contactId = parsed.contactId;
   }
 
   onMount(() => {
