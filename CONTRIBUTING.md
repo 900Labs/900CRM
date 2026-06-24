@@ -164,6 +164,11 @@ npm run build
 npm run tauri -- build
 ```
 
+`npm run lint` uses ESLint's flat config for JavaScript repo tooling and config
+files (`.js`, `.mjs`, and `.cjs`). TypeScript and Svelte diagnostics are covered
+by `npm run check`; extending ESLint to those file types should add the required
+parser/plugin dependencies in the same change.
+
 ---
 
 ## Project Structure
@@ -499,8 +504,8 @@ Fill in all sections of the PR template:
 ### CI Requirements
 
 All PRs must pass:
-- `npm run check` — TypeScript type checking
-- `npm run lint` — ESLint and Svelte checks
+- `npm run check` — TypeScript and Svelte diagnostics
+- `npm run lint` — ESLint for JavaScript repo tooling/config files
 - `cargo clippy --workspace -- -D warnings` — Rust linting
 - `cargo test --workspace` — Rust unit tests
 - `npm run test` — Frontend unit tests

@@ -3,6 +3,8 @@ use tauri::State;
 
 use crate::AppState;
 
+// Preserve the existing field-level IPC command shape for frontend callers.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn create_deal(
     state: State<'_, AppState>,
@@ -52,6 +54,8 @@ pub async fn list_deals_by_stage(
     core.list_deals_by_stage(&stage).map_err(|e| e.to_string())
 }
 
+// Preserve the existing field-level IPC command shape for frontend callers.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn update_deal(
     state: State<'_, AppState>,

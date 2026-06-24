@@ -267,7 +267,7 @@ pub fn list_activities(conn: &Connection) -> CrmResult<Vec<Activity>> {
         "#,
     )?;
 
-    let rows = stmt.query_map([], |row| row_to_activity(row))?;
+    let rows = stmt.query_map([], row_to_activity)?;
     let activities: Vec<Activity> = rows.filter_map(|r| r.ok()).collect();
 
     log::debug!("list_activities: {} results", activities.len());
@@ -293,7 +293,7 @@ pub fn list_activities_for_contact(
         "#,
     )?;
 
-    let rows = stmt.query_map(params![contact_id], |row| row_to_activity(row))?;
+    let rows = stmt.query_map(params![contact_id], row_to_activity)?;
     let activities: Vec<Activity> = rows.filter_map(|r| r.ok()).collect();
 
     log::debug!(
@@ -320,7 +320,7 @@ pub fn list_activities_for_deal(conn: &Connection, deal_id: &str) -> CrmResult<V
         "#,
     )?;
 
-    let rows = stmt.query_map(params![deal_id], |row| row_to_activity(row))?;
+    let rows = stmt.query_map(params![deal_id], row_to_activity)?;
     let activities: Vec<Activity> = rows.filter_map(|r| r.ok()).collect();
 
     log::debug!(
@@ -354,7 +354,7 @@ pub fn list_upcoming_activities(conn: &Connection, limit: u32) -> CrmResult<Vec<
         "#,
     )?;
 
-    let rows = stmt.query_map(params![now, limit as i64], |row| row_to_activity(row))?;
+    let rows = stmt.query_map(params![now, limit as i64], row_to_activity)?;
     let activities: Vec<Activity> = rows.filter_map(|r| r.ok()).collect();
 
     log::debug!("list_upcoming_activities: {} results", activities.len());
@@ -383,7 +383,7 @@ pub fn list_overdue_activities(conn: &Connection) -> CrmResult<Vec<Activity>> {
         "#,
     )?;
 
-    let rows = stmt.query_map(params![now], |row| row_to_activity(row))?;
+    let rows = stmt.query_map(params![now], row_to_activity)?;
     let activities: Vec<Activity> = rows.filter_map(|r| r.ok()).collect();
 
     log::debug!("list_overdue_activities: {} results", activities.len());

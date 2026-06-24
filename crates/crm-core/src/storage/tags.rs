@@ -130,7 +130,7 @@ pub fn list_tags(conn: &Connection) -> CrmResult<Vec<Tag>> {
         "#,
     )?;
 
-    let rows = stmt.query_map([], |row| row_to_tag(row))?;
+    let rows = stmt.query_map([], row_to_tag)?;
     let tags: Vec<Tag> = rows.filter_map(|r| r.ok()).collect();
 
     log::debug!("list_tags: {} results", tags.len());
@@ -350,7 +350,7 @@ pub fn get_tags_for_entity(
         "#,
     )?;
 
-    let rows = stmt.query_map(params![entity_type, entity_id], |row| row_to_tag(row))?;
+    let rows = stmt.query_map(params![entity_type, entity_id], row_to_tag)?;
     let tags: Vec<Tag> = rows.filter_map(|r| r.ok()).collect();
 
     Ok(tags)

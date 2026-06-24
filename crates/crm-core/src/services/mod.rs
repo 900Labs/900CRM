@@ -134,6 +134,8 @@ impl CrmCore {
         self.engine.default_stages.len()
     }
 
+    // Preserve the existing field-level service API used by Tauri command wiring.
+    #[allow(clippy::too_many_arguments)]
     pub fn create_deal(
         &mut self,
         title: String,
@@ -222,6 +224,8 @@ impl CrmCore {
         storage::deals::list_deals_by_stage(&self.db.conn, stage)
     }
 
+    // Preserve the existing field-level service API used by Tauri command wiring.
+    #[allow(clippy::too_many_arguments)]
     pub fn update_deal(
         &mut self,
         id: &str,
@@ -408,6 +412,8 @@ impl CrmCore {
         self.set_activity_completion(id, false)
     }
 
+    // Preserve the existing field-level service API used by Tauri command wiring.
+    #[allow(clippy::too_many_arguments)]
     pub fn update_activity(
         &mut self,
         id: &str,
@@ -1212,6 +1218,8 @@ fn load_or_create_device_id(db: &storage::Database) -> CrmResult<String> {
     }
 }
 
+// Audit records intentionally keep before/after context explicit at call sites.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn record_audit_json<TBefore, TAfter>(
     conn: &Connection,
     actor_type: &str,
