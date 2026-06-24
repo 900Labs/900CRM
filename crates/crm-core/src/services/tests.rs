@@ -364,6 +364,244 @@ fn duplicate_detection_uses_contact_repository_queries() {
 }
 
 #[test]
+fn contact_duplicate_candidates_flag_email_and_phone_pairs_without_writes() {
+    let (mut core, path) = open_test_core();
+
+    let email_target = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            Some("Target".to_string()),
+            None,
+            Some("Ada.Exact@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("email target should be created");
+    let email_source = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            Some("Source".to_string()),
+            None,
+            Some(" Ada.Exact@example.com ".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("email source should be created");
+    let case_only_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Case".to_string()),
+            Some("Only".to_string()),
+            None,
+            Some("ada.exact@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("case-only email contact should be created");
+    let phone_target = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Grace".to_string()),
+            Some("Target".to_string()),
+            None,
+            None,
+            Some("+15550100".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("phone target should be created");
+    let phone_source = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Grace".to_string()),
+            Some("Source".to_string()),
+            None,
+            None,
+            Some(" +15550100 ".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("phone source should be created");
+    let blank_contact_a = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Blank".to_string()),
+            Some("One".to_string()),
+            None,
+            Some("   ".to_string()),
+            Some("   ".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("blank contact should be created");
+    let blank_contact_b = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Blank".to_string()),
+            Some("Two".to_string()),
+            None,
+            Some("   ".to_string()),
+            Some("   ".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("blank contact should be created");
+    let deleted_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Deleted".to_string()),
+            Some("Duplicate".to_string()),
+            None,
+            Some("Ada.Exact@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("deleted duplicate should be created");
+    core.delete_contact(&deleted_contact.id)
+        .expect("deleted duplicate should be soft-deleted");
+
+    let contact_count_before = count(&core, "SELECT COUNT(*) FROM contacts");
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let candidates = core
+        .list_contact_duplicate_candidates()
+        .expect("duplicate candidates should load");
+
+    assert_eq!(candidates.len(), 2);
+
+    let email_candidate = candidates
+        .iter()
+        .find(|candidate| candidate.match_type == "email")
+        .expect("email duplicate candidate should exist");
+    assert_eq!(email_candidate.source_id, email_source.id);
+    assert_eq!(email_candidate.source_display_label, "Ada Source");
+    assert_eq!(email_candidate.target_id, email_target.id);
+    assert_eq!(email_candidate.target_display_label, "Ada Target");
+    assert_eq!(email_candidate.matched_value, "Ada.Exact@example.com");
+    assert_eq!(
+        email_candidate.reason,
+        "Same email address: Ada.Exact@example.com"
+    );
+
+    let phone_candidate = candidates
+        .iter()
+        .find(|candidate| candidate.match_type == "phone")
+        .expect("phone duplicate candidate should exist");
+    assert_eq!(phone_candidate.source_id, phone_source.id);
+    assert_eq!(phone_candidate.source_display_label, "Grace Source");
+    assert_eq!(phone_candidate.target_id, phone_target.id);
+    assert_eq!(phone_candidate.target_display_label, "Grace Target");
+    assert_eq!(phone_candidate.matched_value, "+15550100");
+    assert_eq!(phone_candidate.reason, "Same phone number: +15550100");
+
+    for ignored_id in [
+        blank_contact_a.id.as_str(),
+        blank_contact_b.id.as_str(),
+        case_only_contact.id.as_str(),
+        deleted_contact.id.as_str(),
+    ] {
+        assert!(candidates.iter().all(|candidate| {
+            candidate.source_id != ignored_id && candidate.target_id != ignored_id
+        }));
+    }
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM contacts"),
+        contact_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn contact_duplicate_candidates_report_pair_once_when_email_and_phone_match() {
+    let (mut core, path) = open_test_core();
+
+    let target = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Pair".to_string()),
+            Some("Target".to_string()),
+            None,
+            Some("Pair@example.com".to_string()),
+            Some("+15550200".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("target should be created");
+    let source = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Pair".to_string()),
+            Some("Source".to_string()),
+            None,
+            Some(" Pair@example.com ".to_string()),
+            Some(" +15550200 ".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("source should be created");
+
+    let candidates = core
+        .list_contact_duplicate_candidates()
+        .expect("duplicate candidates should load");
+
+    assert_eq!(candidates.len(), 1);
+    assert_eq!(candidates[0].match_type, "email");
+    assert_eq!(candidates[0].matched_value, "Pair@example.com");
+    assert_eq!(candidates[0].source_id, source.id);
+    assert_eq!(candidates[0].target_id, target.id);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn pipeline_age_query_ignores_closed_deals() {
     let (mut core, path) = open_test_core();
 

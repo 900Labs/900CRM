@@ -1,4 +1,6 @@
-use crm_core::storage::contacts::{Contact, ContactListParams, ContactListResult};
+use crm_core::storage::contacts::{
+    Contact, ContactDuplicateCandidate, ContactListParams, ContactListResult,
+};
 use tauri::State;
 
 use crate::{commands::lock_core, AppState};
@@ -101,6 +103,15 @@ pub async fn search_contacts(
 ) -> Result<Vec<Contact>, String> {
     let core = lock_core(&state)?;
     core.search_contacts(&query).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_contact_duplicate_candidates(
+    state: State<'_, AppState>,
+) -> Result<Vec<ContactDuplicateCandidate>, String> {
+    let core = lock_core(&state)?;
+    core.list_contact_duplicate_candidates()
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

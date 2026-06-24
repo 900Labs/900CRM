@@ -73,7 +73,21 @@
     "created": "তৈরি হয়েছে",
     "updated": "সর্বশেষ আপডেট",
     "legacyTags": "লিগেসি ট্যাগ",
-    "legacyNotes": "লিগেসি নোট"
+    "legacyNotes": "লিগেসি নোট",
+    "duplicatesCheck": "Check duplicates",
+    "duplicatesChecking": "Checking duplicates...",
+    "duplicatesCheckFailed": "Duplicate check failed.",
+    "duplicatesRetry": "Retry check",
+    "duplicatesFound": "{count} potential duplicate contact matches",
+    "duplicatesCandidateOption": "{source} into {target} ({type}: {value})",
+    "duplicatesReviewLabel": "Duplicate match",
+    "duplicatesSource": "Source",
+    "duplicatesTarget": "Target",
+    "duplicatesSwap": "Swap source and target",
+    "duplicatesExplanation": "Target keeps existing non-empty fields. Source fills blank fields, notes are appended, and source is soft-deleted.",
+    "duplicatesMergeAction": "Merge selected",
+    "duplicatesMerging": "Merging...",
+    "duplicatesConfirmMerge": "Merge {source} into {target}? Target keeps existing non-empty fields, source fills blank fields, notes are appended, and source is soft-deleted."
   },
   "entityNotes": {
     "title": "নোট",
