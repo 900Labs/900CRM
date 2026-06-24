@@ -26,6 +26,16 @@ pub async fn import_contacts_csv_with_mapping(
 }
 
 #[tauri::command]
+pub async fn import_contacts_json(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportResult, String> {
+    let mut core = super::lock_core(&state)?;
+    core.import_contacts_json(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn preflight_contacts_csv_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -87,6 +97,16 @@ pub async fn import_deals_csv_with_mapping(
 }
 
 #[tauri::command]
+pub async fn import_deals_json(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportResult, String> {
+    let mut core = super::lock_core(&state)?;
+    core.import_deals_json(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn preflight_deals_csv_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -144,6 +164,16 @@ pub async fn import_organizations_csv_with_mapping(
 ) -> Result<ImportResult, String> {
     let mut core = super::lock_core(&state)?;
     core.import_organizations_csv_with_mapping(&file_path, mapping)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn import_organizations_json(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportResult, String> {
+    let mut core = super::lock_core(&state)?;
+    core.import_organizations_json(&file_path)
         .map_err(|e| e.to_string())
 }
 

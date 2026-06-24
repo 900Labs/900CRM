@@ -20,12 +20,17 @@ import {
   exportOrganizationsJson,
   importContactsCsv,
   importContactsCsvWithMapping,
+  importContactsJson,
   importCsv,
   importCsvWithMapping,
+  importData,
   importDealsCsv,
   importDealsCsvWithMapping,
+  importDealsJson,
+  importJson,
   importOrganizationsCsv,
   importOrganizationsCsvWithMapping,
+  importOrganizationsJson,
   preflightContactsCsvImport,
   preflightContactsCsvImportWithMapping,
   preflightCsv,
@@ -52,6 +57,16 @@ describe('import/export API', () => {
       file_path: '/tmp/contacts.csv',
     });
 
+    invokeMock.mockResolvedValueOnce({ created: 2, skipped: 0, errors: [] });
+    await expect(importContactsJson('/tmp/contacts.json')).resolves.toEqual({
+      created: 2,
+      skipped: 0,
+      errors: [],
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_json', {
+      file_path: '/tmp/contacts.json',
+    });
+
     invokeMock.mockResolvedValueOnce(2);
     await expect(exportContactsCsv('/tmp/contacts-export.csv')).resolves.toBe(2);
     expect(invokeMock).toHaveBeenLastCalledWith('export_contacts_csv', {
@@ -76,6 +91,16 @@ describe('import/export API', () => {
       file_path: '/tmp/deals.csv',
     });
 
+    invokeMock.mockResolvedValueOnce({ created: 3, skipped: 0, errors: [] });
+    await expect(importDealsJson('/tmp/deals.json')).resolves.toEqual({
+      created: 3,
+      skipped: 0,
+      errors: [],
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('import_deals_json', {
+      file_path: '/tmp/deals.json',
+    });
+
     invokeMock.mockResolvedValueOnce(3);
     await expect(exportDealsCsv('/tmp/deals-export.csv')).resolves.toBe(3);
     expect(invokeMock).toHaveBeenLastCalledWith('export_deals_csv', {
@@ -98,6 +123,16 @@ describe('import/export API', () => {
     });
     expect(invokeMock).toHaveBeenLastCalledWith('import_organizations_csv', {
       file_path: '/tmp/organizations.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce({ created: 1, skipped: 0, errors: [] });
+    await expect(importOrganizationsJson('/tmp/organizations.json')).resolves.toEqual({
+      created: 1,
+      skipped: 0,
+      errors: [],
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('import_organizations_json', {
+      file_path: '/tmp/organizations.json',
     });
 
     invokeMock.mockResolvedValueOnce(1);
@@ -125,9 +160,27 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('export_organizations_csv', {
       file_path: '/tmp/orgs-export.csv',
     });
+
+    invokeMock.mockResolvedValueOnce({ created: 2, skipped: 0, errors: [] });
+    await importJson('contacts', '/tmp/contacts.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_json', {
+      file_path: '/tmp/contacts.json',
+    });
   });
 
-  it('routes generic export helpers by entity and format', async () => {
+  it('routes generic import/export helpers by entity and format', async () => {
+    invokeMock.mockResolvedValueOnce({ created: 2, skipped: 0, errors: [] });
+    await importData('deals', 'json', '/tmp/deals.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('import_deals_json', {
+      file_path: '/tmp/deals.json',
+    });
+
+    invokeMock.mockResolvedValueOnce({ created: 3, skipped: 0, errors: [] });
+    await importData('contacts', 'csv', '/tmp/contacts.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_csv', {
+      file_path: '/tmp/contacts.csv',
+    });
+
     invokeMock.mockResolvedValueOnce(1);
     await exportJson('organizations', '/tmp/orgs-export.json');
     expect(invokeMock).toHaveBeenLastCalledWith('export_organizations_json', {

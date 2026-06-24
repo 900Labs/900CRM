@@ -8,7 +8,8 @@ exist today.
 
 ## Current Scope
 
-900CRM currently supports local CSV import/export and local JSON export for:
+900CRM currently supports local CSV import/export and local JSON import/export
+for:
 
 - contacts;
 - deals;
@@ -17,14 +18,15 @@ exist today.
 Import and export use local files selected by the user. There is no cloud import
 service, no remote export destination, and no automatic upload.
 
-JSON support is export-only. JSON import is not implemented.
+JSON import is intentionally limited to direct local `.json` files that match
+the flat array-of-objects shape produced by JSON export.
 
 ## Import Entry Point
 
 The import/export modal is available from the desktop UI. The import tab asks
-the user to choose an entity type and a CSV file.
+the user to choose an entity type, import format, and local file.
 
-For contacts, deals, and organizations, the current wizard flow is:
+For CSV contacts, deals, and organizations, the current wizard flow is:
 
 1. Select entity type and CSV file.
 2. Preview parsed headers and the first rows.
@@ -38,7 +40,17 @@ Mapped imports require a desktop-selected file path so the Rust backend can read
 the same CSV file. The browser file-input fallback can preview text, but mapped
 backend import/preflight requires the desktop file picker path.
 
-## CSV Parsing
+For JSON contacts, deals, and organizations, the current flow is direct:
+
+1. Select entity type and JSON format.
+2. Select a local `.json` file.
+3. Run import.
+4. Review the import summary.
+
+JSON import does not include browser preview, field mapping, duplicate preflight,
+or wizard confirmation steps.
+
+## CSV Import Parsing
 
 Frontend preview parsing handles:
 
@@ -56,6 +68,25 @@ Rows with a blank required field are skipped by the parser:
 - contacts require `first_name`;
 - deals require `title`;
 - organizations require `name`.
+
+## JSON Import Parsing
+
+JSON import accepts a top-level array of flat objects using the same fields as
+the matching JSON export:
+
+- contacts: `first_name`, `last_name`, `org_name`, `email`, `phone`, `address`,
+  `city`, `country`, and `notes`;
+- deals: `title`, `value`, `currency`, `stage`, `expected_close`, and `notes`;
+- organizations: `name`, `email`, `phone`, `website`, `address_line1`,
+  `address_line2`, `city`, `region`, `country`, `postal_code`, and
+  `description`.
+
+JSON rows are parsed into the same flat row structs used by CSV import and then
+sent through the same `crm-core` create/import paths as CSV rows. Rows with a
+blank required field are skipped before create attempts, matching CSV behavior.
+
+JSON row numbers are reported with the same data-row offset as CSV imports: the
+first JSON array item is row 2.
 
 ## Contact CSV
 
@@ -132,10 +163,11 @@ deals pass `None` for `contact_id` and `organization_id`.
 Deal export writes `title`, `value`, `currency`, `stage`, `expected_close`, and
 `notes` with a header row. Values are formatted with two decimal places.
 
-## JSON Export
+## JSON Import And Export
 
-JSON export is available for contacts, deals, and organizations from the same
-export modal as CSV. The user selects a local `.json` path in the save dialog.
+JSON import and export are available for contacts, deals, and organizations from
+the same import/export modal as CSV. Import uses an open dialog for `.json`
+files. Export uses a save dialog for `.json` files.
 
 JSON exports are pretty-printed arrays of objects. They use the same flat fields
 as the matching CSV export:
@@ -160,6 +192,11 @@ relationship rows, custom fields, separate note records, tags, activities, audit
 log entries, proposed actions, external clients, permissions, settings, or
 backup metadata.
 
+JSON import has the same entity scope. It does not import record IDs, timestamps,
+deleted rows, device IDs, relationship rows, custom fields, separate note
+records, tags, activities, audit log entries, proposed actions, external
+clients, permissions, settings, or backup metadata.
+
 ## Duplicate Preflight
 
 Duplicate preflight is currently implemented for contacts, deals, and
@@ -181,7 +218,8 @@ Deal preflight checks active deals for:
 - case-insensitive exact title matches after trimming the imported title.
 
 Preflight returns warnings with the CSV row number, match type, CSV value,
-existing record ID, existing display label, and a human-readable reason.
+existing record ID, existing display label, and a human-readable reason. JSON
+import does not run duplicate preflight in the current UI.
 
 Preflight warnings do not block import automatically. The UI lets the user
 continue despite warnings. The import then attempts to create each row and
@@ -195,8 +233,8 @@ Imports return:
 - `skipped`: number of rows that failed during creation after parsing;
 - `errors`: row-numbered error strings from failed create attempts.
 
-Rows skipped during CSV parsing because the required field is blank are not
-included in the import result as row-level errors.
+Rows skipped during CSV or JSON parsing because the required field is blank are
+not included in the import result as row-level errors.
 
 Successful imported rows are written through normal `crm-core` create paths.
 Those paths record sync changelog entries and audit evidence. The import
@@ -218,11 +256,11 @@ trusted or encrypted location.
 
 ## Relationship To Backups
 
-CSV import/export and JSON export are not a backup system.
+CSV import/export and JSON import/export are not a backup system.
 
 - CSV export is useful for portability, spreadsheet use, and migration.
-- JSON export is useful for portability and inspection of the supported flat
-  entity fields.
+- JSON import/export is useful for portability and inspection of the supported
+  flat entity fields.
 - Local backup creates a SQLite snapshot plus metadata and is the safer way to
   preserve full application state before a destructive restore or risky import.
 - Import does not create an automatic backup before writing rows.
@@ -235,7 +273,7 @@ Before large imports, create a local backup from Settings. See
 
 The following are not implemented in the current import/export surface:
 
-- JSON import.
+- JSON duplicate preflight, duplicate warning UI, mapping, or browser preview.
 - Contact or organization duplicate auto-merge during import.
 - Deal duplicate auto-merge during import.
 - Import rollback for a completed multi-row import.
