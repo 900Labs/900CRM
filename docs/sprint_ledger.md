@@ -20,3 +20,4 @@
 | 016 | 2026-06-24 | `codex/notes-tags-core-surface-preserve` | Generic notes/tags `crm-core` services, Tauri commands, frontend API wrappers, compatibility mirroring, and focused tests without route/UI work | Completed |
 | 017 | 2026-06-24 | `codex/notes-tags-contract-hardening` | Notes/tags contract hardening for idempotent tag link audit/sync semantics and explicit tag color reset behavior without UI work | Completed |
 | 018 | 2026-06-24 | `codex/notes-tags-ui-surface` | Reusable generic notes/tags Svelte panels integrated for contacts and organizations while preserving legacy contact notes/tags | Completed |
+| 019 | 2026-06-24 | `codex/deal-relationships-core-surface` | Deal organization and deal contact core/API foundation with schema v7, legacy contact mirror preservation, and no Pipeline/Deal UI changes | Completed |

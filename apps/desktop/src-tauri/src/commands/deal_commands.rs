@@ -1,4 +1,4 @@
-use crm_core::storage::deals::{Deal, PipelineSummary};
+use crm_core::storage::deals::{Deal, DealContact, PipelineSummary};
 use tauri::State;
 
 use crate::AppState;
@@ -13,6 +13,7 @@ pub async fn create_deal(
     probability: Option<i32>,
     expected_close: Option<String>,
     contact_id: Option<String>,
+    organization_id: Option<String>,
     notes: Option<String>,
 ) -> Result<Deal, String> {
     let mut core = super::lock_core(&state)?;
@@ -24,6 +25,7 @@ pub async fn create_deal(
         probability,
         expected_close,
         contact_id,
+        organization_id,
         notes,
     )
     .map_err(|e| e.to_string())
@@ -60,7 +62,11 @@ pub async fn update_deal(
     stage: Option<String>,
     probability: Option<i32>,
     expected_close: Option<String>,
+    reset_expected_close: Option<bool>,
     contact_id: Option<String>,
+    reset_contact_id: Option<bool>,
+    organization_id: Option<String>,
+    reset_organization_id: Option<bool>,
     notes: Option<String>,
 ) -> Result<Deal, String> {
     let mut core = super::lock_core(&state)?;
@@ -71,11 +77,29 @@ pub async fn update_deal(
         currency,
         stage,
         probability,
-        expected_close,
-        contact_id,
+        nullable_update_from_args(expected_close, reset_expected_close),
+        nullable_update_from_args(contact_id, reset_contact_id),
+        nullable_update_from_args(organization_id, reset_organization_id),
         notes,
     )
     .map_err(|e| e.to_string())
+}
+
+pub(crate) fn nullable_update_from_args(
+    value: Option<String>,
+    reset: Option<bool>,
+) -> Option<Option<String>> {
+    if reset.unwrap_or(false) {
+        return Some(None);
+    }
+
+    value.map(|value| {
+        if value.trim().is_empty() {
+            None
+        } else {
+            Some(value)
+        }
+    })
 }
 
 #[tauri::command]
@@ -97,9 +121,85 @@ pub async fn delete_deal(state: State<'_, AppState>, id: String) -> Result<(), S
 }
 
 #[tauri::command]
+pub async fn link_deal_to_organization(
+    state: State<'_, AppState>,
+    deal_id: String,
+    organization_id: Option<String>,
+) -> Result<Deal, String> {
+    let mut core = super::lock_core(&state)?;
+    core.link_deal_to_organization(&deal_id, organization_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn add_deal_contact(
+    state: State<'_, AppState>,
+    deal_id: String,
+    contact_id: String,
+    role: Option<String>,
+    is_primary: bool,
+) -> Result<DealContact, String> {
+    let mut core = super::lock_core(&state)?;
+    core.add_deal_contact(&deal_id, &contact_id, role, is_primary)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn remove_deal_contact(
+    state: State<'_, AppState>,
+    deal_id: String,
+    contact_id: String,
+) -> Result<DealContact, String> {
+    let mut core = super::lock_core(&state)?;
+    core.remove_deal_contact(&deal_id, &contact_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_deal_contacts(
+    state: State<'_, AppState>,
+    deal_id: String,
+) -> Result<Vec<DealContact>, String> {
+    let core = super::lock_core(&state)?;
+    core.list_deal_contacts(&deal_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_pipeline_summary(
     state: State<'_, AppState>,
 ) -> Result<Vec<PipelineSummary>, String> {
     let core = super::lock_core(&state)?;
     core.get_pipeline_summary().map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::nullable_update_from_args;
+
+    #[test]
+    fn nullable_update_from_args_distinguishes_no_change_reset_blank_and_set() {
+        assert_eq!(nullable_update_from_args(None, None), None);
+        assert_eq!(nullable_update_from_args(None, Some(false)), None);
+        assert_eq!(nullable_update_from_args(None, Some(true)), Some(None));
+        assert_eq!(
+            nullable_update_from_args(Some("   ".to_string()), None),
+            Some(None)
+        );
+        assert_eq!(
+            nullable_update_from_args(Some("2026-07-15".to_string()), None),
+            Some(Some("2026-07-15".to_string()))
+        );
+        assert_eq!(
+            nullable_update_from_args(Some("contact-1".to_string()), None),
+            Some(Some("contact-1".to_string()))
+        );
+        assert_eq!(
+            nullable_update_from_args(Some("org-1".to_string()), None),
+            Some(Some("org-1".to_string()))
+        );
+        assert_eq!(
+            nullable_update_from_args(Some("org-1".to_string()), Some(true)),
+            Some(None)
+        );
+    }
 }
