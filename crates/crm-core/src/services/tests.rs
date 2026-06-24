@@ -3303,6 +3303,112 @@ fn preflight_contacts_csv_import_flags_email_and_phone_duplicates_without_writes
 }
 
 #[test]
+fn preflight_contacts_json_import_flags_email_and_phone_duplicates_without_writes() {
+    let (mut core, path) = open_test_core();
+
+    let email_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            Some("Lovelace".to_string()),
+            None,
+            Some("ada@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("email fixture contact should be created");
+    let phone_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Grace".to_string()),
+            Some("Hopper".to_string()),
+            None,
+            None,
+            Some("+15550100".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("phone fixture contact should be created");
+
+    let contact_count_before = count(&core, "SELECT COUNT(*) FROM contacts");
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let json_path = path.join("contacts-preflight.json");
+    std::fs::write(
+        &json_path,
+        r#"[
+  {
+    "first_name": "Imported",
+    "last_name": "Email",
+    "email": "ADA@example.com"
+  },
+  {
+    "first_name": "Imported",
+    "last_name": "Phone",
+    "phone": "  +15550100  "
+  }
+]
+"#,
+    )
+    .expect("contact preflight JSON fixture should write");
+
+    let report = core
+        .preflight_contacts_json_import(json_path.to_str().expect("path should be valid UTF-8"))
+        .expect("contact JSON preflight should succeed");
+
+    assert_eq!(report.entity_type, "contacts");
+    assert_eq!(report.total_rows, 2);
+    assert_eq!(report.duplicate_warning_count, 2);
+    assert_eq!(report.warnings.len(), 2);
+
+    let email_warning = report
+        .warnings
+        .iter()
+        .find(|warning| warning.match_type == "email")
+        .expect("email duplicate warning should exist");
+    assert_eq!(email_warning.row_number, 2);
+    assert_eq!(email_warning.csv_value, "ADA@example.com");
+    assert_eq!(email_warning.existing_entity_type, "contact");
+    assert_eq!(email_warning.existing_entity_id, email_contact.id);
+    assert_eq!(email_warning.existing_display_label, "Ada Lovelace");
+
+    let phone_warning = report
+        .warnings
+        .iter()
+        .find(|warning| warning.match_type == "phone")
+        .expect("phone duplicate warning should exist");
+    assert_eq!(phone_warning.row_number, 3);
+    assert_eq!(phone_warning.csv_value, "+15550100");
+    assert_eq!(phone_warning.existing_entity_type, "contact");
+    assert_eq!(phone_warning.existing_entity_id, phone_contact.id);
+    assert_eq!(phone_warning.existing_display_label, "Grace Hopper");
+
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM contacts"),
+        contact_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn preflight_organizations_csv_import_flags_name_email_and_phone_duplicates_without_writes() {
     let (mut core, path) = open_test_core();
 
@@ -3358,6 +3464,157 @@ fn preflight_organizations_csv_import_flags_name_email_and_phone_duplicates_with
     assert_eq!(
         count(&core, "SELECT COUNT(*) FROM organizations"),
         organization_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn preflight_organizations_json_import_flags_name_email_and_phone_duplicates_without_writes() {
+    let (mut core, path) = open_test_core();
+
+    let organization = core
+        .create_organization(
+            "Acme Health".to_string(),
+            Some("hello@acme.example".to_string()),
+            Some("+123456".to_string()),
+            None,
+            None,
+            None,
+            Some("Lagos".to_string()),
+            None,
+            Some("NG".to_string()),
+            None,
+            Some("Regional partner".to_string()),
+        )
+        .expect("organization fixture should be created");
+
+    let organization_count_before = count(&core, "SELECT COUNT(*) FROM organizations");
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let json_path = path.join("organizations-preflight.json");
+    std::fs::write(
+        &json_path,
+        r#"[
+  {
+    "name": " acme health ",
+    "email": "HELLO@acme.example",
+    "phone": "  +123456  "
+  }
+]
+"#,
+    )
+    .expect("organization preflight JSON fixture should write");
+
+    let report = core
+        .preflight_organizations_json_import(
+            json_path.to_str().expect("path should be valid UTF-8"),
+        )
+        .expect("organization JSON preflight should succeed");
+
+    assert_eq!(report.entity_type, "organizations");
+    assert_eq!(report.total_rows, 1);
+    assert_eq!(report.duplicate_warning_count, 3);
+    assert_eq!(report.warnings.len(), 3);
+
+    for match_type in ["name", "email", "phone"] {
+        let warning = report
+            .warnings
+            .iter()
+            .find(|warning| warning.match_type == match_type)
+            .unwrap_or_else(|| panic!("{match_type} duplicate warning should exist"));
+        assert_eq!(warning.row_number, 2);
+        assert_eq!(warning.existing_entity_type, "organization");
+        assert_eq!(warning.existing_entity_id, organization.id);
+        assert_eq!(warning.existing_display_label, "Acme Health");
+    }
+
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM organizations"),
+        organization_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn preflight_deals_json_import_flags_title_duplicates_without_writes() {
+    let (mut core, path) = open_test_core();
+
+    let deal = core
+        .create_deal(
+            "Acme Renewal".to_string(),
+            Some(5000.0),
+            Some("USD".to_string()),
+            Some("Proposal".to_string()),
+            Some(50),
+            Some("2026-09-30".to_string()),
+            None,
+            None,
+            Some("Existing renewal".to_string()),
+        )
+        .expect("deal fixture should be created");
+
+    let deal_count_before = count(&core, "SELECT COUNT(*) FROM deals");
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let json_path = path.join("deals-preflight.json");
+    std::fs::write(
+        &json_path,
+        r#"[
+  {
+    "title": " acme renewal ",
+    "value": "7500",
+    "currency": "USD",
+    "stage": "Negotiation",
+    "expected_close": "2026-10-15",
+    "notes": "Potential duplicate"
+  }
+]
+"#,
+    )
+    .expect("deal preflight JSON fixture should write");
+
+    let report = core
+        .preflight_deals_json_import(json_path.to_str().expect("path should be valid UTF-8"))
+        .expect("deal JSON preflight should succeed");
+
+    assert_eq!(report.entity_type, "deals");
+    assert_eq!(report.total_rows, 1);
+    assert_eq!(report.duplicate_warning_count, 1);
+    assert_eq!(report.warnings.len(), 1);
+
+    let warning = &report.warnings[0];
+    assert_eq!(warning.row_number, 2);
+    assert_eq!(warning.match_type, "title");
+    assert_eq!(warning.csv_value, "acme renewal");
+    assert_eq!(warning.existing_entity_type, "deal");
+    assert_eq!(warning.existing_entity_id, deal.id);
+    assert_eq!(warning.existing_display_label, "Acme Renewal");
+
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM deals"),
+        deal_count_before
     );
     assert_eq!(
         count(&core, "SELECT COUNT(*) FROM audit_log"),

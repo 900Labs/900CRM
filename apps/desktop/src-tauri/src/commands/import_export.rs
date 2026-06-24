@@ -57,6 +57,16 @@ pub async fn preflight_contacts_csv_import_with_mapping(
 }
 
 #[tauri::command]
+pub async fn preflight_contacts_json_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_contacts_json_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn export_contacts_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -128,6 +138,16 @@ pub async fn preflight_deals_csv_import_with_mapping(
 }
 
 #[tauri::command]
+pub async fn preflight_deals_json_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_deals_json_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn export_deals_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -195,6 +215,16 @@ pub async fn preflight_organizations_csv_import_with_mapping(
 ) -> Result<ImportPreflightReport, String> {
     let core = super::lock_core(&state)?;
     core.preflight_organizations_csv_import_with_mapping(&file_path, mapping)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_organizations_json_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_organizations_json_import(&file_path)
         .map_err(|e| e.to_string())
 }
 
