@@ -34,6 +34,7 @@ mod audit;
 mod backup;
 mod contacts;
 mod migration_readiness;
+mod notes_tags;
 mod organizations;
 mod proposed_actions;
 mod settings;
