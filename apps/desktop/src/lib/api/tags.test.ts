@@ -77,11 +77,62 @@ describe('tags API', () => {
     expect(invokeMock).toHaveBeenCalledWith('list_tags');
   });
 
-  it('maps updateTag omitted fields as omitted and blank color as null', async () => {
+  it('maps updateTag omitted color as omitted', async () => {
     invokeMock.mockResolvedValueOnce({
       ...backendTag,
       name: 'Priority',
-      color: '#ef4444',
+      updated_at: '2026-06-24T09:00:00Z',
+    });
+
+    await updateTag(' tag-1 ', {
+      name: ' Priority ',
+    });
+
+    expect(invokeMock).toHaveBeenCalledWith('update_tag', {
+      id: 'tag-1',
+      name: 'Priority',
+    });
+  });
+
+  it('maps updateTag explicit null color to reset request', async () => {
+    invokeMock.mockResolvedValueOnce({
+      ...backendTag,
+      color: '#6366f1',
+      updated_at: '2026-06-24T09:00:00Z',
+    });
+
+    await updateTag('tag-1', {
+      color: null,
+    });
+
+    expect(invokeMock).toHaveBeenCalledWith('update_tag', {
+      id: 'tag-1',
+      reset_color: true,
+    });
+  });
+
+  it('maps updateTag nonblank color without reset flag', async () => {
+    invokeMock.mockResolvedValueOnce({
+      ...backendTag,
+      color: '#0f766e',
+      updated_at: '2026-06-24T09:00:00Z',
+    });
+
+    await updateTag('tag-1', {
+      color: ' #0f766e ',
+    });
+
+    expect(invokeMock).toHaveBeenCalledWith('update_tag', {
+      id: 'tag-1',
+      color: '#0f766e',
+    });
+  });
+
+  it('maps updateTag blank color to reset request', async () => {
+    invokeMock.mockResolvedValueOnce({
+      ...backendTag,
+      name: 'Priority',
+      color: '#6366f1',
       updated_at: '2026-06-24T09:00:00Z',
     });
 
@@ -93,7 +144,7 @@ describe('tags API', () => {
     expect(invokeMock).toHaveBeenCalledWith('update_tag', {
       id: 'tag-1',
       name: 'Priority',
-      color: null,
+      reset_color: true,
     });
   });
 

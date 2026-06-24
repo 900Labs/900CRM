@@ -84,14 +84,24 @@ export async function listTags(): Promise<Tag[]> {
 }
 
 export async function updateTag(id: string, data: UpdateTagPayload): Promise<Tag> {
-  const args: Record<string, string | null> = { id: normalizeText(id) };
+  const args: {
+    id: string;
+    name?: string;
+    color?: string;
+    reset_color?: boolean;
+  } = { id: normalizeText(id) };
 
   if (hasOwn(data, 'name')) {
     args.name = normalizeText(String(data.name ?? ''));
   }
 
-  if (hasOwn(data, 'color')) {
-    args.color = normalizeNullable(data.color);
+  if (hasOwn(data, 'color') && data.color !== undefined) {
+    const color = normalizeNullable(data.color);
+    if (color === null) {
+      args.reset_color = true;
+    } else {
+      args.color = color;
+    }
   }
 
   const tag = await invoke<BackendTag>('update_tag', args);

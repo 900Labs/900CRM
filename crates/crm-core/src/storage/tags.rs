@@ -9,6 +9,8 @@
 //!
 //! - Tag names are unique (enforced by `UNIQUE` constraint).
 //! - Colors are stored as CSS hex strings (e.g. `"#6366f1"`).
+//! - The legacy `tags.color` column is `NOT NULL`; explicit color clears
+//!   reset to the default tag color.
 //! - Tags are soft-deleted where the target compatibility columns are present.
 //! - Legacy `entity_tags` links are physically deleted on remove; target
 //!   `tag_links` rows are soft-deleted.
@@ -21,6 +23,8 @@ use crate::utils::{
     errors::{CrmError, CrmResult},
     uuid::new_uuid,
 };
+
+pub const DEFAULT_TAG_COLOR: &str = "#6366f1";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Domain structs
@@ -218,7 +222,7 @@ pub fn delete_tag(conn: &Connection, id: &str) -> CrmResult<()> {
 
 /// Applies a tag to an entity.
 ///
-/// Idempotent: if the tag is already applied, returns `Ok(())` silently.
+/// Idempotent: if the tag is already applied, returns `Ok(false)` silently.
 ///
 /// # Parameters
 ///
@@ -236,26 +240,27 @@ pub fn add_tag_to_entity(
     entity_id: &str,
     tag_id: &str,
     device_id: &str,
-) -> CrmResult<()> {
+) -> CrmResult<bool> {
     let link_id = new_uuid();
     let now = now_iso8601();
 
-    conn.execute(
-        r#"
+    let legacy_changed = conn
+        .execute(
+            r#"
         INSERT OR IGNORE INTO entity_tags (entity_type, entity_id, tag_id)
         VALUES (?1, ?2, ?3)
         "#,
-        params![entity_type, entity_id, tag_id],
-    )
-    .map_err(|e| {
-        if e.to_string().contains("FOREIGN KEY") {
-            CrmError::NotFound(format!("Tag '{}' does not exist", tag_id))
-        } else {
-            CrmError::Database(e.to_string())
-        }
-    })?;
+            params![entity_type, entity_id, tag_id],
+        )
+        .map_err(|e| {
+            if e.to_string().contains("FOREIGN KEY") {
+                CrmError::NotFound(format!("Tag '{}' does not exist", tag_id))
+            } else {
+                CrmError::Database(e.to_string())
+            }
+        })?;
 
-    conn.execute(
+    let target_changed = conn.execute(
         r#"
         INSERT INTO tag_links (id, tag_id, entity_type, entity_id, created_at, device_id)
         SELECT ?1, ?2, ?3, ?4, ?5, ?6
@@ -272,12 +277,12 @@ pub fn add_tag_to_entity(
     )?;
 
     log::debug!("Added tag {} to {}:{}", tag_id, entity_type, entity_id);
-    Ok(())
+    Ok(legacy_changed > 0 || target_changed > 0)
 }
 
 /// Removes a tag from an entity.
 ///
-/// Idempotent: if the tag is not applied, returns `Ok(())` silently.
+/// Idempotent: if the tag is not applied, returns `Ok(false)` silently.
 ///
 /// # Errors
 ///
@@ -287,12 +292,12 @@ pub fn remove_tag_from_entity(
     entity_type: &str,
     entity_id: &str,
     tag_id: &str,
-) -> CrmResult<()> {
-    conn.execute(
+) -> CrmResult<bool> {
+    let legacy_changed = conn.execute(
         "DELETE FROM entity_tags WHERE entity_type = ?1 AND entity_id = ?2 AND tag_id = ?3",
         params![entity_type, entity_id, tag_id],
     )?;
-    conn.execute(
+    let target_changed = conn.execute(
         r#"
         UPDATE tag_links
         SET deleted_at = ?4
@@ -305,7 +310,7 @@ pub fn remove_tag_from_entity(
     )?;
 
     log::debug!("Removed tag {} from {}:{}", tag_id, entity_type, entity_id);
-    Ok(())
+    Ok(legacy_changed > 0 || target_changed > 0)
 }
 
 /// Returns all tags applied to the specified entity.
