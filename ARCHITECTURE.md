@@ -17,6 +17,7 @@ If you are new to the codebase, read this document before diving into the source
 - [Sync Protocol](#sync-protocol)
 - [Database Schema](#database-schema)
 - [Extension Points](#extension-points)
+- [MCP Readiness](#mcp-readiness)
 - [Key Design Decisions](#key-design-decisions)
 
 ---
@@ -139,9 +140,11 @@ crates/crm-core/src/
 ### Rust Placeholders (`crates/crm-mcp/`, `crates/crm-sdk/`)
 
 ```
-crates/crm-mcp/src/main.rs     Placeholder for future MCP integration.
+crates/crm-mcp/src/main.rs     Placeholder for future optional MCP integration.
 crates/crm-sdk/src/lib.rs      Placeholder for future SDK exports.
 ```
+
+The current MCP package is not implemented and is not started by the desktop app or `crm-core`.
 
 ### Frontend (`apps/desktop/src/`)
 
@@ -602,6 +605,16 @@ The plugin system is planned for v2.0. The plugin architecture follows the same 
 Plugins are sandboxed: they can only call commands they explicitly declare in their `manifest.json`, and they cannot access the SQLite database directly — they must go through the plugin API.
 
 See [plugins/README.md](plugins/README.md) for the current specification.
+
+---
+
+## MCP Readiness
+
+MCP is a future optional package boundary, not a current runtime dependency. The desktop app and `crm-core` do not include a built-in AI agent, do not start an MCP server, do not bind a localhost listener, and do not require internet access, cloud services, or model providers.
+
+The current codebase has external-client records, per-tool permission rows, proposed actions, audit logging, and Pending Actions/Audit Log UI surfaces that can support a future MCP implementation. The active permission modes are limited to `disabled`, `read_only`, and `draft_only`; broader schema-reserved modes are inactive. Approved proposed actions only record approval state and do not execute CRM mutations.
+
+See [MCP Readiness Baseline](docs/MCP_READINESS.md) for the current status, non-goals, security gates, and future implementation acceptance checklist.
 
 ---
 
