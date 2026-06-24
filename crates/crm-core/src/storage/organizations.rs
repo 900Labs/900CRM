@@ -115,6 +115,63 @@ pub fn list_organizations(conn: &Connection) -> CrmResult<Vec<Organization>> {
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+/// Finds active organizations with an exact case-insensitive name match.
+pub fn find_active_organizations_by_name(
+    conn: &Connection,
+    name: &str,
+) -> CrmResult<Vec<Organization>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, name, email, phone, website, address_line1, address_line2,
+               city, region, country, postal_code, source, description,
+               created_at, updated_at, deleted_at, device_id
+        FROM organizations
+        WHERE LOWER(name) = LOWER(?1) AND deleted_at IS NULL
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![name], row_to_organization)?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+/// Finds active organizations with an exact case-insensitive email match.
+pub fn find_active_organizations_by_email(
+    conn: &Connection,
+    email: &str,
+) -> CrmResult<Vec<Organization>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, name, email, phone, website, address_line1, address_line2,
+               city, region, country, postal_code, source, description,
+               created_at, updated_at, deleted_at, device_id
+        FROM organizations
+        WHERE LOWER(email) = LOWER(?1) AND deleted_at IS NULL
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![email], row_to_organization)?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+/// Finds active organizations with a phone number matching exactly after trimming.
+pub fn find_active_organizations_by_phone(
+    conn: &Connection,
+    phone: &str,
+) -> CrmResult<Vec<Organization>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, name, email, phone, website, address_line1, address_line2,
+               city, region, country, postal_code, source, description,
+               created_at, updated_at, deleted_at, device_id
+        FROM organizations
+        WHERE TRIM(phone) = TRIM(?1) AND deleted_at IS NULL
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![phone], row_to_organization)?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn update_organization(
     conn: &Connection,
