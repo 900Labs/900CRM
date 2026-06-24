@@ -397,6 +397,9 @@ cargo test --workspace test_contact_import_utf8
 # Run frontend unit tests (vitest)
 npm run test
 
+# Run browser smoke tests (Playwright Chromium against Vite)
+npm run test:e2e
+
 # Run frontend tests in watch mode
 npm run test -- --watch
 
@@ -509,6 +512,7 @@ All PRs must pass:
 - `npm run check` — TypeScript and Svelte diagnostics
 - `npm run test` — Frontend unit tests
 - `npm run build` — Frontend production build
+- `npm run test:e2e` — Browser smoke tests for the Vite-rendered app shell and hash routes
 - `cargo fmt --all -- --check` — Rust formatting check
 - `cargo clippy --workspace -- -D warnings` — Rust linting
 - `cargo check --workspace` — Rust workspace compile check

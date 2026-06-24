@@ -20,8 +20,13 @@
     "check:tooling": "node scripts/verify-frontend-tooling.mjs",
     "check:watch": "npm --workspace apps/desktop run check:watch",
     "test": "node scripts/test-frontend.mjs",
+    "pretest:e2e": "npm --workspace apps/desktop exec svelte-kit sync",
+    "test:e2e": "playwright test",
     "lint": "eslint .",
     "format": "prettier --write .",
     "tauri": "npm --workspace apps/desktop run tauri"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
   }
 }
