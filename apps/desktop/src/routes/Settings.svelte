@@ -29,6 +29,11 @@
     validateLocalBackup,
     type LocalBackupValidation,
   } from '$lib/api/backup';
+  import {
+    createExternalClientPlaceholder,
+    listExternalClients,
+    type ExternalClient,
+  } from '$lib/api/externalClients';
   import { testEmailServerConnection } from '$lib/api/email';
   import ImportExport from '$lib/components/ImportExport.svelte';
 
@@ -101,6 +106,16 @@
   let backupMessage = $state<string | null>(null);
   let backupError = $state<string | null>(null);
   let lastBackupValidation = $state<LocalBackupValidation | null>(null);
+  let externalClients = $state<ExternalClient[]>([]);
+  let externalClientsLoading = $state(false);
+  let externalClientsError = $state<string | null>(null);
+  let externalClientCreateMessage = $state<string | null>(null);
+  let externalClientCreateError = $state<string | null>(null);
+  let externalClientCreateLoading = $state(false);
+  let externalClientName = $state('');
+  let externalClientType = $state('');
+  let externalClientsListRequestSeq = 0;
+  let externalClientsMutationSeq = 0;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -116,6 +131,7 @@
     imapPortLocal = String(settingsStore.imapPort);
     imapUsernameLocal = settingsStore.imapUsername;
     imapPasswordLocal = settingsStore.imapPassword;
+    void loadExternalClients();
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -352,6 +368,85 @@
       return err;
     }
     return t('settings.backupFailed');
+  }
+
+  function externalClientErrorMessage(err: unknown): string {
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
+    }
+    if (typeof err === 'string' && err.trim()) {
+      return err;
+    }
+    return t('settings.externalClientsCreateFailed');
+  }
+
+  function formatExternalClientTimestamp(value: string): string {
+    if (!value) return t('common.none');
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+
+    return new Intl.DateTimeFormat(settingsStore.language, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(parsed);
+  }
+
+  async function loadExternalClients() {
+    const requestSeq = ++externalClientsListRequestSeq;
+    const mutationSeqAtStart = externalClientsMutationSeq;
+    externalClientsLoading = true;
+    externalClientsError = null;
+    try {
+      const clients = await listExternalClients();
+      if (requestSeq === externalClientsListRequestSeq && mutationSeqAtStart === externalClientsMutationSeq) {
+        externalClients = clients;
+      }
+    } catch (err) {
+      if (requestSeq === externalClientsListRequestSeq && mutationSeqAtStart === externalClientsMutationSeq) {
+        externalClientsError = externalClientErrorMessage(err);
+      }
+    } finally {
+      if (requestSeq === externalClientsListRequestSeq) {
+        externalClientsLoading = false;
+      }
+    }
+  }
+
+  function handleExternalClientNameInput(e: Event) {
+    externalClientName = (e.target as HTMLInputElement).value;
+    externalClientCreateMessage = null;
+    externalClientCreateError = null;
+  }
+
+  function handleExternalClientTypeInput(e: Event) {
+    externalClientType = (e.target as HTMLInputElement).value;
+    externalClientCreateMessage = null;
+    externalClientCreateError = null;
+  }
+
+  async function handleCreateExternalClientPlaceholder() {
+    const name = externalClientName.trim();
+    const clientType = externalClientType.trim();
+    if (!name || !clientType || externalClientCreateLoading) return;
+
+    externalClientCreateLoading = true;
+    externalClientCreateMessage = null;
+    externalClientCreateError = null;
+    try {
+      const created = await createExternalClientPlaceholder(name, clientType);
+      externalClientsMutationSeq += 1;
+      externalClients = [created, ...externalClients.filter((client) => client.id !== created.id)];
+      externalClientsError = null;
+      externalClientName = '';
+      externalClientType = '';
+      externalClientCreateMessage = t('settings.externalClientsCreateSuccess', { name: created.name });
+      uiStore.toastSuccess(t('settings.externalClientsCreateSuccess', { name: created.name }));
+    } catch (err) {
+      externalClientCreateError = externalClientErrorMessage(err);
+      uiStore.toastError(`${t('settings.externalClientsCreateFailed')}: ${externalClientCreateError}`);
+    } finally {
+      externalClientCreateLoading = false;
+    }
   }
 
   async function handleChooseBackupFolder() {
@@ -969,6 +1064,120 @@
         </div>
       </section>
 
+      <!-- Integrations -->
+      <section class="card settings-section" aria-labelledby="integrations-heading">
+        <div class="card-header">
+          <h2 class="section-title" id="integrations-heading">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+            </svg>
+            {t('settings.integrations')}
+          </h2>
+          <button
+            class="btn btn-secondary btn-sm"
+            onclick={loadExternalClients}
+            type="button"
+            disabled={externalClientsLoading}
+          >
+            {externalClientsLoading ? t('common.loading') : t('settings.externalClientsRetry')}
+          </button>
+        </div>
+        <div class="card-body integrations-body">
+          <div class="external-client-create" aria-live="polite">
+            <div class="data-action-info">
+              <span class="data-action-label">{t('settings.externalClients')}</span>
+              <span class="data-action-desc">{t('settings.externalClientsDesc')}</span>
+            </div>
+
+            <div class="external-client-form">
+              <div class="field-row">
+                <label class="field-label" for="external-client-name">{t('settings.externalClientName')}</label>
+                <input
+                  id="external-client-name"
+                  class="input"
+                  type="text"
+                  value={externalClientName}
+                  oninput={handleExternalClientNameInput}
+                  placeholder={t('settings.externalClientNamePlaceholder')}
+                  disabled={externalClientCreateLoading}
+                />
+              </div>
+              <div class="field-row">
+                <label class="field-label" for="external-client-type">{t('settings.externalClientType')}</label>
+                <input
+                  id="external-client-type"
+                  class="input"
+                  type="text"
+                  value={externalClientType}
+                  oninput={handleExternalClientTypeInput}
+                  placeholder={t('settings.externalClientTypePlaceholder')}
+                  disabled={externalClientCreateLoading}
+                />
+              </div>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick={handleCreateExternalClientPlaceholder}
+                type="button"
+                disabled={!externalClientName.trim() || !externalClientType.trim() || externalClientCreateLoading}
+              >
+                {externalClientCreateLoading ? t('common.loading') : t('settings.externalClientsCreate')}
+              </button>
+            </div>
+
+            {#if externalClientCreateMessage}
+              <p class="backup-status backup-status--success">{externalClientCreateMessage}</p>
+            {/if}
+            {#if externalClientCreateError}
+              <p class="backup-status backup-status--error">{externalClientCreateError}</p>
+            {/if}
+          </div>
+
+          {#if externalClientsLoading && externalClients.length === 0}
+            <p class="external-client-empty">{t('settings.externalClientsLoading')}</p>
+          {:else if externalClientsError}
+            <div class="external-client-error" role="alert">
+              <span>{t('settings.externalClientsLoadFailed')}: {externalClientsError}</span>
+              <button class="btn btn-secondary btn-sm" onclick={loadExternalClients} type="button">
+                {t('settings.externalClientsRetry')}
+              </button>
+            </div>
+          {:else if externalClients.length === 0}
+            <p class="external-client-empty">{t('settings.externalClientsEmpty')}</p>
+          {:else}
+            <div class="external-client-list">
+              {#each externalClients as client (client.id)}
+                <article class="external-client-row">
+                  <div class="external-client-row-header">
+                    <div class="external-client-title">
+                      <strong>{client.name}</strong>
+                      <span>{client.clientType}</span>
+                    </div>
+                    <span class:external-client-badge--enabled={client.enabled} class="external-client-badge">
+                      {client.enabled ? t('settings.externalClientEnabled') : t('settings.externalClientDisabled')}
+                    </span>
+                  </div>
+                  <dl class="external-client-meta">
+                    <div>
+                      <dt>{t('settings.externalClientPermissionMode')}</dt>
+                      <dd>{client.permissionMode}</dd>
+                    </div>
+                    <div>
+                      <dt>{t('common.created')}</dt>
+                      <dd>{formatExternalClientTimestamp(client.createdAt)}</dd>
+                    </div>
+                    <div>
+                      <dt>{t('common.updated')}</dt>
+                      <dd>{formatExternalClientTimestamp(client.updatedAt)}</dd>
+                    </div>
+                  </dl>
+                </article>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      </section>
+
       <!-- Data management -->
       <section class="card settings-section" aria-labelledby="data-heading">
         <div class="card-header">
@@ -1538,6 +1747,124 @@
   .data-action-desc {
     font-size: var(--text-xs);
     color: var(--text-secondary);
+  }
+
+  /* ── Integrations ───────────────────────────────────────────────────────── */
+
+  .integrations-body,
+  .external-client-create,
+  .external-client-list,
+  .external-client-form {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .integrations-body,
+  .external-client-list {
+    gap: var(--space-4);
+  }
+
+  .external-client-create,
+  .external-client-form {
+    gap: var(--space-3);
+  }
+
+  .external-client-create,
+  .external-client-row {
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    border: var(--border-width) solid var(--border-default);
+  }
+
+  .external-client-create {
+    background-color: var(--surface-raised);
+  }
+
+  .external-client-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    background-color: var(--surface-default);
+  }
+
+  .external-client-row-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .external-client-title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .external-client-title strong {
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+  }
+
+  .external-client-title span {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+  }
+
+  .external-client-badge {
+    flex-shrink: 0;
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-sm);
+    border: var(--border-width) solid var(--border-default);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+  }
+
+  .external-client-badge--enabled {
+    color: var(--color-success-600);
+    border-color: var(--color-success-600);
+  }
+
+  .external-client-meta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+    margin: 0;
+  }
+
+  .external-client-meta div {
+    min-width: 0;
+  }
+
+  .external-client-meta dt {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--text-tertiary);
+  }
+
+  .external-client-meta dd {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+  }
+
+  .external-client-empty {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+  }
+
+  .external-client-error {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    color: var(--color-danger-600);
+    font-size: var(--text-xs);
   }
 
   .backup-panel {
