@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/900-labs/900crm"
+    "url": "https://github.com/900Labs/900CRM"
   },
   "type": "module",
   "workspaces": [

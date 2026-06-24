@@ -555,4 +555,4 @@ Adding encryption (e.g., SQLCipher) requires a key management strategy. For a si
 
 ---
 
-For questions about the architecture, open a [discussion](https://github.com/900-labs/900crm/discussions) or comment on the relevant issue. Architecture discussions are some of the most valuable contributions you can make.
+For questions about the architecture, open a [discussion](https://github.com/900Labs/900CRM/discussions) or comment on the relevant issue. Architecture discussions are some of the most valuable contributions you can make.
