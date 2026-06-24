@@ -1,4 +1,5 @@
 use crm_core::services::{ImportPreflightReport, ImportResult};
+use crm_core::utils::csv::ImportColumnMapping;
 use tauri::State;
 
 use crate::AppState;
@@ -14,12 +15,34 @@ pub async fn import_contacts_csv(
 }
 
 #[tauri::command]
+pub async fn import_contacts_csv_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportResult, String> {
+    let mut core = super::lock_core(&state)?;
+    core.import_contacts_csv_with_mapping(&file_path, mapping)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn preflight_contacts_csv_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
     let core = super::lock_core(&state)?;
     core.preflight_contacts_csv_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_contacts_csv_import_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_contacts_csv_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
 }
 
@@ -62,12 +85,34 @@ pub async fn import_organizations_csv(
 }
 
 #[tauri::command]
+pub async fn import_organizations_csv_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportResult, String> {
+    let mut core = super::lock_core(&state)?;
+    core.import_organizations_csv_with_mapping(&file_path, mapping)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn preflight_organizations_csv_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
     let core = super::lock_core(&state)?;
     core.preflight_organizations_csv_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_organizations_csv_import_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_organizations_csv_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
 }
 

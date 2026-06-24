@@ -28,9 +28,10 @@ use crate::storage::{
 };
 use crate::utils::{
     csv::{
-        parse_contacts_csv, parse_contacts_csv_with_row_numbers, parse_deals_csv,
-        parse_organizations_csv, parse_organizations_csv_with_row_numbers, write_contacts_csv,
-        write_deals_csv, write_organizations_csv, ContactCsvRow, DealCsvRow, OrganizationCsvRow,
+        parse_contacts_csv_with_mapping, parse_contacts_csv_with_row_numbers, parse_deals_csv,
+        parse_organizations_csv_with_mapping, parse_organizations_csv_with_row_numbers,
+        write_contacts_csv, write_deals_csv, write_organizations_csv, ContactCsvRow, DealCsvRow,
+        ImportColumnMapping, OrganizationCsvRow,
     },
     datetime::now_iso8601,
     errors::{CrmError, CrmResult as InternalCrmResult},
@@ -754,12 +755,29 @@ impl CrmCore {
 
     pub fn import_contacts_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_contacts_csv(file_content.as_slice())?;
+        let rows = parse_contacts_csv_with_row_numbers(file_content.as_slice())?;
+        self.import_contact_rows(rows)
+    }
+
+    pub fn import_contacts_csv_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_contacts_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_contact_rows(rows)
+    }
+
+    fn import_contact_rows(
+        &mut self,
+        rows: Vec<(usize, ContactCsvRow)>,
+    ) -> CrmResult<ImportResult> {
         let mut created = 0u32;
         let mut skipped = 0u32;
         let mut errors = Vec::new();
 
-        for (i, row) in rows.iter().enumerate() {
+        for (row_number, row) in rows {
             match self.create_contact(
                 Some("person".to_string()),
                 Some(row.first_name.clone()),
@@ -788,7 +806,7 @@ impl CrmCore {
                     created += 1;
                 }
                 Err(e) => {
-                    errors.push(format!("Row {}: {} ({})", i + 2, e, row.first_name));
+                    errors.push(format!("Row {}: {} ({})", row_number, e, row.first_name));
                     skipped += 1;
                 }
             }
@@ -807,6 +825,23 @@ impl CrmCore {
     ) -> CrmResult<ImportPreflightReport> {
         let file_content = fs::read(file_path)?;
         let rows = parse_contacts_csv_with_row_numbers(file_content.as_slice())?;
+        self.preflight_contact_rows(rows)
+    }
+
+    pub fn preflight_contacts_csv_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_contacts_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.preflight_contact_rows(rows)
+    }
+
+    fn preflight_contact_rows(
+        &self,
+        rows: Vec<(usize, ContactCsvRow)>,
+    ) -> CrmResult<ImportPreflightReport> {
         let mut warnings = Vec::new();
 
         for (row_number, row) in &rows {
@@ -954,12 +989,29 @@ impl CrmCore {
 
     pub fn import_organizations_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_organizations_csv(file_content.as_slice())?;
+        let rows = parse_organizations_csv_with_row_numbers(file_content.as_slice())?;
+        self.import_organization_rows(rows)
+    }
+
+    pub fn import_organizations_csv_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_organizations_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_organization_rows(rows)
+    }
+
+    fn import_organization_rows(
+        &mut self,
+        rows: Vec<(usize, OrganizationCsvRow)>,
+    ) -> CrmResult<ImportResult> {
         let mut created = 0u32;
         let mut skipped = 0u32;
         let mut errors = Vec::new();
 
-        for (i, row) in rows.iter().enumerate() {
+        for (row_number, row) in rows {
             match self.create_organization(
                 row.name.clone(),
                 row.email.clone(),
@@ -988,7 +1040,7 @@ impl CrmCore {
                     created += 1;
                 }
                 Err(e) => {
-                    errors.push(format!("Row {}: {} ({})", i + 2, e, row.name));
+                    errors.push(format!("Row {}: {} ({})", row_number, e, row.name));
                     skipped += 1;
                 }
             }
@@ -1007,6 +1059,23 @@ impl CrmCore {
     ) -> CrmResult<ImportPreflightReport> {
         let file_content = fs::read(file_path)?;
         let rows = parse_organizations_csv_with_row_numbers(file_content.as_slice())?;
+        self.preflight_organization_rows(rows)
+    }
+
+    pub fn preflight_organizations_csv_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_organizations_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.preflight_organization_rows(rows)
+    }
+
+    fn preflight_organization_rows(
+        &self,
+        rows: Vec<(usize, OrganizationCsvRow)>,
+    ) -> CrmResult<ImportPreflightReport> {
         let mut warnings = Vec::new();
 
         for (row_number, row) in &rows {

@@ -1,7 +1,9 @@
 use rusqlite::params;
 
 use super::{CrmCore, TagColorUpdate};
-use crate::utils::{datetime::now_iso8601, uuid::new_uuid};
+use crate::utils::{
+    csv::ImportColumnMapping, datetime::now_iso8601, errors::CrmError, uuid::new_uuid,
+};
 
 fn open_test_core() -> (CrmCore, std::path::PathBuf) {
     let path = std::env::temp_dir().join(format!("900crm-core-test-{}", new_uuid()));
@@ -14,6 +16,13 @@ fn count(core: &CrmCore, sql: &str) -> i64 {
         .conn
         .query_row(sql, [], |row| row.get(0))
         .expect("count query should succeed")
+}
+
+fn import_mapping(pairs: &[(&str, Option<&str>)]) -> ImportColumnMapping {
+    pairs
+        .iter()
+        .map(|(source, target)| ((*source).to_string(), target.map(str::to_string)))
+        .collect()
 }
 
 #[test]
@@ -738,6 +747,326 @@ fn import_organizations_csv_creates_valid_rows_and_skips_blank_names() {
         )
         .expect("organization import audit count should query");
     assert_eq!(import_audit_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_contacts_csv_with_mapping_imports_nonstandard_headers() {
+    let (mut core, path) = open_test_core();
+    let csv_path = path.join("contacts-mapped.csv");
+    std::fs::write(
+        &csv_path,
+        "Given,Family,Company,Mail,Tel,Street,Town,Nation,Memo,Skip\n\
+         Mina,Okafor,Acme Health,mina@example.com,+234500,Dock 4,Lagos,NG,Primary buyer,ignored\n\
+         ,Blank,Skipped,blank@example.com,,,,,,ignored\n",
+    )
+    .expect("mapped contact CSV fixture should write");
+    let mapping = import_mapping(&[
+        ("Given", Some("first_name")),
+        ("Family", Some("last_name")),
+        ("Company", Some("org_name")),
+        ("Mail", Some("email")),
+        ("Tel", Some("phone")),
+        ("Street", Some("address")),
+        ("Town", Some("city")),
+        ("Nation", Some("country")),
+        ("Memo", Some("notes")),
+        ("Skip", None),
+    ]);
+
+    let result = core
+        .import_contacts_csv_with_mapping(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            mapping,
+        )
+        .expect("mapped contact CSV import should succeed");
+
+    assert_eq!(result.created, 1);
+    assert_eq!(result.skipped, 0);
+    assert!(result.errors.is_empty());
+
+    let imported: (
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    ) = core
+        .db
+        .conn
+        .query_row(
+            "SELECT first_name, last_name, org_name, email, phone, address, city, country, notes FROM contacts WHERE email = ?1",
+            params!["mina@example.com"],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
+                    row.get(8)?,
+                ))
+            },
+        )
+        .expect("mapped contact should query");
+    assert_eq!(
+        imported,
+        (
+            "Mina".to_string(),
+            "Okafor".to_string(),
+            "Acme Health".to_string(),
+            "mina@example.com".to_string(),
+            "+234500".to_string(),
+            "Dock 4".to_string(),
+            "Lagos".to_string(),
+            "NG".to_string(),
+            "Primary buyer".to_string(),
+        )
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_organizations_csv_with_mapping_imports_nonstandard_headers() {
+    let (mut core, path) = open_test_core();
+    let csv_path = path.join("organizations-mapped.csv");
+    std::fs::write(
+        &csv_path,
+        "Company,Inbox,Telephone,Site,Line One,Line Two,Town,State,Nation,Postcode,About,Skip\n\
+         Amani Labs,hello@amani.example,+254700,https://amani.example,Floor 2,Unit B,Nairobi,Nairobi County,KE,00100,Research partner,ignored\n\
+         ,blank@example.com,,,,,,,,,,ignored\n",
+    )
+    .expect("mapped organization CSV fixture should write");
+    let mapping = import_mapping(&[
+        ("Company", Some("name")),
+        ("Inbox", Some("email")),
+        ("Telephone", Some("phone")),
+        ("Site", Some("website")),
+        ("Line One", Some("address_line1")),
+        ("Line Two", Some("address_line2")),
+        ("Town", Some("city")),
+        ("State", Some("region")),
+        ("Nation", Some("country")),
+        ("Postcode", Some("postal_code")),
+        ("About", Some("description")),
+        ("Skip", None),
+    ]);
+
+    let result = core
+        .import_organizations_csv_with_mapping(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            mapping,
+        )
+        .expect("mapped organization CSV import should succeed");
+
+    assert_eq!(result.created, 1);
+    assert_eq!(result.skipped, 0);
+    assert!(result.errors.is_empty());
+
+    let organizations = core
+        .list_organizations()
+        .expect("organizations should list after mapped import");
+    assert_eq!(organizations.len(), 1);
+    assert_eq!(organizations[0].name, "Amani Labs");
+    assert_eq!(
+        organizations[0].email.as_deref(),
+        Some("hello@amani.example")
+    );
+    assert_eq!(organizations[0].phone.as_deref(), Some("+254700"));
+    assert_eq!(
+        organizations[0].website.as_deref(),
+        Some("https://amani.example")
+    );
+    assert_eq!(organizations[0].address_line1.as_deref(), Some("Floor 2"));
+    assert_eq!(organizations[0].address_line2.as_deref(), Some("Unit B"));
+    assert_eq!(organizations[0].city.as_deref(), Some("Nairobi"));
+    assert_eq!(organizations[0].region.as_deref(), Some("Nairobi County"));
+    assert_eq!(organizations[0].country.as_deref(), Some("KE"));
+    assert_eq!(organizations[0].postal_code.as_deref(), Some("00100"));
+    assert_eq!(
+        organizations[0].description.as_deref(),
+        Some("Research partner")
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn mapped_organization_preflight_flags_name_email_and_phone_duplicates() {
+    let (mut core, path) = open_test_core();
+
+    let organization = core
+        .create_organization(
+            "Acme Health".to_string(),
+            Some("hello@acme.example".to_string()),
+            Some("+123456".to_string()),
+            None,
+            None,
+            None,
+            Some("Lagos".to_string()),
+            None,
+            Some("NG".to_string()),
+            None,
+            Some("Regional partner".to_string()),
+        )
+        .expect("organization fixture should be created");
+
+    let csv_path = path.join("organizations-mapped-preflight.csv");
+    std::fs::write(
+        &csv_path,
+        "Company,Inbox,Telephone,Ignored\n\
+         acme health,HELLO@acme.example,+123456,ignored\n",
+    )
+    .expect("mapped organization preflight CSV fixture should write");
+    let mapping = import_mapping(&[
+        ("Company", Some("name")),
+        ("Inbox", Some("email")),
+        ("Telephone", Some("phone")),
+        ("Ignored", None),
+    ]);
+
+    let report = core
+        .preflight_organizations_csv_import_with_mapping(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            mapping,
+        )
+        .expect("mapped organization preflight should succeed");
+
+    assert_eq!(report.entity_type, "organizations");
+    assert_eq!(report.total_rows, 1);
+    assert_eq!(report.duplicate_warning_count, 3);
+    for match_type in ["name", "email", "phone"] {
+        let warning = report
+            .warnings
+            .iter()
+            .find(|warning| warning.match_type == match_type)
+            .unwrap_or_else(|| panic!("{match_type} duplicate warning should exist"));
+        assert_eq!(warning.row_number, 2);
+        assert_eq!(warning.existing_entity_type, "organization");
+        assert_eq!(warning.existing_entity_id, organization.id);
+        assert_eq!(warning.existing_display_label, "Acme Health");
+    }
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn mapped_import_rejects_invalid_target_fields_and_duplicate_assignments() {
+    let (core, path) = open_test_core();
+    let csv_path = path.join("invalid-mapping.csv");
+    std::fs::write(&csv_path, "A,B,C\none,two,three\n")
+        .expect("invalid mapping CSV fixture should write");
+
+    let invalid_target = import_mapping(&[("A", Some("nickname"))]);
+    let err = core
+        .preflight_contacts_csv_import_with_mapping(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            invalid_target,
+        )
+        .expect_err("unknown mapped target should be rejected");
+    match err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("Unknown import target field 'nickname'"));
+        }
+        other => panic!("expected InvalidInput for unknown target, got {other:?}"),
+    }
+
+    let duplicate_target = import_mapping(&[("A", Some("first_name")), ("B", Some("first_name"))]);
+    let err = core
+        .preflight_contacts_csv_import_with_mapping(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            duplicate_target,
+        )
+        .expect_err("duplicate mapped target should be rejected");
+    match err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("mapped more than once"));
+            assert!(message.contains("first_name"));
+        }
+        other => panic!("expected InvalidInput for duplicate target, got {other:?}"),
+    }
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn mapped_contact_preflight_is_read_only() {
+    let (mut core, path) = open_test_core();
+
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            Some("Lovelace".to_string()),
+            None,
+            Some("ada@example.com".to_string()),
+            Some("+15550100".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact fixture should be created");
+
+    let contact_count_before = count(&core, "SELECT COUNT(*) FROM contacts");
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let csv_path = path.join("contacts-mapped-preflight.csv");
+    std::fs::write(
+        &csv_path,
+        "Given,Mail,Telephone,Ignored\n\
+         Imported,ADA@example.com,+15550100,ignored\n",
+    )
+    .expect("mapped contact preflight CSV fixture should write");
+    let mapping = import_mapping(&[
+        ("Given", Some("first_name")),
+        ("Mail", Some("email")),
+        ("Telephone", Some("phone")),
+        ("Ignored", None),
+    ]);
+
+    let report = core
+        .preflight_contacts_csv_import_with_mapping(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            mapping,
+        )
+        .expect("mapped contact preflight should succeed");
+
+    assert_eq!(report.entity_type, "contacts");
+    assert_eq!(report.total_rows, 1);
+    assert_eq!(report.duplicate_warning_count, 2);
+    assert!(report
+        .warnings
+        .iter()
+        .all(|warning| warning.existing_entity_id == contact.id));
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM contacts"),
+        contact_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);
