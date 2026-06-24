@@ -2660,6 +2660,128 @@ fn import_organizations_csv_with_mapping_imports_nonstandard_headers() {
 }
 
 #[test]
+fn import_deals_csv_with_mapping_imports_nonstandard_headers() {
+    let (mut core, path) = open_test_core();
+    let csv_path = path.join("deals-mapped.csv");
+    std::fs::write(
+        &csv_path,
+        "Deal Name,Amount,ISO,Phase,Close Date,Memo,Skip\n\
+         Lagos Renewal,12500.50,EUR,Proposal,2026-09-30,Renewal path,ignored\n\
+         ,2500,USD,Lead,2026-10-01,Blank title,ignored\n",
+    )
+    .expect("mapped deal CSV fixture should write");
+    let mapping = import_mapping(&[
+        ("Deal Name", Some("title")),
+        ("Amount", Some("value")),
+        ("ISO", Some("currency")),
+        ("Phase", Some("stage")),
+        ("Close Date", Some("expected_close")),
+        ("Memo", Some("notes")),
+        ("Skip", None),
+    ]);
+
+    let result = core
+        .import_deals_csv_with_mapping(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            mapping,
+        )
+        .expect("mapped deal CSV import should succeed");
+
+    assert_eq!(result.created, 1);
+    assert_eq!(result.skipped, 0);
+    assert!(result.errors.is_empty());
+
+    let deals = core.list_deals().expect("deals should list after import");
+    assert_eq!(deals.len(), 1);
+    assert_eq!(deals[0].title, "Lagos Renewal");
+    assert_eq!(deals[0].value, 12500.50);
+    assert_eq!(deals[0].currency, "EUR");
+    assert_eq!(deals[0].stage, "Proposal");
+    assert_eq!(deals[0].expected_close.as_deref(), Some("2026-09-30"));
+    assert_eq!(deals[0].notes, "Renewal path");
+    assert_eq!(deals[0].contact_id, None);
+    assert_eq!(deals[0].organization_id, None);
+
+    let import_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE actor_type = 'import' AND action = 'import_row' AND entity_type = 'deal'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("deal import audit count should query");
+    assert_eq!(import_audit_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn preflight_deals_csv_import_flags_title_duplicates_without_writes() {
+    let (mut core, path) = open_test_core();
+
+    let deal = core
+        .create_deal(
+            "Acme Renewal".to_string(),
+            Some(5000.0),
+            Some("USD".to_string()),
+            Some("Proposal".to_string()),
+            Some(50),
+            Some("2026-09-30".to_string()),
+            None,
+            None,
+            Some("Existing renewal".to_string()),
+        )
+        .expect("deal fixture should be created");
+
+    let deal_count_before = count(&core, "SELECT COUNT(*) FROM deals");
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let csv_path = path.join("deals-preflight.csv");
+    std::fs::write(
+        &csv_path,
+        "title,value,currency,stage,expected_close,notes\n\
+         acme renewal,7500,USD,Negotiation,2026-10-15,Potential duplicate\n",
+    )
+    .expect("deal preflight CSV fixture should write");
+
+    let report = core
+        .preflight_deals_csv_import(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("deal preflight should succeed");
+
+    assert_eq!(report.entity_type, "deals");
+    assert_eq!(report.total_rows, 1);
+    assert_eq!(report.duplicate_warning_count, 1);
+    assert_eq!(report.warnings.len(), 1);
+
+    let warning = &report.warnings[0];
+    assert_eq!(warning.row_number, 2);
+    assert_eq!(warning.match_type, "title");
+    assert_eq!(warning.csv_value, "acme renewal");
+    assert_eq!(warning.existing_entity_type, "deal");
+    assert_eq!(warning.existing_entity_id, deal.id);
+    assert_eq!(warning.existing_display_label, "Acme Renewal");
+
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM deals"),
+        deal_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn mapped_organization_preflight_flags_name_email_and_phone_duplicates() {
     let (mut core, path) = open_test_core();
 

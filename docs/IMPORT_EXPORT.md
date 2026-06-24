@@ -26,7 +26,7 @@ yet.
 The import/export modal is available from the desktop UI. The import tab asks
 the user to choose an entity type and a CSV file.
 
-For contacts and organizations, the current wizard flow is:
+For contacts, deals, and organizations, the current wizard flow is:
 
 1. Select entity type and CSV file.
 2. Preview parsed headers and the first rows.
@@ -35,10 +35,6 @@ For contacts and organizations, the current wizard flow is:
 5. Review duplicate warnings.
 6. Confirm import.
 7. Review the import summary.
-
-For deals, the UI uses the legacy direct import path. Deals do not currently
-have field mapping, duplicate preflight warnings, or the multi-step mapped
-wizard.
 
 Mapped imports require a desktop-selected file path so the Rust backend can read
 the same CSV file. The browser file-input fallback can preview text, but mapped
@@ -127,16 +123,21 @@ Supported deal import fields:
 | `expected_close` | No | Stored as provided by the create path. |
 | `notes` | No | Imported as deal notes. |
 
-Current deal import does not map imported deals to contacts or organizations.
-Imported deals pass `None` for `contact_id` and `organization_id`.
+Mapped deal import can accept arbitrary source headers as long as each source
+header is mapped to a supported target field or skipped. The UI suggests common
+aliases such as `opportunity`, `amount`, `pipeline stage`, `close date`, and
+`memo`.
+
+Deal import does not map imported deals to contacts or organizations. Imported
+deals pass `None` for `contact_id` and `organization_id`.
 
 Deal export writes `title`, `value`, `currency`, `stage`, `expected_close`, and
 `notes` with a header row. Values are formatted with two decimal places.
 
 ## Duplicate Preflight
 
-Duplicate preflight is currently implemented for contacts and organizations
-only.
+Duplicate preflight is currently implemented for contacts, deals, and
+organizations.
 
 Contact preflight checks active contacts for:
 
@@ -148,6 +149,10 @@ Organization preflight checks active organizations for:
 - case-insensitive exact name matches;
 - case-insensitive exact email matches;
 - exact phone matches after trimming.
+
+Deal preflight checks active deals for:
+
+- case-insensitive exact title matches after trimming the imported title.
 
 Preflight returns warnings with the CSV row number, match type, CSV value,
 existing record ID, existing display label, and a human-readable reason.
@@ -202,9 +207,8 @@ Before large imports, create a local backup from Settings. See
 The following are not implemented in the current import/export surface:
 
 - JSON export.
-- Deal field mapping.
-- Deal duplicate preflight.
 - Contact or organization duplicate auto-merge during import.
+- Deal duplicate auto-merge during import.
 - Import rollback for a completed multi-row import.
 - Automatic backup before import.
 - Remote import/export endpoints.

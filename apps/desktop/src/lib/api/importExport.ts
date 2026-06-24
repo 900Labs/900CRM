@@ -5,7 +5,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export type ImportExportEntity = 'contacts' | 'deals' | 'organizations';
-export type ImportPreflightEntity = 'contacts' | 'organizations';
+export type ImportPreflightEntity = 'contacts' | 'deals' | 'organizations';
 export type ContactImportTargetField =
   | 'first_name'
   | 'last_name'
@@ -28,7 +28,17 @@ export type OrganizationImportTargetField =
   | 'country'
   | 'postal_code'
   | 'description';
-export type ImportTargetField = ContactImportTargetField | OrganizationImportTargetField;
+export type DealImportTargetField =
+  | 'title'
+  | 'value'
+  | 'currency'
+  | 'stage'
+  | 'expected_close'
+  | 'notes';
+export type ImportTargetField =
+  | ContactImportTargetField
+  | DealImportTargetField
+  | OrganizationImportTargetField;
 export type ImportColumnMapping<TTarget extends string = ImportTargetField> = Record<
   string,
   TTarget | null
@@ -50,9 +60,9 @@ export interface ImportPreflightReport {
 export interface ImportDuplicateWarning {
   entity_type: ImportPreflightEntity;
   row_number: number;
-  match_type: 'email' | 'phone' | 'name';
+  match_type: 'email' | 'phone' | 'name' | 'title';
   csv_value: string;
-  existing_entity_type: 'contact' | 'organization';
+  existing_entity_type: 'contact' | 'deal' | 'organization';
   existing_entity_id: string;
   existing_display_label: string;
   reason: string;
@@ -72,16 +82,19 @@ const exportCommands: Record<ImportExportEntity, string> = {
 
 const preflightCommands: Record<ImportPreflightEntity, string> = {
   contacts: 'preflight_contacts_csv_import',
+  deals: 'preflight_deals_csv_import',
   organizations: 'preflight_organizations_csv_import',
 };
 
 const importWithMappingCommands: Record<ImportPreflightEntity, string> = {
   contacts: 'import_contacts_csv_with_mapping',
+  deals: 'import_deals_csv_with_mapping',
   organizations: 'import_organizations_csv_with_mapping',
 };
 
 const preflightWithMappingCommands: Record<ImportPreflightEntity, string> = {
   contacts: 'preflight_contacts_csv_import_with_mapping',
+  deals: 'preflight_deals_csv_import_with_mapping',
   organizations: 'preflight_organizations_csv_import_with_mapping',
 };
 
@@ -136,6 +149,30 @@ export async function importDealsCsv(filePath: string): Promise<ImportResult> {
 
 export async function exportDealsCsv(filePath: string): Promise<number> {
   return invoke<number>(exportCommands.deals, filePathArgs(filePath));
+}
+
+export async function preflightDealsCsvImport(filePath: string): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(preflightCommands.deals, filePathArgs(filePath));
+}
+
+export async function importDealsCsvWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<DealImportTargetField>,
+): Promise<ImportResult> {
+  return invoke<ImportResult>(
+    importWithMappingCommands.deals,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
+export async function preflightDealsCsvImportWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<DealImportTargetField>,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightWithMappingCommands.deals,
+    filePathAndMappingArgs(filePath, mapping),
+  );
 }
 
 export async function importOrganizationsCsv(filePath: string): Promise<ImportResult> {

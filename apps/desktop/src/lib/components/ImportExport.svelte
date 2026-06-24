@@ -18,10 +18,13 @@
     exportCsv,
     importCsv,
     importContactsCsvWithMapping,
+    importDealsCsvWithMapping,
     importOrganizationsCsvWithMapping,
     preflightContactsCsvImportWithMapping,
+    preflightDealsCsvImportWithMapping,
     preflightOrganizationsCsvImportWithMapping,
     type ContactImportTargetField,
+    type DealImportTargetField,
     type ImportExportEntity,
     type ImportPreflightReport,
     type ImportResult,
@@ -61,7 +64,9 @@
 
   const previewRows = $derived(parseResult?.rows.slice(0, 5) ?? []);
   const mappedPreviewRows = $derived(applyMapping(previewRows, columnMapping));
-  const isMappedImport = $derived(importEntity === 'contacts' || importEntity === 'organizations');
+  const isMappedImport = $derived(
+    importEntity === 'contacts' || importEntity === 'deals' || importEntity === 'organizations',
+  );
   const mappedEntity = $derived(isMappedImport ? (importEntity as MappedImportEntity) : null);
   const importFieldOptions = $derived(mappedEntity ? getImportFieldOptions(mappedEntity) : []);
   const canUseMappedCommands = $derived(Boolean(fileSource === 'desktop' && selectedImportPath));
@@ -257,6 +262,13 @@
       );
     }
 
+    if (entity === 'deals') {
+      return preflightDealsCsvImportWithMapping(
+        filePath,
+        toBackendMapping<DealImportTargetField>(columnMapping),
+      );
+    }
+
     return preflightOrganizationsCsvImportWithMapping(
       filePath,
       toBackendMapping<OrganizationImportTargetField>(columnMapping),
@@ -271,6 +283,13 @@
       return importContactsCsvWithMapping(
         filePath,
         toBackendMapping<ContactImportTargetField>(columnMapping),
+      );
+    }
+
+    if (entity === 'deals') {
+      return importDealsCsvWithMapping(
+        filePath,
+        toBackendMapping<DealImportTargetField>(columnMapping),
       );
     }
 
