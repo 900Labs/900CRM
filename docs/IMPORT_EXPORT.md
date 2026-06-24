@@ -2,13 +2,13 @@
 
 Date: 2026-06-24
 
-This document describes the current CSV import/export behavior in 900CRM. It is
+This document describes the current import/export behavior in 900CRM. It is
 based on the desktop UI, Tauri command layer, and `crm-core` services as they
 exist today.
 
 ## Current Scope
 
-900CRM currently supports local CSV import and export for:
+900CRM currently supports local CSV import/export and local JSON export for:
 
 - contacts;
 - deals;
@@ -17,9 +17,7 @@ exist today.
 Import and export use local files selected by the user. There is no cloud import
 service, no remote export destination, and no automatic upload.
 
-JSON export is visible as a future option in the UI but is not implemented. If a
-user selects JSON export today, the UI reports that JSON export is not available
-yet.
+JSON support is export-only. JSON import is not implemented.
 
 ## Import Entry Point
 
@@ -134,6 +132,34 @@ deals pass `None` for `contact_id` and `organization_id`.
 Deal export writes `title`, `value`, `currency`, `stage`, `expected_close`, and
 `notes` with a header row. Values are formatted with two decimal places.
 
+## JSON Export
+
+JSON export is available for contacts, deals, and organizations from the same
+export modal as CSV. The user selects a local `.json` path in the save dialog.
+
+JSON exports are pretty-printed arrays of objects. They use the same flat fields
+as the matching CSV export:
+
+- contacts: `first_name`, `last_name`, `org_name`, `email`, `phone`, `address`,
+  `city`, `country`, and `notes`;
+- deals: `title`, `value`, `currency`, `stage`, `expected_close`, and `notes`;
+- organizations: `name`, `email`, `phone`, `website`, `address_line1`,
+  `address_line2`, `city`, `region`, `country`, `postal_code`, and
+  `description`.
+
+JSON export uses the same active-row listing boundaries as CSV export:
+
+- contacts export up to 100,000 active contacts sorted by `first_name`
+  ascending through the contact listing path;
+- deals export active deals through the deal listing path;
+- organizations export active organizations through the organization listing
+  path.
+
+JSON export does not include record IDs, timestamps, deleted rows, device IDs,
+relationship rows, custom fields, separate note records, tags, activities, audit
+log entries, proposed actions, external clients, permissions, settings, or
+backup metadata.
+
 ## Duplicate Preflight
 
 Duplicate preflight is currently implemented for contacts, deals, and
@@ -179,25 +205,28 @@ contact, deal, or organization.
 
 ## Export Behavior
 
-Exports write local CSV files selected by the user through the save dialog.
+Exports write local CSV or JSON files selected by the user through the save
+dialog.
 
-Exported files are plain CSV. They may contain personal, customer, sales, and
+Exported files are plain text. They may contain personal, customer, sales, and
 business data. 900CRM does not encrypt exported files, upload them, or apply
 access controls after they are written.
 
 The Settings Data Management export action displays this disclosure before the
-user opens the export flow. Store exported CSV files containing sensitive data
-in a trusted or encrypted location.
+user opens the export flow. Store exported files containing sensitive data in a
+trusted or encrypted location.
 
 ## Relationship To Backups
 
-CSV import/export is not a backup system.
+CSV import/export and JSON export are not a backup system.
 
 - CSV export is useful for portability, spreadsheet use, and migration.
+- JSON export is useful for portability and inspection of the supported flat
+  entity fields.
 - Local backup creates a SQLite snapshot plus metadata and is the safer way to
   preserve full application state before a destructive restore or risky import.
 - Import does not create an automatic backup before writing rows.
-- Restore validation applies to local backups, not CSV exports.
+- Restore validation applies to local backups, not CSV or JSON exports.
 
 Before large imports, create a local backup from Settings. See
 [Backup and Restore](BACKUP_RESTORE.md) for the validated backup workflow.
@@ -206,7 +235,7 @@ Before large imports, create a local backup from Settings. See
 
 The following are not implemented in the current import/export surface:
 
-- JSON export.
+- JSON import.
 - Contact or organization duplicate auto-merge during import.
 - Deal duplicate auto-merge during import.
 - Import rollback for a completed multi-row import.
