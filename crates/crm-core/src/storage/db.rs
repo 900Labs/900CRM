@@ -21,7 +21,8 @@
 //! | `custom_field_values`| User-defined field values per entity |
 //! | `settings`           | Key-value application preferences |
 //! | `sync_changelog`     | Offline-first mutation log for sync |
-//! | `contacts_fts`       | FTS5 virtual table for full-text search |
+//! | `contacts_fts`       | FTS5 virtual table for contact search |
+//! | `*_fts`              | FTS5 virtual tables for cross-entity search |
 //!
 //! # Migration Strategy
 //!
@@ -42,7 +43,7 @@ use rusqlite::{params, Connection};
 use crate::utils::errors::{CrmError, CrmResult};
 
 /// The current schema version. Increment whenever a new migration is added.
-const CURRENT_SCHEMA_VERSION: u32 = 9;
+const CURRENT_SCHEMA_VERSION: u32 = 10;
 const DATABASE_FILENAME: &str = "900crm.db";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -240,6 +241,10 @@ impl Database {
 
         if current_version < 9 {
             self.migrate_v9_external_client_permission_uniqueness()?;
+        }
+
+        if current_version < 10 {
+            self.migrate_v10_global_search_fts_parity()?;
         }
 
         self.conn.execute_batch(&format!(
@@ -1124,6 +1129,288 @@ impl Database {
         Ok(())
     }
 
+    fn migrate_v10_global_search_fts_parity(&mut self) -> CrmResult<()> {
+        log::info!("Running database migration v10 global search FTS parity");
+
+        if self.table_has_columns(
+            "organizations",
+            &[
+                "name",
+                "email",
+                "phone",
+                "website",
+                "description",
+                "city",
+                "region",
+                "country",
+                "source",
+                "deleted_at",
+            ],
+        )? {
+            self.conn.execute_batch(
+                r#"
+            CREATE VIRTUAL TABLE IF NOT EXISTS organizations_fts USING fts5(
+                name,
+                email,
+                phone,
+                website,
+                description,
+                city,
+                region,
+                country,
+                source,
+                content='organizations',
+                content_rowid='rowid'
+            );
+
+            INSERT INTO organizations_fts(organizations_fts) VALUES('delete-all');
+            INSERT INTO organizations_fts(rowid, name, email, phone, website, description, city, region, country, source)
+            SELECT rowid, name, email, phone, website, description, city, region, country, source
+            FROM organizations
+            WHERE deleted_at IS NULL;
+
+            CREATE TRIGGER IF NOT EXISTS organizations_fts_ai
+            AFTER INSERT ON organizations
+            BEGIN
+                INSERT INTO organizations_fts(rowid, name, email, phone, website, description, city, region, country, source)
+                SELECT new.rowid, new.name, new.email, new.phone, new.website, new.description, new.city, new.region, new.country, new.source
+                WHERE new.deleted_at IS NULL;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS organizations_fts_au
+            AFTER UPDATE ON organizations
+            BEGIN
+                INSERT INTO organizations_fts(organizations_fts, rowid, name, email, phone, website, description, city, region, country, source)
+                SELECT 'delete', old.rowid, old.name, old.email, old.phone, old.website, old.description, old.city, old.region, old.country, old.source
+                WHERE old.deleted_at IS NULL;
+                INSERT INTO organizations_fts(rowid, name, email, phone, website, description, city, region, country, source)
+                SELECT new.rowid, new.name, new.email, new.phone, new.website, new.description, new.city, new.region, new.country, new.source
+                WHERE new.deleted_at IS NULL;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS organizations_fts_ad
+            AFTER DELETE ON organizations
+            BEGIN
+                INSERT INTO organizations_fts(organizations_fts, rowid, name, email, phone, website, description, city, region, country, source)
+                SELECT 'delete', old.rowid, old.name, old.email, old.phone, old.website, old.description, old.city, old.region, old.country, old.source
+                WHERE old.deleted_at IS NULL;
+            END;
+            "#,
+            )?;
+        } else {
+            log::warn!(
+                "Skipping organizations FTS migration because required source columns are missing"
+            );
+        }
+
+        if self.table_has_columns(
+            "deals",
+            &["title", "stage", "notes", "currency", "deleted_at"],
+        )? {
+            self.conn.execute_batch(
+                r#"
+            CREATE VIRTUAL TABLE IF NOT EXISTS deals_fts USING fts5(
+                title,
+                stage,
+                notes,
+                currency,
+                content='deals',
+                content_rowid='rowid'
+            );
+
+            INSERT INTO deals_fts(deals_fts) VALUES('delete-all');
+            INSERT INTO deals_fts(rowid, title, stage, notes, currency)
+            SELECT rowid, title, stage, notes, currency
+            FROM deals
+            WHERE deleted_at IS NULL;
+
+            CREATE TRIGGER IF NOT EXISTS deals_fts_ai
+            AFTER INSERT ON deals
+            BEGIN
+                INSERT INTO deals_fts(rowid, title, stage, notes, currency)
+                SELECT new.rowid, new.title, new.stage, new.notes, new.currency
+                WHERE new.deleted_at IS NULL;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS deals_fts_au
+            AFTER UPDATE ON deals
+            BEGIN
+                INSERT INTO deals_fts(deals_fts, rowid, title, stage, notes, currency)
+                SELECT 'delete', old.rowid, old.title, old.stage, old.notes, old.currency
+                WHERE old.deleted_at IS NULL;
+                INSERT INTO deals_fts(rowid, title, stage, notes, currency)
+                SELECT new.rowid, new.title, new.stage, new.notes, new.currency
+                WHERE new.deleted_at IS NULL;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS deals_fts_ad
+            AFTER DELETE ON deals
+            BEGIN
+                INSERT INTO deals_fts(deals_fts, rowid, title, stage, notes, currency)
+                SELECT 'delete', old.rowid, old.title, old.stage, old.notes, old.currency
+                WHERE old.deleted_at IS NULL;
+            END;
+            "#,
+            )?;
+        } else {
+            log::warn!("Skipping deals FTS migration because required source columns are missing");
+        }
+
+        if self.table_has_columns(
+            "activities",
+            &["title", "activity_type", "description", "deleted_at"],
+        )? {
+            self.conn.execute_batch(
+                r#"
+            CREATE VIRTUAL TABLE IF NOT EXISTS activities_fts USING fts5(
+                title,
+                activity_type,
+                description,
+                content='activities',
+                content_rowid='rowid'
+            );
+
+            INSERT INTO activities_fts(activities_fts) VALUES('delete-all');
+            INSERT INTO activities_fts(rowid, title, activity_type, description)
+            SELECT rowid, title, activity_type, description
+            FROM activities
+            WHERE deleted_at IS NULL;
+
+            CREATE TRIGGER IF NOT EXISTS activities_fts_ai
+            AFTER INSERT ON activities
+            BEGIN
+                INSERT INTO activities_fts(rowid, title, activity_type, description)
+                SELECT new.rowid, new.title, new.activity_type, new.description
+                WHERE new.deleted_at IS NULL;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS activities_fts_au
+            AFTER UPDATE ON activities
+            BEGIN
+                INSERT INTO activities_fts(activities_fts, rowid, title, activity_type, description)
+                SELECT 'delete', old.rowid, old.title, old.activity_type, old.description
+                WHERE old.deleted_at IS NULL;
+                INSERT INTO activities_fts(rowid, title, activity_type, description)
+                SELECT new.rowid, new.title, new.activity_type, new.description
+                WHERE new.deleted_at IS NULL;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS activities_fts_ad
+            AFTER DELETE ON activities
+            BEGIN
+                INSERT INTO activities_fts(activities_fts, rowid, title, activity_type, description)
+                SELECT 'delete', old.rowid, old.title, old.activity_type, old.description
+                WHERE old.deleted_at IS NULL;
+            END;
+            "#,
+            )?;
+        } else {
+            log::warn!(
+                "Skipping activities FTS migration because required source columns are missing"
+            );
+        }
+
+        if self.table_has_columns("notes", &["content", "body", "entity_type", "deleted_at"])? {
+            self.conn.execute_batch(
+                r#"
+            CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+                content,
+                body,
+                entity_type,
+                content='notes',
+                content_rowid='rowid'
+            );
+
+            INSERT INTO notes_fts(notes_fts) VALUES('delete-all');
+            INSERT INTO notes_fts(rowid, content, body, entity_type)
+            SELECT rowid, content, body, entity_type
+            FROM notes
+            WHERE deleted_at IS NULL;
+
+            CREATE TRIGGER IF NOT EXISTS notes_fts_ai
+            AFTER INSERT ON notes
+            BEGIN
+                INSERT INTO notes_fts(rowid, content, body, entity_type)
+                SELECT new.rowid, new.content, new.body, new.entity_type
+                WHERE new.deleted_at IS NULL;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS notes_fts_au
+            AFTER UPDATE ON notes
+            BEGIN
+                INSERT INTO notes_fts(notes_fts, rowid, content, body, entity_type)
+                SELECT 'delete', old.rowid, old.content, old.body, old.entity_type
+                WHERE old.deleted_at IS NULL;
+                INSERT INTO notes_fts(rowid, content, body, entity_type)
+                SELECT new.rowid, new.content, new.body, new.entity_type
+                WHERE new.deleted_at IS NULL;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS notes_fts_ad
+            AFTER DELETE ON notes
+            BEGIN
+                INSERT INTO notes_fts(notes_fts, rowid, content, body, entity_type)
+                SELECT 'delete', old.rowid, old.content, old.body, old.entity_type
+                WHERE old.deleted_at IS NULL;
+            END;
+            "#,
+            )?;
+        } else {
+            log::warn!("Skipping notes FTS migration because required source columns are missing");
+        }
+
+        if self.table_has_columns("tags", &["name", "color", "deleted_at"])? {
+            self.conn.execute_batch(
+                r#"
+            CREATE VIRTUAL TABLE IF NOT EXISTS tags_fts USING fts5(
+                name,
+                color,
+                content='tags',
+                content_rowid='rowid'
+            );
+
+            INSERT INTO tags_fts(tags_fts) VALUES('delete-all');
+            INSERT INTO tags_fts(rowid, name, color)
+            SELECT rowid, name, color
+            FROM tags
+            WHERE deleted_at IS NULL;
+
+            CREATE TRIGGER IF NOT EXISTS tags_fts_ai
+            AFTER INSERT ON tags
+            BEGIN
+                INSERT INTO tags_fts(rowid, name, color)
+                SELECT new.rowid, new.name, new.color
+                WHERE new.deleted_at IS NULL;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS tags_fts_au
+            AFTER UPDATE ON tags
+            BEGIN
+                INSERT INTO tags_fts(tags_fts, rowid, name, color)
+                SELECT 'delete', old.rowid, old.name, old.color
+                WHERE old.deleted_at IS NULL;
+                INSERT INTO tags_fts(rowid, name, color)
+                SELECT new.rowid, new.name, new.color
+                WHERE new.deleted_at IS NULL;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS tags_fts_ad
+            AFTER DELETE ON tags
+            BEGIN
+                INSERT INTO tags_fts(tags_fts, rowid, name, color)
+                SELECT 'delete', old.rowid, old.name, old.color
+                WHERE old.deleted_at IS NULL;
+            END;
+            "#,
+            )?;
+        } else {
+            log::warn!("Skipping tags FTS migration because required source columns are missing");
+        }
+
+        log::info!("Migration v10 global search FTS parity complete");
+        Ok(())
+    }
+
     fn table_exists(&self, table_name: &str) -> CrmResult<bool> {
         let table_count: i64 = self.conn.query_row(
             "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
@@ -1132,6 +1419,26 @@ impl Database {
         )?;
 
         Ok(table_count != 0)
+    }
+
+    fn table_has_columns(&self, table_name: &str, required_columns: &[&str]) -> CrmResult<bool> {
+        if !self.table_exists(table_name)? {
+            return Ok(false);
+        }
+
+        let mut stmt = self
+            .conn
+            .prepare(&format!("PRAGMA table_info({})", table_name))?;
+        let columns = stmt.query_map([], |row| row.get::<_, String>(1))?;
+        let mut existing_columns = Vec::new();
+
+        for column in columns {
+            existing_columns.push(column?);
+        }
+
+        Ok(required_columns
+            .iter()
+            .all(|required| existing_columns.iter().any(|column| column == required)))
     }
 
     fn add_column_if_missing(

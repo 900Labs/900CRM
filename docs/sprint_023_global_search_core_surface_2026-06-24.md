@@ -27,6 +27,8 @@ Scope: Stable core, Tauri, and frontend API surface for offline global search wi
 
 This sprint does not add FTS5 tables or triggers for organizations, deals, activities, notes, or tags. That keeps the migration non-destructive and tightly scoped, but it means contact search remains the only FTS-backed entity search path. Full FTS5 parity remains deferred.
 
+Superseded by Sprint 052 on 2026-06-24: schema v10 adds FTS5 tables, active-row backfills, and maintenance triggers for organizations, deals, activities, notes, and tags. Global search now uses those storage-owned FTS repositories first with the Sprint 023 text queries retained as fallback.
+
 ## Validation
 
 - [x] `npm run check`

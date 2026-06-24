@@ -15,7 +15,7 @@ future data access.
 - The desktop shell opens `900crm.db` in the platform app data directory.
 - SQLite runs in WAL mode with foreign keys enabled.
 - Schema state is tracked with `PRAGMA user_version`; the current schema version
-  is `9`.
+  is `10`.
 - Migrations are idempotent and run at startup through
   `crates/crm-core/src/storage/db.rs`.
 - Tauri command handlers and future optional integrations should call typed
@@ -144,9 +144,11 @@ as plain strings.
 
 ### Search And Reports
 
-Contacts have an FTS5 index. Global search combines contact FTS with text
-queries over deals, activities, organizations, notes, and tags through
-`storage::search` and `crm_engine::search`.
+Contacts, organizations, deals, activities, notes, and tags have FTS5 indexes.
+Global search routes each entity type through `storage::search`, using FTS first
+and falling back to the legacy text queries if an FTS table is unavailable or
+returns no rows. `crm_engine::search` only orchestrates and maps typed storage
+records.
 
 Reporting and dashboard paths use aggregate queries and indexes over existing
 contacts, organizations, deals, activities, and custom fields. There is no
@@ -245,6 +247,7 @@ Current migration history:
 | 7 | Deal relationship foundation with `organization_id` and `deal_contacts`. |
 | 8 | Activity relationship foundation with `activity_links`. |
 | 9 | External-client permission uniqueness cleanup and unique index. |
+| 10 | Global search FTS5 parity for organizations, deals, activities, notes, and tags with active-row backfill and maintenance triggers. |
 
 ## Legacy And Compatibility Caveats
 
