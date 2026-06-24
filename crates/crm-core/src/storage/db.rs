@@ -42,7 +42,7 @@ use rusqlite::{params, Connection};
 use crate::utils::errors::{CrmError, CrmResult};
 
 /// The current schema version. Increment whenever a new migration is added.
-const CURRENT_SCHEMA_VERSION: u32 = 7;
+const CURRENT_SCHEMA_VERSION: u32 = 8;
 const DATABASE_FILENAME: &str = "900crm.db";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -232,6 +232,10 @@ impl Database {
 
         if current_version < 7 {
             self.migrate_v7_deal_relationships_core_surface()?;
+        }
+
+        if current_version < 8 {
+            self.migrate_v8_activity_relationships_core_surface()?;
         }
 
         self.conn.execute_batch(&format!(
@@ -959,6 +963,122 @@ impl Database {
         }
 
         log::info!("Migration v7 deal relationships complete");
+        Ok(())
+    }
+
+    /// Schema v8 migration - additive activity relationship foundation.
+    ///
+    /// This keeps `activities.contact_id` and `activities.deal_id` as legacy
+    /// compatibility mirrors while adding a first-class activity link table.
+    fn migrate_v8_activity_relationships_core_surface(&mut self) -> CrmResult<()> {
+        log::info!("Running database migration v8 activity relationships");
+
+        if !self.table_exists("activities")? {
+            log::warn!(
+                "Skipping activity relationship migration because table 'activities' is missing"
+            );
+            return Ok(());
+        }
+
+        self.conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS activity_links (
+                id          TEXT PRIMARY KEY NOT NULL,
+                activity_id TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id   TEXT NOT NULL,
+                created_at  TEXT NOT NULL,
+                deleted_at  TEXT,
+                device_id   TEXT NOT NULL,
+                FOREIGN KEY (activity_id) REFERENCES activities(id),
+                CHECK (entity_type IN ('contact', 'organization', 'deal'))
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_activity_links_activity_id
+                ON activity_links (activity_id);
+            CREATE INDEX IF NOT EXISTS idx_activity_links_entity
+                ON activity_links (entity_type, entity_id);
+            CREATE INDEX IF NOT EXISTS idx_activity_links_active_activity
+                ON activity_links (activity_id)
+                WHERE deleted_at IS NULL;
+            CREATE INDEX IF NOT EXISTS idx_activity_links_active_entity
+                ON activity_links (entity_type, entity_id)
+                WHERE deleted_at IS NULL;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_activity_links_active_unique
+                ON activity_links (activity_id, entity_type, entity_id)
+                WHERE deleted_at IS NULL;
+            "#,
+        )?;
+
+        if self.table_exists("contacts")? {
+            self.conn.execute_batch(
+                r#"
+            INSERT INTO activity_links
+                (id, activity_id, entity_type, entity_id, created_at, deleted_at, device_id)
+            SELECT
+                'legacy-contact:' || a.id || ':' || a.contact_id,
+                a.id,
+                'contact',
+                a.contact_id,
+                COALESCE(NULLIF(TRIM(a.created_at), ''), datetime('now')),
+                NULL,
+                COALESCE(NULLIF(TRIM(a.device_id), ''), 'migration')
+            FROM activities a
+            WHERE a.deleted_at IS NULL
+              AND TRIM(COALESCE(a.contact_id, '')) <> ''
+              AND EXISTS (
+                  SELECT 1
+                  FROM contacts c
+                  WHERE c.id = a.contact_id
+                    AND c.deleted_at IS NULL
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM activity_links al
+                  WHERE al.activity_id = a.id
+                    AND al.entity_type = 'contact'
+                    AND al.entity_id = a.contact_id
+                    AND al.deleted_at IS NULL
+              );
+            "#,
+            )?;
+        }
+
+        if self.table_exists("deals")? {
+            self.conn.execute_batch(
+                r#"
+            INSERT INTO activity_links
+                (id, activity_id, entity_type, entity_id, created_at, deleted_at, device_id)
+            SELECT
+                'legacy-deal:' || a.id || ':' || a.deal_id,
+                a.id,
+                'deal',
+                a.deal_id,
+                COALESCE(NULLIF(TRIM(a.created_at), ''), datetime('now')),
+                NULL,
+                COALESCE(NULLIF(TRIM(a.device_id), ''), 'migration')
+            FROM activities a
+            WHERE a.deleted_at IS NULL
+              AND TRIM(COALESCE(a.deal_id, '')) <> ''
+              AND EXISTS (
+                  SELECT 1
+                  FROM deals d
+                  WHERE d.id = a.deal_id
+                    AND d.deleted_at IS NULL
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM activity_links al
+                  WHERE al.activity_id = a.id
+                    AND al.entity_type = 'deal'
+                    AND al.entity_id = a.deal_id
+                    AND al.deleted_at IS NULL
+              );
+            "#,
+            )?;
+        }
+
+        log::info!("Migration v8 activity relationships complete");
         Ok(())
     }
 

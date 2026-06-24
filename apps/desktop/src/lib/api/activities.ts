@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 export type ActivityType = 'task' | 'call' | 'meeting' | 'email';
 export type ActivityStatus = 'pending' | 'completed' | 'overdue';
+export type ActivityLinkEntityType = 'contact' | 'organization' | 'deal';
 
 export interface Activity {
   id: string;
@@ -30,6 +31,16 @@ export type CreateActivityPayload = Omit<
 
 export type UpdateActivityPayload = Partial<CreateActivityPayload>;
 
+export interface ActivityLink {
+  id: string;
+  activityId: string;
+  entityType: ActivityLinkEntityType;
+  entityId: string;
+  createdAt: string;
+  deletedAt: string | null;
+  deviceId: string;
+}
+
 export interface ListActivitiesParams {
   type?: ActivityType;
   status?: ActivityStatus;
@@ -52,6 +63,50 @@ interface BackendActivity {
   deal_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface BackendActivityLink {
+  id: string;
+  activity_id: string;
+  entity_type: ActivityLinkEntityType;
+  entity_id: string;
+  created_at: string;
+  deleted_at: string | null;
+  device_id: string;
+}
+
+function normalizeNullable(value: string | null | undefined): string | null {
+  if (value == null) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function hasOwn<T extends object, K extends PropertyKey>(
+  object: T,
+  key: K,
+): object is T & Record<K, unknown> {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function assignNullableUpdate(
+  args: Record<string, unknown>,
+  valueKey: string,
+  resetKey: string,
+  value: string | null | undefined,
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  const normalized = normalizeNullable(value);
+  if (normalized === null) {
+    args[resetKey] = true;
+  } else {
+    args[valueKey] = normalized;
+  }
 }
 
 function toActivityType(value: string): ActivityType {
@@ -93,6 +148,18 @@ function mapActivity(activity: BackendActivity): Activity {
     dealName: null,
     createdAt: activity.created_at,
     updatedAt: activity.updated_at,
+  };
+}
+
+function mapActivityLink(link: BackendActivityLink): ActivityLink {
+  return {
+    id: link.id,
+    activityId: link.activity_id,
+    entityType: link.entity_type,
+    entityId: link.entity_id,
+    createdAt: link.created_at,
+    deletedAt: link.deleted_at,
+    deviceId: link.device_id,
   };
 }
 
@@ -182,19 +249,63 @@ export async function markIncomplete(id: string): Promise<Activity> {
 }
 
 export async function updateActivity(id: string, data: UpdateActivityPayload): Promise<Activity> {
-  const activity = await invoke<BackendActivity>('update_activity', {
+  const args: Record<string, unknown> = {
     id,
     activity_type: data.type,
     title: data.subject,
     description: data.notes,
-    due_date: data.dueDate,
-    contact_id: data.contactId,
-    deal_id: data.dealId,
-  });
+  };
+
+  if (hasOwn(data, 'dueDate')) {
+    assignNullableUpdate(args, 'due_date', 'reset_due_date', data.dueDate);
+  }
+
+  if (hasOwn(data, 'contactId')) {
+    assignNullableUpdate(args, 'contact_id', 'reset_contact_id', data.contactId);
+  }
+
+  if (hasOwn(data, 'dealId')) {
+    assignNullableUpdate(args, 'deal_id', 'reset_deal_id', data.dealId);
+  }
+
+  const activity = await invoke<BackendActivity>('update_activity', args);
 
   return mapActivity(activity);
 }
 
 export async function deleteActivity(id: string): Promise<void> {
   await invoke<void>('delete_activity', { id });
+}
+
+export async function listActivityLinks(activityId: string): Promise<ActivityLink[]> {
+  const links = await invoke<BackendActivityLink[]>('list_activity_links', {
+    activity_id: activityId.trim(),
+  });
+  return links.map(mapActivityLink);
+}
+
+export async function addActivityLink(
+  activityId: string,
+  entityType: ActivityLinkEntityType,
+  entityId: string,
+): Promise<ActivityLink> {
+  const link = await invoke<BackendActivityLink>('add_activity_link', {
+    activity_id: activityId.trim(),
+    entity_type: entityType,
+    entity_id: entityId.trim(),
+  });
+  return mapActivityLink(link);
+}
+
+export async function removeActivityLink(
+  activityId: string,
+  entityType: ActivityLinkEntityType,
+  entityId: string,
+): Promise<ActivityLink> {
+  const link = await invoke<BackendActivityLink>('remove_activity_link', {
+    activity_id: activityId.trim(),
+    entity_type: entityType,
+    entity_id: entityId.trim(),
+  });
+  return mapActivityLink(link);
 }

@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 use crate::audit::{ACTOR_DESKTOP_APP, ACTOR_IMPORT};
 use crate::crm_engine::{activities as activity_engine, deals as deal_engine, CrmEngine};
 use crate::result::CrmResult;
+use crate::services::activity_relationships::{
+    create_activity_links_for_legacy_mirrors, sync_activity_links_after_mirror_update,
+};
 use crate::services::deal_relationships::{
     create_primary_deal_contact_for_mirror, sync_primary_deal_contact_after_mirror_update,
 };
@@ -33,6 +36,7 @@ use crate::utils::{
     uuid::new_uuid,
 };
 
+mod activity_relationships;
 mod audit;
 mod backup;
 mod contacts;
@@ -308,6 +312,14 @@ impl CrmCore {
         deal_id: Option<String>,
     ) -> CrmResult<Activity> {
         activity_engine::validate_activity_for_create(&title, &activity_type)?;
+        let contact_id = normalize_optional_string(contact_id);
+        let deal_id = normalize_optional_string(deal_id);
+        if let Some(contact_id) = contact_id.as_deref() {
+            storage::contacts::get_contact(&self.db.conn, contact_id)?;
+        }
+        if let Some(deal_id) = deal_id.as_deref() {
+            storage::deals::get_deal(&self.db.conn, deal_id)?;
+        }
         let device_id = self.device_id.clone();
         let tx = self.db.conn.unchecked_transaction()?;
         let activity = storage::activities::create_activity(
@@ -320,6 +332,7 @@ impl CrmCore {
             deal_id.as_deref(),
             &device_id,
         )?;
+        create_activity_links_for_legacy_mirrors(&tx, &activity, &device_id)?;
         storage::sync::record_change(
             &tx,
             "activity",
@@ -377,11 +390,20 @@ impl CrmCore {
         activity_type: Option<String>,
         title: Option<String>,
         description: Option<String>,
-        due_date: Option<String>,
+        due_date: Option<Option<String>>,
         completed: Option<bool>,
-        contact_id: Option<String>,
-        deal_id: Option<String>,
+        contact_id: Option<Option<String>>,
+        deal_id: Option<Option<String>>,
     ) -> CrmResult<Activity> {
+        let due_date = normalize_optional_update_string(due_date);
+        let contact_id = normalize_optional_update_string(contact_id);
+        let deal_id = normalize_optional_update_string(deal_id);
+        if let Some(Some(contact_id)) = contact_id.as_ref() {
+            storage::contacts::get_contact(&self.db.conn, contact_id)?;
+        }
+        if let Some(Some(deal_id)) = deal_id.as_ref() {
+            storage::deals::get_deal(&self.db.conn, deal_id)?;
+        }
         let before = storage::activities::get_activity(&self.db.conn, id)?;
         let device_id = self.device_id.clone();
         let tx = self.db.conn.unchecked_transaction()?;
@@ -391,11 +413,13 @@ impl CrmCore {
             activity_type.as_deref(),
             title.as_deref(),
             description.as_deref(),
-            Some(due_date.as_deref()),
+            due_date.as_ref().map(|value| value.as_deref()),
             completed,
-            Some(contact_id.as_deref()),
-            Some(deal_id.as_deref()),
+            contact_id.as_ref().map(|value| value.as_deref()),
+            deal_id.as_ref().map(|value| value.as_deref()),
         )?;
+        sync_activity_links_after_mirror_update(&tx, &before, &activity, &device_id)?;
+        let activity = storage::activities::get_activity(&tx, id)?;
         storage::sync::record_change(
             &tx,
             "activity",
