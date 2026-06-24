@@ -15,7 +15,9 @@
     "pipeline": "Pipeline",
     "activities": "Actividades",
     "settings": "Configuración",
-    "organizations": "Organizaciones"
+    "organizations": "Organizaciones",
+    "auditLog": "Audit Log",
+    "pendingActions": "Pending Actions"
   },
   "dashboard": {
     "title": "Panel",
@@ -380,5 +382,48 @@
     "linkContactRequired": "El ID de contacto es obligatorio",
     "manageNotesTags": "Notas y etiquetas",
     "notesTagsTitle": "Notas y etiquetas: {name}"
+  },
+  "auditLog": {
+    "title": "Audit Log",
+    "subtitle": "Recent local changes recorded by the CRM engine.",
+    "limit": "Limit",
+    "timestamp": "Timestamp",
+    "action": "Action",
+    "actor": "Actor",
+    "entity": "Entity",
+    "deviceId": "Device ID",
+    "before": "Before",
+    "after": "After",
+    "loadFailed": "Failed to load audit log",
+    "loadFailedDesc": "The audit log could not be read. Retry when the local database is available.",
+    "emptyTitle": "No audit entries yet",
+    "emptyDesc": "Recent audited changes will appear here.",
+    "noJson": "No JSON",
+    "jsonArrayCount": "{count} items",
+    "jsonEmptyObject": "Empty object",
+    "jsonObjectPreview": "{keys}",
+    "jsonObjectPreviewMore": "{keys} +{count}"
+  },
+  "pendingActions": {
+    "title": "Pending Actions",
+    "subtitle": "Read-only proposed actions waiting for a future approval workflow.",
+    "actionType": "Action Type",
+    "toolName": "Tool",
+    "entity": "Entity",
+    "clientId": "Client ID",
+    "createdAt": "Created",
+    "input": "Input",
+    "proposedOutput": "Proposed Output",
+    "status": "Status",
+    "deviceId": "Device ID",
+    "loadFailed": "Failed to load pending actions",
+    "loadFailedDesc": "Pending proposed actions could not be read. Retry when the local database is available.",
+    "emptyTitle": "No pending actions",
+    "emptyDesc": "Proposed actions awaiting review will appear here.",
+    "noJson": "No JSON",
+    "jsonArrayCount": "{count} items",
+    "jsonEmptyObject": "Empty object",
+    "jsonObjectPreview": "{keys}",
+    "jsonObjectPreviewMore": "{keys} +{count}"
   }
 }
