@@ -35,10 +35,24 @@ fn create_test_proposed_action_with_input(
     core: &mut CrmCore,
     input_json: String,
 ) -> ProposedAction {
+    create_test_proposed_action_with_identity(
+        core,
+        "create_activity",
+        "create_activity_draft",
+        input_json,
+    )
+}
+
+fn create_test_proposed_action_with_identity(
+    core: &mut CrmCore,
+    action_type: &str,
+    tool_name: &str,
+    input_json: String,
+) -> ProposedAction {
     core.create_external_proposed_action_stub(
         None,
-        "create_activity".to_string(),
-        "create_activity_draft".to_string(),
+        action_type.to_string(),
+        tool_name.to_string(),
         Some("activity".to_string()),
         None,
         input_json,
@@ -1700,6 +1714,101 @@ fn approve_unsupported_proposed_action_stays_pending_without_audit_or_activity()
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .expect("unsupported proposed action should query after failed approval");
+    assert_eq!(stored.0, "pending");
+    assert_eq!(stored.1, None);
+    assert_eq!(stored.2, None);
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM activities"), 0);
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM audit_log WHERE action IN ('approve_proposed_action', 'execute_proposed_action')"
+        ),
+        0
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn approve_mismatched_tool_name_stays_pending_without_audit_or_activity() {
+    let (mut core, path) = open_test_core();
+    let proposed_action = create_test_proposed_action_with_identity(
+        &mut core,
+        "create_activity_draft",
+        "send_email_draft",
+        r#"{"title":"Mismatched tool"}"#.to_string(),
+    );
+
+    let err = core
+        .approve_proposed_action(proposed_action.id.clone())
+        .expect_err("mismatched tool should not approve or execute");
+    match err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("Unsupported proposed action tool"));
+            assert!(message.contains("send_email_draft"));
+            assert!(message.contains("create_activity_draft"));
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
+
+    let stored: (String, Option<String>, Option<String>) = core
+        .db
+        .conn
+        .query_row(
+            "SELECT status, approved_at, executed_at FROM proposed_actions WHERE id = ?1",
+            params![&proposed_action.id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("mismatched tool proposed action should query after failed approval");
+    assert_eq!(stored.0, "pending");
+    assert_eq!(stored.1, None);
+    assert_eq!(stored.2, None);
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM activities"), 0);
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM audit_log WHERE action IN ('approve_proposed_action', 'execute_proposed_action')"
+        ),
+        0
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn approve_mismatched_action_type_stays_pending_without_audit_or_activity() {
+    let (mut core, path) = open_test_core();
+    let proposed_action = create_test_proposed_action_with_identity(
+        &mut core,
+        "send_email",
+        "create_activity_draft",
+        r#"{"title":"Mismatched action"}"#.to_string(),
+    );
+
+    let err = core
+        .approve_proposed_action(proposed_action.id.clone())
+        .expect_err("mismatched action type should not approve or execute");
+    match err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("Unsupported proposed action action_type"));
+            assert!(message.contains("send_email"));
+            assert!(message.contains("create_activity_draft"));
+            assert!(message.contains("create_activity"));
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
+
+    let stored: (String, Option<String>, Option<String>) = core
+        .db
+        .conn
+        .query_row(
+            "SELECT status, approved_at, executed_at FROM proposed_actions WHERE id = ?1",
+            params![&proposed_action.id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("mismatched action proposed action should query after failed approval");
     assert_eq!(stored.0, "pending");
     assert_eq!(stored.1, None);
     assert_eq!(stored.2, None);

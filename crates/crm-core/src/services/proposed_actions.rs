@@ -16,6 +16,7 @@ use super::external_client_permissions::{
 use super::{create_activity_in_transaction, record_audit_json, CrmCore};
 
 const CREATE_ACTIVITY_DRAFT_TOOL: &str = "create_activity_draft";
+const CREATE_ACTIVITY_COMPATIBLE_ACTION_TYPE: &str = "create_activity";
 
 impl CrmCore {
     pub fn list_pending_proposed_actions(&self) -> CrmResult<Vec<ProposedAction>> {
@@ -158,12 +159,7 @@ fn execute_create_activity_draft(
     proposed_action: &ProposedAction,
     device_id: &str,
 ) -> CrmResult<Activity> {
-    if !is_create_activity_draft(proposed_action) {
-        return Err(CrmError::InvalidInput(format!(
-            "Unsupported proposed action tool/action for approval execution: tool_name='{}', action_type='{}'",
-            proposed_action.tool_name, proposed_action.action_type
-        )));
-    }
+    validate_create_activity_draft_identity(proposed_action)?;
 
     let draft = CreateActivityDraftExecution::try_from(proposed_action)?;
     let activity = create_activity_in_transaction(
@@ -188,9 +184,24 @@ fn execute_create_activity_draft(
     Ok(activity)
 }
 
-fn is_create_activity_draft(proposed_action: &ProposedAction) -> bool {
-    proposed_action.tool_name == CREATE_ACTIVITY_DRAFT_TOOL
-        || proposed_action.action_type == CREATE_ACTIVITY_DRAFT_TOOL
+fn validate_create_activity_draft_identity(proposed_action: &ProposedAction) -> CrmResult<()> {
+    if proposed_action.tool_name != CREATE_ACTIVITY_DRAFT_TOOL {
+        return Err(CrmError::InvalidInput(format!(
+            "Unsupported proposed action tool for approval execution: tool_name='{}', action_type='{}'",
+            proposed_action.tool_name, proposed_action.action_type
+        )));
+    }
+
+    match proposed_action.action_type.as_str() {
+        CREATE_ACTIVITY_DRAFT_TOOL | CREATE_ACTIVITY_COMPATIBLE_ACTION_TYPE => Ok(()),
+        other => Err(CrmError::InvalidInput(format!(
+            "Unsupported proposed action action_type '{}' for tool '{}'; expected '{}' or compatible '{}'",
+            other,
+            proposed_action.tool_name,
+            CREATE_ACTIVITY_DRAFT_TOOL,
+            CREATE_ACTIVITY_COMPATIBLE_ACTION_TYPE
+        ))),
+    }
 }
 
 #[derive(Debug)]

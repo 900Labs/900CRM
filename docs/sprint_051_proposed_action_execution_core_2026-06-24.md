@@ -6,8 +6,10 @@ Scope: First safe `crm-core` execution path for approved `create_activity_draft`
 
 ## Summary
 
-- Added core approval execution for pending proposed actions where `tool_name` or
-  `action_type` is `create_activity_draft`.
+- Added core approval execution for pending proposed actions where `tool_name`
+  is `create_activity_draft`.
+- `action_type` may be `create_activity_draft` or the compatible legacy category
+  value `create_activity`; it cannot make an unsupported `tool_name` executable.
 - Routed execution through the existing activity creation service/storage
   behavior so activity validation, audit entries, sync changelog rows, and
   legacy contact/deal activity links are preserved.
@@ -54,6 +56,8 @@ Scope: First safe `crm-core` execution path for approved `create_activity_draft`
 - No raw SQL was added to Tauri commands or `crm_engine`.
 - Unsupported proposed-action tool/action types stay pending and return an
   explicit invalid-input error when approval is attempted.
+- Mismatched tool/action identities stay pending and do not create activities or
+  approval/execution audit entries.
 
 ## Validation
 

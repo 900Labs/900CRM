@@ -425,7 +425,7 @@
   },
   "pendingActions": {
     "title": "Pending Actions",
-    "subtitle": "Review pending proposed actions and approve or reject them without executing anything.",
+    "subtitle": "Review pending proposed actions. Approving supported draft actions executes them; unsupported or unsafe approval attempts are rejected. No MCP runtime is added.",
     "actionType": "Action Type",
     "toolName": "Tool",
     "entity": "Entity",

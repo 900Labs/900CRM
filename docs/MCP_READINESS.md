@@ -42,9 +42,11 @@ The following data and API surfaces exist today:
 
 Approving a supported `create_activity_draft` proposed action creates an activity
 through the normal `crm-core` service/storage path and marks the proposed action
-`executed`. Rejection remains decision-only. Unsupported proposed-action
-tool/action types remain pending and return an explicit invalid-input error when
-approval is attempted. Approval still does not run MCP/client code.
+`executed`. The permission-keyed `tool_name` must be `create_activity_draft`;
+`action_type` may be either `create_activity_draft` or the compatible legacy
+category value `create_activity`. Mismatched tool/action identities remain
+pending and return an explicit invalid-input error when approval is attempted.
+Rejection remains decision-only. Approval still does not run MCP/client code.
 
 The supported draft input JSON shape is:
 

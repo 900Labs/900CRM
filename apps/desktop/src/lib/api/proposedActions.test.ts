@@ -65,15 +65,17 @@ describe('proposed actions API', () => {
   it('maps approveProposedAction to approve_proposed_action', async () => {
     const approvedBackendAction = {
       ...backendAction,
-      status: 'approved',
+      status: 'executed',
       approved_at: '2026-06-24T08:05:00Z',
+      executed_at: '2026-06-24T08:05:00Z',
     };
     invokeMock.mockResolvedValueOnce(approvedBackendAction);
 
     await expect(approveProposedAction('proposed-1')).resolves.toEqual({
       ...action,
-      status: 'approved',
+      status: 'executed',
       approvedAt: '2026-06-24T08:05:00Z',
+      executedAt: '2026-06-24T08:05:00Z',
     });
 
     expect(invokeMock).toHaveBeenCalledWith('approve_proposed_action', {
