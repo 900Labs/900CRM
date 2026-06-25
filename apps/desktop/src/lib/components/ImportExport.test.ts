@@ -3,11 +3,19 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { importDataMock, openDialogMock, preflightJsonMock } = vi.hoisted(
+const {
+  importDataMock,
+  openDialogMock,
+  preflightJsonMock,
+  restoreLocalBackupToAppDataMock,
+  validateLocalBackupMock,
+} = vi.hoisted(
   () => ({
     importDataMock: vi.fn(),
     openDialogMock: vi.fn(),
     preflightJsonMock: vi.fn(),
+    restoreLocalBackupToAppDataMock: vi.fn(),
+    validateLocalBackupMock: vi.fn(),
   }),
 );
 
@@ -26,13 +34,80 @@ vi.mock("$lib/api/importExport", async (importOriginal) => {
   };
 });
 
+vi.mock("$lib/api/backup", () => ({
+  restoreLocalBackupToAppData: restoreLocalBackupToAppDataMock,
+  validateLocalBackup: validateLocalBackupMock,
+}));
+
 import ImportExport from "./ImportExport.svelte";
+
+const backupPath = "/tmp/app-data/pre-import-backups/backup-1";
+const backupValidation = {
+  backup_dir: backupPath,
+  database_path: `${backupPath}/900crm.db`,
+  metadata_path: `${backupPath}/metadata.json`,
+  metadata: {
+    backup_format_version: 1,
+    created_at: "2026-06-25T00:00:00Z",
+    app_version: "0.1.0",
+    schema_version: 1,
+    device_id: "device-1",
+    database_file: "900crm.db",
+  },
+};
+const importWithBackupResult = {
+  import: { created: 1, skipped: 0, errors: [] },
+  backup: backupValidation,
+};
+
+async function renderJsonImportSummary(result = importWithBackupResult) {
+  openDialogMock.mockResolvedValue("/tmp/contacts.json");
+  preflightJsonMock.mockResolvedValue({
+    entity_type: "contacts",
+    total_rows: 1,
+    duplicate_warning_count: 1,
+    warnings: [
+      {
+        entity_type: "contacts",
+        row_number: 2,
+        match_type: "email",
+        csv_value: "ada@example.com",
+        existing_entity_type: "contact",
+        existing_entity_id: "contact-1",
+        existing_display_label: "Ada Lovelace",
+        reason: "Email 'ada@example.com' matches existing contact",
+      },
+    ],
+  });
+  importDataMock.mockResolvedValue(result);
+
+  render(ImportExport, { open: true });
+
+  await fireEvent.change(screen.getByLabelText("Format"), {
+    target: { value: "json" },
+  });
+  await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+  await fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
+  await fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
+
+  await waitFor(() => {
+    expect(importDataMock).toHaveBeenCalledWith(
+      "contacts",
+      "json",
+      "/tmp/contacts.json",
+    );
+  });
+  await screen.findByText("Created");
+}
 
 describe("ImportExport component", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     importDataMock.mockReset();
     openDialogMock.mockReset();
     preflightJsonMock.mockReset();
+    restoreLocalBackupToAppDataMock.mockReset();
+    validateLocalBackupMock.mockReset();
   });
 
   it("preflights JSON imports and requires confirmation after duplicate warnings", async () => {
@@ -54,22 +129,7 @@ describe("ImportExport component", () => {
         },
       ],
     });
-    importDataMock.mockResolvedValue({
-      import: { created: 1, skipped: 0, errors: [] },
-      backup: {
-        backup_dir: "/tmp/app-data/pre-import-backups/backup-1",
-        database_path: "/tmp/app-data/pre-import-backups/backup-1/900crm.db",
-        metadata_path: "/tmp/app-data/pre-import-backups/backup-1/metadata.json",
-        metadata: {
-          backup_format_version: 1,
-          created_at: "2026-06-25T00:00:00Z",
-          app_version: "0.1.0",
-          schema_version: 1,
-          device_id: "device-1",
-          database_file: "900crm.db",
-        },
-      },
-    });
+    importDataMock.mockResolvedValue(importWithBackupResult);
 
     render(ImportExport, { open: true });
 
@@ -106,8 +166,76 @@ describe("ImportExport component", () => {
 
     expect(
       screen.getByText(
-        "Automatic pre-import backup created at /tmp/app-data/pre-import-backups/backup-1",
+        `Automatic pre-import backup created at ${backupPath}`,
       ),
     ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Restore pre-import backup" })).toBeTruthy();
+  });
+
+  it("does not show the restore control when the import summary has no backup path", async () => {
+    await renderJsonImportSummary({
+      import: { created: 1, skipped: 0, errors: [] },
+      backup: { ...backupValidation, backup_dir: "" },
+    });
+
+    expect(screen.queryByRole("button", { name: "Restore pre-import backup" })).toBeNull();
+  });
+
+  it("does not restore the pre-import backup when confirmation is cancelled", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    validateLocalBackupMock.mockResolvedValue(backupValidation);
+
+    await renderJsonImportSummary();
+
+    await screen.findByText(`Automatic pre-import backup created at ${backupPath}`);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Restore pre-import backup" }));
+
+    await waitFor(() => {
+      expect(validateLocalBackupMock).toHaveBeenCalledWith(backupPath);
+    });
+    expect(restoreLocalBackupToAppDataMock).not.toHaveBeenCalled();
+    expect(screen.getByText("Pre-import backup restore cancelled")).toBeTruthy();
+  });
+
+  it("validates then restores the pre-import backup after explicit confirmation", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    validateLocalBackupMock.mockResolvedValue(backupValidation);
+    restoreLocalBackupToAppDataMock.mockResolvedValue({
+      restored_at: "2026-06-25T01:00:00Z",
+      database_path: "/app-data/900crm.db",
+      metadata: backupValidation.metadata,
+    });
+
+    await renderJsonImportSummary();
+
+    await screen.findByText(`Automatic pre-import backup created at ${backupPath}`);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Restore pre-import backup" }));
+
+    await waitFor(() => {
+      expect(validateLocalBackupMock).toHaveBeenCalledWith(backupPath);
+    });
+    expect(restoreLocalBackupToAppDataMock).toHaveBeenCalledWith(backupPath, true);
+    expect(screen.getByText("Pre-import backup restored to /app-data/900crm.db")).toBeTruthy();
+  });
+
+  it("keeps the import summary visible when pre-import backup restore fails", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    validateLocalBackupMock.mockResolvedValue(backupValidation);
+    restoreLocalBackupToAppDataMock.mockRejectedValue(new Error("restore failed"));
+
+    await renderJsonImportSummary();
+
+    await screen.findByText(`Automatic pre-import backup created at ${backupPath}`);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Restore pre-import backup" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain(
+        "Pre-import backup restore failed: restore failed",
+      );
+    });
+    expect(screen.getByText(`Automatic pre-import backup created at ${backupPath}`)).toBeTruthy();
   });
 });

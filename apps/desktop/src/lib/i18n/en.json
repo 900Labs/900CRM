@@ -356,7 +356,14 @@
     "created": "Created",
     "skipped": "Skipped",
     "errors": "Errors",
-    "preImportBackupCreated": "Automatic pre-import backup created at {path}"
+    "preImportBackupCreated": "Automatic pre-import backup created at {path}",
+    "preImportBackupRestoreDesc": "Restoring this backup replaces the current local database.",
+    "restorePreImportBackup": "Restore pre-import backup",
+    "restoringBackup": "Restoring…",
+    "preImportBackupRestoreConfirm": "Restore the automatic pre-import backup? This replaces the current local 900CRM database.",
+    "preImportBackupRestored": "Pre-import backup restored to {path}",
+    "preImportBackupRestoreFailed": "Pre-import backup restore failed",
+    "preImportBackupRestoreCancelled": "Pre-import backup restore cancelled"
   },
   "export": {
     "title": "Export",
