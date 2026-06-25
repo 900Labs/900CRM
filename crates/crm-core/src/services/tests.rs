@@ -6497,6 +6497,389 @@ fn export_organizations_json_writes_active_flat_rows() {
 }
 
 #[test]
+fn organization_custom_field_values_require_active_organization() {
+    let (mut core, path) = open_test_core();
+
+    let field = core
+        .create_custom_field_def(
+            "organization".to_string(),
+            "Segment".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("organization custom field should be created");
+    let organization = core
+        .create_organization(
+            "Acme Health".to_string(),
+            Some("hello@acme.example".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("organization should be created");
+
+    let value = core
+        .set_custom_field_value(
+            field.id.clone(),
+            organization.id.clone(),
+            "Enterprise".to_string(),
+        )
+        .expect("organization custom value should be set");
+    assert_eq!(value.value, "Enterprise");
+    assert_eq!(
+        count_custom_field_audit_action(&core, &value.id, "set_value"),
+        1
+    );
+    assert_eq!(
+        count_custom_field_set_sync(&core, &value.id, "Enterprise"),
+        1
+    );
+
+    core.delete_organization(&organization.id)
+        .expect("organization should be soft-deleted");
+    let deleted_error = core
+        .set_custom_field_value(
+            field.id.clone(),
+            organization.id.clone(),
+            "Government".to_string(),
+        )
+        .expect_err("deleted organization custom value should be rejected");
+    assert!(matches!(deleted_error, CrmError::NotFound(_)));
+
+    let missing_error = core
+        .set_custom_field_value(
+            field.id.clone(),
+            "missing-organization".to_string(),
+            "Government".to_string(),
+        )
+        .expect_err("missing organization custom value should be rejected");
+    assert!(matches!(missing_error, CrmError::NotFound(_)));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn organizations_export_and_import_custom_field_values() {
+    let (mut core, path) = open_test_core();
+
+    let segment_field = core
+        .create_custom_field_def(
+            "organization".to_string(),
+            "Segment".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("segment custom field should be created");
+    let escaped_field = core
+        .create_custom_field_def(
+            "organization".to_string(),
+            "Plan #".to_string(),
+            "text".to_string(),
+            None,
+            Some(1),
+        )
+        .expect("escaped organization custom field should be created");
+    let organization = core
+        .create_organization(
+            "Acme Health".to_string(),
+            Some("hello@acme.example".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("organization should be created");
+    core.set_custom_field_value(
+        segment_field.id.clone(),
+        organization.id.clone(),
+        "Enterprise".to_string(),
+    )
+    .expect("segment value should be set");
+    core.set_custom_field_value(
+        escaped_field.id.clone(),
+        organization.id.clone(),
+        "Plus".to_string(),
+    )
+    .expect("escaped-name value should be set");
+
+    let json_path = path.join("organizations-custom-export.json");
+    let csv_path = path.join("organizations-custom-export.csv");
+    assert_eq!(
+        core.export_organizations_json(json_path.to_str().expect("path should be valid UTF-8"))
+            .expect("organization JSON export should succeed"),
+        1
+    );
+    assert_eq!(
+        core.export_organizations_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+            .expect("organization CSV export should succeed"),
+        1
+    );
+    let json_rows = read_json_export(&json_path);
+    assert_eq!(
+        json_rows[0]
+            .get("custom:Segment")
+            .and_then(|value| value.as_str()),
+        Some("Enterprise")
+    );
+    assert_eq!(
+        json_rows[0]
+            .get("custom:Plan %23")
+            .and_then(|value| value.as_str()),
+        Some("Plus")
+    );
+    let csv_rows = read_csv_export(&csv_path);
+    assert_eq!(
+        csv_rows[0].get("custom:Segment").map(String::as_str),
+        Some("Enterprise")
+    );
+    assert_eq!(
+        csv_rows[0].get("custom:Plan %23").map(String::as_str),
+        Some("Plus")
+    );
+
+    let import_csv_path = path.join("organizations-custom-import.csv");
+    std::fs::write(
+        &import_csv_path,
+        "name,email,custom:Segment\nGlobex,hello@globex.example,Mid-market\n",
+    )
+    .expect("organization custom CSV fixture should write");
+    let preflight = core
+        .preflight_organizations_csv_import(
+            import_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("organization custom preflight should succeed");
+    assert_eq!(preflight.entity_type, "organizations");
+    assert_eq!(preflight.total_rows, 1);
+
+    let import_result = core
+        .import_organizations_csv(
+            import_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("organization custom CSV import should succeed");
+    assert_eq!(import_result.created, 1);
+    let rollback_plan = import_result
+        .rollback_plan
+        .clone()
+        .expect("created organization custom import should return rollback plan");
+    let imported = core
+        .list_organizations()
+        .expect("organizations should list")
+        .into_iter()
+        .find(|organization| organization.name == "Globex")
+        .expect("imported organization should exist");
+    let imported_values = core
+        .list_custom_field_values("organization", &imported.id)
+        .expect("organization custom values should list");
+    assert_eq!(imported_values.len(), 1);
+    assert_eq!(imported_values[0].field_def_id, segment_field.id);
+    assert_eq!(imported_values[0].value, "Mid-market");
+    let imported_value_id = imported_values[0].value_id.clone();
+    let delete_audit_before =
+        count_custom_field_audit_action(&core, &imported_value_id, "delete_value");
+    let delete_sync_before =
+        count_custom_field_delete_sync(&core, &imported_value_id, "Mid-market");
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("created organization custom rollback should succeed");
+    assert_eq!(rollback.rolled_back, 1);
+    assert!(rollback.errors.is_empty());
+    assert!(core
+        .list_organizations()
+        .expect("rolled back organizations should list")
+        .into_iter()
+        .all(|organization| organization.name != "Globex"));
+    assert!(core
+        .list_custom_field_values("organization", &imported.id)
+        .expect("rolled back organization custom values should list")
+        .is_empty());
+    assert_eq!(
+        count_custom_field_audit_action(&core, &imported_value_id, "delete_value"),
+        delete_audit_before + 1
+    );
+    assert_eq!(
+        count_custom_field_delete_sync(&core, &imported_value_id, "Mid-market"),
+        delete_sync_before + 1
+    );
+
+    let mapped_json_path = path.join("organizations-custom-mapped.json");
+    std::fs::write(
+        &mapped_json_path,
+        r#"[{"Company":"Initech","Segment":"Enterprise"}]"#,
+    )
+    .expect("mapped organization JSON fixture should write");
+    let mapping = import_mapping(&[
+        ("Company", Some("name")),
+        ("Segment", Some("custom:Segment")),
+    ]);
+    let mapped_preflight = core
+        .preflight_organizations_json_import_with_mapping(
+            mapped_json_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+            mapping.clone(),
+        )
+        .expect("mapped organization custom preflight should succeed");
+    assert_eq!(mapped_preflight.total_rows, 1);
+    let mapped_result = core
+        .import_organizations_json_with_mapping(
+            mapped_json_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+            mapping,
+        )
+        .expect("mapped organization custom import should succeed");
+    assert_eq!(mapped_result.created, 1);
+    let mapped_org = core
+        .list_organizations()
+        .expect("organizations should list")
+        .into_iter()
+        .find(|organization| organization.name == "Initech")
+        .expect("mapped organization should exist");
+    let mapped_values = core
+        .list_custom_field_values("organization", &mapped_org.id)
+        .expect("mapped organization custom values should list");
+    assert_eq!(mapped_values.len(), 1);
+    assert_eq!(mapped_values[0].field_def_id, segment_field.id);
+    assert_eq!(mapped_values[0].value, "Enterprise");
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn organization_duplicate_auto_merge_fills_missing_custom_values_without_overwriting() {
+    let (mut core, path) = open_test_core();
+
+    let segment_field = core
+        .create_custom_field_def(
+            "organization".to_string(),
+            "Segment".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("segment custom field should be created");
+    let missing_custom_org = core
+        .create_organization(
+            "Acme Health".to_string(),
+            Some("hello@acme.example".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("organization without custom value should be created");
+    let existing_custom_org = core
+        .create_organization(
+            "Globex".to_string(),
+            Some("hello@globex.example".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("organization with custom value should be created");
+    core.set_custom_field_value(
+        segment_field.id.clone(),
+        existing_custom_org.id.clone(),
+        "Public Sector".to_string(),
+    )
+    .expect("existing organization custom value should be set");
+
+    let csv_path = path.join("organizations-custom-auto-merge.csv");
+    std::fs::write(
+        &csv_path,
+        "name,email,custom:Segment\nAcme Health,hello@acme.example,Enterprise\nGlobex,hello@globex.example,Mid-market\n",
+    )
+    .expect("organization custom auto-merge fixture should write");
+    let result = core
+        .import_organizations_csv_with_options(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("organization custom auto-merge should succeed");
+    assert_eq!(result.merged, 2);
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("filled organization custom merge should return rollback plan");
+
+    let missing_values = core
+        .list_custom_field_values("organization", &missing_custom_org.id)
+        .expect("filled organization custom value should list");
+    assert_eq!(missing_values.len(), 1);
+    assert_eq!(missing_values[0].field_def_id, segment_field.id);
+    assert_eq!(missing_values[0].value, "Enterprise");
+    let filled_value_id = missing_values[0].value_id.clone();
+    assert_eq!(
+        core.list_custom_field_values("organization", &existing_custom_org.id)
+            .expect("existing organization custom value should list")[0]
+            .value,
+        "Public Sector"
+    );
+
+    let delete_audit_before =
+        count_custom_field_audit_action(&core, &filled_value_id, "delete_value");
+    let delete_sync_before = count_custom_field_delete_sync(&core, &filled_value_id, "Enterprise");
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("organization custom merge rollback should succeed");
+    assert_eq!(rollback.rolled_back, 1);
+    assert!(rollback.errors.is_empty());
+    assert!(core
+        .list_custom_field_values("organization", &missing_custom_org.id)
+        .expect("rolled back organization custom values should list")
+        .is_empty());
+    assert_eq!(
+        core.list_custom_field_values("organization", &existing_custom_org.id)
+            .expect("existing organization custom value should still list")[0]
+            .value,
+        "Public Sector"
+    );
+    assert_eq!(
+        count_custom_field_audit_action(&core, &filled_value_id, "delete_value"),
+        delete_audit_before + 1
+    );
+    assert_eq!(
+        count_custom_field_delete_sync(&core, &filled_value_id, "Enterprise"),
+        delete_sync_before + 1
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn update_organization_can_clear_optional_fields() {
     let (mut core, path) = open_test_core();
 

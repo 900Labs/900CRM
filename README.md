@@ -72,7 +72,7 @@ At-a-glance business metrics on every launch: pipeline value, deals by stage, up
 Full-text search across contacts, deals, and activities. Instant results as you type. Filter by entity type, date range, or tag. Works 100% offline — every search query stays on your machine.
 
 ### Import / Export
-Bring your existing data in with local CSV import for contacts, deals, and organizations. Export supported data sets to CSV for use in spreadsheets, accounting tools, or data migration. See [Import and Export](docs/IMPORT_EXPORT.md) for the current formats, duplicate preflight behavior, and known gaps.
+Bring your existing data in with local CSV or JSON import for contacts, deals, activities, and organizations, including supported custom field values. Export supported data sets to CSV or JSON for use in spreadsheets, accounting tools, or data migration. See [Import and Export](docs/IMPORT_EXPORT.md) for the current formats, duplicate preflight behavior, rollback options, and known gaps.
 
 ### Backup / Restore
 Create local SQLite backups from Settings, validate backup integrity before restore, and restore only after explicit confirmation. See [Backup and Restore](docs/BACKUP_RESTORE.md) for the safety workflow.

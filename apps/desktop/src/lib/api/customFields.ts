@@ -4,7 +4,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 
-export type CustomFieldEntityType = 'contact' | 'deal' | 'activity';
+export type CustomFieldEntityType = 'contact' | 'deal' | 'activity' | 'organization';
 export type CustomFieldType = 'text' | 'number' | 'date' | 'boolean' | 'select';
 
 export interface CustomFieldDefinition {

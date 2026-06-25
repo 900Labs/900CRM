@@ -69,7 +69,7 @@ export const ACTIVITY_IMPORT_FIELDS: ImportFieldOption<ActivityImportTargetField
   { value: 'deal_id', label: 'Deal ID' },
 ];
 
-type CustomImportEntity = 'contacts' | 'deals' | 'activities';
+type CustomImportEntity = 'contacts' | 'deals' | 'activities' | 'organizations';
 
 const CONTACT_ALIASES: Record<string, ContactImportTargetField> = {
   firstname: 'first_name',
@@ -204,7 +204,10 @@ export function getImportFieldOptions(
     ];
   }
 
-  return ORGANIZATION_IMPORT_FIELDS;
+  return [
+    ...ORGANIZATION_IMPORT_FIELDS,
+    ...customFieldOptions('organizations', customFields),
+  ];
 }
 
 export function suggestImportMapping(
@@ -324,10 +327,6 @@ function getCustomImportAliases(
   entity: MappedImportEntity,
   customFields: CustomFieldDefinition[],
 ): Record<string, CustomFieldImportTargetField> {
-  if (entity !== 'contacts' && entity !== 'deals' && entity !== 'activities') {
-    return {};
-  }
-
   const fields = customFieldsForEntity(entity, customFields);
   const duplicateNames = duplicateCustomFieldNames(fields);
   const aliases: Record<string, CustomFieldImportTargetField> = {};
@@ -348,7 +347,13 @@ function customFieldsForEntity(
   customFields: CustomFieldDefinition[],
 ): CustomFieldDefinition[] {
   const expectedEntityType =
-    entity === 'contacts' ? 'contact' : entity === 'deals' ? 'deal' : 'activity';
+    entity === 'contacts'
+      ? 'contact'
+      : entity === 'deals'
+        ? 'deal'
+        : entity === 'activities'
+          ? 'activity'
+          : 'organization';
   return customFields.filter((field) => field.entity_type === expectedEntityType);
 }
 

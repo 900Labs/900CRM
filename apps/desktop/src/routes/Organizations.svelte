@@ -10,7 +10,14 @@
   import type { Organization } from '$lib/api/organizations';
   import { formatDate } from '$lib/utils/formatters';
   import { settingsStore } from '$lib/stores/settings';
+  import {
+    listCustomFieldDefinitions,
+    listCustomFieldValues,
+    setCustomFieldValue,
+    type CustomFieldDefinition,
+  } from '$lib/api/customFields';
   import Modal from '$lib/components/Modal.svelte';
+  import CustomFieldInputs from '$lib/components/CustomFieldInputs.svelte';
   import EntityNotesPanel from '$lib/components/EntityNotesPanel.svelte';
   import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
 
@@ -37,13 +44,20 @@
   let notesTagsOrganization = $state<Organization | null>(null);
   let linkContactId = $state('');
   let form = $state<OrganizationFormState>(emptyOrganizationForm());
+  let customFieldDefinitions = $state<CustomFieldDefinition[]>([]);
+  let customFieldValues = $state<Record<string, string>>({});
+  let originalCustomFieldValues = $state<Record<string, string>>({});
+  let customFieldsLoading = $state(false);
 
   const filteredOrganizations = $derived(
     organizationStore.organizations.filter((organization) => organizationMatches(organization, searchQuery)),
   );
 
   onMount(async () => {
-    await organizationStore.loadOrganizations();
+    await Promise.all([
+      organizationStore.loadOrganizations(),
+      loadOrganizationCustomFieldDefinitions(),
+    ]);
   });
 
   function emptyOrganizationForm(): OrganizationFormState {
@@ -96,6 +110,7 @@
   function openCreateForm() {
     editingOrganization = null;
     form = emptyOrganizationForm();
+    resetCustomFieldsForCreate();
     formOpen = true;
   }
 
@@ -114,6 +129,7 @@
       postalCode: organization.postalCode ?? '',
       description: organization.description ?? '',
     };
+    void loadOrganizationCustomFieldValues(organization.id);
     formOpen = true;
   }
 
@@ -121,6 +137,80 @@
     formOpen = false;
     editingOrganization = null;
     form = emptyOrganizationForm();
+    resetCustomFieldsForCreate();
+  }
+
+  async function loadOrganizationCustomFieldDefinitions() {
+    customFieldsLoading = true;
+    try {
+      customFieldDefinitions = await listCustomFieldDefinitions('organization');
+      resetCustomFieldsForCreate();
+    } catch (err) {
+      console.error('[Organizations] Failed to load custom fields:', err);
+      uiStore.toastError('Failed to load organization custom fields.');
+      customFieldDefinitions = [];
+      customFieldValues = {};
+      originalCustomFieldValues = {};
+    } finally {
+      customFieldsLoading = false;
+    }
+  }
+
+  async function loadOrganizationCustomFieldValues(entityId: string) {
+    customFieldsLoading = true;
+    try {
+      const values = await listCustomFieldValues('organization', entityId);
+      const nextValues = blankCustomFieldValues();
+      for (const value of values) {
+        nextValues[value.field_def_id] = value.value ?? '';
+      }
+      customFieldValues = nextValues;
+      originalCustomFieldValues = { ...nextValues };
+    } catch (err) {
+      console.error('[Organizations] Failed to load custom field values:', err);
+      uiStore.toastError('Failed to load organization custom field values.');
+      customFieldValues = blankCustomFieldValues();
+      originalCustomFieldValues = { ...customFieldValues };
+    } finally {
+      customFieldsLoading = false;
+    }
+  }
+
+  function blankCustomFieldValues(): Record<string, string> {
+    return Object.fromEntries(customFieldDefinitions.map((definition) => [definition.id, '']));
+  }
+
+  function resetCustomFieldsForCreate() {
+    customFieldValues = blankCustomFieldValues();
+    originalCustomFieldValues = { ...customFieldValues };
+  }
+
+  function handleCustomFieldChange(fieldDefId: string, value: string) {
+    customFieldValues = { ...customFieldValues, [fieldDefId]: value };
+  }
+
+  async function persistOrganizationCustomFields(entityId: string, includeBlankValues: boolean) {
+    if (customFieldDefinitions.length === 0) {
+      return;
+    }
+
+    const updates = customFieldDefinitions
+      .filter((definition) => {
+        const value = customFieldValues[definition.id] ?? '';
+        if (!includeBlankValues) {
+          return value.trim().length > 0;
+        }
+        return value !== (originalCustomFieldValues[definition.id] ?? '');
+      })
+      .map((definition) =>
+        setCustomFieldValue({
+          fieldDefId: definition.id,
+          entityId,
+          value: customFieldValues[definition.id] ?? '',
+        })
+      );
+
+    await Promise.all(updates);
   }
 
   async function submitOrganization() {
@@ -143,10 +233,16 @@
       description: blankToNull(form.description),
     };
 
-    if (editingOrganization) {
-      await organizationStore.updateOrganization(editingOrganization.id, payload);
-    } else {
-      await organizationStore.createOrganization(payload);
+    try {
+      const organization = editingOrganization
+        ? await organizationStore.updateOrganization(editingOrganization.id, payload)
+        : await organizationStore.createOrganization(payload);
+
+      await persistOrganizationCustomFields(organization.id, Boolean(editingOrganization));
+    } catch (err) {
+      console.error('[Organizations] Failed to save organization:', err);
+      uiStore.toastError('Failed to save organization.');
+      return;
     }
 
     closeForm();
@@ -352,6 +448,18 @@
         <textarea class="textarea selectable" rows="3" bind:value={form.description}></textarea>
       </label>
     </div>
+    <div class="organization-form-custom-fields">
+      {#if customFieldsLoading}
+        <p class="custom-fields-placeholder">{t('common.loading')}</p>
+      {:else}
+        <CustomFieldInputs
+          definitions={customFieldDefinitions}
+          values={customFieldValues}
+          onchange={handleCustomFieldChange}
+          disabled={organizationStore.isSaving}
+        />
+      {/if}
+    </div>
 
     <div class="modal-form-actions">
       <button class="btn btn-ghost" type="button" onclick={closeForm}>{t('common.cancel')}</button>
@@ -556,6 +664,18 @@
 
   .form-group-full {
     grid-column: 1 / -1;
+  }
+
+  .organization-form-custom-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .custom-fields-placeholder {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
   }
 
   .modal-form-actions {
