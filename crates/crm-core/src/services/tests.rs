@@ -3271,7 +3271,7 @@ fn import_deals_mapped_csv_with_auto_merge_uses_title_duplicate_rule() {
     let (mut core, path) = open_test_core();
     let existing = core
         .create_deal(
-            "Acme Renewal".to_string(),
+            " Acme Renewal ".to_string(),
             Some(0.0),
             Some("USD".to_string()),
             Some("Lead".to_string()),
@@ -3316,7 +3316,7 @@ fn import_deals_mapped_csv_with_auto_merge_uses_title_duplicate_rule() {
     let merged = core
         .get_deal(&existing.id)
         .expect("merged deal should still exist");
-    assert_eq!(merged.title, "Acme Renewal");
+    assert_eq!(merged.title, " Acme Renewal ");
     assert_eq!(merged.value, 4250.0);
     assert_eq!(merged.currency, "USD");
     assert_eq!(merged.stage, "Lead");

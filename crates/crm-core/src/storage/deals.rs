@@ -247,14 +247,14 @@ pub fn list_deals_by_stage(conn: &Connection, stage: &str) -> CrmResult<Vec<Deal
     Ok(deals)
 }
 
-/// Finds active deals with an exact case-insensitive title match.
+/// Finds active deals with an exact case-insensitive title match after trimming.
 pub fn find_active_deals_by_title(conn: &Connection, title: &str) -> CrmResult<Vec<Deal>> {
     let mut stmt = conn.prepare(
         r#"
         SELECT id, title, value, currency, stage, probability, expected_close,
                contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id
         FROM deals
-        WHERE LOWER(title) = LOWER(?1) AND deleted_at IS NULL
+        WHERE LOWER(TRIM(title)) = LOWER(TRIM(?1)) AND deleted_at IS NULL
         ORDER BY created_at ASC, id ASC
         "#,
     )?;

@@ -289,8 +289,10 @@ Imports return:
 
 - `created`: number of rows successfully created;
 - `merged`: number of duplicate rows folded into existing records;
-- `skipped`: number of rows that failed during creation after parsing;
-- `errors`: row-numbered error strings from failed create attempts.
+- `skipped`: number of rows that failed during creation or duplicate
+  auto-merge handling after parsing;
+- `errors`: row-numbered error strings from failed create attempts or skipped
+  ambiguous duplicate auto-merge rows.
 
 Rows skipped during CSV or JSON parsing because the required field is blank are
 not included in the import result as row-level errors.
