@@ -52,6 +52,27 @@ export interface ImportResult {
   errors: string[];
 }
 
+export interface LocalBackupMetadata {
+  backup_format_version: number;
+  created_at: string;
+  app_version: string;
+  schema_version: number;
+  device_id: string;
+  database_file: string;
+}
+
+export interface LocalBackup {
+  backup_dir: string;
+  database_path: string;
+  metadata_path: string;
+  metadata: LocalBackupMetadata;
+}
+
+export interface ImportWithBackupResult {
+  import: ImportResult;
+  backup: LocalBackup;
+}
+
 export interface ImportPreflightReport {
   entity_type: ImportPreflightEntity;
   total_rows: number;
@@ -131,12 +152,12 @@ function filePathAndMappingArgs<TTarget extends string>(
   return { file_path: filePath, mapping };
 }
 
-export async function importContactsCsv(filePath: string): Promise<ImportResult> {
-  return invoke<ImportResult>(importCommands.csv.contacts, filePathArgs(filePath));
+export async function importContactsCsv(filePath: string): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(importCommands.csv.contacts, filePathArgs(filePath));
 }
 
-export async function importContactsJson(filePath: string): Promise<ImportResult> {
-  return invoke<ImportResult>(importCommands.json.contacts, filePathArgs(filePath));
+export async function importContactsJson(filePath: string): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(importCommands.json.contacts, filePathArgs(filePath));
 }
 
 export async function exportContactsCsv(filePath: string): Promise<number> {
@@ -162,8 +183,8 @@ export async function preflightContactsJsonImport(
 export async function importContactsCsvWithMapping(
   filePath: string,
   mapping: ImportColumnMapping<ContactImportTargetField>,
-): Promise<ImportResult> {
-  return invoke<ImportResult>(
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
     importWithMappingCommands.contacts,
     filePathAndMappingArgs(filePath, mapping),
   );
@@ -179,12 +200,12 @@ export async function preflightContactsCsvImportWithMapping(
   );
 }
 
-export async function importDealsCsv(filePath: string): Promise<ImportResult> {
-  return invoke<ImportResult>(importCommands.csv.deals, filePathArgs(filePath));
+export async function importDealsCsv(filePath: string): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(importCommands.csv.deals, filePathArgs(filePath));
 }
 
-export async function importDealsJson(filePath: string): Promise<ImportResult> {
-  return invoke<ImportResult>(importCommands.json.deals, filePathArgs(filePath));
+export async function importDealsJson(filePath: string): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(importCommands.json.deals, filePathArgs(filePath));
 }
 
 export async function exportDealsCsv(filePath: string): Promise<number> {
@@ -206,8 +227,8 @@ export async function preflightDealsJsonImport(filePath: string): Promise<Import
 export async function importDealsCsvWithMapping(
   filePath: string,
   mapping: ImportColumnMapping<DealImportTargetField>,
-): Promise<ImportResult> {
-  return invoke<ImportResult>(
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
     importWithMappingCommands.deals,
     filePathAndMappingArgs(filePath, mapping),
   );
@@ -223,12 +244,12 @@ export async function preflightDealsCsvImportWithMapping(
   );
 }
 
-export async function importOrganizationsCsv(filePath: string): Promise<ImportResult> {
-  return invoke<ImportResult>(importCommands.csv.organizations, filePathArgs(filePath));
+export async function importOrganizationsCsv(filePath: string): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(importCommands.csv.organizations, filePathArgs(filePath));
 }
 
-export async function importOrganizationsJson(filePath: string): Promise<ImportResult> {
-  return invoke<ImportResult>(importCommands.json.organizations, filePathArgs(filePath));
+export async function importOrganizationsJson(filePath: string): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(importCommands.json.organizations, filePathArgs(filePath));
 }
 
 export async function exportOrganizationsCsv(filePath: string): Promise<number> {
@@ -254,8 +275,8 @@ export async function preflightOrganizationsJsonImport(
 export async function importOrganizationsCsvWithMapping(
   filePath: string,
   mapping: ImportColumnMapping<OrganizationImportTargetField>,
-): Promise<ImportResult> {
-  return invoke<ImportResult>(
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
     importWithMappingCommands.organizations,
     filePathAndMappingArgs(filePath, mapping),
   );
@@ -274,23 +295,23 @@ export async function preflightOrganizationsCsvImportWithMapping(
 export async function importCsv(
   entity: ImportExportEntity,
   filePath: string,
-): Promise<ImportResult> {
-  return invoke<ImportResult>(importCommands.csv[entity], filePathArgs(filePath));
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(importCommands.csv[entity], filePathArgs(filePath));
 }
 
 export async function importJson(
   entity: ImportExportEntity,
   filePath: string,
-): Promise<ImportResult> {
-  return invoke<ImportResult>(importCommands.json[entity], filePathArgs(filePath));
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(importCommands.json[entity], filePathArgs(filePath));
 }
 
 export async function importData(
   entity: ImportExportEntity,
   format: ImportFormat,
   filePath: string,
-): Promise<ImportResult> {
-  return invoke<ImportResult>(importCommands[format][entity], filePathArgs(filePath));
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(importCommands[format][entity], filePathArgs(filePath));
 }
 
 export async function exportCsv(entity: ImportExportEntity, filePath: string): Promise<number> {
@@ -327,8 +348,8 @@ export async function importCsvWithMapping(
   entity: ImportPreflightEntity,
   filePath: string,
   mapping: ImportColumnMapping,
-): Promise<ImportResult> {
-  return invoke<ImportResult>(
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
     importWithMappingCommands[entity],
     filePathAndMappingArgs(filePath, mapping),
   );
