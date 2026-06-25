@@ -23,6 +23,7 @@
     importDealsCsvWithMapping,
     importOrganizationsCsvWithMapping,
     preflightJson,
+    previewJson,
     preflightContactsCsvImportWithMapping,
     preflightDealsCsvImportWithMapping,
     preflightOrganizationsCsvImportWithMapping,
@@ -34,6 +35,7 @@
     type ImportPreflightReport,
     type ImportResult,
     type ImportWithBackupResult,
+    type JsonImportPreview,
     type OrganizationImportTargetField,
   } from '$lib/api/importExport';
 
@@ -52,6 +54,7 @@
 
   let csvText = $state('');
   let parseResult = $state<ParseCSVResult | null>(null);
+  let jsonPreview = $state<JsonImportPreview | null>(null);
   let selectedImportPath = $state<string | null>(null);
   let selectedImportLabel = $state<string | null>(null);
   let fileSource = $state<FileSource | null>(null);
@@ -84,6 +87,7 @@
   };
 
   const previewRows = $derived(parseResult?.rows.slice(0, 5) ?? []);
+  const jsonPreviewRows = $derived(jsonPreview?.rows ?? []);
   const mappedPreviewRows = $derived(applyMapping(previewRows, columnMapping));
   const isMappedImport = $derived(
     importEntity === 'contacts' || importEntity === 'deals' || importEntity === 'organizations',
@@ -112,8 +116,7 @@
       }
 
       if (isJsonImport) {
-        loadSelectedJson(selected, selected);
-        await handleJsonPreflight();
+        await loadSelectedJson(selected, selected);
         return;
       }
 
@@ -163,6 +166,7 @@
     selectedImportPath = path;
     fileSource = source;
     parseResult = parseCSV(csvText);
+    jsonPreview = null;
     preflightReport = null;
     importSummary = null;
     importBackupPath = null;
@@ -178,9 +182,10 @@
     }
   }
 
-  function loadSelectedJson(label: string, path: string) {
+  async function loadSelectedJson(label: string, path: string) {
     csvText = '';
     parseResult = null;
+    jsonPreview = null;
     selectedImportLabel = label;
     selectedImportPath = path;
     fileSource = 'desktop';
@@ -192,11 +197,21 @@
     validationErrors = [];
     columnMapping = {};
     importStep = 'select';
+
+    try {
+      jsonPreview = await previewJson(importEntity, path);
+      importStep = 'preview';
+    } catch {
+      selectedImportPath = null;
+      validationErrors = [t('import.previewFailed')];
+      uiStore.toastError(t('import.previewFailed'));
+    }
   }
 
   function resetImportState(options: { keepEntity?: boolean; keepFormat?: boolean } = {}) {
     csvText = '';
     parseResult = null;
+    jsonPreview = null;
     selectedImportPath = null;
     selectedImportLabel = null;
     fileSource = null;
@@ -432,7 +447,11 @@
       if (importStep === 'summary') {
         importStep = 'confirm';
       } else if (importStep === 'confirm') {
-        importStep = (preflightReport?.duplicate_warning_count ?? 0) > 0 ? 'duplicates' : 'select';
+        importStep = (preflightReport?.duplicate_warning_count ?? 0) > 0 ? 'duplicates' : 'preview';
+      } else if (importStep === 'duplicates') {
+        importStep = 'preview';
+      } else if (importStep === 'preview') {
+        importStep = 'select';
       } else {
         importStep = 'select';
       }
@@ -666,6 +685,42 @@
               {/if}
             {/if}
 
+            {#if isJsonImport && jsonPreview && importStep === 'preview'}
+              <p class="import-stats">
+                {t('import.rowCount', { count: jsonPreview.total_rows })}
+              </p>
+
+              {#if jsonPreviewRows.length > 0}
+                <div class="preview-panel">
+                  <div class="preview-title">{t('import.previewRows')}</div>
+                  <div class="preview-table-wrap">
+                    <table class="data-table preview-table">
+                      <thead>
+                        <tr>
+                          <th>{t('import.row')}</th>
+                          {#each jsonPreview.headers as h (h)}
+                            <th>{h}</th>
+                          {/each}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {#each jsonPreviewRows as row (row.row_number)}
+                          <tr>
+                            <td>{row.row_number}</td>
+                            {#each jsonPreview.headers as h (h)}
+                              <td>{row.values[h] ?? ''}</td>
+                            {/each}
+                          </tr>
+                        {/each}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              {:else}
+                <p class="empty-message">{t('import.noPreviewRows')}</p>
+              {/if}
+            {/if}
+
             {#if showCsvWizard && parseResult && importStep === 'mapping'}
               <div class="mapping-panel">
                 <div class="mapping-header">
@@ -869,6 +924,15 @@
         {#if activeTab === 'import'}
           {#if isJsonImport}
             {#if importStep === 'select'}
+              <button
+                class="btn btn-primary"
+                onclick={handleJsonPreflight}
+                disabled={!selectedImportPath || isPreflighting}
+                type="button"
+              >
+                {isPreflighting ? t('import.checking') : t('import.detectDuplicates')}
+              </button>
+            {:else if importStep === 'preview'}
               <button
                 class="btn btn-primary"
                 onclick={handleJsonPreflight}

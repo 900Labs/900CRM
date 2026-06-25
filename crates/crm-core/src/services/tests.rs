@@ -2620,6 +2620,122 @@ fn import_contacts_json_creates_rows_skips_blank_first_names_and_reports_row_err
 }
 
 #[test]
+fn preview_contacts_json_reports_headers_row_numbers_and_does_not_write() {
+    let (core, path) = open_test_core();
+    let json_path = path.join("contacts-preview.json");
+    std::fs::write(
+        &json_path,
+        r#"[
+  {
+    "first_name": "Ada",
+    "last_name": "Lovelace",
+    "email": "ada@example.com",
+    "ignored": "not shown"
+  },
+  {
+    "first_name": "   ",
+    "email": "blank@example.com"
+  },
+  {
+    "first_name": "Grace",
+    "phone": "+15550100"
+  }
+]
+"#,
+    )
+    .expect("contact preview JSON fixture should write");
+
+    let contact_count_before = count(&core, "SELECT COUNT(*) FROM contacts");
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let preview = core
+        .preview_contacts_json_import(json_path.to_str().expect("path should be valid UTF-8"))
+        .expect("contact JSON preview should parse");
+
+    assert_eq!(preview.total_rows, 2);
+    assert_eq!(
+        preview.headers,
+        vec![
+            "first_name",
+            "last_name",
+            "org_name",
+            "email",
+            "phone",
+            "address",
+            "city",
+            "country",
+            "notes",
+        ]
+    );
+    assert_eq!(preview.rows.len(), 2);
+    assert_eq!(preview.rows[0].row_number, 2);
+    assert_eq!(
+        preview.rows[0].values.get("first_name").map(String::as_str),
+        Some("Ada")
+    );
+    assert_eq!(
+        preview.rows[0].values.get("email").map(String::as_str),
+        Some("ada@example.com")
+    );
+    assert_eq!(preview.rows[1].row_number, 4);
+    assert_eq!(
+        preview.rows[1].values.get("phone").map(String::as_str),
+        Some("+15550100")
+    );
+    assert!(!preview.rows[0].values.contains_key("ignored"));
+
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM contacts"),
+        contact_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn preview_json_rejects_unsupported_shape_before_import() {
+    let (mut core, path) = open_test_core();
+    let json_path = path.join("contacts-invalid-preview.json");
+    std::fs::write(&json_path, r#"{ "first_name": "Ada" }"#)
+        .expect("invalid preview JSON fixture should write");
+
+    let preview_err = core
+        .preview_contacts_json_import(json_path.to_str().expect("path should be valid UTF-8"))
+        .expect_err("object JSON import preview should be rejected");
+    match preview_err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("JSON import expects a top-level array of objects"));
+        }
+        other => panic!("expected InvalidInput for unsupported JSON shape, got {other:?}"),
+    }
+
+    let import_err = core
+        .import_contacts_json(json_path.to_str().expect("path should be valid UTF-8"))
+        .expect_err("object JSON import should also be rejected");
+    match import_err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("JSON import expects a top-level array of objects"));
+        }
+        other => panic!("expected InvalidInput for unsupported JSON shape, got {other:?}"),
+    }
+
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM contacts"), 0);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn import_deals_json_creates_valid_rows_and_skips_blank_titles() {
     let (mut core, path) = open_test_core();
     let json_path = path.join("deals.json");
