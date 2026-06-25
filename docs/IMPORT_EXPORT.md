@@ -463,8 +463,8 @@ JSON export uses the same active-row listing boundaries as CSV export:
   ascending, then audit row `id` ascending;
 - proposed action export includes all existing proposed action rows sorted by
   `created_at` ascending, then proposed action `id` ascending;
-- external client export includes active non-deleted external client rows sorted
-  by `created_at` ascending, then external client `id` ascending.
+- external client export includes non-deleted external client placeholders
+  sorted by `created_at` ascending, then external client `id` ascending.
 
 JSON export for importable CRM records does not include record IDs, timestamps,
 deleted rows, device IDs, relationship rows beyond the optional local activity
@@ -501,8 +501,9 @@ It preserves current local external-client placeholder fields: `id`, `name`,
 activate clients, grant permissions, create tokens or secrets, start MCP/AI
 behavior, start sync behavior, create pre-import backups, or write audit rows or
 sync changelog rows. `external_client_permissions` remains deferred and is not
-exported by this surface. For this export surface, active means not
-soft-deleted; disabled readiness placeholders remain exportable for diagnostics.
+exported by this surface. `enabled` is runtime activation state, not export
+eligibility; disabled non-deleted readiness placeholders remain exportable for
+diagnostics.
 
 JSON import has the same entity scope. It does not import record IDs, timestamps,
 deleted rows, device IDs, broad relationship rows, tag data beyond reusable tag

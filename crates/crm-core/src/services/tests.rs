@@ -2767,7 +2767,7 @@ fn export_proposed_actions_csv_and_json_include_all_rows_in_stable_order_without
 }
 
 #[test]
-fn export_external_clients_csv_and_json_include_active_rows_in_stable_order_without_mutation() {
+fn export_external_clients_csv_and_json_include_non_deleted_placeholders_without_mutation() {
     let (mut core, path) = open_test_core();
 
     core.create_contact(
@@ -2785,12 +2785,12 @@ fn export_external_clients_csv_and_json_include_active_rows_in_stable_order_with
     )
     .expect("contact should create audit and sync baseline");
 
-    let first = core
+    let disabled = core
         .create_external_client_placeholder("Claude Desktop", "mcp")
-        .expect("first external client placeholder should be created");
-    let second = core
+        .expect("disabled external client placeholder should be created");
+    let enabled = core
         .create_external_client_placeholder("Local Script", "script")
-        .expect("second external client placeholder should be created");
+        .expect("enabled external client placeholder should be created");
     let deleted = core
         .create_external_client_placeholder("Deleted Integration", "mcp")
         .expect("deleted external client placeholder should be created");
@@ -2799,16 +2799,16 @@ fn export_external_clients_csv_and_json_include_active_rows_in_stable_order_with
         .conn
         .execute(
             "UPDATE external_clients SET created_at = '2026-06-24T09:00:00Z', updated_at = '2026-06-24T09:15:00Z' WHERE id = ?1",
-            params![&first.id],
+            params![&disabled.id],
         )
-        .expect("first external client timestamps should update");
+        .expect("disabled external client timestamps should update");
     core.db
         .conn
         .execute(
             "UPDATE external_clients SET permission_mode = 'read_only', enabled = 1, created_at = '2026-06-24T08:00:00Z', updated_at = '2026-06-24T08:15:00Z' WHERE id = ?1",
-            params![&second.id],
+            params![&enabled.id],
         )
-        .expect("second external client should update");
+        .expect("enabled external client should update");
     core.db
         .conn
         .execute(
@@ -2817,7 +2817,7 @@ fn export_external_clients_csv_and_json_include_active_rows_in_stable_order_with
         )
         .expect("deleted external client should update");
 
-    let expected_order = vec![second.id.clone(), first.id.clone()];
+    let expected_order = vec![enabled.id.clone(), disabled.id.clone()];
     let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
     let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
 
@@ -2846,10 +2846,24 @@ fn export_external_clients_csv_and_json_include_active_rows_in_stable_order_with
     assert!(csv_rows
         .iter()
         .all(|row| row.get("id") != Some(&deleted.id)));
+    let csv_disabled_row = csv_rows
+        .iter()
+        .find(|row| row.get("id") == Some(&disabled.id))
+        .expect("disabled non-deleted placeholder should export");
+    assert_eq!(
+        csv_disabled_row.get("name"),
+        Some(&"Claude Desktop".to_string())
+    );
+    assert_eq!(
+        csv_disabled_row.get("permission_mode"),
+        Some(&"disabled".to_string())
+    );
+    assert_eq!(csv_disabled_row.get("enabled"), Some(&"false".to_string()));
+    assert_eq!(csv_disabled_row.get("deleted_at"), Some(&String::new()));
     let csv_enabled_row = csv_rows
         .iter()
-        .find(|row| row.get("id") == Some(&second.id))
-        .expect("enabled client should export");
+        .find(|row| row.get("id") == Some(&enabled.id))
+        .expect("enabled non-deleted client should export");
     assert_eq!(
         csv_enabled_row.get("name"),
         Some(&"Local Script".to_string())
@@ -2891,10 +2905,18 @@ fn export_external_clients_csv_and_json_include_active_rows_in_stable_order_with
         expected_order
     );
     assert!(json_rows.iter().all(|row| row["id"] != deleted.id));
+    let json_disabled_row = json_rows
+        .iter()
+        .find(|row| row["id"] == disabled.id)
+        .expect("disabled non-deleted placeholder should export");
+    assert_eq!(json_disabled_row["name"], "Claude Desktop");
+    assert_eq!(json_disabled_row["permission_mode"], "disabled");
+    assert_eq!(json_disabled_row["enabled"], false);
+    assert_eq!(json_disabled_row["deleted_at"], serde_json::Value::Null);
     let json_enabled_row = json_rows
         .iter()
-        .find(|row| row["id"] == second.id)
-        .expect("enabled client should export");
+        .find(|row| row["id"] == enabled.id)
+        .expect("enabled non-deleted client should export");
     assert_eq!(json_enabled_row["name"], "Local Script");
     assert_eq!(json_enabled_row["client_type"], "script");
     assert_eq!(json_enabled_row["permission_mode"], "read_only");

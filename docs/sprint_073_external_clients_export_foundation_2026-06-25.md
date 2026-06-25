@@ -15,10 +15,10 @@ Implemented behavior:
 - External client export includes current storage fields: `id`, `name`,
   `client_type`, `permission_mode`, `enabled`, `created_at`, `updated_at`,
   `deleted_at`, and `device_id`.
-- Rows are filtered to active non-deleted external clients and exported in
+- Rows are filtered to non-deleted external client placeholders and exported in
   stable chronological order: `created_at` ascending, then external client `id`
-  ascending. For this surface, active means not soft-deleted, so disabled
-  readiness placeholders remain exportable for diagnostics.
+  ascending. `enabled` is runtime activation state, not export eligibility, so
+  disabled non-deleted readiness placeholders remain exportable for diagnostics.
 - External client export is read-only. It does not record audit rows, sync
   changelog rows, or pre-import backups.
 - SQL for external client export remains in `crm-core` storage; Tauri commands

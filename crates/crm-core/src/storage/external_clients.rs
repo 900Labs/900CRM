@@ -65,6 +65,8 @@ pub fn list_external_clients(conn: &Connection) -> CrmResult<Vec<ExternalClient>
 }
 
 pub fn list_external_clients_for_export(conn: &Connection) -> CrmResult<Vec<ExternalClient>> {
+    // enabled is runtime activation state, not export eligibility; disabled
+    // non-deleted readiness placeholders export for diagnostics.
     let mut stmt = conn.prepare(
         r#"
         SELECT id, name, client_type, permission_mode, enabled,
