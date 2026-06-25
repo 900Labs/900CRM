@@ -29,14 +29,17 @@ use crate::storage::{
 };
 use crate::utils::{
     csv::{
+        parse_activities_csv_with_mapping_targets, parse_activities_csv_with_row_numbers,
+        parse_activities_json_with_mapping_targets, parse_activities_json_with_row_numbers,
         parse_contacts_csv_with_mapping_targets, parse_contacts_csv_with_row_numbers,
         parse_contacts_json_with_mapping_targets, parse_contacts_json_with_row_numbers,
         parse_deals_csv_with_mapping_targets, parse_deals_csv_with_row_numbers,
         parse_deals_json_with_mapping_targets, parse_deals_json_with_row_numbers,
         parse_organizations_csv_with_mapping, parse_organizations_csv_with_row_numbers,
         parse_organizations_json_with_mapping, parse_organizations_json_with_row_numbers,
-        preview_contacts_json_import, preview_deals_json_import, preview_organizations_json_import,
-        write_contacts_csv, write_deals_csv, write_organizations_csv, ContactCsvRow, DealCsvRow,
+        preview_activities_json_import, preview_contacts_json_import, preview_deals_json_import,
+        preview_organizations_json_import, write_activities_csv, write_contacts_csv,
+        write_deals_csv, write_organizations_csv, ActivityCsvRow, ContactCsvRow, DealCsvRow,
         ImportColumnMapping, JsonImportPreview, OrganizationCsvRow, CUSTOM_FIELD_PREFIX,
     },
     datetime::now_iso8601,
@@ -1763,6 +1766,307 @@ impl CrmCore {
                             target.clone(),
                             custom_values
                                 .get(&(d.id.clone(), field_def_id.clone()))
+                                .cloned()
+                                .unwrap_or_default(),
+                        )
+                    })
+                    .collect(),
+            })
+            .collect())
+    }
+
+    pub fn import_activities_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_activities_csv_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_activities_csv_with_options(
+        &mut self,
+        file_path: &str,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_activities_csv_with_row_numbers(file_content.as_slice())?;
+        self.import_activity_rows(rows)
+    }
+
+    pub fn import_activities_csv_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        self.import_activities_csv_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_activities_csv_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let custom_targets = self.custom_field_import_target_keys("activity")?;
+        let rows = parse_activities_csv_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
+        self.import_activity_rows(rows)
+    }
+
+    pub fn import_activities_json(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_activities_json_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_activities_json_with_options(
+        &mut self,
+        file_path: &str,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_activities_json_with_row_numbers(file_content.as_slice())?;
+        self.import_activity_rows(rows)
+    }
+
+    pub fn import_activities_json_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        self.import_activities_json_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_activities_json_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let custom_targets = self.custom_field_import_target_keys("activity")?;
+        let rows = parse_activities_json_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
+        self.import_activity_rows(rows)
+    }
+
+    pub fn preview_activities_json_import(&self, file_path: &str) -> CrmResult<JsonImportPreview> {
+        let file_content = fs::read(file_path)?;
+        preview_activities_json_import(file_content.as_slice())
+    }
+
+    fn import_activity_rows(
+        &mut self,
+        rows: Vec<(usize, ActivityCsvRow)>,
+    ) -> CrmResult<ImportResult> {
+        let custom_targets = self.custom_field_import_targets("activity")?;
+        let custom_rows = rows
+            .iter()
+            .map(|(row_number, row)| (*row_number, row.custom_fields.clone()))
+            .collect::<Vec<_>>();
+        validate_import_custom_fields(&custom_rows, &custom_targets)?;
+
+        let mut created = 0u32;
+        let merged = 0u32;
+        let mut skipped = 0u32;
+        let mut errors = Vec::new();
+        let mut rollback_actions = Vec::new();
+
+        for (row_number, row) in rows {
+            match self.create_activity(
+                row.activity_type.clone(),
+                row.title.clone(),
+                row.description.clone(),
+                row.due_date.clone(),
+                row.contact_id.clone(),
+                row.deal_id.clone(),
+            ) {
+                Ok(activity) => {
+                    let activity = if row.completed.unwrap_or(false) {
+                        self.mark_activity_complete(&activity.id)
+                    } else {
+                        Ok(activity)
+                    };
+
+                    match activity.and_then(|activity| {
+                        custom_field_import_updates(&row.custom_fields, &custom_targets).and_then(
+                            |updates| {
+                                self.apply_custom_field_import_updates(&activity.id, &updates)?;
+                                Ok(activity)
+                            },
+                        )
+                    }) {
+                        Ok(activity) => {
+                            match self.custom_field_snapshot("activity", &activity.id) {
+                                Ok(custom_fields) => {
+                                    rollback_actions.push(
+                                        import_rollback::ImportRollbackAction::created_activity(
+                                            row_number,
+                                            &activity,
+                                            custom_fields,
+                                        ),
+                                    );
+                                    let _ = storage::audit::record_audit(
+                                        &self.db.conn,
+                                        ACTOR_IMPORT,
+                                        None,
+                                        "import_row",
+                                        Some("activity"),
+                                        Some(&activity.id),
+                                        None,
+                                        None,
+                                        &self.device_id,
+                                    );
+                                    created += 1;
+                                }
+                                Err(e) => {
+                                    errors
+                                        .push(format!("Row {}: {} ({})", row_number, e, row.title));
+                                    skipped += 1;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            errors.push(format!("Row {}: {} ({})", row_number, e, row.title));
+                            skipped += 1;
+                        }
+                    }
+                }
+                Err(e) => {
+                    errors.push(format!("Row {}: {} ({})", row_number, e, row.title));
+                    skipped += 1;
+                }
+            }
+        }
+
+        Ok(ImportResult {
+            created,
+            merged,
+            skipped,
+            errors,
+            rollback_plan: import_rollback::ImportRollbackPlan::from_actions(rollback_actions),
+        })
+    }
+
+    pub fn preflight_activities_csv_import(
+        &self,
+        file_path: &str,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_activities_csv_with_row_numbers(file_content.as_slice())?;
+        self.preflight_activity_rows(rows)
+    }
+
+    pub fn preflight_activities_csv_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let custom_targets = self.custom_field_import_target_keys("activity")?;
+        let rows = parse_activities_csv_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
+        self.preflight_activity_rows(rows)
+    }
+
+    pub fn preflight_activities_json_import(
+        &self,
+        file_path: &str,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_activities_json_with_row_numbers(file_content.as_slice())?;
+        self.preflight_activity_rows(rows)
+    }
+
+    pub fn preflight_activities_json_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let custom_targets = self.custom_field_import_target_keys("activity")?;
+        let rows = parse_activities_json_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
+        self.preflight_activity_rows(rows)
+    }
+
+    fn preflight_activity_rows(
+        &self,
+        rows: Vec<(usize, ActivityCsvRow)>,
+    ) -> CrmResult<ImportPreflightReport> {
+        let custom_targets = self.custom_field_export_targets("activity")?;
+        let custom_rows = rows
+            .iter()
+            .map(|(row_number, row)| (*row_number, row.custom_fields.clone()))
+            .collect::<Vec<_>>();
+        validate_import_custom_fields(&custom_rows, &custom_targets)?;
+
+        Ok(import_preflight_report(
+            "activities",
+            rows.len(),
+            Vec::new(),
+        ))
+    }
+
+    pub fn export_activities_csv(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_activity_rows()?;
+        let count = rows.len() as u32;
+        let file = fs::File::create(file_path)?;
+        write_activities_csv(BufWriter::new(file), &rows)?;
+        Ok(count)
+    }
+
+    pub fn export_activities_json(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_activity_rows()?;
+        let count = rows.len() as u32;
+        write_json_export(file_path, &rows)?;
+        Ok(count)
+    }
+
+    fn export_activity_rows(&self) -> CrmResult<Vec<ActivityCsvRow>> {
+        let custom_targets = self.custom_field_import_targets("activity")?;
+        let field_targets = custom_targets
+            .iter()
+            .map(|(target, field_def_id)| (field_def_id.clone(), target.clone()))
+            .collect::<BTreeMap<_, _>>();
+        let custom_values = self
+            .list_custom_field_values_for_type("activity")?
+            .into_iter()
+            .map(|value| ((value.entity_id, value.field_def_id), value.value))
+            .collect::<BTreeMap<_, _>>();
+        let activities = storage::activities::list_activities(&self.db.conn)?;
+        Ok(activities
+            .iter()
+            .map(|activity| ActivityCsvRow {
+                activity_type: activity.activity_type.clone(),
+                title: activity.title.clone(),
+                description: Some(activity.description.clone()).filter(|s| !s.is_empty()),
+                due_date: activity.due_date.clone(),
+                completed: Some(activity.completed),
+                contact_id: activity.contact_id.clone(),
+                deal_id: activity.deal_id.clone(),
+                custom_fields: field_targets
+                    .iter()
+                    .map(|(field_def_id, target)| {
+                        (
+                            target.clone(),
+                            custom_values
+                                .get(&(activity.id.clone(), field_def_id.clone()))
                                 .cloned()
                                 .unwrap_or_default(),
                         )

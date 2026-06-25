@@ -288,6 +288,93 @@ describe("ImportExport component", () => {
     expect(screen.getByRole("button", { name: "Restore pre-import backup" })).toBeTruthy();
   });
 
+  it("skips duplicate review for activity JSON imports while keeping mapping and confirmation", async () => {
+    listCustomFieldDefinitionsMock.mockResolvedValue([
+      {
+        id: "field-outcome",
+        entity_type: "activity",
+        field_name: "Outcome",
+        field_type: "text",
+        field_options: null,
+        sort_order: 0,
+        created_at: "2026-06-25T00:00:00Z",
+      },
+    ]);
+    openDialogMock.mockResolvedValue("/tmp/activities.json");
+    previewJsonMock.mockResolvedValue({
+      total_rows: 1,
+      headers: ["Kind", "Subject", "Outcome"],
+      rows: [
+        {
+          row_number: 2,
+          values: { Kind: "email", Subject: "Send update", Outcome: "Sent" },
+        },
+      ],
+    });
+    preflightJsonWithMappingMock.mockResolvedValue({
+      entity_type: "activities",
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    importJsonWithMappingMock.mockResolvedValue(importWithBackupResult);
+
+    render(ImportExport, { open: true });
+
+    await fireEvent.change(screen.getByLabelText("Type"), {
+      target: { value: "activities" },
+    });
+    await fireEvent.change(screen.getByLabelText("Format"), {
+      target: { value: "json" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+
+    await waitFor(() => {
+      expect(listCustomFieldDefinitionsMock).toHaveBeenCalledWith("activity");
+      expect(previewJsonMock).toHaveBeenCalledWith(
+        "activities",
+        "/tmp/activities.json",
+      );
+    });
+    await screen.findByText("Send update");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Column Mapping")).toBeTruthy();
+    expect(screen.getByLabelText("Map to field: Kind")).toBeTruthy();
+    expect(screen.getByLabelText("Map to field: Subject")).toBeTruthy();
+    expect(screen.getByLabelText("Map to field: Outcome")).toBeTruthy();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Review import" }));
+
+    await waitFor(() => {
+      expect(preflightJsonWithMappingMock).toHaveBeenCalledWith(
+        "activities",
+        "/tmp/activities.json",
+        {
+          Kind: "activity_type",
+          Outcome: "custom:Outcome",
+          Subject: "title",
+        },
+      );
+    });
+    expect(screen.queryByText("Duplicate auto-merge is enabled for this import.")).toBeNull();
+    expect(screen.getByText("Activity imports do not run duplicate detection. Confirmed rows create new activities.")).toBeTruthy();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
+    await waitFor(() => {
+      expect(importJsonWithMappingMock).toHaveBeenCalledWith(
+        "activities",
+        "/tmp/activities.json",
+        {
+          Kind: "activity_type",
+          Outcome: "custom:Outcome",
+          Subject: "title",
+        },
+      );
+    });
+    await screen.findByText("Created");
+  });
+
   it("maps nonstandard JSON source fields before preflight and import", async () => {
     openDialogMock.mockResolvedValue("/tmp/contacts-custom.json");
     previewJsonMock.mockResolvedValue({

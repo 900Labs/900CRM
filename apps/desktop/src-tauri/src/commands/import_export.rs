@@ -296,6 +296,136 @@ pub async fn export_deals_json(
 }
 
 #[tauri::command]
+pub async fn import_activities_csv(
+    state: State<'_, AppState>,
+    file_path: String,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_activities_csv_with_options(&file_path, import_options(merge_duplicates))
+            .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn import_activities_csv_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_activities_csv_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn import_activities_json(
+    state: State<'_, AppState>,
+    file_path: String,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_activities_json_with_options(&file_path, import_options(merge_duplicates))
+            .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn import_activities_json_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_activities_json_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn preview_activities_json_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<JsonImportPreview, String> {
+    let core = super::lock_core(&state)?;
+    core.preview_activities_json_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_activities_csv_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_activities_csv_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_activities_csv_import_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_activities_csv_import_with_mapping(&file_path, mapping)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_activities_json_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_activities_json_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_activities_json_import_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_activities_json_import_with_mapping(&file_path, mapping)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_activities_csv(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<u32, String> {
+    let core = super::lock_core(&state)?;
+    core.export_activities_csv(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_activities_json(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<u32, String> {
+    let core = super::lock_core(&state)?;
+    core.export_activities_json(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn import_organizations_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -652,6 +782,43 @@ mod tests {
             .expect("active deal should remain after merge");
         assert_eq!(active_deal.value, 7500.0);
         assert_eq!(active_deal.notes, "Imported note");
+
+        fs::remove_dir_all(&app_data_dir).ok();
+    }
+
+    #[test]
+    fn backup_is_created_before_activity_import_writes() {
+        let app_data_dir = unique_test_dir("creates-before-activity-write");
+        let csv_path = app_data_dir.join("activities.csv");
+        fs::create_dir_all(&app_data_dir).expect("app data dir");
+        write_csv(
+            &csv_path,
+            "activity_type,title,description,completed\ncall,Intro call,Imported activity,true\n",
+        );
+
+        let mut core = CrmCore::open(&app_data_dir).expect("core opens");
+        let backup_dir = app_data_dir
+            .join("pre-import-backups")
+            .join("before-activity");
+        let result = create_backup_then_import(&mut core, &backup_dir, |core| {
+            core.import_activities_csv(csv_path.to_str().expect("utf8 path"))
+                .map_err(|e| e.to_string())
+        })
+        .expect("backup and activity import should succeed");
+
+        assert_eq!(result.import.created, 1);
+        assert!(backup_dir.join("900crm.db").is_file());
+
+        let backup_core = CrmCore::open(&backup_dir).expect("backup core opens");
+        let backup_activities = backup_core
+            .list_activities()
+            .expect("backup activities list");
+        assert_eq!(backup_activities.len(), 0);
+
+        let active_activities = core.list_activities().expect("active activities list");
+        assert_eq!(active_activities.len(), 1);
+        assert_eq!(active_activities[0].title, "Intro call");
+        assert!(active_activities[0].completed);
 
         fs::remove_dir_all(&app_data_dir).ok();
     }
