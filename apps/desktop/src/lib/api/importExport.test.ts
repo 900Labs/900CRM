@@ -9,6 +9,8 @@ vi.mock('@tauri-apps/api/core', () => ({
 }));
 
 import {
+  exportActivitiesCsv,
+  exportActivitiesJson,
   exportContactsCsv,
   exportContactsJson,
   exportCsv,
@@ -25,6 +27,10 @@ import {
   importCsv,
   importCsvWithMapping,
   importData,
+  importActivitiesCsv,
+  importActivitiesCsvWithMapping,
+  importActivitiesJson,
+  importActivitiesJsonWithMapping,
   importDealsCsv,
   importDealsCsvWithMapping,
   importDealsJson,
@@ -35,6 +41,10 @@ import {
   importOrganizationsCsvWithMapping,
   importOrganizationsJson,
   importOrganizationsJsonWithMapping,
+  preflightActivitiesCsvImport,
+  preflightActivitiesCsvImportWithMapping,
+  preflightActivitiesJsonImport,
+  preflightActivitiesJsonImportWithMapping,
   preflightContactsCsvImport,
   preflightContactsCsvImportWithMapping,
   preflightContactsJsonImport,
@@ -51,6 +61,7 @@ import {
   preflightOrganizationsCsvImportWithMapping,
   preflightOrganizationsJsonImport,
   preflightOrganizationsJsonImportWithMapping,
+  previewActivitiesJsonImport,
   previewContactsJsonImport,
   previewDealsJsonImport,
   previewJson,
@@ -138,6 +149,32 @@ describe('import/export API', () => {
     });
   });
 
+  it('maps activity CSV import/export commands', async () => {
+    invokeMock.mockResolvedValueOnce(importWithBackup(2));
+    await expect(importActivitiesCsv('/tmp/activities.csv')).resolves.toEqual(importWithBackup(2));
+    expect(invokeMock).toHaveBeenLastCalledWith('import_activities_csv', {
+      file_path: '/tmp/activities.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(2));
+    await expect(importActivitiesJson('/tmp/activities.json')).resolves.toEqual(importWithBackup(2));
+    expect(invokeMock).toHaveBeenLastCalledWith('import_activities_json', {
+      file_path: '/tmp/activities.json',
+    });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await expect(exportActivitiesCsv('/tmp/activities-export.csv')).resolves.toBe(2);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_activities_csv', {
+      file_path: '/tmp/activities-export.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await expect(exportActivitiesJson('/tmp/activities-export.json')).resolves.toBe(2);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_activities_json', {
+      file_path: '/tmp/activities-export.json',
+    });
+  });
+
   it('maps organization CSV import/export commands', async () => {
     invokeMock.mockResolvedValueOnce(importWithBackup(1));
     await expect(importOrganizationsCsv('/tmp/organizations.csv')).resolves.toEqual(
@@ -186,6 +223,18 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_json', {
       file_path: '/tmp/contacts.json',
     });
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importCsv('activities', '/tmp/activities.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('import_activities_csv', {
+      file_path: '/tmp/activities.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(1);
+    await exportCsv('activities', '/tmp/activities-export.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_activities_csv', {
+      file_path: '/tmp/activities-export.csv',
+    });
   });
 
   it('routes generic import/export helpers by entity and format', async () => {
@@ -217,6 +266,18 @@ describe('import/export API', () => {
     await exportData('contacts', 'csv', '/tmp/contacts-export.csv');
     expect(invokeMock).toHaveBeenLastCalledWith('export_contacts_csv', {
       file_path: '/tmp/contacts-export.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importData('activities', 'json', '/tmp/activities.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('import_activities_json', {
+      file_path: '/tmp/activities.json',
+    });
+
+    invokeMock.mockResolvedValueOnce(1);
+    await exportData('activities', 'csv', '/tmp/activities-export.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_activities_csv', {
+      file_path: '/tmp/activities-export.csv',
     });
   });
 
@@ -325,6 +386,20 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_deals_csv_import', {
       file_path: '/tmp/deals.csv',
     });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'activities',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await expect(preflightActivitiesCsvImport('/tmp/activities.csv')).resolves.toMatchObject({
+      entity_type: 'activities',
+      duplicate_warning_count: 0,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_activities_csv_import', {
+      file_path: '/tmp/activities.csv',
+    });
   });
 
   it('routes generic CSV preflight helpers by entity', async () => {
@@ -348,6 +423,17 @@ describe('import/export API', () => {
     await preflightCsv('deals', '/tmp/deals.csv');
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_deals_csv_import', {
       file_path: '/tmp/deals.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'activities',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightCsv('activities', '/tmp/activities.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_activities_csv_import', {
+      file_path: '/tmp/activities.csv',
     });
   });
 
@@ -404,6 +490,20 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_deals_json_import', {
       file_path: '/tmp/deals.json',
     });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'activities',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await expect(preflightActivitiesJsonImport('/tmp/activities.json')).resolves.toMatchObject({
+      entity_type: 'activities',
+      duplicate_warning_count: 0,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_activities_json_import', {
+      file_path: '/tmp/activities.json',
+    });
   });
 
   it('routes generic JSON preflight helpers by entity', async () => {
@@ -428,6 +528,17 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_deals_json_import', {
       file_path: '/tmp/deals.json',
     });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'activities',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightJson('activities', '/tmp/activities.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_activities_json_import', {
+      file_path: '/tmp/activities.json',
+    });
   });
 
   it('maps JSON preview commands', async () => {
@@ -449,6 +560,12 @@ describe('import/export API', () => {
       file_path: '/tmp/deals.json',
     });
 
+    invokeMock.mockResolvedValueOnce({ ...preview, headers: ['activity_type', 'title'] });
+    await previewActivitiesJsonImport('/tmp/activities.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preview_activities_json_import', {
+      file_path: '/tmp/activities.json',
+    });
+
     invokeMock.mockResolvedValueOnce({ ...preview, headers: ['name'] });
     await previewOrganizationsJsonImport('/tmp/organizations.json');
     expect(invokeMock).toHaveBeenLastCalledWith('preview_organizations_json_import', {
@@ -466,6 +583,17 @@ describe('import/export API', () => {
     await previewJson('organizations', '/tmp/orgs.json');
     expect(invokeMock).toHaveBeenLastCalledWith('preview_organizations_json_import', {
       file_path: '/tmp/orgs.json',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      total_rows: 1,
+      headers: ['activity_type', 'title'],
+      rows: [{ row_number: 2, values: { activity_type: 'task', title: 'Follow up' } }],
+    });
+
+    await previewJson('activities', '/tmp/activities.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preview_activities_json_import', {
+      file_path: '/tmp/activities.json',
     });
   });
 
@@ -688,6 +816,70 @@ describe('import/export API', () => {
     );
   });
 
+  it('maps activity CSV import/preflight commands with field mappings', async () => {
+    const mapping = {
+      Kind: 'activity_type',
+      Subject: 'title',
+      Done: 'completed',
+      Outcome: 'custom:Outcome',
+      Skip: null,
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importActivitiesCsvWithMapping('/tmp/activities.csv', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_activities_csv_with_mapping', {
+      file_path: '/tmp/activities.csv',
+      mapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'activities',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightActivitiesCsvImportWithMapping('/tmp/activities.csv', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_activities_csv_import_with_mapping',
+      {
+        file_path: '/tmp/activities.csv',
+        mapping,
+      },
+    );
+  });
+
+  it('maps activity JSON import/preflight commands with field mappings', async () => {
+    const mapping = {
+      kind: 'activity_type',
+      subject: 'title',
+      done: 'completed',
+      outcome: 'custom:Outcome',
+      skip: null,
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importActivitiesJsonWithMapping('/tmp/activities.json', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_activities_json_with_mapping', {
+      file_path: '/tmp/activities.json',
+      mapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'activities',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightActivitiesJsonImportWithMapping('/tmp/activities.json', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_activities_json_import_with_mapping',
+      {
+        file_path: '/tmp/activities.json',
+        mapping,
+      },
+    );
+  });
+
   it('routes generic mapped CSV helpers by entity', async () => {
     const mapping = {
       Company: 'name',
@@ -743,6 +935,33 @@ describe('import/export API', () => {
       {
         file_path: '/tmp/deals.csv',
         mapping: dealMapping,
+      },
+    );
+
+    const activityMapping = {
+      Kind: 'activity_type',
+      Subject: 'title',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importCsvWithMapping('activities', '/tmp/activities.csv', activityMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_activities_csv_with_mapping', {
+      file_path: '/tmp/activities.csv',
+      mapping: activityMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'activities',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightCsvWithMapping('activities', '/tmp/activities.csv', activityMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_activities_csv_import_with_mapping',
+      {
+        file_path: '/tmp/activities.csv',
+        mapping: activityMapping,
       },
     );
   });
@@ -802,6 +1021,33 @@ describe('import/export API', () => {
       {
         file_path: '/tmp/deals.json',
         mapping: dealMapping,
+      },
+    );
+
+    const activityMapping = {
+      kind: 'activity_type',
+      subject: 'title',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importJsonWithMapping('activities', '/tmp/activities.json', activityMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_activities_json_with_mapping', {
+      file_path: '/tmp/activities.json',
+      mapping: activityMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'activities',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightJsonWithMapping('activities', '/tmp/activities.json', activityMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_activities_json_import_with_mapping',
+      {
+        file_path: '/tmp/activities.json',
+        mapping: activityMapping,
       },
     );
   });

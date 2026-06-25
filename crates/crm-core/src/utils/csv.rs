@@ -1,4 +1,4 @@
-//! Flat import/export row helpers for contacts, deals, and organizations.
+//! Flat import/export row helpers for contacts, deals, organizations, and activities.
 //!
 //! This module provides utilities for reading and writing CSV files and parsing
 //! JSON arrays used in the 900CRM import/export feature. It wraps the [`csv`]
@@ -29,6 +29,18 @@
 //! | `expected_close` | no       | YYYY-MM-DD or ISO 8601 |
 //! | `notes`          | no       | |
 
+//! # Activity CSV Format
+//!
+//! | Column          | Required | Notes |
+//! |-----------------|----------|-------|
+//! | `activity_type` | yes      | Freeform activity type |
+//! | `title`         | yes      | |
+//! | `description`   | no       | |
+//! | `due_date`      | no       | YYYY-MM-DD or ISO 8601 |
+//! | `completed`     | no       | `true`/`false` |
+//! | `contact_id`    | no       | Existing local contact UUID |
+//! | `deal_id`       | no       | Existing local deal UUID |
+//!
 //! # Organization CSV Format
 //!
 //! | Column          | Required | Notes |
@@ -108,6 +120,16 @@ const DEAL_IMPORT_TARGET_FIELDS: &[&str] = &[
     "stage",
     "expected_close",
     "notes",
+];
+
+const ACTIVITY_IMPORT_TARGET_FIELDS: &[&str] = &[
+    "activity_type",
+    "title",
+    "description",
+    "due_date",
+    "completed",
+    "contact_id",
+    "deal_id",
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -191,6 +213,44 @@ pub struct DealCsvRow {
     /// Freeform notes about the deal.
     #[serde(default)]
     pub notes: Option<String>,
+
+    /// User-defined custom field values keyed by `custom:<field_name>`.
+    #[serde(default, flatten)]
+    pub custom_fields: BTreeMap<String, String>,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Activity CSV record
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A flat CSV record representing one activity row.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityCsvRow {
+    /// Activity type. Required.
+    pub activity_type: String,
+
+    /// Activity title. Required.
+    pub title: String,
+
+    /// Longer description/body.
+    #[serde(default)]
+    pub description: Option<String>,
+
+    /// Due date in `YYYY-MM-DD` or ISO 8601 format.
+    #[serde(default)]
+    pub due_date: Option<String>,
+
+    /// Whether the imported activity should be marked complete after creation.
+    #[serde(default)]
+    pub completed: Option<bool>,
+
+    /// Optional existing local contact UUID.
+    #[serde(default)]
+    pub contact_id: Option<String>,
+
+    /// Optional existing local deal UUID.
+    #[serde(default)]
+    pub deal_id: Option<String>,
 
     /// User-defined custom field values keyed by `custom:<field_name>`.
     #[serde(default, flatten)]
@@ -442,6 +502,91 @@ pub fn parse_deals_csv_with_mapping_targets<R: Read>(
     Ok(rows)
 }
 
+/// Parses CSV data from a byte reader into a `Vec<ActivityCsvRow>`.
+///
+/// Requires a header row with at minimum `activity_type` and `title` columns.
+/// Rows where either required value is blank are skipped.
+pub fn parse_activities_csv<R: Read>(reader: R) -> CrmResult<Vec<ActivityCsvRow>> {
+    Ok(parse_activities_csv_with_row_numbers(reader)?
+        .into_iter()
+        .map(|(_, row)| row)
+        .collect())
+}
+
+/// Parses activity CSV data and preserves the original 1-based source row
+/// number, including the header row offset.
+pub fn parse_activities_csv_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, ActivityCsvRow)>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .trim(csv::Trim::All)
+        .flexible(true)
+        .from_reader(reader);
+
+    let headers = rdr.headers()?.clone();
+    require_csv_header(&headers, "activity_type")?;
+    require_csv_header(&headers, "title")?;
+
+    let mut rows = Vec::new();
+    for (index, result) in rdr.records().enumerate() {
+        let row_number = index + 2;
+        let record = result.map_err(|e| CrmError::Csv(e.to_string()))?;
+        let row = activity_row_from_record(&headers, &record);
+        if row.activity_type.trim().is_empty() || row.title.trim().is_empty() {
+            log::debug!("Skipping CSV row with blank activity_type or title");
+            continue;
+        }
+        rows.push((row_number, row));
+    }
+
+    log::info!("Parsed {} activity rows from CSV", rows.len());
+    Ok(rows)
+}
+
+/// Parses arbitrary-header activity CSV data with a frontend-provided mapping.
+pub fn parse_activities_csv_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, ActivityCsvRow)>> {
+    parse_activities_csv_with_mapping_targets(reader, mapping, &[])
+}
+
+pub fn parse_activities_csv_with_mapping_targets<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+    custom_targets: &[String],
+) -> CrmResult<Vec<(usize, ActivityCsvRow)>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .trim(csv::Trim::All)
+        .flexible(true)
+        .from_reader(reader);
+
+    let headers = rdr.headers()?.clone();
+    let assignments = validate_import_mapping(
+        &headers,
+        mapping,
+        ACTIVITY_IMPORT_TARGET_FIELDS,
+        custom_targets,
+    )?;
+
+    let mut rows = Vec::new();
+    for (index, result) in rdr.records().enumerate() {
+        let row_number = index + 2;
+        let record = result.map_err(|e| CrmError::Csv(e.to_string()))?;
+        let row = activity_row_from_mapped_record(&record, &assignments);
+        if row.activity_type.trim().is_empty() || row.title.trim().is_empty() {
+            log::debug!("Skipping CSV row with blank activity_type or title");
+            continue;
+        }
+        rows.push((row_number, row));
+    }
+
+    log::info!("Parsed {} mapped activity rows from CSV", rows.len());
+    Ok(rows)
+}
+
 /// Parses CSV data from a byte reader into a `Vec<OrganizationCsvRow>`.
 ///
 /// Requires a header row with at minimum a `name` column. Rows where `name` is
@@ -665,6 +810,79 @@ pub fn parse_deals_json_with_mapping_targets<R: Read>(
     Ok(parsed_rows)
 }
 
+/// Parses activity JSON data from a top-level array of flat row objects.
+///
+/// Row numbers are reported with the same data-row offset as CSV imports:
+/// the first JSON array item is row 2.
+pub fn parse_activities_json_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, ActivityCsvRow)>> {
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        let row = activity_row_from_json_object(object, &headers);
+        if row.activity_type.trim().is_empty() || row.title.trim().is_empty() {
+            log::debug!("Skipping JSON row with blank activity_type or title");
+            continue;
+        }
+        parsed_rows.push((row_number, row));
+    }
+
+    log::info!("Parsed {} activity rows from JSON", parsed_rows.len());
+    Ok(parsed_rows)
+}
+
+/// Parses activity JSON data with frontend-provided source-field mapping.
+pub fn parse_activities_json_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, ActivityCsvRow)>> {
+    parse_activities_json_with_mapping_targets(reader, mapping, &[])
+}
+
+pub fn parse_activities_json_with_mapping_targets<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+    custom_targets: &[String],
+) -> CrmResult<Vec<(usize, ActivityCsvRow)>> {
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let assignments = validate_import_mapping_sources(
+        &headers,
+        mapping,
+        ACTIVITY_IMPORT_TARGET_FIELDS,
+        custom_targets,
+        "field",
+        "JSON",
+    )?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        let row = activity_row_from_mapped_json_object(object, &headers, &assignments);
+        if row.activity_type.trim().is_empty() || row.title.trim().is_empty() {
+            log::debug!("Skipping JSON row with blank activity_type or title");
+            continue;
+        }
+        parsed_rows.push((row_number, row));
+    }
+
+    log::info!(
+        "Parsed {} mapped activity rows from JSON",
+        parsed_rows.len()
+    );
+    Ok(parsed_rows)
+}
+
 /// Parses organization JSON data from a top-level array of flat row objects.
 ///
 /// Row numbers are reported with the same data-row offset as CSV imports:
@@ -722,6 +940,10 @@ pub fn preview_contacts_json_import<R: Read>(reader: R) -> CrmResult<JsonImportP
 }
 
 pub fn preview_deals_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
+    preview_json_import(reader)
+}
+
+pub fn preview_activities_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
     preview_json_import(reader)
 }
 
@@ -1164,6 +1386,101 @@ fn deal_row_from_mapped_json_object(
     row
 }
 
+fn activity_row_from_record(
+    headers: &csv::StringRecord,
+    record: &csv::StringRecord,
+) -> ActivityCsvRow {
+    let mut row = default_activity_row();
+
+    for (index, header) in headers.iter().enumerate() {
+        let value = record.get(index).unwrap_or_default().trim();
+        assign_activity_value(&mut row, header.trim(), value);
+    }
+
+    row
+}
+
+fn activity_row_from_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+) -> ActivityCsvRow {
+    let mut row = default_activity_row();
+
+    for header in headers {
+        let value = json_preview_cell(object.get(header.as_str()));
+        assign_activity_value(&mut row, header.trim(), value.trim());
+    }
+
+    row
+}
+
+fn activity_row_from_mapped_record(
+    record: &csv::StringRecord,
+    assignments: &[Option<String>],
+) -> ActivityCsvRow {
+    let mut row = default_activity_row();
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = record.get(index).unwrap_or_default().trim();
+        assign_activity_value(&mut row, target, value);
+    }
+
+    row
+}
+
+fn activity_row_from_mapped_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+    assignments: &[Option<String>],
+) -> ActivityCsvRow {
+    let mut row = default_activity_row();
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = json_preview_cell(object.get(headers[index].as_str()));
+        let value = value.trim();
+        assign_activity_value(&mut row, target, value);
+    }
+
+    row
+}
+
+fn default_activity_row() -> ActivityCsvRow {
+    ActivityCsvRow {
+        activity_type: String::new(),
+        title: String::new(),
+        description: None,
+        due_date: None,
+        completed: None,
+        contact_id: None,
+        deal_id: None,
+        custom_fields: BTreeMap::new(),
+    }
+}
+
+fn assign_activity_value(row: &mut ActivityCsvRow, target: &str, value: &str) {
+    match target {
+        "activity_type" => row.activity_type = value.to_string(),
+        "title" => row.title = value.to_string(),
+        "description" => row.description = optional_csv_value(value),
+        "due_date" => row.due_date = optional_csv_value(value),
+        "completed" => row.completed = optional_bool_value(value),
+        "contact_id" => row.contact_id = optional_csv_value(value),
+        "deal_id" => row.deal_id = optional_csv_value(value),
+        _ if is_custom_field_target(target) => {
+            if let Some(value) = optional_csv_value(value) {
+                row.custom_fields.insert(target.to_string(), value);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn default_deal_row() -> DealCsvRow {
     DealCsvRow {
         title: String::new(),
@@ -1202,6 +1519,14 @@ fn optional_csv_value(value: &str) -> Option<String> {
         None
     } else {
         Some(value.to_string())
+    }
+}
+
+fn optional_bool_value(value: &str) -> Option<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "true" | "1" | "yes" | "y" => Some(true),
+        "false" | "0" | "no" | "n" => Some(false),
+        _ => None,
     }
 }
 
@@ -1318,6 +1643,54 @@ pub fn write_deals_csv<W: Write>(writer: W, rows: &[DealCsvRow]) -> CrmResult<()
 
     wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
     log::info!("Wrote {} deal rows to CSV", rows.len());
+    Ok(())
+}
+
+/// Serializes a slice of [`ActivityCsvRow`] to CSV bytes.
+///
+/// The output always includes a header row.
+pub fn write_activities_csv<W: Write>(writer: W, rows: &[ActivityCsvRow]) -> CrmResult<()> {
+    let mut wtr = csv::WriterBuilder::new()
+        .has_headers(false)
+        .from_writer(writer);
+
+    let custom_headers = collect_custom_headers(rows.iter().map(|row| &row.custom_fields));
+    let mut headers = vec![
+        "activity_type".to_string(),
+        "title".to_string(),
+        "description".to_string(),
+        "due_date".to_string(),
+        "completed".to_string(),
+        "contact_id".to_string(),
+        "deal_id".to_string(),
+    ];
+    headers.extend(custom_headers.iter().cloned());
+    wtr.write_record(&headers)
+        .map_err(|e| CrmError::Csv(e.to_string()))?;
+
+    for row in rows {
+        let mut record = vec![
+            row.activity_type.clone(),
+            row.title.clone(),
+            row.description.clone().unwrap_or_default(),
+            row.due_date.clone().unwrap_or_default(),
+            row.completed
+                .map(|completed| completed.to_string())
+                .unwrap_or_default(),
+            row.contact_id.clone().unwrap_or_default(),
+            row.deal_id.clone().unwrap_or_default(),
+        ];
+        record.extend(
+            custom_headers
+                .iter()
+                .map(|header| row.custom_fields.get(header).cloned().unwrap_or_default()),
+        );
+        wtr.write_record(&record)
+            .map_err(|e| CrmError::Csv(e.to_string()))?;
+    }
+
+    wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
+    log::info!("Wrote {} activity rows to CSV", rows.len());
     Ok(())
 }
 

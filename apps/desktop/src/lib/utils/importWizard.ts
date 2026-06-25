@@ -1,6 +1,7 @@
 import { mapColumns, type ColumnMapping } from './csv';
 import type { CustomFieldDefinition } from '$lib/api/customFields';
 import type {
+  ActivityImportTargetField,
   ContactImportTargetField,
   CustomFieldImportTargetField,
   DealImportTargetField,
@@ -58,7 +59,17 @@ export const DEAL_IMPORT_FIELDS: ImportFieldOption<DealImportTargetField>[] = [
   { value: 'notes', label: 'Notes' },
 ];
 
-type CustomImportEntity = 'contacts' | 'deals';
+export const ACTIVITY_IMPORT_FIELDS: ImportFieldOption<ActivityImportTargetField>[] = [
+  { value: 'activity_type', label: 'Activity type', required: true },
+  { value: 'title', label: 'Title', required: true },
+  { value: 'description', label: 'Description' },
+  { value: 'due_date', label: 'Due date' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'contact_id', label: 'Contact ID' },
+  { value: 'deal_id', label: 'Deal ID' },
+];
+
+type CustomImportEntity = 'contacts' | 'deals' | 'activities';
 
 const CONTACT_ALIASES: Record<string, ContactImportTargetField> = {
   firstname: 'first_name',
@@ -144,6 +155,30 @@ const DEAL_ALIASES: Record<string, DealImportTargetField> = {
   memo: 'notes',
 };
 
+const ACTIVITY_ALIASES: Record<string, ActivityImportTargetField> = {
+  activitytype: 'activity_type',
+  type: 'activity_type',
+  kind: 'activity_type',
+  title: 'title',
+  subject: 'title',
+  summary: 'title',
+  description: 'description',
+  details: 'description',
+  notes: 'description',
+  note: 'description',
+  body: 'description',
+  duedate: 'due_date',
+  due: 'due_date',
+  deadline: 'due_date',
+  completed: 'completed',
+  complete: 'completed',
+  done: 'completed',
+  contactid: 'contact_id',
+  localcontactid: 'contact_id',
+  dealid: 'deal_id',
+  localdealid: 'deal_id',
+};
+
 export function getImportFieldOptions(
   entity: MappedImportEntity,
   customFields: CustomFieldDefinition[] = [],
@@ -159,6 +194,13 @@ export function getImportFieldOptions(
     return [
       ...DEAL_IMPORT_FIELDS,
       ...customFieldOptions('deals', customFields),
+    ];
+  }
+
+  if (entity === 'activities') {
+    return [
+      ...ACTIVITY_IMPORT_FIELDS,
+      ...customFieldOptions('activities', customFields),
     ];
   }
 
@@ -201,6 +243,10 @@ function getImportAliases(entity: MappedImportEntity): Record<string, ImportTarg
 
   if (entity === 'deals') {
     return DEAL_ALIASES;
+  }
+
+  if (entity === 'activities') {
+    return ACTIVITY_ALIASES;
   }
 
   return ORGANIZATION_ALIASES;
@@ -278,7 +324,7 @@ function getCustomImportAliases(
   entity: MappedImportEntity,
   customFields: CustomFieldDefinition[],
 ): Record<string, CustomFieldImportTargetField> {
-  if (entity !== 'contacts' && entity !== 'deals') {
+  if (entity !== 'contacts' && entity !== 'deals' && entity !== 'activities') {
     return {};
   }
 
@@ -301,7 +347,8 @@ function customFieldsForEntity(
   entity: CustomImportEntity,
   customFields: CustomFieldDefinition[],
 ): CustomFieldDefinition[] {
-  const expectedEntityType = entity === 'contacts' ? 'contact' : 'deal';
+  const expectedEntityType =
+    entity === 'contacts' ? 'contact' : entity === 'deals' ? 'deal' : 'activity';
   return customFields.filter((field) => field.entity_type === expectedEntityType);
 }
 

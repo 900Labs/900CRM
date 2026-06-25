@@ -19,17 +19,20 @@
   import {
     exportData,
     importCsv,
+    importActivitiesCsvWithMapping,
     importContactsCsvWithMapping,
     importDealsCsvWithMapping,
     importJsonWithMapping,
     importOrganizationsCsvWithMapping,
     rollbackCompletedImport,
     previewJson,
+    preflightActivitiesCsvImportWithMapping,
     preflightContactsCsvImportWithMapping,
     preflightDealsCsvImportWithMapping,
     preflightJsonWithMapping,
     preflightOrganizationsCsvImportWithMapping,
     type ExportFormat,
+    type ActivityImportTargetField,
     type ContactImportTargetField,
     type DealImportTargetField,
     type ImportFormat,
@@ -85,10 +88,12 @@
   let importCustomFieldDefinitions = $state<{
     contacts: CustomFieldDefinition[];
     deals: CustomFieldDefinition[];
-  }>({ contacts: [], deals: [] });
-  let loadedImportCustomFields = $state<{ contacts: boolean; deals: boolean }>({
+    activities: CustomFieldDefinition[];
+  }>({ contacts: [], deals: [], activities: [] });
+  let loadedImportCustomFields = $state<{ contacts: boolean; deals: boolean; activities: boolean }>({
     contacts: false,
     deals: false,
+    activities: false,
   });
 
   let exportEntity = $state<ImportExportEntity>('contacts');
@@ -108,18 +113,24 @@
   const previewRows = $derived(parseResult?.rows.slice(0, 5) ?? []);
   const jsonPreviewRows = $derived(jsonPreview?.rows ?? []);
   const isMappedImport = $derived(
-    importEntity === 'contacts' || importEntity === 'deals' || importEntity === 'organizations',
+    importEntity === 'contacts' ||
+      importEntity === 'deals' ||
+      importEntity === 'activities' ||
+      importEntity === 'organizations',
   );
   const isCsvImport = $derived(importFormat === 'csv');
   const isJsonImport = $derived(importFormat === 'json');
   const showMappingWizard = $derived(isMappedImport && (isCsvImport || isJsonImport));
-  const showDuplicateReview = $derived(showMappingWizard);
+  const usesDuplicatePreflight = $derived(importEntity !== 'activities');
+  const showDuplicateReview = $derived(showMappingWizard && usesDuplicatePreflight);
   const mappedEntity = $derived(isMappedImport ? (importEntity as MappedImportEntity) : null);
   const activeImportCustomFields = $derived(
     importEntity === 'contacts'
       ? importCustomFieldDefinitions.contacts
       : importEntity === 'deals'
         ? importCustomFieldDefinitions.deals
+        : importEntity === 'activities'
+          ? importCustomFieldDefinitions.activities
         : [],
   );
   const importFieldOptions = $derived(
@@ -140,7 +151,7 @@
   const importRollbackActionCount = $derived(importRollbackPlan?.actions.length ?? 0);
 
   async function ensureImportCustomFields(entity: ImportExportEntity): Promise<CustomFieldDefinition[]> {
-    if (entity !== 'contacts' && entity !== 'deals') {
+    if (entity !== 'contacts' && entity !== 'deals' && entity !== 'activities') {
       return [];
     }
 
@@ -148,7 +159,7 @@
       return importCustomFieldDefinitions[entity];
     }
 
-    const entityType = entity === 'contacts' ? 'contact' : 'deal';
+    const entityType = entity === 'contacts' ? 'contact' : entity === 'deals' ? 'deal' : 'activity';
     const definitions = await listCustomFieldDefinitions(entityType);
     importCustomFieldDefinitions = {
       ...importCustomFieldDefinitions,
@@ -454,6 +465,13 @@
       );
     }
 
+    if (entity === 'activities') {
+      return preflightActivitiesCsvImportWithMapping(
+        filePath,
+        toBackendMapping<ActivityImportTargetField>(columnMapping),
+      );
+    }
+
     return preflightOrganizationsCsvImportWithMapping(
       filePath,
       toBackendMapping<OrganizationImportTargetField>(columnMapping),
@@ -487,6 +505,13 @@
         : importDealsCsvWithMapping(filePath, mapping);
     }
 
+    if (entity === 'activities') {
+      const mapping = toBackendMapping<ActivityImportTargetField>(columnMapping);
+      return importOptions
+        ? importActivitiesCsvWithMapping(filePath, mapping, importOptions)
+        : importActivitiesCsvWithMapping(filePath, mapping);
+    }
+
     const mapping = toBackendMapping<OrganizationImportTargetField>(columnMapping);
     return importOptions
       ? importOrganizationsCsvWithMapping(filePath, mapping, importOptions)
@@ -511,7 +536,10 @@
     if (importStep === 'summary') {
       importStep = 'confirm';
     } else if (importStep === 'confirm') {
-      importStep = (preflightReport?.duplicate_warning_count ?? 0) > 0 ? 'duplicates' : 'mapping';
+      importStep =
+        usesDuplicatePreflight && (preflightReport?.duplicate_warning_count ?? 0) > 0
+          ? 'duplicates'
+          : 'mapping';
     } else if (importStep === 'duplicates') {
       importStep = 'mapping';
     } else if (importStep === 'mapping') {
@@ -700,6 +728,7 @@
               <select id="import-entity" class="select" value={importEntity} onchange={handleImportEntityChange}>
                 <option value="contacts">{t('contacts.title')}</option>
                 <option value="deals">{t('deals.title')}</option>
+                <option value="activities">{t('activities.title')}</option>
                 <option value="organizations">{t('organizations.title')}</option>
               </select>
             </div>
@@ -713,11 +742,17 @@
             </div>
 
             {#if showMappingWizard}
-              <ol class="wizard-steps" aria-label={t('import.wizardProgress')}>
+              <ol
+                class="wizard-steps"
+                class:no-duplicates={!usesDuplicatePreflight}
+                aria-label={t('import.wizardProgress')}
+              >
                 <li class:active={importStep === 'select'} class:complete={importStep !== 'select'}>{t('import.stepSelect')}</li>
                 <li class:active={importStep === 'preview'} class:complete={['mapping', 'duplicates', 'confirm', 'summary'].includes(importStep)}>{t('import.stepPreview')}</li>
                 <li class:active={importStep === 'mapping'} class:complete={['duplicates', 'confirm', 'summary'].includes(importStep)}>{t('import.stepMap')}</li>
-                <li class:active={importStep === 'duplicates'} class:complete={['confirm', 'summary'].includes(importStep)}>{t('import.stepDuplicates')}</li>
+                {#if usesDuplicatePreflight}
+                  <li class:active={importStep === 'duplicates'} class:complete={['confirm', 'summary'].includes(importStep)}>{t('import.stepDuplicates')}</li>
+                {/if}
                 <li class:active={importStep === 'confirm'} class:complete={importStep === 'summary'}>{t('import.stepConfirm')}</li>
                 <li class:active={importStep === 'summary'}>{t('import.stepSummary')}</li>
               </ol>
@@ -935,7 +970,7 @@
               </div>
             {/if}
 
-            {#if showDuplicateReview && importStep === 'confirm'}
+            {#if showMappingWizard && importStep === 'confirm'}
               <div class="confirm-panel">
                 <p class="import-stats">
                   {t('import.confirmRows', { count: preflightReport?.total_rows ?? (isJsonImport ? jsonPreview?.total_rows : parseResult?.count) ?? 0 })}
@@ -949,6 +984,9 @@
                       ? t('import.confirmDuplicateWarningsWithMerge', { count: preflightReport?.duplicate_warning_count ?? 0 })
                       : t('import.confirmDuplicateWarnings', { count: preflightReport?.duplicate_warning_count ?? 0 })}
                   </p>
+                {/if}
+                {#if !usesDuplicatePreflight}
+                  <p class="import-stats">{t('import.activitiesSkipDuplicates')}</p>
                 {/if}
                 {#if validationErrors.length > 0}
                   <div class="validation-list" role="alert">
@@ -1052,6 +1090,7 @@
               <select id="export-entity" class="select" bind:value={exportEntity}>
                 <option value="contacts">{t('contacts.title')}</option>
                 <option value="deals">{t('deals.title')}</option>
+                <option value="activities">{t('activities.title')}</option>
                 <option value="organizations">{t('organizations.title')}</option>
               </select>
             </div>
@@ -1068,7 +1107,7 @@
       </div>
 
       <div class="modal-footer">
-        {#if activeTab === 'import' && showDuplicateReview && importStep !== 'select' && importStep !== 'summary'}
+        {#if activeTab === 'import' && showMappingWizard && importStep !== 'select' && importStep !== 'summary'}
           <button class="btn btn-secondary" onclick={backFromCurrentStep} type="button" disabled={isImporting || isPreflighting}>
             {t('common.back')}
           </button>
@@ -1104,7 +1143,11 @@
                 disabled={isPreviewing || isPreflighting}
                 type="button"
               >
-                {isPreflighting ? t('import.checking') : t('import.detectDuplicates')}
+                {isPreflighting
+                  ? t('import.checking')
+                  : usesDuplicatePreflight
+                    ? t('import.detectDuplicates')
+                    : t('import.reviewImport')}
               </button>
             {:else if importStep === 'duplicates'}
               <button class="btn btn-primary" onclick={() => importStep = 'confirm'} type="button">
@@ -1164,6 +1207,10 @@
     list-style: none;
     margin: 0;
     padding: 0;
+  }
+
+  .wizard-steps.no-duplicates {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .wizard-steps li {

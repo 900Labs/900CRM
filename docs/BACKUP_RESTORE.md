@@ -27,8 +27,8 @@ containing sensitive data in a trusted or encrypted location.
 
 ## Automatic pre-import backups
 
-Supported desktop imports for contacts, deals, and organizations create a local
-backup automatically before writing CSV, mapped CSV, or JSON rows. These
+Supported desktop imports for contacts, deals, activities, and organizations
+create a local backup automatically before writing CSV, mapped CSV, or JSON rows. These
 pre-import backups use the same local backup format and are stored under the
 platform app data directory at:
 
@@ -89,8 +89,8 @@ During restore, the active `CrmCore` instance is closed, the validated backup da
 Import summary backup restore is full database replacement. It is not
 row-level import rollback, partial restore, or merge-back. Row-level import
 rollback is intentionally narrower: it only applies supported import rows and
-supported contact/deal custom field value changes from the current summary, and
-skips records that changed after import.
+supported contact/deal/activity custom field value changes from the current
+summary, and skips records that changed after import.
 
 ## Developer API surface
 
