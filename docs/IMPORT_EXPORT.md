@@ -45,13 +45,13 @@ still duplicate-gated:
 
 1. Select entity type and JSON format.
 2. Select a local `.json` file.
-3. Run duplicate preflight checks.
-4. Review duplicate warnings if any are found.
-5. Confirm import.
-6. Review the import summary.
+3. Preview the parsed JSON rows in the browser.
+4. Run duplicate preflight checks.
+5. Review duplicate warnings if any are found.
+6. Confirm import.
+7. Review the import summary.
 
-JSON import does not include browser preview, field mapping, or the CSV
-mapping/preview wizard.
+JSON import does not include field mapping or the CSV mapping wizard.
 
 ## CSV Import Parsing
 
@@ -90,6 +90,13 @@ blank required field are skipped before create attempts, matching CSV behavior.
 
 JSON row numbers are reported with the same data-row offset as CSV imports: the
 first JSON array item is row 2.
+
+The desktop UI parses JSON files through a read-only preview command before
+duplicate preflight or import confirmation. The preview shows the supported
+flat fields and up to the first five importable rows. Preview parsing does not
+create automatic backups, create or update CRM rows, or write audit/sync rows.
+Invalid JSON or an unsupported shape blocks the duplicate preflight/import path
+and shows a preview error.
 
 ## Contact CSV
 
@@ -200,6 +207,10 @@ deleted rows, device IDs, relationship rows, custom fields, separate note
 records, tags, activities, audit log entries, proposed actions, external
 clients, permissions, settings, or backup metadata.
 
+JSON import preview is read-only and browser-visible in the import/export modal.
+It uses the same supported flat fields as JSON import/export and does not add
+JSON field mapping.
+
 ## Duplicate Preflight
 
 Duplicate preflight is currently implemented for contacts, deals, and
@@ -300,7 +311,7 @@ validated backup workflow.
 
 The following are not implemented in the current import/export surface:
 
-- JSON field mapping or browser preview.
+- JSON field mapping.
 - Contact or organization duplicate auto-merge during import.
 - Deal duplicate auto-merge during import.
 - Import rollback for a completed multi-row import.

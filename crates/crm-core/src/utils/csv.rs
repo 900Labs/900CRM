@@ -59,6 +59,20 @@ use crate::utils::errors::{CrmError, CrmResult};
 /// present in the map are also skipped.
 pub type ImportColumnMapping = HashMap<String, Option<String>>;
 
+/// Read-only preview generated from a JSON import file.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct JsonImportPreview {
+    pub total_rows: usize,
+    pub headers: Vec<String>,
+    pub rows: Vec<JsonImportPreviewRow>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct JsonImportPreviewRow {
+    pub row_number: usize,
+    pub values: HashMap<String, String>,
+}
+
 const CONTACT_IMPORT_TARGET_FIELDS: &[&str] = &[
     "first_name",
     "last_name",
@@ -530,6 +544,18 @@ pub fn parse_organizations_json_with_row_numbers<R: Read>(
     )
 }
 
+pub fn preview_contacts_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
+    preview_json_import(reader, CONTACT_IMPORT_TARGET_FIELDS, "first_name")
+}
+
+pub fn preview_deals_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
+    preview_json_import(reader, DEAL_IMPORT_TARGET_FIELDS, "title")
+}
+
+pub fn preview_organizations_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
+    preview_json_import(reader, ORGANIZATION_IMPORT_TARGET_FIELDS, "name")
+}
+
 fn parse_json_array_rows<R: Read>(reader: R) -> CrmResult<Vec<Value>> {
     let json: Value = serde_json::from_reader(reader)?;
     match json {
@@ -537,6 +563,74 @@ fn parse_json_array_rows<R: Read>(reader: R) -> CrmResult<Vec<Value>> {
         _ => Err(CrmError::InvalidInput(
             "JSON import expects a top-level array of objects".to_string(),
         )),
+    }
+}
+
+fn preview_json_import<R: Read>(
+    reader: R,
+    allowed_headers: &[&str],
+    required_field: &str,
+) -> CrmResult<JsonImportPreview> {
+    const MAX_PREVIEW_ROWS: usize = 5;
+    const MAX_PREVIEW_COLUMNS: usize = 12;
+
+    let rows = parse_json_array_rows(reader)?;
+    let headers = allowed_headers
+        .iter()
+        .take(MAX_PREVIEW_COLUMNS)
+        .map(|header| (*header).to_string())
+        .collect::<Vec<_>>();
+    let mut preview_rows = Vec::new();
+    let mut importable_rows = 0;
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+
+        if json_required_field_is_blank(object.get(required_field)) {
+            continue;
+        }
+
+        importable_rows += 1;
+
+        if preview_rows.len() < MAX_PREVIEW_ROWS {
+            let values = headers
+                .iter()
+                .map(|header| {
+                    (
+                        header.clone(),
+                        json_preview_cell(object.get(header.as_str())),
+                    )
+                })
+                .collect();
+            preview_rows.push(JsonImportPreviewRow { row_number, values });
+        }
+    }
+
+    Ok(JsonImportPreview {
+        total_rows: importable_rows,
+        headers,
+        rows: preview_rows,
+    })
+}
+
+fn json_required_field_is_blank(value: Option<&Value>) -> bool {
+    match value {
+        Some(Value::String(value)) => value.trim().is_empty(),
+        Some(Value::Null) | None => true,
+        Some(value) => json_preview_cell(Some(value)).trim().is_empty(),
+    }
+}
+
+fn json_preview_cell(value: Option<&Value>) -> String {
+    match value {
+        Some(Value::String(value)) => value.clone(),
+        Some(Value::Number(value)) => value.to_string(),
+        Some(Value::Bool(value)) => value.to_string(),
+        Some(Value::Null) | None => String::new(),
+        Some(value) => value.to_string(),
     }
 }
 

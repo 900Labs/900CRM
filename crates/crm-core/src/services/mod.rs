@@ -32,9 +32,10 @@ use crate::utils::{
         parse_contacts_json_with_row_numbers, parse_deals_csv_with_mapping,
         parse_deals_csv_with_row_numbers, parse_deals_json_with_row_numbers,
         parse_organizations_csv_with_mapping, parse_organizations_csv_with_row_numbers,
-        parse_organizations_json_with_row_numbers, write_contacts_csv, write_deals_csv,
-        write_organizations_csv, ContactCsvRow, DealCsvRow, ImportColumnMapping,
-        OrganizationCsvRow,
+        parse_organizations_json_with_row_numbers, preview_contacts_json_import,
+        preview_deals_json_import, preview_organizations_json_import, write_contacts_csv,
+        write_deals_csv, write_organizations_csv, ContactCsvRow, DealCsvRow, ImportColumnMapping,
+        JsonImportPreview, OrganizationCsvRow,
     },
     datetime::now_iso8601,
     errors::{CrmError, CrmResult as InternalCrmResult},
@@ -759,6 +760,11 @@ impl CrmCore {
         self.import_contact_rows(rows)
     }
 
+    pub fn preview_contacts_json_import(&self, file_path: &str) -> CrmResult<JsonImportPreview> {
+        let file_content = fs::read(file_path)?;
+        preview_contacts_json_import(file_content.as_slice())
+    }
+
     fn import_contact_rows(
         &mut self,
         rows: Vec<(usize, ContactCsvRow)>,
@@ -948,6 +954,11 @@ impl CrmCore {
         self.import_deal_rows(rows)
     }
 
+    pub fn preview_deals_json_import(&self, file_path: &str) -> CrmResult<JsonImportPreview> {
+        let file_content = fs::read(file_path)?;
+        preview_deals_json_import(file_content.as_slice())
+    }
+
     fn import_deal_rows(&mut self, rows: Vec<(usize, DealCsvRow)>) -> CrmResult<ImportResult> {
         let mut created = 0u32;
         let mut skipped = 0u32;
@@ -1095,6 +1106,14 @@ impl CrmCore {
         let file_content = fs::read(file_path)?;
         let rows = parse_organizations_json_with_row_numbers(file_content.as_slice())?;
         self.import_organization_rows(rows)
+    }
+
+    pub fn preview_organizations_json_import(
+        &self,
+        file_path: &str,
+    ) -> CrmResult<JsonImportPreview> {
+        let file_content = fs::read(file_path)?;
+        preview_organizations_json_import(file_content.as_slice())
     }
 
     fn import_organization_rows(
