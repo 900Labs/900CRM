@@ -156,6 +156,8 @@ pub fn run() {
             commands::import_export::export_proposed_actions_json,
             commands::import_export::export_external_clients_csv,
             commands::import_export::export_external_clients_json,
+            commands::import_export::export_external_client_permissions_csv,
+            commands::import_export::export_external_client_permissions_json,
             commands::import_export::import_deals_csv,
             commands::import_export::import_deals_csv_with_mapping,
             commands::import_export::import_deals_json,

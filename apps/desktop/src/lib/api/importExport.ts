@@ -13,7 +13,12 @@ export type ImportEntity =
   | 'tag_definitions'
   | 'custom_field_definitions'
   | 'tag_links';
-export type ExportEntity = ImportEntity | 'audit_log' | 'proposed_actions' | 'external_clients';
+export type ExportEntity =
+  | ImportEntity
+  | 'audit_log'
+  | 'proposed_actions'
+  | 'external_clients'
+  | 'external_client_permissions';
 export type ImportExportEntity = ImportEntity;
 export type ImportPreflightEntity = ImportEntity;
 export type ImportFormat = 'csv' | 'json';
@@ -370,6 +375,7 @@ const exportCommands: Record<ExportFormat, Record<ExportEntity, string>> = {
     audit_log: 'export_audit_log_csv',
     proposed_actions: 'export_proposed_actions_csv',
     external_clients: 'export_external_clients_csv',
+    external_client_permissions: 'export_external_client_permissions_csv',
   },
   json: {
     contacts: 'export_contacts_json',
@@ -383,6 +389,7 @@ const exportCommands: Record<ExportFormat, Record<ExportEntity, string>> = {
     audit_log: 'export_audit_log_json',
     proposed_actions: 'export_proposed_actions_json',
     external_clients: 'export_external_clients_json',
+    external_client_permissions: 'export_external_client_permissions_json',
   },
 };
 
@@ -1226,6 +1233,14 @@ export async function exportExternalClientsCsv(filePath: string): Promise<number
 
 export async function exportExternalClientsJson(filePath: string): Promise<number> {
   return invoke<number>(exportCommands.json.external_clients, filePathArgs(filePath));
+}
+
+export async function exportExternalClientPermissionsCsv(filePath: string): Promise<number> {
+  return invoke<number>(exportCommands.csv.external_client_permissions, filePathArgs(filePath));
+}
+
+export async function exportExternalClientPermissionsJson(filePath: string): Promise<number> {
+  return invoke<number>(exportCommands.json.external_client_permissions, filePathArgs(filePath));
 }
 
 export async function exportCsv(entity: ExportEntity, filePath: string): Promise<number> {

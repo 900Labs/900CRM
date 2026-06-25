@@ -2940,6 +2940,200 @@ fn export_external_clients_csv_and_json_include_non_deleted_placeholders_without
 }
 
 #[test]
+fn export_external_client_permissions_csv_and_json_include_rows_in_stable_order_without_mutation() {
+    let (mut core, path) = open_test_core();
+
+    let read_client = create_test_external_client_with_mode(&mut core, "read_only");
+    let draft_client = create_test_external_client_with_mode(&mut core, "draft_only");
+
+    let read_permission = core
+        .upsert_external_client_tool_permission(
+            &read_client.id,
+            "contacts.search",
+            true,
+            false,
+            false,
+        )
+        .expect("read permission should insert");
+    let lookup_permission = core
+        .upsert_external_client_tool_permission(
+            &read_client.id,
+            "accounts.lookup",
+            true,
+            false,
+            true,
+        )
+        .expect("second read permission should insert");
+    let draft_permission = core
+        .upsert_external_client_tool_permission(
+            &draft_client.id,
+            "create_activity_draft",
+            true,
+            true,
+            true,
+        )
+        .expect("draft permission should insert");
+
+    core.db
+        .conn
+        .execute(
+            "UPDATE external_client_permissions SET created_at = '2026-06-24T09:00:00Z', updated_at = '2026-06-24T09:15:00Z' WHERE id = ?1",
+            params![&read_permission.id],
+        )
+        .expect("read permission timestamps should update");
+    core.db
+        .conn
+        .execute(
+            "UPDATE external_client_permissions SET created_at = '2026-06-24T08:00:00Z', updated_at = '2026-06-24T08:15:00Z' WHERE id = ?1",
+            params![&lookup_permission.id],
+        )
+        .expect("lookup permission timestamps should update");
+    core.db
+        .conn
+        .execute(
+            "UPDATE external_client_permissions SET created_at = '2026-06-24T07:00:00Z', updated_at = '2026-06-24T07:15:00Z' WHERE id = ?1",
+            params![&draft_permission.id],
+        )
+        .expect("draft permission timestamps should update");
+
+    let mut expected_order = vec![
+        (
+            read_client.id.clone(),
+            "contacts.search".to_string(),
+            "2026-06-24T09:00:00Z".to_string(),
+            read_permission.id.clone(),
+        ),
+        (
+            read_client.id.clone(),
+            "accounts.lookup".to_string(),
+            "2026-06-24T08:00:00Z".to_string(),
+            lookup_permission.id.clone(),
+        ),
+        (
+            draft_client.id.clone(),
+            "create_activity_draft".to_string(),
+            "2026-06-24T07:00:00Z".to_string(),
+            draft_permission.id.clone(),
+        ),
+    ];
+    expected_order.sort();
+    let expected_ids = expected_order
+        .into_iter()
+        .map(|(_, _, _, id)| id)
+        .collect::<Vec<_>>();
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let csv_export_path = path.join("external-client-permissions-export.csv");
+    let csv_count = core
+        .export_external_client_permissions_csv(
+            csv_export_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("external client permissions CSV export should succeed");
+    assert_eq!(csv_count, 3);
+    let csv_rows = read_csv_export(&csv_export_path);
+    assert_eq!(csv_rows.len(), 3);
+    let csv_text = std::fs::read_to_string(&csv_export_path).expect("CSV export should read");
+    assert!(csv_text.starts_with(
+        "id,client_id,tool_name,can_read,can_write,requires_confirmation,created_at,updated_at\n"
+    ));
+    assert_eq!(
+        csv_rows
+            .iter()
+            .map(|row| row.get("id").expect("id should export").clone())
+            .collect::<Vec<_>>(),
+        expected_ids.clone()
+    );
+    let csv_draft_row = csv_rows
+        .iter()
+        .find(|row| row.get("id") == Some(&draft_permission.id))
+        .expect("draft permission should export");
+    assert_eq!(csv_draft_row.get("client_id"), Some(&draft_client.id));
+    assert_eq!(
+        csv_draft_row.get("tool_name"),
+        Some(&"create_activity_draft".to_string())
+    );
+    assert_eq!(csv_draft_row.get("can_read"), Some(&"true".to_string()));
+    assert_eq!(csv_draft_row.get("can_write"), Some(&"true".to_string()));
+    assert_eq!(
+        csv_draft_row.get("requires_confirmation"),
+        Some(&"true".to_string())
+    );
+    assert_eq!(
+        csv_draft_row.get("updated_at"),
+        Some(&"2026-06-24T07:15:00Z".to_string())
+    );
+    let csv_lookup_row = csv_rows
+        .iter()
+        .find(|row| row.get("id") == Some(&lookup_permission.id))
+        .expect("lookup permission should export");
+    assert_eq!(
+        csv_lookup_row.get("requires_confirmation"),
+        Some(&"true".to_string())
+    );
+    let csv_read_row = csv_rows
+        .iter()
+        .find(|row| row.get("id") == Some(&read_permission.id))
+        .expect("read permission should export");
+    assert_eq!(
+        csv_read_row.get("requires_confirmation"),
+        Some(&"false".to_string())
+    );
+
+    let json_export_path = path.join("external-client-permissions-export.json");
+    let json_count = core
+        .export_external_client_permissions_json(
+            json_export_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("external client permissions JSON export should succeed");
+    assert_eq!(json_count, 3);
+    let json_rows = read_json_export(&json_export_path);
+    assert_eq!(
+        json_rows
+            .iter()
+            .map(|row| row["id"].as_str().expect("id should export").to_string())
+            .collect::<Vec<_>>(),
+        expected_ids
+    );
+    let json_draft_row = json_rows
+        .iter()
+        .find(|row| row["id"] == draft_permission.id)
+        .expect("draft permission should export");
+    assert_eq!(
+        json_draft_row
+            .as_object()
+            .expect("permission row should be object")
+            .len(),
+        8
+    );
+    assert_eq!(json_draft_row["client_id"], draft_client.id);
+    assert_eq!(json_draft_row["tool_name"], "create_activity_draft");
+    assert_eq!(json_draft_row["can_read"], true);
+    assert_eq!(json_draft_row["can_write"], true);
+    assert_eq!(json_draft_row["requires_confirmation"], true);
+    assert_eq!(json_draft_row["created_at"], "2026-06-24T07:00:00Z");
+    assert_eq!(json_draft_row["updated_at"], "2026-06-24T07:15:00Z");
+    assert!(json_draft_row.get("name").is_none());
+    assert!(json_draft_row.get("permission_mode").is_none());
+
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn create_organization_writes_organization_audit_and_sync() {
     let (mut core, path) = open_test_core();
 
