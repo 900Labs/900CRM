@@ -6,6 +6,7 @@
   import { t } from '$lib/i18n';
   import { parseCSV, applyMapping } from '$lib/utils/csv';
   import type { ParseCSVResult, ColumnMapping } from '$lib/utils/csv';
+  import { restoreLocalBackupToAppData, validateLocalBackup } from '$lib/api/backup';
   import {
     getImportFieldOptions,
     suggestImportMapping,
@@ -64,6 +65,9 @@
   let preflightReport = $state<ImportPreflightReport | null>(null);
   let importSummary = $state<ImportResult | null>(null);
   let importBackupPath = $state<string | null>(null);
+  let isRestoringImportBackup = $state(false);
+  let importRestoreMessage = $state<string | null>(null);
+  let importRestoreError = $state<string | null>(null);
 
   let exportEntity = $state<ImportExportEntity>('contacts');
   let exportFormat = $state<ExportFormat>('csv');
@@ -162,6 +166,8 @@
     preflightReport = null;
     importSummary = null;
     importBackupPath = null;
+    importRestoreMessage = null;
+    importRestoreError = null;
     validationErrors = [];
     importStep = parseResult.headers.length > 0 ? 'preview' : 'select';
 
@@ -181,6 +187,8 @@
     preflightReport = null;
     importSummary = null;
     importBackupPath = null;
+    importRestoreMessage = null;
+    importRestoreError = null;
     validationErrors = [];
     columnMapping = {};
     importStep = 'select';
@@ -200,6 +208,8 @@
     preflightReport = null;
     importSummary = null;
     importBackupPath = null;
+    importRestoreMessage = null;
+    importRestoreError = null;
 
     if (!options.keepEntity) {
       importEntity = 'contacts';
@@ -216,6 +226,8 @@
     preflightReport = null;
     importSummary = null;
     importBackupPath = null;
+    importRestoreMessage = null;
+    importRestoreError = null;
   }
 
   function validateCurrentMapping(): boolean {
@@ -445,6 +457,50 @@
   function applyImportResult(result: ImportWithBackupResult) {
     importSummary = result.import;
     importBackupPath = result.backup.backup_dir;
+    importRestoreMessage = null;
+    importRestoreError = null;
+  }
+
+  function backupActionErrorMessage(err: unknown): string {
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
+    }
+
+    if (typeof err === 'string' && err.trim()) {
+      return err;
+    }
+
+    return t('import.preImportBackupRestoreFailed');
+  }
+
+  async function restorePreImportBackup() {
+    if (!importBackupPath) {
+      return;
+    }
+
+    isRestoringImportBackup = true;
+    importRestoreMessage = null;
+    importRestoreError = null;
+
+    try {
+      const validation = await validateLocalBackup(importBackupPath);
+      const confirmed = window.confirm(t('import.preImportBackupRestoreConfirm'));
+
+      if (!confirmed) {
+        importRestoreMessage = t('import.preImportBackupRestoreCancelled');
+        return;
+      }
+
+      const result = await restoreLocalBackupToAppData(validation.backup_dir, true);
+      const message = t('import.preImportBackupRestored', { path: result.database_path });
+      importRestoreMessage = message;
+      uiStore.toastSuccess(message);
+    } catch (err) {
+      importRestoreError = backupActionErrorMessage(err);
+      uiStore.toastError(`${t('import.preImportBackupRestoreFailed')}: ${importRestoreError}`);
+    } finally {
+      isRestoringImportBackup = false;
+    }
   }
 
   async function handleExport() {
@@ -747,9 +803,28 @@
                   </div>
                 {/if}
                 {#if importBackupPath}
-                  <p class="backup-summary">
-                    {t('import.preImportBackupCreated', { path: importBackupPath })}
-                  </p>
+                  <div class="backup-summary">
+                    <div class="backup-summary-copy">
+                      <span>{t('import.preImportBackupCreated', { path: importBackupPath })}</span>
+                      <span class="backup-summary-warning">{t('import.preImportBackupRestoreDesc')}</span>
+                    </div>
+                    <button
+                      class="btn btn-danger"
+                      onclick={restorePreImportBackup}
+                      type="button"
+                      disabled={isRestoringImportBackup}
+                    >
+                      {isRestoringImportBackup ? t('import.restoringBackup') : t('import.restorePreImportBackup')}
+                    </button>
+                  </div>
+                  {#if importRestoreMessage}
+                    <p class="backup-restore-status backup-restore-status--success">{importRestoreMessage}</p>
+                  {/if}
+                  {#if importRestoreError}
+                    <p class="backup-restore-status backup-restore-status--error" role="alert">
+                      {t('import.preImportBackupRestoreFailed')}: {importRestoreError}
+                    </p>
+                  {/if}
                 {/if}
               </div>
             {/if}
@@ -929,13 +1004,46 @@
   }
 
   .backup-summary {
+    align-items: flex-start;
     background-color: var(--surface-hover);
     border-left: 3px solid var(--color-primary);
     color: var(--text-secondary);
+    display: flex;
+    gap: var(--space-3);
+    justify-content: space-between;
     font-size: var(--text-sm);
     margin: 0;
     overflow-wrap: anywhere;
     padding: var(--space-3);
+  }
+
+  .backup-summary-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .backup-summary-warning {
+    color: var(--text-danger);
+    font-size: var(--text-xs);
+  }
+
+  .backup-restore-status {
+    border-left: 3px solid currentColor;
+    font-size: var(--text-sm);
+    margin: 0;
+    padding: var(--space-3);
+  }
+
+  .backup-restore-status--success {
+    background-color: var(--surface-hover);
+    color: var(--text-success);
+  }
+
+  .backup-restore-status--error {
+    background-color: var(--surface-hover);
+    color: var(--text-danger);
   }
 
   .validation-message {
@@ -1115,6 +1223,10 @@
 
     .summary-grid {
       grid-template-columns: 1fr;
+    }
+
+    .backup-summary {
+      flex-direction: column;
     }
   }
 </style>
