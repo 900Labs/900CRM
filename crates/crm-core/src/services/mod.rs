@@ -35,8 +35,8 @@ use crate::utils::{
         parse_contacts_json_with_mapping_targets, parse_contacts_json_with_row_numbers,
         parse_deals_csv_with_mapping_targets, parse_deals_csv_with_row_numbers,
         parse_deals_json_with_mapping_targets, parse_deals_json_with_row_numbers,
-        parse_organizations_csv_with_mapping, parse_organizations_csv_with_row_numbers,
-        parse_organizations_json_with_mapping, parse_organizations_json_with_row_numbers,
+        parse_organizations_csv_with_mapping_targets, parse_organizations_csv_with_row_numbers,
+        parse_organizations_json_with_mapping_targets, parse_organizations_json_with_row_numbers,
         preview_activities_json_import, preview_contacts_json_import, preview_deals_json_import,
         preview_organizations_json_import, write_activities_csv, write_contacts_csv,
         write_deals_csv, write_organizations_csv, ActivityCsvRow, ContactCsvRow, DealCsvRow,
@@ -651,6 +651,9 @@ impl CrmCore {
         entity_id: String,
         value: String,
     ) -> CrmResult<CustomFieldValue> {
+        let definition = storage::custom_fields::get_definition(&self.db.conn, &field_def_id)?;
+        self.ensure_custom_field_entity_exists(&definition.entity_type, &entity_id)?;
+
         let device_id = self.device_id.clone();
         let tx = self.db.conn.unchecked_transaction()?;
         let field_value =
@@ -676,6 +679,25 @@ impl CrmCore {
         )?;
         tx.commit()?;
         Ok(field_value)
+    }
+
+    fn ensure_custom_field_entity_exists(
+        &self,
+        entity_type: &str,
+        entity_id: &str,
+    ) -> CrmResult<()> {
+        match entity_type {
+            "contact" => storage::contacts::get_contact(&self.db.conn, entity_id).map(|_| ()),
+            "deal" => storage::deals::get_deal(&self.db.conn, entity_id).map(|_| ()),
+            "activity" => storage::activities::get_activity(&self.db.conn, entity_id).map(|_| ()),
+            "organization" => {
+                storage::organizations::get_organization(&self.db.conn, entity_id).map(|_| ())
+            }
+            _ => Err(CrmError::InvalidInput(format!(
+                "Invalid entity_type '{}'",
+                entity_type
+            ))),
+        }
     }
 
     pub fn list_custom_field_values(
@@ -2109,7 +2131,12 @@ impl CrmCore {
         options: ImportOptions,
     ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_organizations_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        let custom_targets = self.custom_field_import_target_keys("organization")?;
+        let rows = parse_organizations_csv_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
         self.import_organization_rows(rows, options)
     }
 
@@ -2146,7 +2173,12 @@ impl CrmCore {
         options: ImportOptions,
     ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_organizations_json_with_mapping(file_content.as_slice(), &mapping)?;
+        let custom_targets = self.custom_field_import_target_keys("organization")?;
+        let rows = parse_organizations_json_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
         self.import_organization_rows(rows, options)
     }
 
@@ -2163,6 +2195,13 @@ impl CrmCore {
         rows: Vec<(usize, OrganizationCsvRow)>,
         options: ImportOptions,
     ) -> CrmResult<ImportResult> {
+        let custom_targets = self.custom_field_import_targets("organization")?;
+        let custom_rows = rows
+            .iter()
+            .map(|(row_number, row)| (*row_number, row.custom_fields.clone()))
+            .collect::<Vec<_>>();
+        validate_import_custom_fields(&custom_rows, &custom_targets)?;
+
         let mut created = 0u32;
         let mut merged = 0u32;
         let mut skipped = 0u32;
@@ -2173,8 +2212,12 @@ impl CrmCore {
             if options.merge_duplicates {
                 match self.find_unique_organization_import_match(&row) {
                     Ok(Some(organization)) => {
-                        match self.merge_organization_import_row(row_number, &organization.id, &row)
-                        {
+                        match self.merge_organization_import_row(
+                            row_number,
+                            &organization.id,
+                            &row,
+                            &custom_targets,
+                        ) {
                             Ok(rollback_action) => {
                                 if let Some(action) = rollback_action {
                                     rollback_actions.push(action);
@@ -2223,24 +2266,38 @@ impl CrmCore {
                 row.description.clone(),
             ) {
                 Ok(organization) => {
-                    rollback_actions.push(
-                        import_rollback::ImportRollbackAction::created_organization(
-                            row_number,
-                            &organization,
-                        ),
-                    );
-                    let _ = storage::audit::record_audit(
-                        &self.db.conn,
-                        ACTOR_IMPORT,
-                        None,
-                        "import_row",
-                        Some("organization"),
-                        Some(&organization.id),
-                        None,
-                        None,
-                        &self.device_id,
-                    );
-                    created += 1;
+                    match custom_field_import_updates(&row.custom_fields, &custom_targets).and_then(
+                        |updates| {
+                            self.apply_custom_field_import_updates(&organization.id, &updates)?;
+                            self.custom_field_snapshot("organization", &organization.id)
+                        },
+                    ) {
+                        Ok(custom_fields) => {
+                            rollback_actions.push(
+                                import_rollback::ImportRollbackAction::created_organization(
+                                    row_number,
+                                    &organization,
+                                    custom_fields,
+                                ),
+                            );
+                            let _ = storage::audit::record_audit(
+                                &self.db.conn,
+                                ACTOR_IMPORT,
+                                None,
+                                "import_row",
+                                Some("organization"),
+                                Some(&organization.id),
+                                None,
+                                None,
+                                &self.device_id,
+                            );
+                            created += 1;
+                        }
+                        Err(e) => {
+                            errors.push(format!("Row {}: {} ({})", row_number, e, row.name));
+                            skipped += 1;
+                        }
+                    }
                 }
                 Err(e) => {
                     errors.push(format!("Row {}: {} ({})", row_number, e, row.name));
@@ -2304,8 +2361,14 @@ impl CrmCore {
         row_number: usize,
         organization_id: &str,
         row: &OrganizationCsvRow,
+        custom_targets: &BTreeMap<String, String>,
     ) -> CrmResult<Option<import_rollback::ImportRollbackAction>> {
         let existing = self.get_organization(organization_id)?;
+        let before_custom_fields = self.custom_field_snapshot("organization", organization_id)?;
+        let incoming_custom_fields =
+            custom_field_import_updates(&row.custom_fields, custom_targets)?;
+        let custom_updates =
+            custom_field_auto_merge_updates(&before_custom_fields, &incoming_custom_fields);
         let email = fill_blank_option(&existing.email, row.email.as_ref()).map(Some);
         let phone = fill_blank_option(&existing.phone, row.phone.as_ref()).map(Some);
         let website = fill_blank_option(&existing.website, row.website.as_ref()).map(Some);
@@ -2331,26 +2394,47 @@ impl CrmCore {
             && country.is_none()
             && postal_code.is_none()
             && description.is_none()
+            && custom_updates.is_empty()
         {
             return Ok(None);
         }
 
-        let updated = self.update_organization(
-            organization_id,
-            None,
-            email,
-            phone,
-            website,
-            address_line1,
-            address_line2,
-            city,
-            region,
-            country,
-            postal_code,
-            description,
-        )?;
+        let updated = if email.is_some()
+            || phone.is_some()
+            || website.is_some()
+            || address_line1.is_some()
+            || address_line2.is_some()
+            || city.is_some()
+            || region.is_some()
+            || country.is_some()
+            || postal_code.is_some()
+            || description.is_some()
+        {
+            self.update_organization(
+                organization_id,
+                None,
+                email,
+                phone,
+                website,
+                address_line1,
+                address_line2,
+                city,
+                region,
+                country,
+                postal_code,
+                description,
+            )?
+        } else {
+            existing.clone()
+        };
+        self.apply_custom_field_import_updates(organization_id, &custom_updates)?;
+        let post_custom_fields = self.custom_field_snapshot("organization", organization_id)?;
         Ok(import_rollback::ImportRollbackAction::merged_organization(
-            row_number, &existing, &updated,
+            row_number,
+            &existing,
+            &updated,
+            before_custom_fields,
+            post_custom_fields,
         ))
     }
 
@@ -2369,7 +2453,12 @@ impl CrmCore {
         mapping: ImportColumnMapping,
     ) -> CrmResult<ImportPreflightReport> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_organizations_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        let custom_targets = self.custom_field_import_target_keys("organization")?;
+        let rows = parse_organizations_csv_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
         self.preflight_organization_rows(rows)
     }
 
@@ -2388,7 +2477,12 @@ impl CrmCore {
         mapping: ImportColumnMapping,
     ) -> CrmResult<ImportPreflightReport> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_organizations_json_with_mapping(file_content.as_slice(), &mapping)?;
+        let custom_targets = self.custom_field_import_target_keys("organization")?;
+        let rows = parse_organizations_json_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
         self.preflight_organization_rows(rows)
     }
 
@@ -2396,6 +2490,13 @@ impl CrmCore {
         &self,
         rows: Vec<(usize, OrganizationCsvRow)>,
     ) -> CrmResult<ImportPreflightReport> {
+        let custom_targets = self.custom_field_export_targets("organization")?;
+        let custom_rows = rows
+            .iter()
+            .map(|(row_number, row)| (*row_number, row.custom_fields.clone()))
+            .collect::<Vec<_>>();
+        validate_import_custom_fields(&custom_rows, &custom_targets)?;
+
         let mut warnings = Vec::new();
 
         for (row_number, row) in &rows {
@@ -2475,6 +2576,16 @@ impl CrmCore {
     }
 
     fn export_organization_rows(&self) -> CrmResult<Vec<OrganizationCsvRow>> {
+        let custom_targets = self.custom_field_import_targets("organization")?;
+        let field_targets = custom_targets
+            .iter()
+            .map(|(target, field_def_id)| (field_def_id.clone(), target.clone()))
+            .collect::<BTreeMap<_, _>>();
+        let custom_values = self
+            .list_custom_field_values_for_type("organization")?
+            .into_iter()
+            .map(|value| ((value.entity_id, value.field_def_id), value.value))
+            .collect::<BTreeMap<_, _>>();
         let organizations = storage::organizations::list_organizations(&self.db.conn)?;
         Ok(organizations
             .iter()
@@ -2490,6 +2601,18 @@ impl CrmCore {
                 country: organization.country.clone(),
                 postal_code: organization.postal_code.clone(),
                 description: organization.description.clone(),
+                custom_fields: field_targets
+                    .iter()
+                    .map(|(field_def_id, target)| {
+                        (
+                            target.clone(),
+                            custom_values
+                                .get(&(organization.id.clone(), field_def_id.clone()))
+                                .cloned()
+                                .unwrap_or_default(),
+                        )
+                    })
+                    .collect(),
             })
             .collect())
     }

@@ -1,6 +1,6 @@
 # Data Model
 
-Date: 2026-06-24
+Date: 2026-06-25
 
 This document describes the current 900CRM local data model as implemented in
 `crates/crm-core` and exposed through the desktop app. It is a public baseline
@@ -127,9 +127,11 @@ target `tag_links` row.
 Custom field definitions live in `custom_field_defs`; values live in
 `custom_field_values`.
 
-Current supported entity types are `contact`, `deal`, and `activity`. Supported
-field types are `text`, `number`, `date`, `boolean`, and `select`. Organization
-custom fields are not implemented in the current storage validation.
+Current supported entity types are `contact`, `deal`, `activity`, and
+`organization`. Supported field types are `text`, `number`, `date`, `boolean`,
+and `select`. Custom field value writes validate that the referenced entity is
+an existing active row for the definition's entity type before storing the
+value.
 
 ### Settings
 

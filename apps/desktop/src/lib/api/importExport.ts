@@ -31,7 +31,8 @@ export type OrganizationImportTargetField =
   | 'region'
   | 'country'
   | 'postal_code'
-  | 'description';
+  | 'description'
+  | CustomFieldImportTargetField;
 export type DealImportTargetField =
   | 'title'
   | 'value'
@@ -130,6 +131,7 @@ export interface OrganizationImportRollbackSnapshot {
   source?: string | null;
   description?: string | null;
   updated_at: string;
+  custom_fields?: Record<string, string>;
 }
 
 export type ImportRollbackAction =

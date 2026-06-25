@@ -89,11 +89,13 @@
     contacts: CustomFieldDefinition[];
     deals: CustomFieldDefinition[];
     activities: CustomFieldDefinition[];
-  }>({ contacts: [], deals: [], activities: [] });
-  let loadedImportCustomFields = $state<{ contacts: boolean; deals: boolean; activities: boolean }>({
+    organizations: CustomFieldDefinition[];
+  }>({ contacts: [], deals: [], activities: [], organizations: [] });
+  let loadedImportCustomFields = $state<{ contacts: boolean; deals: boolean; activities: boolean; organizations: boolean }>({
     contacts: false,
     deals: false,
     activities: false,
+    organizations: false,
   });
 
   let exportEntity = $state<ImportExportEntity>('contacts');
@@ -131,7 +133,7 @@
         ? importCustomFieldDefinitions.deals
         : importEntity === 'activities'
           ? importCustomFieldDefinitions.activities
-        : [],
+          : importCustomFieldDefinitions.organizations,
   );
   const importFieldOptions = $derived(
     mappedEntity ? getImportFieldOptions(mappedEntity, activeImportCustomFields) : [],
@@ -151,15 +153,18 @@
   const importRollbackActionCount = $derived(importRollbackPlan?.actions.length ?? 0);
 
   async function ensureImportCustomFields(entity: ImportExportEntity): Promise<CustomFieldDefinition[]> {
-    if (entity !== 'contacts' && entity !== 'deals' && entity !== 'activities') {
-      return [];
-    }
-
     if (loadedImportCustomFields[entity]) {
       return importCustomFieldDefinitions[entity];
     }
 
-    const entityType = entity === 'contacts' ? 'contact' : entity === 'deals' ? 'deal' : 'activity';
+    const entityType =
+      entity === 'contacts'
+        ? 'contact'
+        : entity === 'deals'
+          ? 'deal'
+          : entity === 'activities'
+            ? 'activity'
+            : 'organization';
     const definitions = await listCustomFieldDefinitions(entityType);
     importCustomFieldDefinitions = {
       ...importCustomFieldDefinitions,
