@@ -113,6 +113,22 @@ pub fn list_pending_proposed_actions(conn: &Connection) -> CrmResult<Vec<Propose
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+pub fn list_all_proposed_actions(conn: &Connection) -> CrmResult<Vec<ProposedAction>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, client_id, action_type, tool_name, entity_type, entity_id,
+               input_json, proposed_output_json, status, created_at,
+               approved_at, rejected_at, executed_at, device_id
+        FROM proposed_actions
+        ORDER BY created_at ASC, id ASC
+        "#,
+    )?;
+
+    let rows = stmt.query_map([], map_proposed_action_row)?;
+
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
 pub fn approve_proposed_action(conn: &Connection, id: &str) -> CrmResult<ProposedAction> {
     decide_proposed_action(conn, id, ProposedActionDecision::Approve, |_, _| Ok(()))
 }

@@ -26,6 +26,8 @@ import {
   exportNotesJson,
   exportOrganizationsCsv,
   exportOrganizationsJson,
+  exportProposedActionsCsv,
+  exportProposedActionsJson,
   exportTagDefinitionsCsv,
   exportTagDefinitionsJson,
   exportTagLinksCsv,
@@ -381,6 +383,20 @@ describe('import/export API', () => {
     });
   });
 
+  it('maps proposed actions export-only commands', async () => {
+    invokeMock.mockResolvedValueOnce(3);
+    await expect(exportProposedActionsCsv('/tmp/proposed-actions-export.csv')).resolves.toBe(3);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_proposed_actions_csv', {
+      file_path: '/tmp/proposed-actions-export.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(3);
+    await expect(exportProposedActionsJson('/tmp/proposed-actions-export.json')).resolves.toBe(3);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_proposed_actions_json', {
+      file_path: '/tmp/proposed-actions-export.json',
+    });
+  });
+
   it('routes generic CSV helpers by entity', async () => {
     invokeMock.mockResolvedValueOnce(importWithBackup(1));
     await importCsv('organizations', '/tmp/orgs.csv');
@@ -441,6 +457,12 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('export_audit_log_csv', {
       file_path: '/tmp/audit-log-export.csv',
     });
+
+    invokeMock.mockResolvedValueOnce(3);
+    await exportCsv('proposed_actions', '/tmp/proposed-actions-export.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_proposed_actions_csv', {
+      file_path: '/tmp/proposed-actions-export.csv',
+    });
   });
 
   it('routes generic import/export helpers by entity and format', async () => {
@@ -496,6 +518,12 @@ describe('import/export API', () => {
     await exportData('audit_log', 'json', '/tmp/audit-log-export.json');
     expect(invokeMock).toHaveBeenLastCalledWith('export_audit_log_json', {
       file_path: '/tmp/audit-log-export.json',
+    });
+
+    invokeMock.mockResolvedValueOnce(3);
+    await exportData('proposed_actions', 'json', '/tmp/proposed-actions-export.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_proposed_actions_json', {
+      file_path: '/tmp/proposed-actions-export.json',
     });
   });
 
