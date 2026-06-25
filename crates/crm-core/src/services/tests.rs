@@ -2747,6 +2747,83 @@ fn import_rollback_soft_deletes_created_contact_rows_once() {
 }
 
 #[test]
+fn import_rollback_soft_deletes_created_deal_and_organization_rows() {
+    let (mut core, path) = open_test_core();
+    let deal_json_path = path.join("deals-created-rollback.json");
+    std::fs::write(
+        &deal_json_path,
+        r#"[
+  {
+    "title": "Acme Renewal",
+    "value": "12500.50",
+    "currency": "EUR",
+    "stage": "Proposal",
+    "expected_close": "2026-09-30",
+    "notes": "Renewal path"
+  }
+]
+"#,
+    )
+    .expect("deal JSON fixture should write");
+
+    let deal_result = core
+        .import_deals_json(deal_json_path.to_str().expect("path should be valid UTF-8"))
+        .expect("deal import should succeed");
+    let deal_rollback_plan = deal_result
+        .rollback_plan
+        .clone()
+        .expect("created deal import should return a rollback plan");
+    assert_eq!(deal_rollback_plan.actions.len(), 1);
+    assert_eq!(core.list_deals().expect("deals list").len(), 1);
+
+    let deal_rollback = core
+        .rollback_completed_import(&deal_rollback_plan)
+        .expect("created deal rollback should complete");
+    assert_eq!(deal_rollback.rolled_back, 1);
+    assert_eq!(deal_rollback.skipped, 0);
+    assert!(deal_rollback.errors.is_empty());
+    assert_eq!(core.list_deals().expect("deals list").len(), 0);
+
+    let organization_csv_path = path.join("organizations-created-rollback.csv");
+    std::fs::write(
+        &organization_csv_path,
+        "name,email,phone\nAcme Health,hello@acme.example,+2345550100\n",
+    )
+    .expect("organization CSV fixture should write");
+
+    let organization_result = core
+        .import_organizations_csv(
+            organization_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("organization import should succeed");
+    let organization_rollback_plan = organization_result
+        .rollback_plan
+        .clone()
+        .expect("created organization import should return a rollback plan");
+    assert_eq!(organization_rollback_plan.actions.len(), 1);
+    assert_eq!(
+        core.list_organizations().expect("organizations list").len(),
+        1
+    );
+
+    let organization_rollback = core
+        .rollback_completed_import(&organization_rollback_plan)
+        .expect("created organization rollback should complete");
+    assert_eq!(organization_rollback.rolled_back, 1);
+    assert_eq!(organization_rollback.skipped, 0);
+    assert!(organization_rollback.errors.is_empty());
+    assert_eq!(
+        core.list_organizations().expect("organizations list").len(),
+        0
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn import_rollback_restores_only_changed_contact_merge_fields() {
     let (mut core, path) = open_test_core();
     let existing = core
@@ -3364,6 +3441,75 @@ fn import_deals_csv_with_auto_merge_fills_safe_fields_without_overwriting_and_cr
         "SELECT COUNT(*) FROM audit_log WHERE actor_type = 'import' AND action = 'import_row_merge' AND entity_type = 'deal'",
     );
     assert_eq!(import_merge_audit, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_rollback_restores_changed_deal_merge_fields() {
+    let (mut core, path) = open_test_core();
+    let existing = core
+        .create_deal(
+            "Acme Renewal".to_string(),
+            Some(0.0),
+            Some("EUR".to_string()),
+            Some("Proposal".to_string()),
+            Some(50),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("existing deal should be created");
+
+    let csv_path = path.join("deals-merge-rollback.csv");
+    std::fs::write(
+        &csv_path,
+        "title,value,currency,stage,expected_close,notes\n\
+         acme renewal,12500.50,USD,Negotiation,2026-10-15,Imported note\n",
+    )
+    .expect("deal auto-merge CSV fixture should write");
+
+    let result = core
+        .import_deals_csv_with_options(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("deal auto-merge import should succeed");
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("deal merge import should return a rollback plan");
+
+    let merged = core
+        .get_deal(&existing.id)
+        .expect("merged deal should still exist");
+    assert_eq!(merged.title, "Acme Renewal");
+    assert_eq!(merged.value, 12500.50);
+    assert_eq!(merged.currency, "EUR");
+    assert_eq!(merged.stage, "Proposal");
+    assert_eq!(merged.expected_close.as_deref(), Some("2026-10-15"));
+    assert_eq!(merged.notes, "Imported note");
+
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("deal merge rollback should complete");
+    assert_eq!(rollback.rolled_back, 1);
+    assert_eq!(rollback.skipped, 0);
+    assert!(rollback.errors.is_empty());
+
+    let restored = core
+        .get_deal(&existing.id)
+        .expect("deal should still exist after rollback");
+    assert_eq!(restored.title, "Acme Renewal");
+    assert_eq!(restored.value, 0.0);
+    assert_eq!(restored.currency, "EUR");
+    assert_eq!(restored.stage, "Proposal");
+    assert_eq!(restored.expected_close, None);
+    assert_eq!(restored.notes, "");
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);
