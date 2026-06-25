@@ -1,5 +1,5 @@
 //! Flat import/export row helpers for contacts, deals, organizations, activities, notes, tags,
-//! custom field definitions, audit logs, and proposed actions.
+//! custom field definitions, external clients, audit logs, and proposed actions.
 //!
 //! This module provides utilities for reading and writing CSV files and parsing
 //! JSON arrays used in the 900CRM import/export feature. It wraps the [`csv`]
@@ -89,6 +89,20 @@
 //! | `after_json`  | Optional post-change JSON payload |
 //! | `created_at`  | Audit row creation timestamp |
 //! | `device_id`   | Local device identifier |
+//!
+//! # External Clients CSV Format
+//!
+//! | Column            | Notes |
+//! |-------------------|-------|
+//! | `id`              | Local external client UUID |
+//! | `name`            | Client display name |
+//! | `client_type`     | Client category, such as `mcp` |
+//! | `permission_mode` | Stored permission mode; export does not grant permissions |
+//! | `enabled`         | Stored enabled flag |
+//! | `created_at`      | Client creation timestamp |
+//! | `updated_at`      | Client update timestamp |
+//! | `deleted_at`      | Soft-delete timestamp, blank for exported active rows |
+//! | `device_id`       | Local device identifier |
 //!
 //! # Proposed Actions CSV Format
 //!
@@ -492,6 +506,25 @@ pub struct AuditLogCsvRow {
     #[serde(default)]
     pub after_json: Option<String>,
     pub created_at: String,
+    pub device_id: String,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// External client CSV record
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A flat CSV/JSON row representing one local external client placeholder.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExternalClientCsvRow {
+    pub id: String,
+    pub name: String,
+    pub client_type: String,
+    pub permission_mode: String,
+    pub enabled: bool,
+    pub created_at: String,
+    pub updated_at: String,
+    #[serde(default)]
+    pub deleted_at: Option<String>,
     pub device_id: String,
 }
 
@@ -2956,6 +2989,52 @@ pub fn write_audit_log_csv<W: Write>(writer: W, rows: &[AuditLogCsvRow]) -> CrmR
 
     wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
     log::info!("Wrote {} audit log rows to CSV", rows.len());
+    Ok(())
+}
+
+/// Serializes a slice of [`ExternalClientCsvRow`] to CSV bytes.
+///
+/// The output always includes current external-client storage columns in a
+/// deterministic order. It is export-only and does not imply activation.
+pub fn write_external_clients_csv<W: Write>(
+    writer: W,
+    rows: &[ExternalClientCsvRow],
+) -> CrmResult<()> {
+    let mut wtr = csv::WriterBuilder::new()
+        .has_headers(false)
+        .from_writer(writer);
+
+    wtr.write_record([
+        "id",
+        "name",
+        "client_type",
+        "permission_mode",
+        "enabled",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+        "device_id",
+    ])
+    .map_err(|e| CrmError::Csv(e.to_string()))?;
+
+    for row in rows {
+        let enabled = row.enabled.to_string();
+        wtr.write_record([
+            &row.id,
+            &row.name,
+            &row.client_type,
+            &row.permission_mode,
+            &enabled,
+            &row.created_at,
+            &row.updated_at,
+            row.deleted_at.as_deref().unwrap_or_default(),
+            &row.device_id,
+        ])
+        .map_err(|e| CrmError::Csv(e.to_string()))?;
+    }
+
+    wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
+    log::info!("Wrote {} external client rows to CSV", rows.len());
     Ok(())
 }
 

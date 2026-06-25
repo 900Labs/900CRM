@@ -5,7 +5,6 @@ use crate::result::CrmResult;
 use crate::storage::{
     self,
     activities::{Activity, ActivityLinkEntityType},
-    external_clients::ExternalClient,
     proposed_actions::ProposedAction,
 };
 use crate::utils::{
@@ -58,26 +57,6 @@ impl CrmCore {
 
     pub fn reject_proposed_action(&mut self, id: String) -> CrmResult<ProposedAction> {
         self.decide_proposed_action(id, ProposedActionDecision::Reject)
-    }
-
-    pub fn list_external_clients(&self) -> CrmResult<Vec<ExternalClient>> {
-        storage::external_clients::list_external_clients(&self.db.conn)
-    }
-
-    pub fn create_external_client_placeholder(
-        &mut self,
-        name: &str,
-        client_type: &str,
-    ) -> CrmResult<ExternalClient> {
-        let name = required_external_client_field("name", name)?;
-        let client_type = required_external_client_field("client_type", client_type)?;
-
-        storage::external_clients::create_external_client_placeholder(
-            &self.db.conn,
-            &name,
-            &client_type,
-            &self.device_id,
-        )
     }
 
     // Preserve the placeholder API shape until external-client execution is implemented.
