@@ -8,6 +8,7 @@ export type ImportExportEntity = 'contacts' | 'deals' | 'organizations';
 export type ImportPreflightEntity = 'contacts' | 'deals' | 'organizations';
 export type ImportFormat = 'csv' | 'json';
 export type ExportFormat = 'csv' | 'json';
+export type CustomFieldImportTargetField = `custom:${string}`;
 export type ContactImportTargetField =
   | 'first_name'
   | 'last_name'
@@ -17,7 +18,8 @@ export type ContactImportTargetField =
   | 'address'
   | 'city'
   | 'country'
-  | 'notes';
+  | 'notes'
+  | CustomFieldImportTargetField;
 export type OrganizationImportTargetField =
   | 'name'
   | 'email'
@@ -36,7 +38,8 @@ export type DealImportTargetField =
   | 'currency'
   | 'stage'
   | 'expected_close'
-  | 'notes';
+  | 'notes'
+  | CustomFieldImportTargetField;
 export type ImportTargetField =
   | ContactImportTargetField
   | DealImportTargetField
@@ -74,6 +77,7 @@ export interface ContactImportRollbackSnapshot {
   organization_id?: string | null;
   notes: string;
   updated_at: string;
+  custom_fields?: Record<string, string>;
 }
 
 export interface DealImportRollbackSnapshot {
@@ -87,6 +91,7 @@ export interface DealImportRollbackSnapshot {
   organization_id?: string | null;
   notes: string;
   updated_at: string;
+  custom_fields?: Record<string, string>;
 }
 
 export interface OrganizationImportRollbackSnapshot {

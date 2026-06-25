@@ -1,6 +1,8 @@
 import { mapColumns, type ColumnMapping } from './csv';
+import type { CustomFieldDefinition } from '$lib/api/customFields';
 import type {
   ContactImportTargetField,
+  CustomFieldImportTargetField,
   DealImportTargetField,
   ImportColumnMapping,
   ImportPreflightEntity,
@@ -55,6 +57,8 @@ export const DEAL_IMPORT_FIELDS: ImportFieldOption<DealImportTargetField>[] = [
   { value: 'expected_close', label: 'Expected close' },
   { value: 'notes', label: 'Notes' },
 ];
+
+type CustomImportEntity = 'contacts' | 'deals';
 
 const CONTACT_ALIASES: Record<string, ContactImportTargetField> = {
   firstname: 'first_name',
@@ -140,27 +144,50 @@ const DEAL_ALIASES: Record<string, DealImportTargetField> = {
   memo: 'notes',
 };
 
-export function getImportFieldOptions(entity: MappedImportEntity): ImportFieldOption[] {
+export function getImportFieldOptions(
+  entity: MappedImportEntity,
+  customFields: CustomFieldDefinition[] = [],
+): ImportFieldOption[] {
   if (entity === 'contacts') {
-    return CONTACT_IMPORT_FIELDS;
+    return [
+      ...CONTACT_IMPORT_FIELDS,
+      ...customFieldOptions('contacts', customFields),
+    ];
   }
 
   if (entity === 'deals') {
-    return DEAL_IMPORT_FIELDS;
+    return [
+      ...DEAL_IMPORT_FIELDS,
+      ...customFieldOptions('deals', customFields),
+    ];
   }
 
   return ORGANIZATION_IMPORT_FIELDS;
 }
 
-export function suggestImportMapping(entity: MappedImportEntity, headers: string[]): ColumnMapping {
-  const fields = getImportFieldOptions(entity).map((field) => field.value);
+export function suggestImportMapping(
+  entity: MappedImportEntity,
+  headers: string[],
+  customFields: CustomFieldDefinition[] = [],
+): ColumnMapping {
+  const fields = getImportFieldOptions(entity, customFields)
+    .map((field) => field.value)
+    .filter((field) => !field.startsWith('custom:'));
   const suggested = mapColumns(headers, fields);
   const aliases = getImportAliases(entity);
+  const customAliases = getCustomImportAliases(entity, customFields);
 
   for (const header of headers) {
-    const alias = aliases[normalizeHeader(header)];
+    const normalized = normalizeHeader(header);
+    const alias = aliases[normalized];
     if (alias) {
       suggested[header] = alias;
+      continue;
+    }
+
+    const customAlias = customAliases[normalized];
+    if (customAlias && suggested[header] === null) {
+      suggested[header] = customAlias;
     }
   }
 
@@ -182,8 +209,9 @@ function getImportAliases(entity: MappedImportEntity): Record<string, ImportTarg
 export function validateImportMapping(
   entity: MappedImportEntity,
   mapping: ColumnMapping,
+  customFields: CustomFieldDefinition[] = [],
 ): ImportMappingValidation {
-  const fieldOptions = getImportFieldOptions(entity);
+  const fieldOptions = getImportFieldOptions(entity, customFields);
   const allowedFields = new Set<string>(fieldOptions.map((field) => field.value));
   const assigned = new Map<string, string[]>();
   const errors: string[] = [];
@@ -229,4 +257,75 @@ export function toBackendMapping<TTarget extends ImportTargetField>(
 
 function normalizeHeader(header: string): string {
   return header.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function customFieldOptions(
+  entity: CustomImportEntity,
+  customFields: CustomFieldDefinition[],
+): ImportFieldOption<CustomFieldImportTargetField>[] {
+  const fields = customFieldsForEntity(entity, customFields);
+  const duplicateNames = duplicateCustomFieldNames(fields);
+
+  return fields.map((field) => ({
+    value: customFieldTarget(field, duplicateNames.has(field.field_name)),
+    label: duplicateNames.has(field.field_name)
+      ? `Custom: ${field.field_name} (${field.id})`
+      : `Custom: ${field.field_name}`,
+  }));
+}
+
+function getCustomImportAliases(
+  entity: MappedImportEntity,
+  customFields: CustomFieldDefinition[],
+): Record<string, CustomFieldImportTargetField> {
+  if (entity !== 'contacts' && entity !== 'deals') {
+    return {};
+  }
+
+  const fields = customFieldsForEntity(entity, customFields);
+  const duplicateNames = duplicateCustomFieldNames(fields);
+  const aliases: Record<string, CustomFieldImportTargetField> = {};
+  for (const field of fields) {
+    const duplicateName = duplicateNames.has(field.field_name);
+    const target = customFieldTarget(field, duplicateName);
+    aliases[normalizeHeader(target)] = target;
+
+    if (!duplicateName) {
+      aliases[normalizeHeader(field.field_name)] = target;
+    }
+  }
+  return aliases;
+}
+
+function customFieldsForEntity(
+  entity: CustomImportEntity,
+  customFields: CustomFieldDefinition[],
+): CustomFieldDefinition[] {
+  const expectedEntityType = entity === 'contacts' ? 'contact' : 'deal';
+  return customFields.filter((field) => field.entity_type === expectedEntityType);
+}
+
+function duplicateCustomFieldNames(customFields: CustomFieldDefinition[]): Set<string> {
+  const counts = new Map<string, number>();
+  for (const field of customFields) {
+    counts.set(field.field_name, (counts.get(field.field_name) ?? 0) + 1);
+  }
+
+  return new Set(
+    Array.from(counts.entries())
+      .filter(([, count]) => count > 1)
+      .map(([fieldName]) => fieldName),
+  );
+}
+
+function customFieldTarget(
+  field: CustomFieldDefinition,
+  duplicateName: boolean,
+): CustomFieldImportTargetField {
+  const escapedFieldName = escapeCustomFieldName(field.field_name);
+  return duplicateName ? `custom:${escapedFieldName}#${field.id}` : `custom:${escapedFieldName}`;
+}
+
+function escapeCustomFieldName(fieldName: string): string {
+  return fieldName.replace(/%/g, '%25').replace(/#/g, '%23');
 }

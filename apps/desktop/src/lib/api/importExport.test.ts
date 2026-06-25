@@ -535,6 +535,35 @@ describe('import/export API', () => {
     );
   });
 
+  it('passes contact custom field mappings through invoke payloads', async () => {
+    const mapping = {
+      first: 'first_name',
+      vip: 'custom:VIP Tier',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importContactsJsonWithMapping('/tmp/contacts.json', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_json_with_mapping', {
+      file_path: '/tmp/contacts.json',
+      mapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'contacts',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightContactsJsonImportWithMapping('/tmp/contacts.json', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_contacts_json_import_with_mapping',
+      {
+        file_path: '/tmp/contacts.json',
+        mapping,
+      },
+    );
+  });
+
   it('maps organization CSV import/preflight commands with field mappings', async () => {
     const mapping = {
       Company: 'name',

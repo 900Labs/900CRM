@@ -175,6 +175,45 @@ deals pass `None` for `contact_id` and `organization_id`.
 Deal export writes `title`, `value`, `currency`, `stage`, `expected_close`, and
 `notes` with a header row. Values are formatted with two decimal places.
 
+## Contact And Deal Custom Fields
+
+Contact and deal import/export supports existing active custom field values using
+the stable target convention `custom:<field_name>` when the active field name is
+unique for that entity type. If two active custom fields for the same entity
+type share a name, those duplicate-name targets use
+`custom:<field_name>#<field_id>`.
+Literal `%` and `#` characters in the field name portion are escaped as `%25`
+and `%23` so the duplicate-name suffix stays unambiguous.
+
+CSV and JSON exports include one `custom:` column or object key for each active
+custom field definition on the exported entity type. Rows with no value for that
+definition export a blank value. Exports use the existing custom field storage
+definitions and values; they do not create, rename, or delete custom field
+definitions.
+
+CSV and JSON imports can set contact and deal custom values in two ways:
+
+- direct imports can use source columns or JSON object keys named
+  with the supported `custom:` target;
+- mapped imports can map any source column or JSON object key to a supported
+  `custom:` target shown in the import wizard.
+
+Blank custom field source values are ignored. Non-blank values are written
+through the existing custom field value upsert path after the contact or deal row
+is created or merged.
+
+Custom field names are user-readable and are not currently schema-unique. If two
+active custom field definitions for the same entity type share a field name, the
+field-id suffix keeps exports complete and lets imports map back to the intended
+existing custom field definition. The import wizard labels duplicate-name
+options with the field id. For unusual field names that contain `%` or `#`, use
+the exported `custom:` key or the import wizard target rather than typing an
+unescaped key by hand.
+
+Organization custom field import/export is not supported because organization
+custom field storage is not part of the current custom field validation surface.
+Activity import/export is not part of the current import/export surface.
+
 ## JSON Import And Export
 
 JSON import and export are available for contacts, deals, and organizations from
@@ -200,14 +239,17 @@ JSON export uses the same active-row listing boundaries as CSV export:
   path.
 
 JSON export does not include record IDs, timestamps, deleted rows, device IDs,
-relationship rows, custom fields, separate note records, tags, activities, audit
-log entries, proposed actions, external clients, permissions, settings, or
-backup metadata.
+relationship rows, separate note records, tags, activities, audit log entries,
+proposed actions, external clients, permissions, settings, or backup metadata.
+For contacts and deals, JSON export does include active custom field values using
+`custom:` keys as described above.
 
 JSON import has the same entity scope. It does not import record IDs, timestamps,
-deleted rows, device IDs, relationship rows, custom fields, separate note
-records, tags, activities, audit log entries, proposed actions, external
-clients, permissions, settings, or backup metadata.
+deleted rows, device IDs, relationship rows, separate note records, tags,
+activities, audit log entries, proposed actions, external clients, permissions,
+settings, or backup metadata. For contacts and deals, JSON import can set
+existing custom field values using `custom:` keys or mapped custom
+field targets as described above.
 
 JSON import preview is read-only and browser-visible in the import/export modal.
 It shows source object keys before the mapping step. Matching supported JSON
@@ -233,6 +275,10 @@ Organization preflight checks active organizations for:
 Deal preflight checks active deals for:
 
 - case-insensitive exact title matches after trimming the imported title.
+
+Custom field values do not participate in duplicate detection. Preflight parses
+and validates supported contact/deal custom field targets, but duplicate warnings
+are based only on the flat fields listed above.
 
 Preflight returns warnings with the source row number, match type, source value,
 existing record ID, existing display label, and a human-readable reason. CSV
@@ -270,6 +316,10 @@ blank fields on that record without overwriting existing non-empty values.
 Existing IDs and active rows are preserved, and updates route through the
 existing `crm-core` update services so sync and audit behavior stays aligned
 with normal edits. Non-duplicate rows continue to create normally.
+
+For contacts and deals, duplicate auto-merge also fills missing or blank custom
+field values from supported `custom:` import targets. It does not
+overwrite existing non-empty custom field values.
 
 Deal auto-merge is intentionally conservative. Existing deal titles are never
 overwritten. Imported `expected_close` and `notes` values fill only blank
@@ -324,20 +374,24 @@ fields through duplicate auto-merge. The current Import/Export summary can use
 that plan to request rollback of the just-completed import.
 
 Rollback is available for CSV, mapped CSV, JSON, and mapped JSON imports. It is
-limited to the same flat contact, deal, and organization fields supported by
+limited to the same contact, deal, and organization rows supported by
 import/export:
 
 - created rows are soft-deleted through the existing `crm-core` delete service
-  for the matching entity;
+  for the matching entity; contact/deal custom field values created by that
+  imported row are deleted after the row passes its rollback conflict check;
 - duplicate auto-merge rows restore only the fields that the import merge
   changed, through the existing `crm-core` update service for the matching
-  entity.
+  entity; contact/deal custom field values changed by duplicate auto-merge are
+  restored to their before-import value or removed if they did not exist before
+  import.
 
 Rollback is conflict-safe. Before applying each row action, `crm-core` compares
 the current active row to the post-import state recorded in the rollback plan.
 If the row was edited, deleted, or otherwise no longer matches the expected
-post-import state, that row is skipped and reported as a row-level error. Later
-rollback rows continue to run.
+post-import state, that row is skipped and reported as a row-level error. For
+contacts and deals, the post-import comparison includes custom field values.
+Later rollback rows continue to run.
 
 The rollback result reports:
 
@@ -355,9 +409,9 @@ created rows are reported as skipped, and already-restored merge rows no longer
 match the post-import expected state.
 
 Row-level rollback is not full database restore. It does not roll back
-relationships, custom fields, notes-as-records, tags, activities, audit logs,
-sync changelog rows, proposed actions, external clients, permissions, settings,
-backup metadata, or schema changes.
+relationships, organization custom fields, notes-as-records, tags, activities,
+audit logs, sync changelog rows, proposed actions, external clients,
+permissions, settings, backup metadata, or schema changes.
 
 ## Export Behavior
 
@@ -409,6 +463,6 @@ The following are not implemented in the current import/export surface:
 - Scheduled export.
 - MCP/AI-driven import behavior.
 - Sync-server upload or download as part of import/export.
-- Custom field import/export.
+- Organization or activity custom field import/export.
 - Notes, tags, activities, audit log, proposed actions, external clients, or
   permissions import/export.

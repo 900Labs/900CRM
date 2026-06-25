@@ -29,15 +29,15 @@ use crate::storage::{
 };
 use crate::utils::{
     csv::{
-        parse_contacts_csv_with_mapping, parse_contacts_csv_with_row_numbers,
-        parse_contacts_json_with_mapping, parse_contacts_json_with_row_numbers,
-        parse_deals_csv_with_mapping, parse_deals_csv_with_row_numbers,
-        parse_deals_json_with_mapping, parse_deals_json_with_row_numbers,
+        parse_contacts_csv_with_mapping_targets, parse_contacts_csv_with_row_numbers,
+        parse_contacts_json_with_mapping_targets, parse_contacts_json_with_row_numbers,
+        parse_deals_csv_with_mapping_targets, parse_deals_csv_with_row_numbers,
+        parse_deals_json_with_mapping_targets, parse_deals_json_with_row_numbers,
         parse_organizations_csv_with_mapping, parse_organizations_csv_with_row_numbers,
         parse_organizations_json_with_mapping, parse_organizations_json_with_row_numbers,
         preview_contacts_json_import, preview_deals_json_import, preview_organizations_json_import,
         write_contacts_csv, write_deals_csv, write_organizations_csv, ContactCsvRow, DealCsvRow,
-        ImportColumnMapping, JsonImportPreview, OrganizationCsvRow,
+        ImportColumnMapping, JsonImportPreview, OrganizationCsvRow, CUSTOM_FIELD_PREFIX,
     },
     datetime::now_iso8601,
     errors::{CrmError, CrmResult as InternalCrmResult},
@@ -690,6 +690,131 @@ impl CrmCore {
         storage::custom_fields::list_values_for_entity_type(&self.db.conn, entity_type)
     }
 
+    fn custom_field_import_target_keys(&self, entity_type: &str) -> CrmResult<Vec<String>> {
+        Ok(self
+            .custom_field_import_targets(entity_type)?
+            .keys()
+            .cloned()
+            .collect())
+    }
+
+    fn custom_field_import_targets(
+        &self,
+        entity_type: &str,
+    ) -> CrmResult<BTreeMap<String, String>> {
+        let definitions =
+            storage::custom_fields::list_definitions(&self.db.conn, Some(entity_type))?;
+        Ok(custom_field_targets(definitions))
+    }
+
+    fn custom_field_export_targets(
+        &self,
+        entity_type: &str,
+    ) -> CrmResult<BTreeMap<String, String>> {
+        let definitions =
+            storage::custom_fields::list_definitions(&self.db.conn, Some(entity_type))?;
+        Ok(custom_field_targets(definitions))
+    }
+
+    fn custom_field_snapshot(
+        &self,
+        entity_type: &str,
+        entity_id: &str,
+    ) -> CrmResult<BTreeMap<String, String>> {
+        Ok(
+            storage::custom_fields::list_values_for_entity(&self.db.conn, entity_type, entity_id)?
+                .into_iter()
+                .map(|value| (value.field_def_id, value.value))
+                .collect(),
+        )
+    }
+
+    fn restore_custom_field_value_for_rollback(
+        &mut self,
+        field_def_id: &str,
+        entity_id: &str,
+        value: &str,
+    ) -> CrmResult<()> {
+        self.set_custom_field_value(
+            field_def_id.to_string(),
+            entity_id.to_string(),
+            value.to_string(),
+        )?;
+        Ok(())
+    }
+
+    fn delete_custom_field_value_for_rollback(
+        &mut self,
+        field_def_id: &str,
+        entity_id: &str,
+    ) -> CrmResult<()> {
+        let device_id = self.device_id.clone();
+        let tx = self.db.conn.unchecked_transaction()?;
+        let Some(before) =
+            storage::custom_fields::get_value_for_entity_field(&tx, field_def_id, entity_id)?
+        else {
+            tx.commit()?;
+            return Ok(());
+        };
+
+        storage::custom_fields::delete_value_for_entity_field(&tx, field_def_id, entity_id)?;
+        storage::sync::record_change(
+            &tx,
+            "custom_field_value",
+            &before.id,
+            "__delete__",
+            Some(&before.value),
+            None,
+            &device_id,
+        )?;
+        record_audit_json(
+            &tx,
+            ACTOR_DESKTOP_APP,
+            "delete_value",
+            Some("custom_field_value"),
+            Some(&before.id),
+            Some(&before),
+            Option::<&CustomFieldValue>::None,
+            &device_id,
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn delete_custom_field_values_for_rollback(
+        &mut self,
+        entity_type: &str,
+        entity_id: &str,
+    ) -> CrmResult<()> {
+        let field_def_ids = self
+            .custom_field_snapshot(entity_type, entity_id)?
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        for field_def_id in field_def_ids {
+            self.delete_custom_field_value_for_rollback(&field_def_id, entity_id)?;
+        }
+
+        Ok(())
+    }
+
+    fn apply_custom_field_import_updates(
+        &mut self,
+        entity_id: &str,
+        updates: &BTreeMap<String, String>,
+    ) -> CrmResult<()> {
+        for (field_def_id, value) in updates {
+            self.set_custom_field_value(
+                field_def_id.clone(),
+                entity_id.to_string(),
+                value.clone(),
+            )?;
+        }
+
+        Ok(())
+    }
+
     pub fn get_pipeline_conversion_report(&self) -> CrmResult<PipelineConversionReport> {
         storage::reporting::get_pipeline_conversion_report(&self.db.conn)
     }
@@ -784,7 +909,12 @@ impl CrmCore {
         options: ImportOptions,
     ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_contacts_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        let custom_targets = self.custom_field_import_target_keys("contact")?;
+        let rows = parse_contacts_csv_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
         self.import_contact_rows(rows, options)
     }
 
@@ -821,7 +951,12 @@ impl CrmCore {
         options: ImportOptions,
     ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_contacts_json_with_mapping(file_content.as_slice(), &mapping)?;
+        let custom_targets = self.custom_field_import_target_keys("contact")?;
+        let rows = parse_contacts_json_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
         self.import_contact_rows(rows, options)
     }
 
@@ -835,6 +970,13 @@ impl CrmCore {
         rows: Vec<(usize, ContactCsvRow)>,
         options: ImportOptions,
     ) -> CrmResult<ImportResult> {
+        let custom_targets = self.custom_field_import_targets("contact")?;
+        let custom_rows = rows
+            .iter()
+            .map(|(row_number, row)| (*row_number, row.custom_fields.clone()))
+            .collect::<Vec<_>>();
+        validate_import_custom_fields(&custom_rows, &custom_targets)?;
+
         let mut created = 0u32;
         let mut merged = 0u32;
         let mut skipped = 0u32;
@@ -845,7 +987,12 @@ impl CrmCore {
             if options.merge_duplicates {
                 match self.find_unique_contact_import_match(&row) {
                     Ok(Some(contact)) => {
-                        match self.merge_contact_import_row(row_number, &contact.id, &row) {
+                        match self.merge_contact_import_row(
+                            row_number,
+                            &contact.id,
+                            &row,
+                            &custom_targets,
+                        ) {
                             Ok(rollback_action) => {
                                 if let Some(action) = rollback_action {
                                     rollback_actions.push(action);
@@ -897,21 +1044,38 @@ impl CrmCore {
                 row.notes.clone(),
             ) {
                 Ok(contact) => {
-                    rollback_actions.push(import_rollback::ImportRollbackAction::created_contact(
-                        row_number, &contact,
-                    ));
-                    let _ = storage::audit::record_audit(
-                        &self.db.conn,
-                        ACTOR_IMPORT,
-                        None,
-                        "import_row",
-                        Some("contact"),
-                        Some(&contact.id),
-                        None,
-                        None,
-                        &self.device_id,
-                    );
-                    created += 1;
+                    match custom_field_import_updates(&row.custom_fields, &custom_targets).and_then(
+                        |updates| {
+                            self.apply_custom_field_import_updates(&contact.id, &updates)?;
+                            self.custom_field_snapshot("contact", &contact.id)
+                        },
+                    ) {
+                        Ok(custom_fields) => {
+                            rollback_actions.push(
+                                import_rollback::ImportRollbackAction::created_contact(
+                                    row_number,
+                                    &contact,
+                                    custom_fields,
+                                ),
+                            );
+                            let _ = storage::audit::record_audit(
+                                &self.db.conn,
+                                ACTOR_IMPORT,
+                                None,
+                                "import_row",
+                                Some("contact"),
+                                Some(&contact.id),
+                                None,
+                                None,
+                                &self.device_id,
+                            );
+                            created += 1;
+                        }
+                        Err(e) => {
+                            errors.push(format!("Row {}: {} ({})", row_number, e, row.first_name));
+                            skipped += 1;
+                        }
+                    }
                 }
                 Err(e) => {
                     errors.push(format!("Row {}: {} ({})", row_number, e, row.first_name));
@@ -964,8 +1128,14 @@ impl CrmCore {
         row_number: usize,
         contact_id: &str,
         row: &ContactCsvRow,
+        custom_targets: &BTreeMap<String, String>,
     ) -> CrmResult<Option<import_rollback::ImportRollbackAction>> {
         let existing = self.get_contact(contact_id)?;
+        let before_custom_fields = self.custom_field_snapshot("contact", contact_id)?;
+        let incoming_custom_fields =
+            custom_field_import_updates(&row.custom_fields, custom_targets)?;
+        let custom_updates =
+            custom_field_auto_merge_updates(&before_custom_fields, &incoming_custom_fields);
         let first_name = fill_blank_string(&existing.first_name, Some(&row.first_name));
         let last_name = fill_blank_string(&existing.last_name, row.last_name.as_ref());
         let org_name = fill_blank_string(&existing.org_name, row.org_name.as_ref());
@@ -985,16 +1155,36 @@ impl CrmCore {
             && city.is_none()
             && country.is_none()
             && notes.is_none()
+            && custom_updates.is_empty()
         {
             return Ok(None);
         }
 
-        let updated = self.update_contact(
-            contact_id, None, first_name, last_name, org_name, email, phone, address, city,
-            country, notes,
-        )?;
+        let updated = if first_name.is_some()
+            || last_name.is_some()
+            || org_name.is_some()
+            || email.is_some()
+            || phone.is_some()
+            || address.is_some()
+            || city.is_some()
+            || country.is_some()
+            || notes.is_some()
+        {
+            self.update_contact(
+                contact_id, None, first_name, last_name, org_name, email, phone, address, city,
+                country, notes,
+            )?
+        } else {
+            existing.clone()
+        };
+        self.apply_custom_field_import_updates(contact_id, &custom_updates)?;
+        let post_custom_fields = self.custom_field_snapshot("contact", contact_id)?;
         Ok(import_rollback::ImportRollbackAction::merged_contact(
-            row_number, &existing, &updated,
+            row_number,
+            &existing,
+            &updated,
+            before_custom_fields,
+            post_custom_fields,
         ))
     }
 
@@ -1013,7 +1203,12 @@ impl CrmCore {
         mapping: ImportColumnMapping,
     ) -> CrmResult<ImportPreflightReport> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_contacts_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        let custom_targets = self.custom_field_import_target_keys("contact")?;
+        let rows = parse_contacts_csv_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
         self.preflight_contact_rows(rows)
     }
 
@@ -1032,7 +1227,12 @@ impl CrmCore {
         mapping: ImportColumnMapping,
     ) -> CrmResult<ImportPreflightReport> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_contacts_json_with_mapping(file_content.as_slice(), &mapping)?;
+        let custom_targets = self.custom_field_import_target_keys("contact")?;
+        let rows = parse_contacts_json_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
         self.preflight_contact_rows(rows)
     }
 
@@ -1040,6 +1240,13 @@ impl CrmCore {
         &self,
         rows: Vec<(usize, ContactCsvRow)>,
     ) -> CrmResult<ImportPreflightReport> {
+        let custom_targets = self.custom_field_export_targets("contact")?;
+        let custom_rows = rows
+            .iter()
+            .map(|(row_number, row)| (*row_number, row.custom_fields.clone()))
+            .collect::<Vec<_>>();
+        validate_import_custom_fields(&custom_rows, &custom_targets)?;
+
         let mut warnings = Vec::new();
 
         for (row_number, row) in &rows {
@@ -1097,6 +1304,16 @@ impl CrmCore {
     }
 
     fn export_contact_rows(&self) -> CrmResult<Vec<ContactCsvRow>> {
+        let custom_targets = self.custom_field_import_targets("contact")?;
+        let field_targets = custom_targets
+            .iter()
+            .map(|(target, field_def_id)| (field_def_id.clone(), target.clone()))
+            .collect::<BTreeMap<_, _>>();
+        let custom_values = self
+            .list_custom_field_values_for_type("contact")?
+            .into_iter()
+            .map(|value| ((value.entity_id, value.field_def_id), value.value))
+            .collect::<BTreeMap<_, _>>();
         let params = ContactListParams {
             page: 1,
             per_page: 100_000,
@@ -1121,6 +1338,18 @@ impl CrmCore {
                 city: Some(c.city.clone()).filter(|s| !s.is_empty()),
                 country: Some(c.country.clone()).filter(|s| !s.is_empty()),
                 notes: Some(c.notes.clone()).filter(|s| !s.is_empty()),
+                custom_fields: field_targets
+                    .iter()
+                    .map(|(field_def_id, target)| {
+                        (
+                            target.clone(),
+                            custom_values
+                                .get(&(c.id.clone(), field_def_id.clone()))
+                                .cloned()
+                                .unwrap_or_default(),
+                        )
+                    })
+                    .collect(),
             })
             .collect())
     }
@@ -1154,7 +1383,12 @@ impl CrmCore {
         options: ImportOptions,
     ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_deals_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        let custom_targets = self.custom_field_import_target_keys("deal")?;
+        let rows = parse_deals_csv_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
         self.import_deal_rows(rows, options)
     }
 
@@ -1191,7 +1425,12 @@ impl CrmCore {
         options: ImportOptions,
     ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_deals_json_with_mapping(file_content.as_slice(), &mapping)?;
+        let custom_targets = self.custom_field_import_target_keys("deal")?;
+        let rows = parse_deals_json_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
         self.import_deal_rows(rows, options)
     }
 
@@ -1205,6 +1444,13 @@ impl CrmCore {
         rows: Vec<(usize, DealCsvRow)>,
         options: ImportOptions,
     ) -> CrmResult<ImportResult> {
+        let custom_targets = self.custom_field_import_targets("deal")?;
+        let custom_rows = rows
+            .iter()
+            .map(|(row_number, row)| (*row_number, row.custom_fields.clone()))
+            .collect::<Vec<_>>();
+        validate_import_custom_fields(&custom_rows, &custom_targets)?;
+
         let mut created = 0u32;
         let mut merged = 0u32;
         let mut skipped = 0u32;
@@ -1215,7 +1461,12 @@ impl CrmCore {
             if options.merge_duplicates {
                 match self.find_unique_deal_import_match(&row) {
                     Ok(Some(deal)) => {
-                        match self.merge_deal_import_row(row_number, &deal.id, &row) {
+                        match self.merge_deal_import_row(
+                            row_number,
+                            &deal.id,
+                            &row,
+                            &custom_targets,
+                        ) {
                             Ok(rollback_action) => {
                                 if let Some(action) = rollback_action {
                                     rollback_actions.push(action);
@@ -1267,21 +1518,38 @@ impl CrmCore {
                 row.notes.clone(),
             ) {
                 Ok(deal) => {
-                    rollback_actions.push(import_rollback::ImportRollbackAction::created_deal(
-                        row_number, &deal,
-                    ));
-                    let _ = storage::audit::record_audit(
-                        &self.db.conn,
-                        ACTOR_IMPORT,
-                        None,
-                        "import_row",
-                        Some("deal"),
-                        Some(&deal.id),
-                        None,
-                        None,
-                        &self.device_id,
-                    );
-                    created += 1;
+                    match custom_field_import_updates(&row.custom_fields, &custom_targets).and_then(
+                        |updates| {
+                            self.apply_custom_field_import_updates(&deal.id, &updates)?;
+                            self.custom_field_snapshot("deal", &deal.id)
+                        },
+                    ) {
+                        Ok(custom_fields) => {
+                            rollback_actions.push(
+                                import_rollback::ImportRollbackAction::created_deal(
+                                    row_number,
+                                    &deal,
+                                    custom_fields,
+                                ),
+                            );
+                            let _ = storage::audit::record_audit(
+                                &self.db.conn,
+                                ACTOR_IMPORT,
+                                None,
+                                "import_row",
+                                Some("deal"),
+                                Some(&deal.id),
+                                None,
+                                None,
+                                &self.device_id,
+                            );
+                            created += 1;
+                        }
+                        Err(e) => {
+                            errors.push(format!("Row {}: {} ({})", row_number, e, row.title));
+                            skipped += 1;
+                        }
+                    }
                 }
                 Err(e) => {
                     errors.push(format!("Row {}: {} ({})", row_number, e, row.title));
@@ -1330,31 +1598,51 @@ impl CrmCore {
         row_number: usize,
         deal_id: &str,
         row: &DealCsvRow,
+        custom_targets: &BTreeMap<String, String>,
     ) -> CrmResult<Option<import_rollback::ImportRollbackAction>> {
         let existing = self.get_deal(deal_id)?;
+        let before_custom_fields = self.custom_field_snapshot("deal", deal_id)?;
+        let incoming_custom_fields =
+            custom_field_import_updates(&row.custom_fields, custom_targets)?;
+        let custom_updates =
+            custom_field_auto_merge_updates(&before_custom_fields, &incoming_custom_fields);
         let value = fill_zero_value(existing.value, row.value.as_ref());
         let expected_close =
             fill_blank_option(&existing.expected_close, row.expected_close.as_ref()).map(Some);
         let notes = fill_blank_string(&existing.notes, row.notes.as_ref());
 
-        if value.is_none() && expected_close.is_none() && notes.is_none() {
+        if value.is_none()
+            && expected_close.is_none()
+            && notes.is_none()
+            && custom_updates.is_empty()
+        {
             return Ok(None);
         }
 
-        let updated = self.update_deal(
-            deal_id,
-            None,
-            value,
-            None,
-            None,
-            None,
-            expected_close,
-            None,
-            None,
-            notes,
-        )?;
+        let updated = if value.is_some() || expected_close.is_some() || notes.is_some() {
+            self.update_deal(
+                deal_id,
+                None,
+                value,
+                None,
+                None,
+                None,
+                expected_close,
+                None,
+                None,
+                notes,
+            )?
+        } else {
+            existing.clone()
+        };
+        self.apply_custom_field_import_updates(deal_id, &custom_updates)?;
+        let post_custom_fields = self.custom_field_snapshot("deal", deal_id)?;
         Ok(import_rollback::ImportRollbackAction::merged_deal(
-            row_number, &existing, &updated,
+            row_number,
+            &existing,
+            &updated,
+            before_custom_fields,
+            post_custom_fields,
         ))
     }
 
@@ -1370,7 +1658,12 @@ impl CrmCore {
         mapping: ImportColumnMapping,
     ) -> CrmResult<ImportPreflightReport> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_deals_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        let custom_targets = self.custom_field_import_target_keys("deal")?;
+        let rows = parse_deals_csv_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
         self.preflight_deal_rows(rows)
     }
 
@@ -1386,7 +1679,12 @@ impl CrmCore {
         mapping: ImportColumnMapping,
     ) -> CrmResult<ImportPreflightReport> {
         let file_content = fs::read(file_path)?;
-        let rows = parse_deals_json_with_mapping(file_content.as_slice(), &mapping)?;
+        let custom_targets = self.custom_field_import_target_keys("deal")?;
+        let rows = parse_deals_json_with_mapping_targets(
+            file_content.as_slice(),
+            &mapping,
+            &custom_targets,
+        )?;
         self.preflight_deal_rows(rows)
     }
 
@@ -1394,6 +1692,13 @@ impl CrmCore {
         &self,
         rows: Vec<(usize, DealCsvRow)>,
     ) -> CrmResult<ImportPreflightReport> {
+        let custom_targets = self.custom_field_export_targets("deal")?;
+        let custom_rows = rows
+            .iter()
+            .map(|(row_number, row)| (*row_number, row.custom_fields.clone()))
+            .collect::<Vec<_>>();
+        validate_import_custom_fields(&custom_rows, &custom_targets)?;
+
         let mut warnings = Vec::new();
 
         for (row_number, row) in &rows {
@@ -1431,6 +1736,16 @@ impl CrmCore {
     }
 
     fn export_deal_rows(&self) -> CrmResult<Vec<DealCsvRow>> {
+        let custom_targets = self.custom_field_import_targets("deal")?;
+        let field_targets = custom_targets
+            .iter()
+            .map(|(target, field_def_id)| (field_def_id.clone(), target.clone()))
+            .collect::<BTreeMap<_, _>>();
+        let custom_values = self
+            .list_custom_field_values_for_type("deal")?
+            .into_iter()
+            .map(|value| ((value.entity_id, value.field_def_id), value.value))
+            .collect::<BTreeMap<_, _>>();
         let all_deals = storage::deals::list_deals(&self.db.conn)?;
         Ok(all_deals
             .iter()
@@ -1441,6 +1756,18 @@ impl CrmCore {
                 stage: Some(d.stage.clone()),
                 expected_close: d.expected_close.clone(),
                 notes: Some(d.notes.clone()).filter(|s| !s.is_empty()),
+                custom_fields: field_targets
+                    .iter()
+                    .map(|(field_def_id, target)| {
+                        (
+                            target.clone(),
+                            custom_values
+                                .get(&(d.id.clone(), field_def_id.clone()))
+                                .cloned()
+                                .unwrap_or_default(),
+                        )
+                    })
+                    .collect(),
             })
             .collect())
     }
@@ -2064,6 +2391,109 @@ fn fill_zero_value(existing: f64, incoming: Option<&String>) -> Option<f64> {
     incoming
         .and_then(|value| value.trim().parse::<f64>().ok())
         .filter(|value| *value != 0.0)
+}
+
+fn custom_field_targets(definitions: Vec<CustomFieldDefinition>) -> BTreeMap<String, String> {
+    let mut name_counts = BTreeMap::new();
+    for definition in &definitions {
+        *name_counts
+            .entry(definition.field_name.clone())
+            .or_insert(0usize) += 1;
+    }
+
+    definitions
+        .into_iter()
+        .map(|definition| {
+            let duplicate_name = name_counts
+                .get(&definition.field_name)
+                .copied()
+                .unwrap_or_default()
+                > 1;
+            let target = custom_field_target(
+                &definition.field_name,
+                duplicate_name.then_some(definition.id.as_str()),
+            );
+            (target, definition.id)
+        })
+        .collect()
+}
+
+fn custom_field_target(field_name: &str, field_id: Option<&str>) -> String {
+    let escaped_field_name = escape_custom_field_name(field_name);
+    match field_id {
+        Some(id) => format!("{CUSTOM_FIELD_PREFIX}{escaped_field_name}#{id}"),
+        None => format!("{CUSTOM_FIELD_PREFIX}{escaped_field_name}"),
+    }
+}
+
+fn escape_custom_field_name(field_name: &str) -> String {
+    let mut escaped = String::with_capacity(field_name.len());
+    for character in field_name.chars() {
+        match character {
+            '%' => escaped.push_str("%25"),
+            '#' => escaped.push_str("%23"),
+            _ => escaped.push(character),
+        }
+    }
+    escaped
+}
+
+fn validate_import_custom_fields(
+    rows: &[(usize, BTreeMap<String, String>)],
+    targets: &BTreeMap<String, String>,
+) -> CrmResult<()> {
+    for (row_number, custom_fields) in rows {
+        for target in custom_fields.keys() {
+            if !targets.contains_key(target) {
+                return Err(CrmError::InvalidInput(format!(
+                    "Row {} maps to unsupported custom field '{}'",
+                    row_number, target
+                )));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn custom_field_import_updates(
+    row_custom_fields: &BTreeMap<String, String>,
+    targets: &BTreeMap<String, String>,
+) -> CrmResult<BTreeMap<String, String>> {
+    let mut updates = BTreeMap::new();
+
+    for (target, value) in row_custom_fields {
+        let Some(field_def_id) = targets.get(target) else {
+            return Err(CrmError::InvalidInput(format!(
+                "Unsupported custom field target '{}'",
+                target
+            )));
+        };
+
+        let value = value.trim();
+        if !value.is_empty() {
+            updates.insert(field_def_id.clone(), value.to_string());
+        }
+    }
+
+    Ok(updates)
+}
+
+fn custom_field_auto_merge_updates(
+    existing: &BTreeMap<String, String>,
+    incoming: &BTreeMap<String, String>,
+) -> BTreeMap<String, String> {
+    incoming
+        .iter()
+        .filter(|(field_def_id, value)| {
+            !value.trim().is_empty()
+                && existing
+                    .get(*field_def_id)
+                    .map(|existing| existing.trim().is_empty())
+                    .unwrap_or(true)
+        })
+        .map(|(field_def_id, value)| (field_def_id.clone(), value.trim().to_string()))
+        .collect()
 }
 
 fn import_preflight_report(

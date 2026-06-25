@@ -88,8 +88,9 @@ During restore, the active `CrmCore` instance is closed, the validated backup da
 
 Import summary backup restore is full database replacement. It is not
 row-level import rollback, partial restore, or merge-back. Row-level import
-rollback is intentionally narrower: it only applies supported flat import rows
-from the current summary and skips records that changed after import.
+rollback is intentionally narrower: it only applies supported import rows and
+supported contact/deal custom field value changes from the current summary, and
+skips records that changed after import.
 
 ## Developer API surface
 

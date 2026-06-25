@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   importJsonWithMappingMock,
+  listCustomFieldDefinitionsMock,
   openDialogMock,
   preflightJsonWithMappingMock,
   previewJsonMock,
@@ -14,6 +15,7 @@ const {
 } = vi.hoisted(
   () => ({
     importJsonWithMappingMock: vi.fn(),
+    listCustomFieldDefinitionsMock: vi.fn(),
     openDialogMock: vi.fn(),
     preflightJsonWithMappingMock: vi.fn(),
     previewJsonMock: vi.fn(),
@@ -43,6 +45,10 @@ vi.mock("$lib/api/importExport", async (importOriginal) => {
 vi.mock("$lib/api/backup", () => ({
   restoreLocalBackupToAppData: restoreLocalBackupToAppDataMock,
   validateLocalBackup: validateLocalBackupMock,
+}));
+
+vi.mock("$lib/api/customFields", () => ({
+  listCustomFieldDefinitions: listCustomFieldDefinitionsMock,
 }));
 
 import ImportExport from "./ImportExport.svelte";
@@ -175,6 +181,8 @@ describe("ImportExport component", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     importJsonWithMappingMock.mockReset();
+    listCustomFieldDefinitionsMock.mockReset();
+    listCustomFieldDefinitionsMock.mockResolvedValue([]);
     openDialogMock.mockReset();
     preflightJsonWithMappingMock.mockReset();
     previewJsonMock.mockReset();
@@ -336,6 +344,74 @@ describe("ImportExport component", () => {
         {
           Given: "first_name",
           Mail: "email",
+        },
+      );
+    });
+  });
+
+  it("includes contact custom field targets in JSON mapping payloads", async () => {
+    listCustomFieldDefinitionsMock.mockResolvedValue([
+      {
+        id: "field-vip-tier",
+        entity_type: "contact",
+        field_name: "VIP Tier",
+        field_type: "text",
+        field_options: null,
+        sort_order: 0,
+        created_at: "2026-06-25T00:00:00Z",
+      },
+    ]);
+    openDialogMock.mockResolvedValue("/tmp/contacts-custom-fields.json");
+    previewJsonMock.mockResolvedValue({
+      total_rows: 1,
+      headers: ["first_name", "VIP Tier"],
+      rows: [
+        {
+          row_number: 2,
+          values: { first_name: "Ada", "VIP Tier": "Gold" },
+        },
+      ],
+    });
+    preflightJsonWithMappingMock.mockResolvedValue({
+      entity_type: "contacts",
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    importJsonWithMappingMock.mockResolvedValue(importWithBackupResult);
+
+    render(ImportExport, { open: true });
+
+    await fireEvent.change(screen.getByLabelText("Format"), {
+      target: { value: "json" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+    await screen.findByText("Gold");
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(screen.getByLabelText("Map to field: VIP Tier")).toBeTruthy();
+    expect(screen.getAllByRole("option", { name: "Custom: VIP Tier" }).length).toBeGreaterThan(0);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Detect duplicates" }));
+    await waitFor(() => {
+      expect(preflightJsonWithMappingMock).toHaveBeenCalledWith(
+        "contacts",
+        "/tmp/contacts-custom-fields.json",
+        {
+          "VIP Tier": "custom:VIP Tier",
+          first_name: "first_name",
+        },
+      );
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
+    await waitFor(() => {
+      expect(importJsonWithMappingMock).toHaveBeenCalledWith(
+        "contacts",
+        "/tmp/contacts-custom-fields.json",
+        {
+          "VIP Tier": "custom:VIP Tier",
+          first_name: "first_name",
         },
       );
     });

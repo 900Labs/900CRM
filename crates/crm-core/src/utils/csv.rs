@@ -45,13 +45,15 @@
 //! | `postal_code`   | no       | |
 //! | `description`   | no       | |
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::{Read, Write};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::utils::errors::{CrmError, CrmResult};
+
+pub const CUSTOM_FIELD_PREFIX: &str = "custom:";
 
 /// Frontend-provided CSV mapping: source CSV header -> target CRM field.
 ///
@@ -152,6 +154,10 @@ pub struct ContactCsvRow {
     /// Freeform notes.
     #[serde(default)]
     pub notes: Option<String>,
+
+    /// User-defined custom field values keyed by `custom:<field_name>`.
+    #[serde(default, flatten)]
+    pub custom_fields: BTreeMap<String, String>,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -185,6 +191,10 @@ pub struct DealCsvRow {
     /// Freeform notes about the deal.
     #[serde(default)]
     pub notes: Option<String>,
+
+    /// User-defined custom field values keyed by `custom:<field_name>`.
+    #[serde(default, flatten)]
+    pub custom_fields: BTreeMap<String, String>,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -282,22 +292,19 @@ pub fn parse_contacts_csv_with_row_numbers<R: Read>(
         .flexible(true)
         .from_reader(reader);
 
+    let headers = rdr.headers()?.clone();
+    require_csv_header(&headers, "first_name")?;
+
     let mut rows = Vec::new();
-    for (index, result) in rdr.deserialize::<ContactCsvRow>().enumerate() {
+    for (index, result) in rdr.records().enumerate() {
         let row_number = index + 2;
-        match result {
-            Ok(row) => {
-                if row.first_name.trim().is_empty() {
-                    log::debug!("Skipping CSV row with blank first_name");
-                    continue;
-                }
-                rows.push((row_number, row));
-            }
-            Err(e) => {
-                log::error!("CSV parse error: {}", e);
-                return Err(CrmError::Csv(e.to_string()));
-            }
+        let record = result.map_err(|e| CrmError::Csv(e.to_string()))?;
+        let row = contact_row_from_record(&headers, &record);
+        if row.first_name.trim().is_empty() {
+            log::debug!("Skipping CSV row with blank first_name");
+            continue;
         }
+        rows.push((row_number, row));
     }
 
     log::info!("Parsed {} contact rows from CSV", rows.len());
@@ -312,6 +319,14 @@ pub fn parse_contacts_csv_with_mapping<R: Read>(
     reader: R,
     mapping: &ImportColumnMapping,
 ) -> CrmResult<Vec<(usize, ContactCsvRow)>> {
+    parse_contacts_csv_with_mapping_targets(reader, mapping, &[])
+}
+
+pub fn parse_contacts_csv_with_mapping_targets<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+    custom_targets: &[String],
+) -> CrmResult<Vec<(usize, ContactCsvRow)>> {
     let mut rdr = csv::ReaderBuilder::new()
         .has_headers(true)
         .trim(csv::Trim::All)
@@ -319,7 +334,12 @@ pub fn parse_contacts_csv_with_mapping<R: Read>(
         .from_reader(reader);
 
     let headers = rdr.headers()?.clone();
-    let assignments = validate_import_mapping(&headers, mapping, CONTACT_IMPORT_TARGET_FIELDS)?;
+    let assignments = validate_import_mapping(
+        &headers,
+        mapping,
+        CONTACT_IMPORT_TARGET_FIELDS,
+        custom_targets,
+    )?;
 
     let mut rows = Vec::new();
     for (index, result) in rdr.records().enumerate() {
@@ -361,22 +381,19 @@ pub fn parse_deals_csv_with_row_numbers<R: Read>(reader: R) -> CrmResult<Vec<(us
         .flexible(true)
         .from_reader(reader);
 
+    let headers = rdr.headers()?.clone();
+    require_csv_header(&headers, "title")?;
+
     let mut rows = Vec::new();
-    for (index, result) in rdr.deserialize::<DealCsvRow>().enumerate() {
+    for (index, result) in rdr.records().enumerate() {
         let row_number = index + 2;
-        match result {
-            Ok(row) => {
-                if row.title.trim().is_empty() {
-                    log::debug!("Skipping CSV row with blank title");
-                    continue;
-                }
-                rows.push((row_number, row));
-            }
-            Err(e) => {
-                log::error!("CSV parse error: {}", e);
-                return Err(CrmError::Csv(e.to_string()));
-            }
+        let record = result.map_err(|e| CrmError::Csv(e.to_string()))?;
+        let row = deal_row_from_record(&headers, &record);
+        if row.title.trim().is_empty() {
+            log::debug!("Skipping CSV row with blank title");
+            continue;
         }
+        rows.push((row_number, row));
     }
 
     log::info!("Parsed {} deal rows from CSV", rows.len());
@@ -391,6 +408,14 @@ pub fn parse_deals_csv_with_mapping<R: Read>(
     reader: R,
     mapping: &ImportColumnMapping,
 ) -> CrmResult<Vec<(usize, DealCsvRow)>> {
+    parse_deals_csv_with_mapping_targets(reader, mapping, &[])
+}
+
+pub fn parse_deals_csv_with_mapping_targets<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+    custom_targets: &[String],
+) -> CrmResult<Vec<(usize, DealCsvRow)>> {
     let mut rdr = csv::ReaderBuilder::new()
         .has_headers(true)
         .trim(csv::Trim::All)
@@ -398,7 +423,8 @@ pub fn parse_deals_csv_with_mapping<R: Read>(
         .from_reader(reader);
 
     let headers = rdr.headers()?.clone();
-    let assignments = validate_import_mapping(&headers, mapping, DEAL_IMPORT_TARGET_FIELDS)?;
+    let assignments =
+        validate_import_mapping(&headers, mapping, DEAL_IMPORT_TARGET_FIELDS, custom_targets)?;
 
     let mut rows = Vec::new();
     for (index, result) in rdr.records().enumerate() {
@@ -481,7 +507,7 @@ pub fn parse_organizations_csv_with_mapping<R: Read>(
 
     let headers = rdr.headers()?.clone();
     let assignments =
-        validate_import_mapping(&headers, mapping, ORGANIZATION_IMPORT_TARGET_FIELDS)?;
+        validate_import_mapping(&headers, mapping, ORGANIZATION_IMPORT_TARGET_FIELDS, &[])?;
 
     let mut rows = Vec::new();
     for (index, result) in rdr.records().enumerate() {
@@ -506,12 +532,25 @@ pub fn parse_organizations_csv_with_mapping<R: Read>(
 pub fn parse_contacts_json_with_row_numbers<R: Read>(
     reader: R,
 ) -> CrmResult<Vec<(usize, ContactCsvRow)>> {
-    parse_json_rows_with_row_numbers::<ContactCsvRow, _>(
-        parse_json_array_rows(reader)?,
-        "contact",
-        "first_name",
-        |row| row.first_name.trim().is_empty(),
-    )
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        let row = contact_row_from_json_object(object, &headers);
+        if row.first_name.trim().is_empty() {
+            log::debug!("Skipping JSON row with blank first_name");
+            continue;
+        }
+        parsed_rows.push((row_number, row));
+    }
+
+    log::info!("Parsed {} contact rows from JSON", parsed_rows.len());
+    Ok(parsed_rows)
 }
 
 /// Parses contact JSON data with frontend-provided source-field mapping.
@@ -519,12 +558,21 @@ pub fn parse_contacts_json_with_mapping<R: Read>(
     reader: R,
     mapping: &ImportColumnMapping,
 ) -> CrmResult<Vec<(usize, ContactCsvRow)>> {
+    parse_contacts_json_with_mapping_targets(reader, mapping, &[])
+}
+
+pub fn parse_contacts_json_with_mapping_targets<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+    custom_targets: &[String],
+) -> CrmResult<Vec<(usize, ContactCsvRow)>> {
     let rows = parse_json_array_rows(reader)?;
     let headers = collect_json_source_fields(&rows)?;
     let assignments = validate_import_mapping_sources(
         &headers,
         mapping,
         CONTACT_IMPORT_TARGET_FIELDS,
+        custom_targets,
         "field",
         "JSON",
     )?;
@@ -554,12 +602,25 @@ pub fn parse_contacts_json_with_mapping<R: Read>(
 pub fn parse_deals_json_with_row_numbers<R: Read>(
     reader: R,
 ) -> CrmResult<Vec<(usize, DealCsvRow)>> {
-    parse_json_rows_with_row_numbers::<DealCsvRow, _>(
-        parse_json_array_rows(reader)?,
-        "deal",
-        "title",
-        |row| row.title.trim().is_empty(),
-    )
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        let row = deal_row_from_json_object(object, &headers);
+        if row.title.trim().is_empty() {
+            log::debug!("Skipping JSON row with blank title");
+            continue;
+        }
+        parsed_rows.push((row_number, row));
+    }
+
+    log::info!("Parsed {} deal rows from JSON", parsed_rows.len());
+    Ok(parsed_rows)
 }
 
 /// Parses deal JSON data with frontend-provided source-field mapping.
@@ -567,12 +628,21 @@ pub fn parse_deals_json_with_mapping<R: Read>(
     reader: R,
     mapping: &ImportColumnMapping,
 ) -> CrmResult<Vec<(usize, DealCsvRow)>> {
+    parse_deals_json_with_mapping_targets(reader, mapping, &[])
+}
+
+pub fn parse_deals_json_with_mapping_targets<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+    custom_targets: &[String],
+) -> CrmResult<Vec<(usize, DealCsvRow)>> {
     let rows = parse_json_array_rows(reader)?;
     let headers = collect_json_source_fields(&rows)?;
     let assignments = validate_import_mapping_sources(
         &headers,
         mapping,
         DEAL_IMPORT_TARGET_FIELDS,
+        custom_targets,
         "field",
         "JSON",
     )?;
@@ -621,6 +691,7 @@ pub fn parse_organizations_json_with_mapping<R: Read>(
         &headers,
         mapping,
         ORGANIZATION_IMPORT_TARGET_FIELDS,
+        &[],
         "field",
         "JSON",
     )?;
@@ -768,20 +839,33 @@ fn validate_import_mapping(
     headers: &csv::StringRecord,
     mapping: &ImportColumnMapping,
     allowed_targets: &[&str],
+    custom_targets: &[String],
 ) -> CrmResult<Vec<Option<String>>> {
     let headers = headers.iter().map(str::to_string).collect::<Vec<_>>();
-    validate_import_mapping_sources(&headers, mapping, allowed_targets, "header", "CSV")
+    validate_import_mapping_sources(
+        &headers,
+        mapping,
+        allowed_targets,
+        custom_targets,
+        "header",
+        "CSV",
+    )
 }
 
 fn validate_import_mapping_sources(
     headers: &[String],
     mapping: &ImportColumnMapping,
     allowed_targets: &[&str],
+    custom_targets: &[String],
     source_label: &str,
     data_label: &str,
 ) -> CrmResult<Vec<Option<String>>> {
     let header_set: HashSet<&str> = headers.iter().map(String::as_str).collect();
-    let allowed_target_set: HashSet<&str> = allowed_targets.iter().copied().collect();
+    let mut allowed_target_set: HashSet<String> = allowed_targets
+        .iter()
+        .map(|target| (*target).to_string())
+        .collect();
+    allowed_target_set.extend(custom_targets.iter().cloned());
     let mut assigned_targets: HashMap<String, String> = HashMap::new();
 
     for (source_header, target) in mapping {
@@ -823,39 +907,57 @@ fn validate_import_mapping_sources(
         .collect())
 }
 
+fn require_csv_header(headers: &csv::StringRecord, required: &str) -> CrmResult<()> {
+    if headers.iter().any(|header| header == required) {
+        return Ok(());
+    }
+
+    Err(CrmError::Csv(format!(
+        "CSV missing required header '{}'",
+        required
+    )))
+}
+
+fn contact_row_from_record(
+    headers: &csv::StringRecord,
+    record: &csv::StringRecord,
+) -> ContactCsvRow {
+    let mut row = default_contact_row();
+
+    for (index, header) in headers.iter().enumerate() {
+        let value = record.get(index).unwrap_or_default().trim();
+        assign_contact_value(&mut row, header.trim(), value);
+    }
+
+    row
+}
+
+fn contact_row_from_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+) -> ContactCsvRow {
+    let mut row = default_contact_row();
+
+    for header in headers {
+        let value = json_preview_cell(object.get(header.as_str()));
+        assign_contact_value(&mut row, header.trim(), value.trim());
+    }
+
+    row
+}
+
 fn contact_row_from_mapped_record(
     record: &csv::StringRecord,
     assignments: &[Option<String>],
 ) -> ContactCsvRow {
-    let mut row = ContactCsvRow {
-        first_name: String::new(),
-        last_name: None,
-        org_name: None,
-        email: None,
-        phone: None,
-        address: None,
-        city: None,
-        country: None,
-        notes: None,
-    };
+    let mut row = default_contact_row();
 
     for (index, target) in assignments.iter().enumerate() {
         let Some(target) = target.as_deref() else {
             continue;
         };
         let value = record.get(index).unwrap_or_default().trim();
-        match target {
-            "first_name" => row.first_name = value.to_string(),
-            "last_name" => row.last_name = optional_csv_value(value),
-            "org_name" => row.org_name = optional_csv_value(value),
-            "email" => row.email = optional_csv_value(value),
-            "phone" => row.phone = optional_csv_value(value),
-            "address" => row.address = optional_csv_value(value),
-            "city" => row.city = optional_csv_value(value),
-            "country" => row.country = optional_csv_value(value),
-            "notes" => row.notes = optional_csv_value(value),
-            _ => {}
-        }
+        assign_contact_value(&mut row, target, value);
     }
 
     row
@@ -866,7 +968,22 @@ fn contact_row_from_mapped_json_object(
     headers: &[String],
     assignments: &[Option<String>],
 ) -> ContactCsvRow {
-    let mut row = ContactCsvRow {
+    let mut row = default_contact_row();
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = json_preview_cell(object.get(headers[index].as_str()));
+        let value = value.trim();
+        assign_contact_value(&mut row, target, value);
+    }
+
+    row
+}
+
+fn default_contact_row() -> ContactCsvRow {
+    ContactCsvRow {
         first_name: String::new(),
         last_name: None,
         org_name: None,
@@ -876,29 +993,28 @@ fn contact_row_from_mapped_json_object(
         city: None,
         country: None,
         notes: None,
-    };
-
-    for (index, target) in assignments.iter().enumerate() {
-        let Some(target) = target.as_deref() else {
-            continue;
-        };
-        let value = json_preview_cell(object.get(headers[index].as_str()));
-        let value = value.trim();
-        match target {
-            "first_name" => row.first_name = value.to_string(),
-            "last_name" => row.last_name = optional_csv_value(value),
-            "org_name" => row.org_name = optional_csv_value(value),
-            "email" => row.email = optional_csv_value(value),
-            "phone" => row.phone = optional_csv_value(value),
-            "address" => row.address = optional_csv_value(value),
-            "city" => row.city = optional_csv_value(value),
-            "country" => row.country = optional_csv_value(value),
-            "notes" => row.notes = optional_csv_value(value),
-            _ => {}
-        }
+        custom_fields: BTreeMap::new(),
     }
+}
 
-    row
+fn assign_contact_value(row: &mut ContactCsvRow, target: &str, value: &str) {
+    match target {
+        "first_name" => row.first_name = value.to_string(),
+        "last_name" => row.last_name = optional_csv_value(value),
+        "org_name" => row.org_name = optional_csv_value(value),
+        "email" => row.email = optional_csv_value(value),
+        "phone" => row.phone = optional_csv_value(value),
+        "address" => row.address = optional_csv_value(value),
+        "city" => row.city = optional_csv_value(value),
+        "country" => row.country = optional_csv_value(value),
+        "notes" => row.notes = optional_csv_value(value),
+        _ if is_custom_field_target(target) => {
+            if let Some(value) = optional_csv_value(value) {
+                row.custom_fields.insert(target.to_string(), value);
+            }
+        }
+        _ => {}
+    }
 }
 
 fn organization_row_from_mapped_record(
@@ -987,33 +1103,43 @@ fn organization_row_from_mapped_json_object(
     row
 }
 
+fn deal_row_from_record(headers: &csv::StringRecord, record: &csv::StringRecord) -> DealCsvRow {
+    let mut row = default_deal_row();
+
+    for (index, header) in headers.iter().enumerate() {
+        let value = record.get(index).unwrap_or_default().trim();
+        assign_deal_value(&mut row, header.trim(), value);
+    }
+
+    row
+}
+
+fn deal_row_from_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+) -> DealCsvRow {
+    let mut row = default_deal_row();
+
+    for header in headers {
+        let value = json_preview_cell(object.get(header.as_str()));
+        assign_deal_value(&mut row, header.trim(), value.trim());
+    }
+
+    row
+}
+
 fn deal_row_from_mapped_record(
     record: &csv::StringRecord,
     assignments: &[Option<String>],
 ) -> DealCsvRow {
-    let mut row = DealCsvRow {
-        title: String::new(),
-        value: None,
-        currency: None,
-        stage: None,
-        expected_close: None,
-        notes: None,
-    };
+    let mut row = default_deal_row();
 
     for (index, target) in assignments.iter().enumerate() {
         let Some(target) = target.as_deref() else {
             continue;
         };
         let value = record.get(index).unwrap_or_default().trim();
-        match target {
-            "title" => row.title = value.to_string(),
-            "value" => row.value = optional_csv_value(value),
-            "currency" => row.currency = optional_csv_value(value),
-            "stage" => row.stage = optional_csv_value(value),
-            "expected_close" => row.expected_close = optional_csv_value(value),
-            "notes" => row.notes = optional_csv_value(value),
-            _ => {}
-        }
+        assign_deal_value(&mut row, target, value);
     }
 
     row
@@ -1024,14 +1150,7 @@ fn deal_row_from_mapped_json_object(
     headers: &[String],
     assignments: &[Option<String>],
 ) -> DealCsvRow {
-    let mut row = DealCsvRow {
-        title: String::new(),
-        value: None,
-        currency: None,
-        stage: None,
-        expected_close: None,
-        notes: None,
-    };
+    let mut row = default_deal_row();
 
     for (index, target) in assignments.iter().enumerate() {
         let Some(target) = target.as_deref() else {
@@ -1039,18 +1158,43 @@ fn deal_row_from_mapped_json_object(
         };
         let value = json_preview_cell(object.get(headers[index].as_str()));
         let value = value.trim();
-        match target {
-            "title" => row.title = value.to_string(),
-            "value" => row.value = optional_csv_value(value),
-            "currency" => row.currency = optional_csv_value(value),
-            "stage" => row.stage = optional_csv_value(value),
-            "expected_close" => row.expected_close = optional_csv_value(value),
-            "notes" => row.notes = optional_csv_value(value),
-            _ => {}
-        }
+        assign_deal_value(&mut row, target, value);
     }
 
     row
+}
+
+fn default_deal_row() -> DealCsvRow {
+    DealCsvRow {
+        title: String::new(),
+        value: None,
+        currency: None,
+        stage: None,
+        expected_close: None,
+        notes: None,
+        custom_fields: BTreeMap::new(),
+    }
+}
+
+fn assign_deal_value(row: &mut DealCsvRow, target: &str, value: &str) {
+    match target {
+        "title" => row.title = value.to_string(),
+        "value" => row.value = optional_csv_value(value),
+        "currency" => row.currency = optional_csv_value(value),
+        "stage" => row.stage = optional_csv_value(value),
+        "expected_close" => row.expected_close = optional_csv_value(value),
+        "notes" => row.notes = optional_csv_value(value),
+        _ if is_custom_field_target(target) => {
+            if let Some(value) = optional_csv_value(value) {
+                row.custom_fields.insert(target.to_string(), value);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn is_custom_field_target(target: &str) -> bool {
+    target.starts_with(CUSTOM_FIELD_PREFIX) && target.len() > CUSTOM_FIELD_PREFIX.len()
 }
 
 fn optional_csv_value(value: &str) -> Option<String> {
@@ -1084,11 +1228,43 @@ fn optional_csv_value(value: &str) -> Option<String> {
 /// ```
 pub fn write_contacts_csv<W: Write>(writer: W, rows: &[ContactCsvRow]) -> CrmResult<()> {
     let mut wtr = csv::WriterBuilder::new()
-        .has_headers(true)
+        .has_headers(false)
         .from_writer(writer);
 
+    let custom_headers = collect_custom_headers(rows.iter().map(|row| &row.custom_fields));
+    let mut headers = vec![
+        "first_name".to_string(),
+        "last_name".to_string(),
+        "org_name".to_string(),
+        "email".to_string(),
+        "phone".to_string(),
+        "address".to_string(),
+        "city".to_string(),
+        "country".to_string(),
+        "notes".to_string(),
+    ];
+    headers.extend(custom_headers.iter().cloned());
+    wtr.write_record(&headers)
+        .map_err(|e| CrmError::Csv(e.to_string()))?;
+
     for row in rows {
-        wtr.serialize(row)
+        let mut record = vec![
+            row.first_name.clone(),
+            row.last_name.clone().unwrap_or_default(),
+            row.org_name.clone().unwrap_or_default(),
+            row.email.clone().unwrap_or_default(),
+            row.phone.clone().unwrap_or_default(),
+            row.address.clone().unwrap_or_default(),
+            row.city.clone().unwrap_or_default(),
+            row.country.clone().unwrap_or_default(),
+            row.notes.clone().unwrap_or_default(),
+        ];
+        record.extend(
+            custom_headers
+                .iter()
+                .map(|header| row.custom_fields.get(header).cloned().unwrap_or_default()),
+        );
+        wtr.write_record(&record)
             .map_err(|e| CrmError::Csv(e.to_string()))?;
     }
 
@@ -1106,17 +1282,59 @@ pub fn write_contacts_csv<W: Write>(writer: W, rows: &[ContactCsvRow]) -> CrmRes
 /// Returns [`CrmError::Csv`] if writing fails.
 pub fn write_deals_csv<W: Write>(writer: W, rows: &[DealCsvRow]) -> CrmResult<()> {
     let mut wtr = csv::WriterBuilder::new()
-        .has_headers(true)
+        .has_headers(false)
         .from_writer(writer);
 
+    let custom_headers = collect_custom_headers(rows.iter().map(|row| &row.custom_fields));
+    let mut headers = vec![
+        "title".to_string(),
+        "value".to_string(),
+        "currency".to_string(),
+        "stage".to_string(),
+        "expected_close".to_string(),
+        "notes".to_string(),
+    ];
+    headers.extend(custom_headers.iter().cloned());
+    wtr.write_record(&headers)
+        .map_err(|e| CrmError::Csv(e.to_string()))?;
+
     for row in rows {
-        wtr.serialize(row)
+        let mut record = vec![
+            row.title.clone(),
+            row.value.clone().unwrap_or_default(),
+            row.currency.clone().unwrap_or_default(),
+            row.stage.clone().unwrap_or_default(),
+            row.expected_close.clone().unwrap_or_default(),
+            row.notes.clone().unwrap_or_default(),
+        ];
+        record.extend(
+            custom_headers
+                .iter()
+                .map(|header| row.custom_fields.get(header).cloned().unwrap_or_default()),
+        );
+        wtr.write_record(&record)
             .map_err(|e| CrmError::Csv(e.to_string()))?;
     }
 
     wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
     log::info!("Wrote {} deal rows to CSV", rows.len());
     Ok(())
+}
+
+fn collect_custom_headers<'a, I>(custom_fields: I) -> Vec<String>
+where
+    I: IntoIterator<Item = &'a BTreeMap<String, String>>,
+{
+    let mut headers = BTreeSet::new();
+    for fields in custom_fields {
+        headers.extend(
+            fields
+                .keys()
+                .filter(|key| is_custom_field_target(key))
+                .cloned(),
+        );
+    }
+    headers.into_iter().collect()
 }
 
 /// Serializes a slice of [`OrganizationCsvRow`] to CSV bytes.
