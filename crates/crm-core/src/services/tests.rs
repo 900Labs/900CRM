@@ -2881,6 +2881,309 @@ fn import_rollback_soft_deletes_created_deal_and_organization_rows() {
 }
 
 #[test]
+fn import_notes_csv_preflights_imports_exports_and_rolls_back_generic_notes() {
+    let (mut core, path) = open_test_core();
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            Some("Lovelace".to_string()),
+            None,
+            Some("ada@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should create");
+    let organization = core
+        .create_organization(
+            "Acme Health".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("organization should create");
+    let deal = core
+        .create_deal(
+            "Acme Renewal".to_string(),
+            Some(12500.0),
+            Some("USD".to_string()),
+            Some("Lead".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("deal should create");
+    let activity = core
+        .create_activity(
+            "call".to_string(),
+            "Intro call".to_string(),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("activity should create");
+
+    let csv_path = path.join("notes.csv");
+    std::fs::write(
+        &csv_path,
+        format!(
+            "entity_type,entity_id,content\n\
+             contact,{},Contact note\n\
+             organization,{},Organization note\n\
+             deal,{},Deal note\n\
+             activity,{},Activity note\n",
+            contact.id, organization.id, deal.id, activity.id
+        ),
+    )
+    .expect("note CSV fixture should write");
+
+    let preflight = core
+        .preflight_notes_csv_import(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("note preflight should succeed");
+    assert_eq!(preflight.entity_type, "notes");
+    assert_eq!(preflight.total_rows, 4);
+    assert_eq!(preflight.duplicate_warning_count, 0);
+    assert!(preflight.warnings.is_empty());
+    assert!(core.list_notes().expect("notes list").is_empty());
+
+    let result = core
+        .import_notes_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("note import should succeed");
+    assert_eq!(result.created, 4);
+    assert_eq!(result.merged, 0);
+    assert_eq!(result.skipped, 0);
+    assert!(result.errors.is_empty());
+    assert_eq!(
+        result
+            .rollback_plan
+            .as_ref()
+            .expect("note import should return rollback plan")
+            .actions
+            .len(),
+        4
+    );
+
+    let notes = core.list_notes().expect("notes should list");
+    assert_eq!(notes.len(), 4);
+    assert!(notes.iter().any(|note| note.content == "Contact note"));
+    assert!(notes
+        .iter()
+        .any(|note| note.entity_type == "organization" && note.entity_id == organization.id));
+
+    let csv_export_path = path.join("notes-export.csv");
+    assert_eq!(
+        core.export_notes_csv(
+            csv_export_path
+                .to_str()
+                .expect("path should be valid UTF-8")
+        )
+        .expect("note CSV export should succeed"),
+        4
+    );
+    let csv_rows = read_csv_export(&csv_export_path);
+    assert_eq!(csv_rows.len(), 4);
+    assert_eq!(csv_rows[0].keys().len(), 3);
+    assert!(csv_rows
+        .iter()
+        .any(|row| row["entity_type"] == "contact" && row["content"] == "Contact note"));
+
+    let json_export_path = path.join("notes-export.json");
+    assert_eq!(
+        core.export_notes_json(
+            json_export_path
+                .to_str()
+                .expect("path should be valid UTF-8")
+        )
+        .expect("note JSON export should succeed"),
+        4
+    );
+    let json_rows = read_json_export(&json_export_path);
+    assert!(json_rows.iter().all(|row| row.get("id").is_none()));
+    assert!(json_rows
+        .iter()
+        .any(|row| row["entity_type"] == "activity" && row["content"] == "Activity note"));
+
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("note import should return rollback plan");
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("note rollback should complete");
+    assert_eq!(rollback.rolled_back, 4);
+    assert_eq!(rollback.skipped, 0);
+    assert!(rollback.errors.is_empty());
+    assert!(core
+        .list_notes()
+        .expect("notes list after rollback")
+        .is_empty());
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn preflight_notes_csv_import_validates_active_targets_without_writes() {
+    let (mut core, path) = open_test_core();
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Deleted".to_string()),
+            Some("Contact".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should create");
+    core.delete_contact(&contact.id)
+        .expect("contact should be soft deleted");
+
+    let csv_path = path.join("notes-invalid.csv");
+    std::fs::write(
+        &csv_path,
+        format!(
+            "entity_type,entity_id,content\ncontact,{},Cannot attach\n",
+            contact.id
+        ),
+    )
+    .expect("invalid note CSV fixture should write");
+
+    let error = core
+        .preflight_notes_csv_import(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect_err("preflight should reject deleted parent entity");
+    assert!(error.to_string().contains("Row 2"));
+    assert!(error.to_string().contains("not found"));
+    assert!(core.list_notes().expect("notes should list").is_empty());
+
+    let unsupported_path = path.join("notes-unsupported.csv");
+    std::fs::write(
+        &unsupported_path,
+        "entity_type,entity_id,content\ninvoice,local-1,Unsupported\n",
+    )
+    .expect("unsupported note CSV fixture should write");
+    let unsupported_error = core
+        .preflight_notes_csv_import(
+            unsupported_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect_err("preflight should reject unsupported entity type");
+    assert!(unsupported_error
+        .to_string()
+        .contains("Unsupported entity_type 'invoice'"));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_notes_json_with_mapping_uses_note_service_and_conflict_safe_rollback() {
+    let (mut core, path) = open_test_core();
+    let organization = core
+        .create_organization(
+            "Acme Health".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("organization should create");
+    let json_path = path.join("notes-mapped.json");
+    std::fs::write(
+        &json_path,
+        format!(
+            r#"[
+  {{
+    "Kind": "organization",
+    "Target": "{}",
+    "Body": "Mapped organization note"
+  }}
+]
+"#,
+            organization.id
+        ),
+    )
+    .expect("mapped note JSON fixture should write");
+    let mapping = import_mapping(&[
+        ("Kind", Some("entity_type")),
+        ("Target", Some("entity_id")),
+        ("Body", Some("content")),
+    ]);
+
+    let preflight = core
+        .preflight_notes_json_import_with_mapping(
+            json_path.to_str().expect("path should be valid UTF-8"),
+            mapping.clone(),
+        )
+        .expect("mapped note preflight should succeed");
+    assert_eq!(preflight.entity_type, "notes");
+    assert_eq!(preflight.duplicate_warning_count, 0);
+
+    let result = core
+        .import_notes_json_with_mapping(
+            json_path.to_str().expect("path should be valid UTF-8"),
+            mapping,
+        )
+        .expect("mapped note import should succeed");
+    assert_eq!(result.created, 1);
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("created note import should return rollback plan");
+    let note_id = match &rollback_plan.actions[0] {
+        super::import_rollback::ImportRollbackAction::Note { entity_id, .. } => entity_id.clone(),
+        other => panic!("expected note rollback action, got {other:?}"),
+    };
+    let note = core.get_note(&note_id).expect("imported note should exist");
+    assert_eq!(note.content, "Mapped organization note");
+    assert_eq!(note.entity_type, "organization");
+    assert_eq!(note.entity_id, organization.id);
+
+    core.update_note(&note_id, "Edited after import".to_string())
+        .expect("note should update after import");
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("note rollback should complete with conflict skip");
+    assert_eq!(rollback.rolled_back, 0);
+    assert_eq!(rollback.skipped, 1);
+    assert_eq!(rollback.errors[0].code, "conflict");
+    assert_eq!(
+        core.get_note(&note_id)
+            .expect("conflicted note should remain")
+            .content,
+        "Edited after import"
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn import_rollback_restores_only_changed_contact_merge_fields() {
     let (mut core, path) = open_test_core();
     let existing = core

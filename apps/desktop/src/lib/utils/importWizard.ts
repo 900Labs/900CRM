@@ -8,6 +8,7 @@ import type {
   ImportColumnMapping,
   ImportPreflightEntity,
   ImportTargetField,
+  NoteImportTargetField,
   OrganizationImportTargetField,
 } from '$lib/api/importExport';
 
@@ -67,6 +68,12 @@ export const ACTIVITY_IMPORT_FIELDS: ImportFieldOption<ActivityImportTargetField
   { value: 'completed', label: 'Completed' },
   { value: 'contact_id', label: 'Contact ID' },
   { value: 'deal_id', label: 'Deal ID' },
+];
+
+export const NOTE_IMPORT_FIELDS: ImportFieldOption<NoteImportTargetField>[] = [
+  { value: 'entity_type', label: 'Entity type', required: true },
+  { value: 'entity_id', label: 'Entity ID', required: true },
+  { value: 'content', label: 'Content', required: true },
 ];
 
 type CustomImportEntity = 'contacts' | 'deals' | 'activities' | 'organizations';
@@ -179,6 +186,26 @@ const ACTIVITY_ALIASES: Record<string, ActivityImportTargetField> = {
   localdealid: 'deal_id',
 };
 
+const NOTE_ALIASES: Record<string, NoteImportTargetField> = {
+  entitytype: 'entity_type',
+  type: 'entity_type',
+  kind: 'entity_type',
+  parenttype: 'entity_type',
+  parententitytype: 'entity_type',
+  entityid: 'entity_id',
+  id: 'entity_id',
+  target: 'entity_id',
+  targetid: 'entity_id',
+  localtargetid: 'entity_id',
+  parentid: 'entity_id',
+  parententityid: 'entity_id',
+  content: 'content',
+  body: 'content',
+  note: 'content',
+  notes: 'content',
+  text: 'content',
+};
+
 export function getImportFieldOptions(
   entity: MappedImportEntity,
   customFields: CustomFieldDefinition[] = [],
@@ -202,6 +229,10 @@ export function getImportFieldOptions(
       ...ACTIVITY_IMPORT_FIELDS,
       ...customFieldOptions('activities', customFields),
     ];
+  }
+
+  if (entity === 'notes') {
+    return NOTE_IMPORT_FIELDS;
   }
 
   return [
@@ -250,6 +281,10 @@ function getImportAliases(entity: MappedImportEntity): Record<string, ImportTarg
 
   if (entity === 'activities') {
     return ACTIVITY_ALIASES;
+  }
+
+  if (entity === 'notes') {
+    return NOTE_ALIASES;
   }
 
   return ORGANIZATION_ALIASES;
@@ -327,6 +362,10 @@ function getCustomImportAliases(
   entity: MappedImportEntity,
   customFields: CustomFieldDefinition[],
 ): Record<string, CustomFieldImportTargetField> {
+  if (entity === 'notes') {
+    return {};
+  }
+
   const fields = customFieldsForEntity(entity, customFields);
   const duplicateNames = duplicateCustomFieldNames(fields);
   const aliases: Record<string, CustomFieldImportTargetField> = {};

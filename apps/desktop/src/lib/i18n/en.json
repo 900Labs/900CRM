@@ -345,6 +345,7 @@
     "detectDuplicates": "Detect duplicates",
     "reviewImport": "Review import",
     "activitiesSkipDuplicates": "Activity imports do not run duplicate detection. Confirmed rows create new activities.",
+    "notesSkipDuplicates": "Note imports do not run duplicate detection. Confirmed rows create new notes.",
     "duplicateWarningCount": "{count} duplicate warnings",
     "row": "Row",
     "rowNumber": "Row {number}",

@@ -122,6 +122,26 @@ describe('import wizard helpers', () => {
     });
   });
 
+  it('suggests note mappings from common CSV headers', () => {
+    expect(
+      suggestImportMapping('notes', [
+        'Parent Type',
+        'Parent ID',
+        'Kind',
+        'Target',
+        'Body',
+        'Ignore',
+      ]),
+    ).toEqual({
+      'Parent Type': 'entity_type',
+      'Parent ID': 'entity_id',
+      Kind: 'entity_type',
+      Target: 'entity_id',
+      Body: 'content',
+      Ignore: null,
+    });
+  });
+
   it('adds contact custom fields as mapping options and suggestions', () => {
     expect(getImportFieldOptions('contacts', contactCustomFields)).toContainEqual({
       value: 'custom:VIP Tier',
@@ -265,6 +285,18 @@ describe('import wizard helpers', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Activity type is required.');
     expect(result.errors).toContain('Title is mapped more than once: Subject, Summary.');
+  });
+
+  it('blocks missing required note fields and duplicate note targets', () => {
+    const result = validateImportMapping('notes', {
+      Kind: 'entity_type',
+      Type: 'entity_type',
+      Body: 'content',
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Entity ID is required.');
+    expect(result.errors).toContain('Entity type is mapped more than once: Kind, Type.');
   });
 
   it('accepts valid organization mappings with skipped columns', () => {
