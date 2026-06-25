@@ -60,7 +60,7 @@ const importWithBackupResult = {
   backup: backupValidation,
 };
 
-async function renderJsonImportSummary() {
+async function renderJsonImportSummary(result = importWithBackupResult) {
   openDialogMock.mockResolvedValue("/tmp/contacts.json");
   preflightJsonMock.mockResolvedValue({
     entity_type: "contacts",
@@ -79,7 +79,7 @@ async function renderJsonImportSummary() {
       },
     ],
   });
-  importDataMock.mockResolvedValue(importWithBackupResult);
+  importDataMock.mockResolvedValue(result);
 
   render(ImportExport, { open: true });
 
@@ -90,7 +90,14 @@ async function renderJsonImportSummary() {
   await fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
   await fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
 
-  await screen.findByText(`Automatic pre-import backup created at ${backupPath}`);
+  await waitFor(() => {
+    expect(importDataMock).toHaveBeenCalledWith(
+      "contacts",
+      "json",
+      "/tmp/contacts.json",
+    );
+  });
+  await screen.findByText("Created");
 }
 
 describe("ImportExport component", () => {
@@ -165,11 +172,22 @@ describe("ImportExport component", () => {
     expect(screen.getByRole("button", { name: "Restore pre-import backup" })).toBeTruthy();
   });
 
+  it("does not show the restore control when the import summary has no backup path", async () => {
+    await renderJsonImportSummary({
+      import: { created: 1, skipped: 0, errors: [] },
+      backup: { ...backupValidation, backup_dir: "" },
+    });
+
+    expect(screen.queryByRole("button", { name: "Restore pre-import backup" })).toBeNull();
+  });
+
   it("does not restore the pre-import backup when confirmation is cancelled", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     validateLocalBackupMock.mockResolvedValue(backupValidation);
 
     await renderJsonImportSummary();
+
+    await screen.findByText(`Automatic pre-import backup created at ${backupPath}`);
 
     await fireEvent.click(screen.getByRole("button", { name: "Restore pre-import backup" }));
 
@@ -191,6 +209,8 @@ describe("ImportExport component", () => {
 
     await renderJsonImportSummary();
 
+    await screen.findByText(`Automatic pre-import backup created at ${backupPath}`);
+
     await fireEvent.click(screen.getByRole("button", { name: "Restore pre-import backup" }));
 
     await waitFor(() => {
@@ -206,6 +226,8 @@ describe("ImportExport component", () => {
     restoreLocalBackupToAppDataMock.mockRejectedValue(new Error("restore failed"));
 
     await renderJsonImportSummary();
+
+    await screen.findByText(`Automatic pre-import backup created at ${backupPath}`);
 
     await fireEvent.click(screen.getByRole("button", { name: "Restore pre-import backup" }));
 
