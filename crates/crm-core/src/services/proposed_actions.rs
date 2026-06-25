@@ -1,3 +1,5 @@
+use std::{fs, io::BufWriter};
+
 use crate::audit::ACTOR_DESKTOP_APP;
 use crate::result::CrmResult;
 use crate::storage::{
@@ -6,7 +8,10 @@ use crate::storage::{
     external_clients::ExternalClient,
     proposed_actions::ProposedAction,
 };
-use crate::utils::errors::CrmError;
+use crate::utils::{
+    csv::{write_proposed_actions_csv, ProposedActionCsvRow},
+    errors::CrmError,
+};
 use serde::Deserialize;
 
 use super::activity_relationships::add_activity_link_in_transaction;
@@ -21,6 +26,30 @@ const CREATE_ACTIVITY_COMPATIBLE_ACTION_TYPE: &str = "create_activity";
 impl CrmCore {
     pub fn list_pending_proposed_actions(&self) -> CrmResult<Vec<ProposedAction>> {
         storage::proposed_actions::list_pending_proposed_actions(&self.db.conn)
+    }
+
+    pub fn export_proposed_actions_csv(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_proposed_action_rows()?;
+        let count = rows.len() as u32;
+        let file = fs::File::create(file_path)?;
+        write_proposed_actions_csv(BufWriter::new(file), &rows)?;
+        Ok(count)
+    }
+
+    pub fn export_proposed_actions_json(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_proposed_action_rows()?;
+        let count = rows.len() as u32;
+        super::write_json_export(file_path, &rows)?;
+        Ok(count)
+    }
+
+    fn export_proposed_action_rows(&self) -> CrmResult<Vec<ProposedActionCsvRow>> {
+        Ok(
+            storage::proposed_actions::list_all_proposed_actions(&self.db.conn)?
+                .into_iter()
+                .map(proposed_action_export_row)
+                .collect(),
+        )
     }
 
     pub fn approve_proposed_action(&mut self, id: String) -> CrmResult<ProposedAction> {
@@ -151,6 +180,36 @@ impl CrmCore {
         )?;
         tx.commit()?;
         Ok(proposed_action)
+    }
+}
+
+fn proposed_action_export_row(action: ProposedAction) -> ProposedActionCsvRow {
+    let external_client_id = action.client_id.clone();
+    let payload_json = action.input_json.clone();
+    let decided_at = action
+        .approved_at
+        .clone()
+        .or_else(|| action.rejected_at.clone());
+
+    ProposedActionCsvRow {
+        id: action.id,
+        external_client_id,
+        client_id: action.client_id,
+        tool_name: action.tool_name,
+        action_type: action.action_type,
+        entity_type: action.entity_type,
+        entity_id: action.entity_id,
+        payload_json,
+        input_json: action.input_json,
+        proposed_output_json: action.proposed_output_json,
+        status: action.status,
+        created_at: action.created_at,
+        decided_at,
+        approved_at: action.approved_at,
+        rejected_at: action.rejected_at,
+        executed_at: action.executed_at,
+        error_message: None,
+        device_id: action.device_id,
     }
 }
 
