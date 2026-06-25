@@ -1,6 +1,7 @@
 use std::{fs, io::BufWriter};
 
 use rusqlite::Connection;
+use serde::Serialize;
 
 use crate::audit::ACTOR_DESKTOP_APP;
 use crate::permissions::{
@@ -17,6 +18,12 @@ use crate::utils::{
 };
 
 use super::{record_audit_json, CrmCore};
+
+const EVALUATE_EXTERNAL_CLIENT_READ_PERMISSION_ACTION: &str =
+    "evaluate_external_client_read_permission";
+const EVALUATE_EXTERNAL_CLIENT_DRAFT_PERMISSION_ACTION: &str =
+    "evaluate_external_client_draft_permission";
+const EXTERNAL_CLIENT_ENTITY_TYPE: &str = "external_client";
 
 impl CrmCore {
     pub fn list_external_client_permissions(
@@ -121,7 +128,15 @@ impl CrmCore {
         let client_id = required_external_client_field("client_id", client_id)?;
         let tool_name = required_external_client_field("tool_name", tool_name)?;
 
-        evaluate_external_client_tool_read_permission(&self.db.conn, &client_id, &tool_name)
+        evaluate_external_client_permission_with_audit(
+            &self.db.conn,
+            ACTOR_DESKTOP_APP,
+            &self.device_id,
+            ExternalClientAccessKind::Read,
+            &client_id,
+            &tool_name,
+            None,
+        )
     }
 
     pub fn evaluate_external_client_draft_permission(
@@ -132,7 +147,15 @@ impl CrmCore {
         let client_id = required_external_client_field("client_id", client_id)?;
         let tool_name = required_external_client_field("tool_name", tool_name)?;
 
-        evaluate_external_client_draft_permission(&self.db.conn, &client_id, &tool_name)
+        evaluate_external_client_permission_with_audit(
+            &self.db.conn,
+            ACTOR_DESKTOP_APP,
+            &self.device_id,
+            ExternalClientAccessKind::Draft,
+            &client_id,
+            &tool_name,
+            None,
+        )
     }
 }
 
@@ -153,10 +176,21 @@ fn external_client_permission_export_row(
 
 pub(super) fn ensure_external_client_draft_permission(
     conn: &Connection,
+    actor_type: &str,
+    device_id: &str,
     client_id: &str,
     tool_name: &str,
+    entity_scope: Option<ExternalClientEntityScope<'_>>,
 ) -> CrmResult<ToolPermissionEvaluation> {
-    let evaluation = evaluate_external_client_draft_permission(conn, client_id, tool_name)?;
+    let evaluation = evaluate_external_client_permission_with_audit(
+        conn,
+        actor_type,
+        device_id,
+        ExternalClientAccessKind::Draft,
+        client_id,
+        tool_name,
+        entity_scope,
+    )?;
     if evaluation.allowed {
         return Ok(evaluation);
     }
@@ -181,24 +215,53 @@ pub(super) fn required_external_client_field(field: &str, value: &str) -> CrmRes
     Ok(trimmed.to_string())
 }
 
-fn evaluate_external_client_tool_read_permission(
-    conn: &Connection,
-    client_id: &str,
-    tool_name: &str,
-) -> CrmResult<ToolPermissionEvaluation> {
-    let mode = external_client_mode_for_evaluation(conn, client_id)?;
-    let permission =
-        storage::external_client_permissions::get_permission_for_tool(conn, client_id, tool_name)?;
+pub(super) fn external_client_entity_scope<'a>(
+    entity_type: Option<&'a str>,
+    entity_id: Option<&'a str>,
+) -> Option<ExternalClientEntityScope<'a>> {
+    if entity_type.is_none() && entity_id.is_none() {
+        return None;
+    }
 
-    Ok(evaluate_tool_read_permission(
-        mode,
-        tool_name,
-        permission.as_ref().map(ExternalClientPermission::grant),
-    ))
+    Some(ExternalClientEntityScope {
+        entity_type,
+        entity_id,
+    })
 }
 
-fn evaluate_external_client_draft_permission(
+fn evaluate_external_client_permission_with_audit(
     conn: &Connection,
+    actor_type: &str,
+    device_id: &str,
+    access_kind: ExternalClientAccessKind,
+    client_id: &str,
+    tool_name: &str,
+    entity_scope: Option<ExternalClientEntityScope<'_>>,
+) -> CrmResult<ToolPermissionEvaluation> {
+    let result =
+        evaluate_external_client_permission_decision(conn, access_kind, client_id, tool_name);
+
+    let audit_result = record_external_client_permission_evaluation_audit(
+        conn,
+        actor_type,
+        device_id,
+        access_kind,
+        client_id,
+        tool_name,
+        entity_scope,
+        result.as_ref(),
+    );
+
+    match (result, audit_result) {
+        (Ok(evaluation), Ok(_)) => Ok(evaluation),
+        (Ok(_), Err(audit_error)) => Err(audit_error),
+        (Err(evaluation_error), _) => Err(evaluation_error),
+    }
+}
+
+fn evaluate_external_client_permission_decision(
+    conn: &Connection,
+    access_kind: ExternalClientAccessKind,
     client_id: &str,
     tool_name: &str,
 ) -> CrmResult<ToolPermissionEvaluation> {
@@ -206,11 +269,42 @@ fn evaluate_external_client_draft_permission(
     let permission =
         storage::external_client_permissions::get_permission_for_tool(conn, client_id, tool_name)?;
 
-    Ok(evaluate_tool_draft_permission(
-        mode,
+    let grant = permission.as_ref().map(ExternalClientPermission::grant);
+    Ok(match access_kind {
+        ExternalClientAccessKind::Read => evaluate_tool_read_permission(mode, tool_name, grant),
+        ExternalClientAccessKind::Draft => evaluate_tool_draft_permission(mode, tool_name, grant),
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn record_external_client_permission_evaluation_audit(
+    conn: &Connection,
+    actor_type: &str,
+    device_id: &str,
+    access_kind: ExternalClientAccessKind,
+    client_id: &str,
+    tool_name: &str,
+    entity_scope: Option<ExternalClientEntityScope<'_>>,
+    result: Result<&ToolPermissionEvaluation, &CrmError>,
+) -> CrmResult<()> {
+    let context = ExternalClientPermissionEvaluationAudit::from_result(
+        client_id,
         tool_name,
-        permission.as_ref().map(ExternalClientPermission::grant),
-    ))
+        access_kind,
+        entity_scope,
+        result,
+    );
+    record_audit_json(
+        conn,
+        actor_type,
+        access_kind.audit_action(),
+        Some(EXTERNAL_CLIENT_ENTITY_TYPE),
+        Some(client_id),
+        None::<&()>,
+        Some(&context),
+        device_id,
+    )?;
+    Ok(())
 }
 
 fn require_existing_external_client(
@@ -223,6 +317,97 @@ fn require_existing_external_client(
             client_id
         ))
     })
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+pub(super) struct ExternalClientEntityScope<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    entity_type: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    entity_id: Option<&'a str>,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ExternalClientAccessKind {
+    Read,
+    Draft,
+}
+
+impl ExternalClientAccessKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Read => "read",
+            Self::Draft => "draft",
+        }
+    }
+
+    fn audit_action(self) -> &'static str {
+        match self {
+            Self::Read => EVALUATE_EXTERNAL_CLIENT_READ_PERMISSION_ACTION,
+            Self::Draft => EVALUATE_EXTERNAL_CLIENT_DRAFT_PERMISSION_ACTION,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct ExternalClientPermissionEvaluationAudit<'a> {
+    client_id: &'a str,
+    tool_name: &'a str,
+    access_kind: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<&'static str>,
+    allowed: bool,
+    reason: &'static str,
+    status: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    entity_scope: Option<ExternalClientEntityScope<'a>>,
+}
+
+impl<'a> ExternalClientPermissionEvaluationAudit<'a> {
+    fn from_result(
+        client_id: &'a str,
+        tool_name: &'a str,
+        access_kind: ExternalClientAccessKind,
+        entity_scope: Option<ExternalClientEntityScope<'a>>,
+        result: Result<&ToolPermissionEvaluation, &CrmError>,
+    ) -> Self {
+        match result {
+            Ok(evaluation) => Self {
+                client_id,
+                tool_name,
+                access_kind: access_kind.as_str(),
+                mode: Some(evaluation.mode.as_str()),
+                allowed: evaluation.allowed,
+                reason: evaluation.reason.as_str(),
+                status: if evaluation.allowed {
+                    "allowed"
+                } else {
+                    "denied"
+                },
+                entity_scope,
+            },
+            Err(CrmError::NotFound(_)) => Self {
+                client_id,
+                tool_name,
+                access_kind: access_kind.as_str(),
+                mode: None,
+                allowed: false,
+                reason: "client_not_found_or_deleted",
+                status: "error",
+                entity_scope,
+            },
+            Err(_) => Self {
+                client_id,
+                tool_name,
+                access_kind: access_kind.as_str(),
+                mode: None,
+                allowed: false,
+                reason: "evaluation_error",
+                status: "error",
+                entity_scope,
+            },
+        }
+    }
 }
 
 fn require_initial_external_client_mode(

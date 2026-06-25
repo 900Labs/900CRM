@@ -36,6 +36,10 @@ The following data and API surfaces exist today:
   records using only `disabled`, `read_only`, and `draft_only`.
 - Proposed action rows with pending, approved, rejected, and other schema-reserved lifecycle states.
 - Audit log entries for accountable changes and proposed-action decisions.
+- Audit log entries for explicit external-client read/draft permission
+  evaluations and draft permission checks performed before external proposed
+  actions are created, including denied attempts where the attempted
+  client/tool can be identified.
 - Pending Actions UI for reviewing proposed actions.
 - Audit Log UI for inspecting recorded activity.
 - Proposed action approve/reject APIs and UI controls.
@@ -93,6 +97,14 @@ does not issue credentials, start a server/listener, enable sync server
 behavior, or run MCP/client code. Disabled clients still evaluate as disabled
 even when permission rows exist.
 
+Explicit `crm-core` permission evaluations now write local `audit_log` evidence
+with the attempted `client_id`, `tool_name`, access kind (`read` or `draft`),
+mode when available, allowed flag, decision reason, and result status. Draft
+permission checks inside `create_external_proposed_action_stub` use the
+`mcp_client` actor, include available proposed-action entity scope, and record
+denied checks before returning the existing denial or not-found error. These
+audit-only evaluation entries do not create `sync_changelog` rows.
+
 Activation updates must keep stored state consistent:
 
 - disabled clients store `enabled = false` and `permission_mode = 'disabled'`;
@@ -145,7 +157,7 @@ A future MCP implementation should not be accepted until all of the following ar
 - [ ] No raw SQL, shell, process, or arbitrary file tools are exposed.
 - [ ] External client enablement and per-tool permission grants have explicit review UI.
 - [ ] Only `disabled`, `read_only`, and `draft_only` are active unless a future sprint implements broader modes with tests and docs.
-- [ ] Read access is audited with enough context to identify client, tool, entity scope, and result status.
+- [ ] MCP runtime read access is audited with enough context to identify client, tool, entity scope, and result status. Local `crm-core` external-client permission evaluations already record readiness audit evidence, but MCP runtime/tool access remains unimplemented.
 - [ ] Draft proposed actions are audited and visible in Pending Actions.
 - [ ] Approved proposed actions execute only when a reviewed, supported core execution path exists; unsupported actions remain pending with explicit errors.
 - [ ] Prompt-injection boundaries are documented and tested with CRM content treated as untrusted.
