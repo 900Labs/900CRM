@@ -356,6 +356,42 @@ pub fn list_values_for_entity_type(
     Ok(rows.filter_map(|r| r.ok()).collect())
 }
 
+pub fn delete_value_for_entity_field(
+    conn: &Connection,
+    field_def_id: &str,
+    entity_id: &str,
+) -> CrmResult<bool> {
+    let deleted = conn.execute(
+        "DELETE FROM custom_field_values WHERE field_def_id = ?1 AND entity_id = ?2",
+        params![field_def_id, entity_id],
+    )?;
+
+    Ok(deleted > 0)
+}
+
+pub fn delete_values_for_entity(
+    conn: &Connection,
+    entity_type: &str,
+    entity_id: &str,
+) -> CrmResult<usize> {
+    validate_entity_type(entity_type)?;
+
+    let deleted = conn.execute(
+        r#"
+        DELETE FROM custom_field_values
+        WHERE entity_id = ?1
+          AND field_def_id IN (
+              SELECT id
+              FROM custom_field_defs
+              WHERE entity_type = ?2
+          )
+        "#,
+        params![entity_id, entity_type],
+    )?;
+
+    Ok(deleted)
+}
+
 fn row_to_definition(row: &rusqlite::Row<'_>) -> rusqlite::Result<CustomFieldDefinition> {
     Ok(CustomFieldDefinition {
         id: row.get(0)?,

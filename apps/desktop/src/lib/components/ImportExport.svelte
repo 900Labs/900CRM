@@ -7,6 +7,7 @@
   import { parseCSV, applyMapping } from '$lib/utils/csv';
   import type { ParseCSVResult, ColumnMapping } from '$lib/utils/csv';
   import { restoreLocalBackupToAppData, validateLocalBackup } from '$lib/api/backup';
+  import { listCustomFieldDefinitions, type CustomFieldDefinition } from '$lib/api/customFields';
   import {
     getImportFieldOptions,
     suggestImportMapping,
@@ -81,6 +82,14 @@
   let importRollbackError = $state<string | null>(null);
   let importRollbackResult = $state<ImportRollbackResult | null>(null);
   let importRollbackCompleted = $state(false);
+  let importCustomFieldDefinitions = $state<{
+    contacts: CustomFieldDefinition[];
+    deals: CustomFieldDefinition[];
+  }>({ contacts: [], deals: [] });
+  let loadedImportCustomFields = $state<{ contacts: boolean; deals: boolean }>({
+    contacts: false,
+    deals: false,
+  });
 
   let exportEntity = $state<ImportExportEntity>('contacts');
   let exportFormat = $state<ExportFormat>('csv');
@@ -106,7 +115,16 @@
   const showMappingWizard = $derived(isMappedImport && (isCsvImport || isJsonImport));
   const showDuplicateReview = $derived(showMappingWizard);
   const mappedEntity = $derived(isMappedImport ? (importEntity as MappedImportEntity) : null);
-  const importFieldOptions = $derived(mappedEntity ? getImportFieldOptions(mappedEntity) : []);
+  const activeImportCustomFields = $derived(
+    importEntity === 'contacts'
+      ? importCustomFieldDefinitions.contacts
+      : importEntity === 'deals'
+        ? importCustomFieldDefinitions.deals
+        : [],
+  );
+  const importFieldOptions = $derived(
+    mappedEntity ? getImportFieldOptions(mappedEntity, activeImportCustomFields) : [],
+  );
   const sourceHeaders = $derived(isJsonImport ? (jsonPreview?.headers ?? []) : (parseResult?.headers ?? []));
   const sourcePreviewRows = $derived(
     isJsonImport ? jsonPreviewRows.map((row) => row.values) : previewRows,
@@ -121,6 +139,29 @@
   const importRollbackPlan = $derived(importSummary?.rollback_plan ?? null);
   const importRollbackActionCount = $derived(importRollbackPlan?.actions.length ?? 0);
 
+  async function ensureImportCustomFields(entity: ImportExportEntity): Promise<CustomFieldDefinition[]> {
+    if (entity !== 'contacts' && entity !== 'deals') {
+      return [];
+    }
+
+    if (loadedImportCustomFields[entity]) {
+      return importCustomFieldDefinitions[entity];
+    }
+
+    const entityType = entity === 'contacts' ? 'contact' : 'deal';
+    const definitions = await listCustomFieldDefinitions(entityType);
+    importCustomFieldDefinitions = {
+      ...importCustomFieldDefinitions,
+      [entity]: definitions,
+    };
+    loadedImportCustomFields = {
+      ...loadedImportCustomFields,
+      [entity]: true,
+    };
+
+    return definitions;
+  }
+
   async function handleFilePick() {
     try {
       const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
@@ -134,14 +175,16 @@
         return;
       }
 
+      const customFields = await ensureImportCustomFields(importEntity);
+
       if (isJsonImport) {
-        await loadSelectedJson(selected, selected);
+        await loadSelectedJson(selected, selected, customFields);
         return;
       }
 
       const { readTextFile } = await import('@tauri-apps/plugin-fs');
       const text = await readTextFile(selected);
-      loadSelectedCsv(text, selected, selected, 'desktop');
+      loadSelectedCsv(text, selected, selected, 'desktop', customFields);
     } catch {
       if (isCsvImport) {
         document.getElementById('csv-file-input')?.click();
@@ -162,9 +205,10 @@
     }
 
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const text = (ev.target?.result as string) ?? '';
-      loadSelectedCsv(text, file.name, file.name, 'browser');
+      const customFields = await ensureImportCustomFields(importEntity);
+      loadSelectedCsv(text, file.name, file.name, 'browser', customFields);
     };
     reader.readAsText(file);
   }
@@ -179,7 +223,13 @@
     resetImportState({ keepEntity: true, keepFormat: true });
   }
 
-  function loadSelectedCsv(text: string, label: string, path: string | null, source: FileSource) {
+  function loadSelectedCsv(
+    text: string,
+    label: string,
+    path: string | null,
+    source: FileSource,
+    customFields: CustomFieldDefinition[] = activeImportCustomFields,
+  ) {
     csvText = text;
     selectedImportLabel = label;
     selectedImportPath = path;
@@ -197,13 +247,17 @@
     importStep = parseResult.headers.length > 0 ? 'preview' : 'select';
 
     if (isMappedImport && mappedEntity) {
-      columnMapping = suggestImportMapping(mappedEntity, parseResult.headers);
+      columnMapping = suggestImportMapping(mappedEntity, parseResult.headers, customFields);
     } else {
       columnMapping = {};
     }
   }
 
-  async function loadSelectedJson(label: string, path: string) {
+  async function loadSelectedJson(
+    label: string,
+    path: string,
+    customFields: CustomFieldDefinition[] = activeImportCustomFields,
+  ) {
     csvText = '';
     parseResult = null;
     jsonPreview = null;
@@ -228,7 +282,7 @@
     try {
       jsonPreview = await previewJson(importEntity, path);
       if (mappedEntity) {
-        columnMapping = suggestImportMapping(mappedEntity, jsonPreview.headers);
+        columnMapping = suggestImportMapping(mappedEntity, jsonPreview.headers, customFields);
       }
       importStep = 'preview';
     } catch {
@@ -287,7 +341,7 @@
       return true;
     }
 
-    const result = validateImportMapping(mappedEntity, columnMapping);
+    const result = validateImportMapping(mappedEntity, columnMapping, activeImportCustomFields);
     validationErrors = result.errors;
     return result.valid;
   }

@@ -1,11 +1,15 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    storage::{contacts::Contact, deals::Deal, organizations::Organization},
+    storage::{contacts::Contact, custom_fields, deals::Deal, organizations::Organization},
     utils::{errors::CrmError, uuid::new_uuid},
 };
 
 use super::{CrmCore, CrmResult};
+
+const CUSTOM_FIELD_ROLLBACK_PREFIX: &str = "custom_field:";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportRollbackPlan {
@@ -56,14 +60,18 @@ pub enum ImportRollbackAction {
 }
 
 impl ImportRollbackAction {
-    pub(crate) fn created_contact(row_number: usize, contact: &Contact) -> Self {
+    pub(crate) fn created_contact(
+        row_number: usize,
+        contact: &Contact,
+        custom_fields: BTreeMap<String, String>,
+    ) -> Self {
         Self::Contact {
             row_number: row_number as u32,
             entity_id: contact.id.clone(),
             operation: ImportRollbackOperation::Created,
             changed_fields: Vec::new(),
             before_import: None,
-            post_import: ContactImportRollbackSnapshot::from(contact),
+            post_import: ContactImportRollbackSnapshot::from_contact(contact, custom_fields),
         }
     }
 
@@ -71,8 +79,15 @@ impl ImportRollbackAction {
         row_number: usize,
         before_import: &Contact,
         post_import: &Contact,
+        before_custom_fields: BTreeMap<String, String>,
+        post_custom_fields: BTreeMap<String, String>,
     ) -> Option<Self> {
-        let changed_fields = changed_contact_import_fields(before_import, post_import);
+        let changed_fields = changed_contact_import_fields(
+            before_import,
+            post_import,
+            &before_custom_fields,
+            &post_custom_fields,
+        );
         if changed_fields.is_empty() {
             return None;
         }
@@ -82,19 +97,29 @@ impl ImportRollbackAction {
             entity_id: post_import.id.clone(),
             operation: ImportRollbackOperation::Merged,
             changed_fields,
-            before_import: Some(ContactImportRollbackSnapshot::from(before_import)),
-            post_import: ContactImportRollbackSnapshot::from(post_import),
+            before_import: Some(ContactImportRollbackSnapshot::from_contact(
+                before_import,
+                before_custom_fields,
+            )),
+            post_import: ContactImportRollbackSnapshot::from_contact(
+                post_import,
+                post_custom_fields,
+            ),
         })
     }
 
-    pub(crate) fn created_deal(row_number: usize, deal: &Deal) -> Self {
+    pub(crate) fn created_deal(
+        row_number: usize,
+        deal: &Deal,
+        custom_fields: BTreeMap<String, String>,
+    ) -> Self {
         Self::Deal {
             row_number: row_number as u32,
             entity_id: deal.id.clone(),
             operation: ImportRollbackOperation::Created,
             changed_fields: Vec::new(),
             before_import: None,
-            post_import: DealImportRollbackSnapshot::from(deal),
+            post_import: DealImportRollbackSnapshot::from_deal(deal, custom_fields),
         }
     }
 
@@ -102,8 +127,15 @@ impl ImportRollbackAction {
         row_number: usize,
         before_import: &Deal,
         post_import: &Deal,
+        before_custom_fields: BTreeMap<String, String>,
+        post_custom_fields: BTreeMap<String, String>,
     ) -> Option<Self> {
-        let changed_fields = changed_deal_import_fields(before_import, post_import);
+        let changed_fields = changed_deal_import_fields(
+            before_import,
+            post_import,
+            &before_custom_fields,
+            &post_custom_fields,
+        );
         if changed_fields.is_empty() {
             return None;
         }
@@ -113,8 +145,11 @@ impl ImportRollbackAction {
             entity_id: post_import.id.clone(),
             operation: ImportRollbackOperation::Merged,
             changed_fields,
-            before_import: Some(DealImportRollbackSnapshot::from(before_import)),
-            post_import: DealImportRollbackSnapshot::from(post_import),
+            before_import: Some(DealImportRollbackSnapshot::from_deal(
+                before_import,
+                before_custom_fields,
+            )),
+            post_import: DealImportRollbackSnapshot::from_deal(post_import, post_custom_fields),
         })
     }
 
@@ -172,10 +207,18 @@ pub struct ContactImportRollbackSnapshot {
     pub organization_id: Option<String>,
     pub notes: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub custom_fields: BTreeMap<String, String>,
 }
 
 impl From<&Contact> for ContactImportRollbackSnapshot {
     fn from(contact: &Contact) -> Self {
+        Self::from_contact(contact, BTreeMap::new())
+    }
+}
+
+impl ContactImportRollbackSnapshot {
+    fn from_contact(contact: &Contact, custom_fields: BTreeMap<String, String>) -> Self {
         Self {
             contact_type: contact.contact_type.clone(),
             first_name: contact.first_name.clone(),
@@ -190,6 +233,7 @@ impl From<&Contact> for ContactImportRollbackSnapshot {
             organization_id: contact.organization_id.clone(),
             notes: contact.notes.clone(),
             updated_at: contact.updated_at.clone(),
+            custom_fields,
         }
     }
 }
@@ -206,10 +250,18 @@ pub struct DealImportRollbackSnapshot {
     pub organization_id: Option<String>,
     pub notes: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub custom_fields: BTreeMap<String, String>,
 }
 
 impl From<&Deal> for DealImportRollbackSnapshot {
     fn from(deal: &Deal) -> Self {
+        Self::from_deal(deal, BTreeMap::new())
+    }
+}
+
+impl DealImportRollbackSnapshot {
+    fn from_deal(deal: &Deal, custom_fields: BTreeMap<String, String>) -> Self {
         Self {
             title: deal.title.clone(),
             value: deal.value,
@@ -221,6 +273,7 @@ impl From<&Deal> for DealImportRollbackSnapshot {
             organization_id: deal.organization_id.clone(),
             notes: deal.notes.clone(),
             updated_at: deal.updated_at.clone(),
+            custom_fields,
         }
     }
 }
@@ -422,13 +475,30 @@ impl CrmCore {
             return;
         };
 
-        if ContactImportRollbackSnapshot::from(&current) != *post_import {
+        let Some(current_snapshot) =
+            contact_snapshot_for_rollback(self, row_number, entity_id, &current, result)
+        else {
+            return;
+        };
+
+        if current_snapshot != *post_import {
             record_conflict(result, "contact", entity_id, row_number);
             return;
         }
 
         match self.delete_contact(entity_id) {
-            Ok(()) => result.record_rolled_back(),
+            Ok(()) => {
+                match custom_fields::delete_values_for_entity(&self.db.conn, "contact", entity_id) {
+                    Ok(_) => result.record_rolled_back(),
+                    Err(err) => result.record_error(
+                        "contact",
+                        entity_id,
+                        row_number,
+                        "rollback_failed",
+                        err.to_string(),
+                    ),
+                }
+            }
             Err(CrmError::NotFound(message)) => {
                 result.record_skipped("contact", entity_id, row_number, "not_found", message)
             }
@@ -460,7 +530,13 @@ impl CrmCore {
             return;
         };
 
-        if ContactImportRollbackSnapshot::from(&current) != *post_import {
+        let Some(current_snapshot) =
+            contact_snapshot_for_rollback(self, row_number, entity_id, &current, result)
+        else {
+            return;
+        };
+
+        if current_snapshot != *post_import {
             record_conflict(result, "contact", entity_id, row_number);
             return;
         }
@@ -478,7 +554,21 @@ impl CrmCore {
             string_field_update(changed_fields, "country", &before_import.country),
             string_field_update(changed_fields, "notes", &before_import.notes),
         ) {
-            Ok(_) => result.record_rolled_back(),
+            Ok(_) => match restore_custom_field_changes(
+                self,
+                entity_id,
+                changed_fields,
+                &before_import.custom_fields,
+            ) {
+                Ok(()) => result.record_rolled_back(),
+                Err(err) => result.record_error(
+                    "contact",
+                    entity_id,
+                    row_number,
+                    "rollback_failed",
+                    err.to_string(),
+                ),
+            },
             Err(err) => result.record_error(
                 "contact",
                 entity_id,
@@ -500,13 +590,30 @@ impl CrmCore {
             return;
         };
 
-        if DealImportRollbackSnapshot::from(&current) != *post_import {
+        let Some(current_snapshot) =
+            deal_snapshot_for_rollback(self, row_number, entity_id, &current, result)
+        else {
+            return;
+        };
+
+        if current_snapshot != *post_import {
             record_conflict(result, "deal", entity_id, row_number);
             return;
         }
 
         match self.delete_deal(entity_id) {
-            Ok(()) => result.record_rolled_back(),
+            Ok(()) => {
+                match custom_fields::delete_values_for_entity(&self.db.conn, "deal", entity_id) {
+                    Ok(_) => result.record_rolled_back(),
+                    Err(err) => result.record_error(
+                        "deal",
+                        entity_id,
+                        row_number,
+                        "rollback_failed",
+                        err.to_string(),
+                    ),
+                }
+            }
             Err(CrmError::NotFound(message)) => {
                 result.record_skipped("deal", entity_id, row_number, "not_found", message)
             }
@@ -537,7 +644,13 @@ impl CrmCore {
             return;
         };
 
-        if DealImportRollbackSnapshot::from(&current) != *post_import {
+        let Some(current_snapshot) =
+            deal_snapshot_for_rollback(self, row_number, entity_id, &current, result)
+        else {
+            return;
+        };
+
+        if current_snapshot != *post_import {
             record_conflict(result, "deal", entity_id, row_number);
             return;
         }
@@ -562,7 +675,21 @@ impl CrmCore {
             ),
             string_field_update(changed_fields, "notes", &before_import.notes),
         ) {
-            Ok(_) => result.record_rolled_back(),
+            Ok(_) => match restore_custom_field_changes(
+                self,
+                entity_id,
+                changed_fields,
+                &before_import.custom_fields,
+            ) {
+                Ok(()) => result.record_rolled_back(),
+                Err(err) => result.record_error(
+                    "deal",
+                    entity_id,
+                    row_number,
+                    "rollback_failed",
+                    err.to_string(),
+                ),
+            },
             Err(err) => result.record_error(
                 "deal",
                 entity_id,
@@ -737,6 +864,70 @@ fn current_organization_for_rollback(
     }
 }
 
+fn contact_snapshot_for_rollback(
+    core: &CrmCore,
+    row_number: u32,
+    entity_id: &str,
+    contact: &Contact,
+    result: &mut ImportRollbackResult,
+) -> Option<ContactImportRollbackSnapshot> {
+    match core.custom_field_snapshot("contact", entity_id) {
+        Ok(custom_fields) => Some(ContactImportRollbackSnapshot::from_contact(
+            contact,
+            custom_fields,
+        )),
+        Err(err) => {
+            result.record_error(
+                "contact",
+                entity_id,
+                row_number,
+                "read_failed",
+                err.to_string(),
+            );
+            None
+        }
+    }
+}
+
+fn deal_snapshot_for_rollback(
+    core: &CrmCore,
+    row_number: u32,
+    entity_id: &str,
+    deal: &Deal,
+    result: &mut ImportRollbackResult,
+) -> Option<DealImportRollbackSnapshot> {
+    match core.custom_field_snapshot("deal", entity_id) {
+        Ok(custom_fields) => Some(DealImportRollbackSnapshot::from_deal(deal, custom_fields)),
+        Err(err) => {
+            result.record_error(
+                "deal",
+                entity_id,
+                row_number,
+                "read_failed",
+                err.to_string(),
+            );
+            None
+        }
+    }
+}
+
+fn restore_custom_field_changes(
+    core: &CrmCore,
+    entity_id: &str,
+    changed_fields: &[String],
+    before_custom_fields: &BTreeMap<String, String>,
+) -> CrmResult<()> {
+    for field_def_id in changed_custom_field_ids(changed_fields) {
+        if let Some(value) = before_custom_fields.get(&field_def_id) {
+            custom_fields::set_value(&core.db.conn, &field_def_id, entity_id, value)?;
+        } else {
+            custom_fields::delete_value_for_entity_field(&core.db.conn, &field_def_id, entity_id)?;
+        }
+    }
+
+    Ok(())
+}
+
 fn record_conflict(
     result: &mut ImportRollbackResult,
     entity_type: &str,
@@ -794,7 +985,12 @@ fn field_changed(changed_fields: &[String], field: &str) -> bool {
     changed_fields.iter().any(|changed| changed == field)
 }
 
-fn changed_contact_import_fields(before: &Contact, after: &Contact) -> Vec<String> {
+fn changed_contact_import_fields(
+    before: &Contact,
+    after: &Contact,
+    before_custom_fields: &BTreeMap<String, String>,
+    after_custom_fields: &BTreeMap<String, String>,
+) -> Vec<String> {
     let mut fields = Vec::new();
     push_changed_string(
         &mut fields,
@@ -815,10 +1011,16 @@ fn changed_contact_import_fields(before: &Contact, after: &Contact) -> Vec<Strin
     push_changed_string(&mut fields, "city", &before.city, &after.city);
     push_changed_string(&mut fields, "country", &before.country, &after.country);
     push_changed_string(&mut fields, "notes", &before.notes, &after.notes);
+    push_changed_custom_fields(&mut fields, before_custom_fields, after_custom_fields);
     fields
 }
 
-fn changed_deal_import_fields(before: &Deal, after: &Deal) -> Vec<String> {
+fn changed_deal_import_fields(
+    before: &Deal,
+    after: &Deal,
+    before_custom_fields: &BTreeMap<String, String>,
+    after_custom_fields: &BTreeMap<String, String>,
+) -> Vec<String> {
     let mut fields = Vec::new();
     if before.value != after.value {
         fields.push("value".to_string());
@@ -830,6 +1032,7 @@ fn changed_deal_import_fields(before: &Deal, after: &Deal) -> Vec<String> {
         &after.expected_close,
     );
     push_changed_string(&mut fields, "notes", &before.notes, &after.notes);
+    push_changed_custom_fields(&mut fields, before_custom_fields, after_custom_fields);
     fields
 }
 
@@ -883,4 +1086,30 @@ fn push_changed_option_string(
     if before != after {
         fields.push(field.to_string());
     }
+}
+
+fn push_changed_custom_fields(
+    fields: &mut Vec<String>,
+    before: &BTreeMap<String, String>,
+    after: &BTreeMap<String, String>,
+) {
+    let field_def_ids = before
+        .keys()
+        .chain(after.keys())
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+
+    for field_def_id in field_def_ids {
+        if before.get(&field_def_id) != after.get(&field_def_id) {
+            fields.push(format!("{CUSTOM_FIELD_ROLLBACK_PREFIX}{field_def_id}"));
+        }
+    }
+}
+
+fn changed_custom_field_ids(changed_fields: &[String]) -> Vec<String> {
+    changed_fields
+        .iter()
+        .filter_map(|field| field.strip_prefix(CUSTOM_FIELD_ROLLBACK_PREFIX))
+        .map(str::to_string)
+        .collect()
 }
