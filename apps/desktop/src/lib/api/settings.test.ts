@@ -15,9 +15,26 @@ const warningCopy = {
     'Local backup folders are unencrypted local files. Store folders containing sensitive data in a trusted or encrypted location.',
 };
 
+const importDuplicateAutoMergeCopy = {
+  confirmDuplicateWarningsWithMerge:
+    '{count} duplicate warnings will be merged into matching existing records where safe.',
+  confirmAutoMergeEnabled:
+    'Duplicate auto-merge is enabled. Safe contact or organization matches will merge instead of creating duplicate records.',
+  mergeDuplicates: 'Merge duplicate rows into existing records',
+  mergeDuplicatesDescription:
+    'When enabled, matching contact or organization rows fill blank existing fields without overwriting existing values.',
+  duplicateAutoMergeEnabled: 'Duplicate auto-merge is enabled for this import.',
+  merged: 'Merged',
+};
+
 function readLocaleSettings(localeFile: string): Record<string, string> {
   const source = readFileSync(path.join(i18nDir, localeFile), 'utf8');
   return JSON.parse(source).settings;
+}
+
+function readLocaleImport(localeFile: string): Record<string, string> {
+  const source = readFileSync(path.join(i18nDir, localeFile), 'utf8');
+  return JSON.parse(source).import;
 }
 
 describe('Settings unencrypted file warnings', () => {
@@ -33,6 +50,20 @@ describe('Settings unencrypted file warnings', () => {
 
       expect(settings.exportUnencryptedWarning).toBe(warningCopy.exportUnencryptedWarning);
       expect(settings.backupUnencryptedWarning).toBe(warningCopy.backupUnencryptedWarning);
+    }
+  });
+
+  it('keeps duplicate auto-merge import copy available in every locale', () => {
+    const localeFiles = readdirSync(i18nDir)
+      .filter((file) => file.endsWith('.json'))
+      .sort();
+
+    for (const localeFile of localeFiles) {
+      const importCopy = readLocaleImport(localeFile);
+
+      for (const [key, value] of Object.entries(importDuplicateAutoMergeCopy)) {
+        expect(importCopy[key]).toBe(value);
+      }
     }
   });
 

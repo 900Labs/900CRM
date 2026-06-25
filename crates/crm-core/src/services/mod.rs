@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::BufWriter;
 use std::path::Path;
@@ -81,8 +82,15 @@ pub struct DashboardStats {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportResult {
     pub created: u32,
+    #[serde(default)]
+    pub merged: u32,
     pub skipped: u32,
     pub errors: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ImportOptions {
+    pub merge_duplicates: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -740,9 +748,17 @@ impl CrmCore {
     }
 
     pub fn import_contacts_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_contacts_csv_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_contacts_csv_with_options(
+        &mut self,
+        file_path: &str,
+        options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_contacts_csv_with_row_numbers(file_content.as_slice())?;
-        self.import_contact_rows(rows)
+        self.import_contact_rows(rows, options)
     }
 
     pub fn import_contacts_csv_with_mapping(
@@ -750,15 +766,36 @@ impl CrmCore {
         file_path: &str,
         mapping: ImportColumnMapping,
     ) -> CrmResult<ImportResult> {
+        self.import_contacts_csv_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_contacts_csv_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_contacts_csv_with_mapping(file_content.as_slice(), &mapping)?;
-        self.import_contact_rows(rows)
+        self.import_contact_rows(rows, options)
     }
 
     pub fn import_contacts_json(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_contacts_json_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_contacts_json_with_options(
+        &mut self,
+        file_path: &str,
+        options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_contacts_json_with_row_numbers(file_content.as_slice())?;
-        self.import_contact_rows(rows)
+        self.import_contact_rows(rows, options)
     }
 
     pub fn import_contacts_json_with_mapping(
@@ -766,9 +803,22 @@ impl CrmCore {
         file_path: &str,
         mapping: ImportColumnMapping,
     ) -> CrmResult<ImportResult> {
+        self.import_contacts_json_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_contacts_json_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_contacts_json_with_mapping(file_content.as_slice(), &mapping)?;
-        self.import_contact_rows(rows)
+        self.import_contact_rows(rows, options)
     }
 
     pub fn preview_contacts_json_import(&self, file_path: &str) -> CrmResult<JsonImportPreview> {
@@ -779,12 +829,47 @@ impl CrmCore {
     fn import_contact_rows(
         &mut self,
         rows: Vec<(usize, ContactCsvRow)>,
+        options: ImportOptions,
     ) -> CrmResult<ImportResult> {
         let mut created = 0u32;
+        let mut merged = 0u32;
         let mut skipped = 0u32;
         let mut errors = Vec::new();
 
         for (row_number, row) in rows {
+            if options.merge_duplicates {
+                match self.find_unique_contact_import_match(&row) {
+                    Ok(Some(contact)) => match self.merge_contact_import_row(&contact.id, &row) {
+                        Ok(()) => {
+                            let _ = storage::audit::record_audit(
+                                &self.db.conn,
+                                ACTOR_IMPORT,
+                                None,
+                                "import_row_merge",
+                                Some("contact"),
+                                Some(&contact.id),
+                                None,
+                                None,
+                                &self.device_id,
+                            );
+                            merged += 1;
+                            continue;
+                        }
+                        Err(e) => {
+                            errors.push(format!("Row {}: {} ({})", row_number, e, row.first_name));
+                            skipped += 1;
+                            continue;
+                        }
+                    },
+                    Ok(None) => {}
+                    Err(e) => {
+                        errors.push(format!("Row {}: {} ({})", row_number, e, row.first_name));
+                        skipped += 1;
+                        continue;
+                    }
+                }
+            }
+
             match self.create_contact(
                 Some("person".to_string()),
                 Some(row.first_name.clone()),
@@ -821,9 +906,72 @@ impl CrmCore {
 
         Ok(ImportResult {
             created,
+            merged,
             skipped,
             errors,
         })
+    }
+
+    fn find_unique_contact_import_match(
+        &self,
+        row: &ContactCsvRow,
+    ) -> CrmResult<Option<storage::contacts::Contact>> {
+        let mut matches = BTreeMap::new();
+
+        if let Some(email) = trimmed_optional(&row.email) {
+            for contact in storage::contacts::find_active_contacts_by_email(&self.db.conn, &email)?
+            {
+                matches.insert(contact.id.clone(), contact);
+            }
+        }
+
+        if let Some(phone) = trimmed_optional(&row.phone) {
+            for contact in storage::contacts::find_active_contacts_by_phone(&self.db.conn, &phone)?
+            {
+                matches.insert(contact.id.clone(), contact);
+            }
+        }
+
+        match matches.len() {
+            0 => Ok(None),
+            1 => Ok(matches.into_values().next()),
+            _ => Err(CrmError::InvalidInput(format!(
+                "duplicate auto-merge skipped because multiple contacts match: {}",
+                matches.keys().cloned().collect::<Vec<_>>().join(", ")
+            ))),
+        }
+    }
+
+    fn merge_contact_import_row(&mut self, contact_id: &str, row: &ContactCsvRow) -> CrmResult<()> {
+        let existing = self.get_contact(contact_id)?;
+        let first_name = fill_blank_string(&existing.first_name, Some(&row.first_name));
+        let last_name = fill_blank_string(&existing.last_name, row.last_name.as_ref());
+        let org_name = fill_blank_string(&existing.org_name, row.org_name.as_ref());
+        let email = fill_blank_string(&existing.email, row.email.as_ref());
+        let phone = fill_blank_string(&existing.phone, row.phone.as_ref());
+        let address = fill_blank_string(&existing.address, row.address.as_ref());
+        let city = fill_blank_string(&existing.city, row.city.as_ref());
+        let country = fill_blank_string(&existing.country, row.country.as_ref());
+        let notes = fill_blank_string(&existing.notes, row.notes.as_ref());
+
+        if first_name.is_none()
+            && last_name.is_none()
+            && org_name.is_none()
+            && email.is_none()
+            && phone.is_none()
+            && address.is_none()
+            && city.is_none()
+            && country.is_none()
+            && notes.is_none()
+        {
+            return Ok(());
+        }
+
+        self.update_contact(
+            contact_id, None, first_name, last_name, org_name, email, phone, address, city,
+            country, notes,
+        )?;
+        Ok(())
     }
 
     pub fn preflight_contacts_csv_import(
@@ -1035,6 +1183,7 @@ impl CrmCore {
 
         Ok(ImportResult {
             created,
+            merged: 0,
             skipped,
             errors,
         })
@@ -1128,9 +1277,17 @@ impl CrmCore {
     }
 
     pub fn import_organizations_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_organizations_csv_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_organizations_csv_with_options(
+        &mut self,
+        file_path: &str,
+        options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_organizations_csv_with_row_numbers(file_content.as_slice())?;
-        self.import_organization_rows(rows)
+        self.import_organization_rows(rows, options)
     }
 
     pub fn import_organizations_csv_with_mapping(
@@ -1138,15 +1295,36 @@ impl CrmCore {
         file_path: &str,
         mapping: ImportColumnMapping,
     ) -> CrmResult<ImportResult> {
+        self.import_organizations_csv_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_organizations_csv_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_organizations_csv_with_mapping(file_content.as_slice(), &mapping)?;
-        self.import_organization_rows(rows)
+        self.import_organization_rows(rows, options)
     }
 
     pub fn import_organizations_json(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_organizations_json_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_organizations_json_with_options(
+        &mut self,
+        file_path: &str,
+        options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_organizations_json_with_row_numbers(file_content.as_slice())?;
-        self.import_organization_rows(rows)
+        self.import_organization_rows(rows, options)
     }
 
     pub fn import_organizations_json_with_mapping(
@@ -1154,9 +1332,22 @@ impl CrmCore {
         file_path: &str,
         mapping: ImportColumnMapping,
     ) -> CrmResult<ImportResult> {
+        self.import_organizations_json_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_organizations_json_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_organizations_json_with_mapping(file_content.as_slice(), &mapping)?;
-        self.import_organization_rows(rows)
+        self.import_organization_rows(rows, options)
     }
 
     pub fn preview_organizations_json_import(
@@ -1170,12 +1361,49 @@ impl CrmCore {
     fn import_organization_rows(
         &mut self,
         rows: Vec<(usize, OrganizationCsvRow)>,
+        options: ImportOptions,
     ) -> CrmResult<ImportResult> {
         let mut created = 0u32;
+        let mut merged = 0u32;
         let mut skipped = 0u32;
         let mut errors = Vec::new();
 
         for (row_number, row) in rows {
+            if options.merge_duplicates {
+                match self.find_unique_organization_import_match(&row) {
+                    Ok(Some(organization)) => {
+                        match self.merge_organization_import_row(&organization.id, &row) {
+                            Ok(()) => {
+                                let _ = storage::audit::record_audit(
+                                    &self.db.conn,
+                                    ACTOR_IMPORT,
+                                    None,
+                                    "import_row_merge",
+                                    Some("organization"),
+                                    Some(&organization.id),
+                                    None,
+                                    None,
+                                    &self.device_id,
+                                );
+                                merged += 1;
+                                continue;
+                            }
+                            Err(e) => {
+                                errors.push(format!("Row {}: {} ({})", row_number, e, row.name));
+                                skipped += 1;
+                                continue;
+                            }
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        errors.push(format!("Row {}: {} ({})", row_number, e, row.name));
+                        skipped += 1;
+                        continue;
+                    }
+                }
+            }
+
             match self.create_organization(
                 row.name.clone(),
                 row.email.clone(),
@@ -1212,9 +1440,103 @@ impl CrmCore {
 
         Ok(ImportResult {
             created,
+            merged,
             skipped,
             errors,
         })
+    }
+
+    fn find_unique_organization_import_match(
+        &self,
+        row: &OrganizationCsvRow,
+    ) -> CrmResult<Option<storage::organizations::Organization>> {
+        let mut matches = BTreeMap::new();
+
+        let name = row.name.trim().to_string();
+        if !name.is_empty() {
+            for organization in
+                storage::organizations::find_active_organizations_by_name(&self.db.conn, &name)?
+            {
+                matches.insert(organization.id.clone(), organization);
+            }
+        }
+
+        if let Some(email) = trimmed_optional(&row.email) {
+            for organization in
+                storage::organizations::find_active_organizations_by_email(&self.db.conn, &email)?
+            {
+                matches.insert(organization.id.clone(), organization);
+            }
+        }
+
+        if let Some(phone) = trimmed_optional(&row.phone) {
+            for organization in
+                storage::organizations::find_active_organizations_by_phone(&self.db.conn, &phone)?
+            {
+                matches.insert(organization.id.clone(), organization);
+            }
+        }
+
+        match matches.len() {
+            0 => Ok(None),
+            1 => Ok(matches.into_values().next()),
+            _ => Err(CrmError::InvalidInput(format!(
+                "duplicate auto-merge skipped because multiple organizations match: {}",
+                matches.keys().cloned().collect::<Vec<_>>().join(", ")
+            ))),
+        }
+    }
+
+    fn merge_organization_import_row(
+        &mut self,
+        organization_id: &str,
+        row: &OrganizationCsvRow,
+    ) -> CrmResult<()> {
+        let existing = self.get_organization(organization_id)?;
+        let email = fill_blank_option(&existing.email, row.email.as_ref()).map(Some);
+        let phone = fill_blank_option(&existing.phone, row.phone.as_ref()).map(Some);
+        let website = fill_blank_option(&existing.website, row.website.as_ref()).map(Some);
+        let address_line1 =
+            fill_blank_option(&existing.address_line1, row.address_line1.as_ref()).map(Some);
+        let address_line2 =
+            fill_blank_option(&existing.address_line2, row.address_line2.as_ref()).map(Some);
+        let city = fill_blank_option(&existing.city, row.city.as_ref()).map(Some);
+        let region = fill_blank_option(&existing.region, row.region.as_ref()).map(Some);
+        let country = fill_blank_option(&existing.country, row.country.as_ref()).map(Some);
+        let postal_code =
+            fill_blank_option(&existing.postal_code, row.postal_code.as_ref()).map(Some);
+        let description =
+            fill_blank_option(&existing.description, row.description.as_ref()).map(Some);
+
+        if email.is_none()
+            && phone.is_none()
+            && website.is_none()
+            && address_line1.is_none()
+            && address_line2.is_none()
+            && city.is_none()
+            && region.is_none()
+            && country.is_none()
+            && postal_code.is_none()
+            && description.is_none()
+        {
+            return Ok(());
+        }
+
+        self.update_organization(
+            organization_id,
+            None,
+            email,
+            phone,
+            website,
+            address_line1,
+            address_line2,
+            city,
+            region,
+            country,
+            postal_code,
+            description,
+        )?;
+        Ok(())
     }
 
     pub fn preflight_organizations_csv_import(
@@ -1524,6 +1846,30 @@ fn trimmed_optional(value: &Option<String>) -> Option<String> {
         .map(str::trim)
         .filter(|trimmed| !trimmed.is_empty())
         .map(str::to_string)
+}
+
+fn fill_blank_string(existing: &str, incoming: Option<&String>) -> Option<String> {
+    if !existing.trim().is_empty() {
+        return None;
+    }
+
+    incoming
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn fill_blank_option(existing: &Option<String>, incoming: Option<&String>) -> Option<String> {
+    if existing
+        .as_deref()
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+    {
+        return None;
+    }
+
+    incoming
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn import_preflight_report(

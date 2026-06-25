@@ -63,3 +63,4 @@
 | 059 | 2026-06-25 | `codex/import-summary-restore` | Import summary restore control for automatic pre-import backups with validation, destructive confirmation, focused component tests, and docs | Completed |
 | 060 | 2026-06-25 | `codex/json-import-preview` | Read-only browser-visible JSON import preview for contacts, deals, and organizations before duplicate preflight and confirmation without JSON field mapping or import/backup behavior changes | Completed |
 | 061 | 2026-06-25 | `codex/json-import-field-mapping` | JSON import field mapping for contacts, deals, and organizations reusing CSV mapping concepts before duplicate preflight and backed confirmed imports | Completed |
+| 062 | 2026-06-25 | `codex/contact-org-import-auto-merge` | Opt-in contact and organization duplicate auto-merge during CSV, mapped CSV, JSON, and mapped JSON imports with conservative fill-blank policy, merged summaries, backup guard preservation, tests, and docs | Completed |

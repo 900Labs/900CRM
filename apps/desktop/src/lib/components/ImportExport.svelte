@@ -32,6 +32,7 @@
     type DealImportTargetField,
     type ImportFormat,
     type ImportExportEntity,
+    type ImportOptions,
     type ImportPreflightReport,
     type ImportResult,
     type ImportWithBackupResult,
@@ -69,6 +70,7 @@
   let preflightReport = $state<ImportPreflightReport | null>(null);
   let importSummary = $state<ImportResult | null>(null);
   let importBackupPath = $state<string | null>(null);
+  let mergeDuplicateImportRows = $state(false);
   let isRestoringImportBackup = $state(false);
   let importRestoreMessage = $state<string | null>(null);
   let importRestoreError = $state<string | null>(null);
@@ -106,6 +108,7 @@
   const canUseMappedCommands = $derived(Boolean(showMappingWizard && fileSource === 'desktop' && selectedImportPath));
   const fallbackImportBlocked = $derived(showMappingWizard && isCsvImport && fileSource === 'browser');
   const duplicateWarnings = $derived(preflightReport?.warnings ?? []);
+  const canAutoMergeDuplicates = $derived(importEntity === 'contacts' || importEntity === 'organizations');
 
   async function handleFilePick() {
     try {
@@ -158,6 +161,9 @@
   function handleImportEntityChange(e: Event) {
     importEntity = (e.target as HTMLSelectElement).value as ImportExportEntity;
     resetImportState({ keepEntity: true, keepFormat: true });
+    if (importEntity === 'deals') {
+      mergeDuplicateImportRows = false;
+    }
   }
 
   function handleImportFormatChange(e: Event) {
@@ -176,6 +182,7 @@
     preflightReport = null;
     importSummary = null;
     importBackupPath = null;
+    mergeDuplicateImportRows = false;
     importRestoreMessage = null;
     importRestoreError = null;
     validationErrors = [];
@@ -386,15 +393,20 @@
     entity: MappedImportEntity,
     filePath: string,
   ): Promise<ImportWithBackupResult> {
+    const importOptions = duplicateAutoMergeOptions(entity);
+
     if (isJsonImport) {
-      return importJsonWithMapping(entity, filePath, toBackendMapping(columnMapping));
+      const mapping = toBackendMapping(columnMapping);
+      return importOptions
+        ? importJsonWithMapping(entity, filePath, mapping, importOptions)
+        : importJsonWithMapping(entity, filePath, mapping);
     }
 
     if (entity === 'contacts') {
-      return importContactsCsvWithMapping(
-        filePath,
-        toBackendMapping<ContactImportTargetField>(columnMapping),
-      );
+      const mapping = toBackendMapping<ContactImportTargetField>(columnMapping);
+      return importOptions
+        ? importContactsCsvWithMapping(filePath, mapping, importOptions)
+        : importContactsCsvWithMapping(filePath, mapping);
     }
 
     if (entity === 'deals') {
@@ -404,10 +416,18 @@
       );
     }
 
-    return importOrganizationsCsvWithMapping(
-      filePath,
-      toBackendMapping<OrganizationImportTargetField>(columnMapping),
-    );
+    const mapping = toBackendMapping<OrganizationImportTargetField>(columnMapping);
+    return importOptions
+      ? importOrganizationsCsvWithMapping(filePath, mapping, importOptions)
+      : importOrganizationsCsvWithMapping(filePath, mapping);
+  }
+
+  function duplicateAutoMergeOptions(entity: MappedImportEntity): ImportOptions | undefined {
+    if (entity === 'deals' || !mergeDuplicateImportRows) {
+      return undefined;
+    }
+
+    return { mergeDuplicates: mergeDuplicateImportRows };
   }
 
   function isTargetAssigned(target: string, currentHeader: string): boolean {
@@ -740,11 +760,27 @@
               </div>
             {/if}
 
+            {#if canAutoMergeDuplicates && ['mapping', 'duplicates', 'confirm'].includes(importStep)}
+              <div class="merge-option">
+                <label class="merge-option-label">
+                  <input
+                    type="checkbox"
+                    bind:checked={mergeDuplicateImportRows}
+                  />
+                  <span>{t('import.mergeDuplicates')}</span>
+                </label>
+                <p>{t('import.mergeDuplicatesDescription')}</p>
+              </div>
+            {/if}
+
             {#if showDuplicateReview && importStep === 'duplicates'}
               <div class="duplicate-panel">
                 <p class="import-stats">
                   {t('import.duplicateWarningCount', { count: preflightReport?.duplicate_warning_count ?? 0 })}
                 </p>
+                {#if mergeDuplicateImportRows && canAutoMergeDuplicates}
+                  <p class="import-stats">{t('import.duplicateAutoMergeEnabled')}</p>
+                {/if}
                 {#if duplicateWarnings.length > 0}
                   <div class="preview-table-wrap duplicate-table-wrap">
                     <table class="data-table preview-table">
@@ -781,9 +817,14 @@
                 <p class="import-stats">
                   {t('import.confirmRows', { count: preflightReport?.total_rows ?? (isJsonImport ? jsonPreview?.total_rows : parseResult?.count) ?? 0 })}
                 </p>
+                {#if mergeDuplicateImportRows && canAutoMergeDuplicates}
+                  <p class="import-stats">{t('import.confirmAutoMergeEnabled')}</p>
+                {/if}
                 {#if (preflightReport?.duplicate_warning_count ?? 0) > 0}
                   <p class="import-warnings">
-                    {t('import.confirmDuplicateWarnings', { count: preflightReport?.duplicate_warning_count ?? 0 })}
+                    {mergeDuplicateImportRows && canAutoMergeDuplicates
+                      ? t('import.confirmDuplicateWarningsWithMerge', { count: preflightReport?.duplicate_warning_count ?? 0 })
+                      : t('import.confirmDuplicateWarnings', { count: preflightReport?.duplicate_warning_count ?? 0 })}
                   </p>
                 {/if}
                 {#if validationErrors.length > 0}
@@ -802,6 +843,10 @@
                   <div>
                     <span>{t('import.created')}</span>
                     <strong>{importSummary.created}</strong>
+                  </div>
+                  <div>
+                    <span>{t('import.merged')}</span>
+                    <strong>{importSummary.merged ?? 0}</strong>
                   </div>
                   <div>
                     <span>{t('import.skipped')}</span>
@@ -996,6 +1041,31 @@
   .import-warnings {
     color: var(--text-warning);
     font-size: var(--text-sm);
+  }
+
+  .merge-option {
+    background-color: var(--surface-hover);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .merge-option-label {
+    align-items: center;
+    color: var(--text-primary);
+    display: flex;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    gap: var(--space-2);
+  }
+
+  .merge-option p {
+    font-size: var(--text-xs);
+    margin: 0;
   }
 
   .backup-summary {
