@@ -853,6 +853,7 @@
                 <option value="custom_field_definitions">Custom field definitions</option>
                 <option value="tag_links">Tag links</option>
                 <option value="" disabled>Proposed actions (export only)</option>
+                <option value="" disabled>External clients (export only)</option>
               </select>
             </div>
 
@@ -1231,6 +1232,7 @@
                 <option value="tag_links">Tag links</option>
                 <option value="audit_log">Audit log</option>
                 <option value="proposed_actions">Proposed actions</option>
+                <option value="external_clients">External clients</option>
               </select>
             </div>
 

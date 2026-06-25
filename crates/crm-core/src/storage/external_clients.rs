@@ -59,20 +59,25 @@ pub fn list_external_clients(conn: &Connection) -> CrmResult<Vec<ExternalClient>
         "#,
     )?;
 
-    let rows = stmt.query_map([], |row| {
-        let enabled: i64 = row.get(4)?;
-        Ok(ExternalClient {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            client_type: row.get(2)?,
-            permission_mode: row.get(3)?,
-            enabled: enabled != 0,
-            created_at: row.get(5)?,
-            updated_at: row.get(6)?,
-            deleted_at: row.get(7)?,
-            device_id: row.get(8)?,
-        })
-    })?;
+    let rows = stmt.query_map([], map_external_client_row)?;
+
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+pub fn list_external_clients_for_export(conn: &Connection) -> CrmResult<Vec<ExternalClient>> {
+    // enabled is runtime activation state, not export eligibility; disabled
+    // non-deleted readiness placeholders export for diagnostics.
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, name, client_type, permission_mode, enabled,
+               created_at, updated_at, deleted_at, device_id
+        FROM external_clients
+        WHERE deleted_at IS NULL
+        ORDER BY created_at ASC, id ASC
+        "#,
+    )?;
+
+    let rows = stmt.query_map([], map_external_client_row)?;
 
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
@@ -90,22 +95,24 @@ pub fn get_active_external_client(
         "#,
     )?;
 
-    match stmt.query_row(params![client_id], |row| {
-        let enabled: i64 = row.get(4)?;
-        Ok(ExternalClient {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            client_type: row.get(2)?,
-            permission_mode: row.get(3)?,
-            enabled: enabled != 0,
-            created_at: row.get(5)?,
-            updated_at: row.get(6)?,
-            deleted_at: row.get(7)?,
-            device_id: row.get(8)?,
-        })
-    }) {
+    match stmt.query_row(params![client_id], map_external_client_row) {
         Ok(client) => Ok(Some(client)),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
         Err(err) => Err(err.into()),
     }
+}
+
+fn map_external_client_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExternalClient> {
+    let enabled: i64 = row.get(4)?;
+    Ok(ExternalClient {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        client_type: row.get(2)?,
+        permission_mode: row.get(3)?,
+        enabled: enabled != 0,
+        created_at: row.get(5)?,
+        updated_at: row.get(6)?,
+        deleted_at: row.get(7)?,
+        device_id: row.get(8)?,
+    })
 }

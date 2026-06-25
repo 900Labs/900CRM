@@ -21,6 +21,8 @@ import {
   exportData,
   exportDealsCsv,
   exportDealsJson,
+  exportExternalClientsCsv,
+  exportExternalClientsJson,
   exportJson,
   exportNotesCsv,
   exportNotesJson,
@@ -397,6 +399,20 @@ describe('import/export API', () => {
     });
   });
 
+  it('maps external clients export-only commands', async () => {
+    invokeMock.mockResolvedValueOnce(2);
+    await expect(exportExternalClientsCsv('/tmp/external-clients-export.csv')).resolves.toBe(2);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_external_clients_csv', {
+      file_path: '/tmp/external-clients-export.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await expect(exportExternalClientsJson('/tmp/external-clients-export.json')).resolves.toBe(2);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_external_clients_json', {
+      file_path: '/tmp/external-clients-export.json',
+    });
+  });
+
   it('routes generic CSV helpers by entity', async () => {
     invokeMock.mockResolvedValueOnce(importWithBackup(1));
     await importCsv('organizations', '/tmp/orgs.csv');
@@ -463,6 +479,12 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('export_proposed_actions_csv', {
       file_path: '/tmp/proposed-actions-export.csv',
     });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await exportCsv('external_clients', '/tmp/external-clients-export.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_external_clients_csv', {
+      file_path: '/tmp/external-clients-export.csv',
+    });
   });
 
   it('routes generic import/export helpers by entity and format', async () => {
@@ -524,6 +546,12 @@ describe('import/export API', () => {
     await exportData('proposed_actions', 'json', '/tmp/proposed-actions-export.json');
     expect(invokeMock).toHaveBeenLastCalledWith('export_proposed_actions_json', {
       file_path: '/tmp/proposed-actions-export.json',
+    });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await exportData('external_clients', 'json', '/tmp/external-clients-export.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_external_clients_json', {
+      file_path: '/tmp/external-clients-export.json',
     });
   });
 

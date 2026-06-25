@@ -28,6 +28,12 @@ JSON for diagnostics and portability, but they are intentionally not importable,
 replayable, approvable, rejectable, executable, or otherwise mutated through
 the import/export surface.
 
+External clients are export-only readiness placeholders. They can be exported
+to local CSV or JSON for diagnostics and portability, but they are intentionally
+not importable, activatable, tokenized, permission-granting, executable, or
+connected to MCP, AI, sync, or remote-client behavior through the import/export
+surface.
+
 Import and export use local files selected by the user. There is no cloud import
 service, no remote export destination, and no automatic upload.
 
@@ -410,7 +416,8 @@ organizations, generic notes, tag definitions, custom field definitions, and
 tag links from the same import/export modal as CSV. Import uses an open dialog
 for `.json` files. Export uses a save dialog for `.json` files.
 
-Audit log JSON is export-only from the export tab.
+Audit log, proposed action, and external client JSON are export-only from the
+export tab.
 
 JSON exports are pretty-printed arrays of objects. They use the same flat fields
 as the matching CSV export:
@@ -429,7 +436,13 @@ as the matching CSV export:
   `field_options`, and `sort_order`;
 - tag links: `entity_type`, `entity_id`, and `tag_id`;
 - audit log entries: `id`, `actor_type`, `actor_id`, `action`, `entity_type`,
-  `entity_id`, `before_json`, `after_json`, `created_at`, and `device_id`.
+  `entity_id`, `before_json`, `after_json`, `created_at`, and `device_id`;
+- proposed actions: `id`, `external_client_id`, `client_id`, `tool_name`,
+  `action_type`, `entity_type`, `entity_id`, `payload_json`, `input_json`,
+  `proposed_output_json`, `status`, `created_at`, `decided_at`, `approved_at`,
+  `rejected_at`, `executed_at`, `error_message`, and `device_id`;
+- external clients: `id`, `name`, `client_type`, `permission_mode`, `enabled`,
+  `created_at`, `updated_at`, `deleted_at`, and `device_id`.
 
 JSON export uses the same active-row listing boundaries as CSV export:
 
@@ -449,7 +462,9 @@ JSON export uses the same active-row listing boundaries as CSV export:
 - audit log export includes all existing audit rows sorted by `created_at`
   ascending, then audit row `id` ascending;
 - proposed action export includes all existing proposed action rows sorted by
-  `created_at` ascending, then proposed action `id` ascending.
+  `created_at` ascending, then proposed action `id` ascending;
+- external client export includes non-deleted external client placeholders
+  sorted by `created_at` ascending, then external client `id` ascending.
 
 JSON export for importable CRM records does not include record IDs, timestamps,
 deleted rows, device IDs, relationship rows beyond the optional local activity
@@ -478,6 +493,17 @@ stored `input_json`), `input_json`, `proposed_output_json`, `status`,
 `error_message`, and `device_id`. The current storage schema has no dedicated
 `error_message` column, so that export field is reserved and blank/null.
 Exporting proposed actions does not create audit rows or sync changelog rows.
+
+External client export is another export-only readiness/diagnostic exception.
+It preserves current local external-client placeholder fields: `id`, `name`,
+`client_type`, `permission_mode`, `enabled`, `created_at`, `updated_at`,
+`deleted_at`, and `device_id`. Exporting external clients does not import or
+activate clients, grant permissions, create tokens or secrets, start MCP/AI
+behavior, start sync behavior, create pre-import backups, or write audit rows or
+sync changelog rows. `external_client_permissions` remains deferred and is not
+exported by this surface. `enabled` is runtime activation state, not export
+eligibility; disabled non-deleted readiness placeholders remain exportable for
+diagnostics.
 
 JSON import has the same entity scope. It does not import record IDs, timestamps,
 deleted rows, device IDs, broad relationship rows, tag data beyond reusable tag
@@ -746,6 +772,13 @@ proposed action import, preview, preflight, backup, rollback, replay, approval,
 rejection, execution, MCP/client behavior, or AI behavior in the import/export
 surface.
 
+External client export writes local readiness placeholder state, including
+external client IDs, names, client types, permission modes, enabled flags,
+timestamps, and device ID. It is read-only and export-only; there is no external
+client import, preview, preflight, backup, rollback, activation, token/secret
+creation, permission grant, MCP/client behavior, AI behavior, or sync behavior
+in the import/export surface.
+
 The Settings Data Management export action displays this disclosure before the
 user opens the export flow. Store exported files containing sensitive data in a
 trusted or encrypted location.
@@ -762,6 +795,9 @@ CSV import/export and JSON import/export are not a backup system.
 - Proposed action export is useful for local diagnostics and should not be
   treated as an importable backup, replay log, approval queue, or execution
   format.
+- External client export is useful for local readiness diagnostics and should
+  not be treated as an importable backup, activation manifest, permission grant,
+  token source, MCP runtime configuration, or sync setup.
 - Local backup creates a SQLite snapshot plus metadata and is the safer way to
   preserve full application state before a destructive restore or risky import.
 - Supported desktop imports automatically create a local pre-import backup
@@ -801,5 +837,8 @@ The following are not implemented in the current import/export surface:
 - Audit log import.
 - Proposed action import, replay, approval, rejection, or execution through the
   import/export surface.
-- External clients, permissions, settings, sync changelog, or backup metadata
+- External client import, activation, permission grants, tokens/secrets,
+  MCP/client behavior, AI behavior, or sync behavior through the import/export
+  surface.
+- External client permissions, settings, sync changelog, or backup metadata
   import/export.

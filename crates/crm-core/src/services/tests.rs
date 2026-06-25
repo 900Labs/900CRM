@@ -2767,6 +2767,179 @@ fn export_proposed_actions_csv_and_json_include_all_rows_in_stable_order_without
 }
 
 #[test]
+fn export_external_clients_csv_and_json_include_non_deleted_placeholders_without_mutation() {
+    let (mut core, path) = open_test_core();
+
+    core.create_contact(
+        Some("person".to_string()),
+        Some("External".to_string()),
+        Some("Client Export".to_string()),
+        None,
+        Some("external.client.export@example.com".to_string()),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("contact should create audit and sync baseline");
+
+    let disabled = core
+        .create_external_client_placeholder("Claude Desktop", "mcp")
+        .expect("disabled external client placeholder should be created");
+    let enabled = core
+        .create_external_client_placeholder("Local Script", "script")
+        .expect("enabled external client placeholder should be created");
+    let deleted = core
+        .create_external_client_placeholder("Deleted Integration", "mcp")
+        .expect("deleted external client placeholder should be created");
+
+    core.db
+        .conn
+        .execute(
+            "UPDATE external_clients SET created_at = '2026-06-24T09:00:00Z', updated_at = '2026-06-24T09:15:00Z' WHERE id = ?1",
+            params![&disabled.id],
+        )
+        .expect("disabled external client timestamps should update");
+    core.db
+        .conn
+        .execute(
+            "UPDATE external_clients SET permission_mode = 'read_only', enabled = 1, created_at = '2026-06-24T08:00:00Z', updated_at = '2026-06-24T08:15:00Z' WHERE id = ?1",
+            params![&enabled.id],
+        )
+        .expect("enabled external client should update");
+    core.db
+        .conn
+        .execute(
+            "UPDATE external_clients SET created_at = '2026-06-24T07:00:00Z', updated_at = '2026-06-24T07:15:00Z', deleted_at = '2026-06-24T07:30:00Z' WHERE id = ?1",
+            params![&deleted.id],
+        )
+        .expect("deleted external client should update");
+
+    let expected_order = vec![enabled.id.clone(), disabled.id.clone()];
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let csv_export_path = path.join("external-clients-export.csv");
+    let csv_count = core
+        .export_external_clients_csv(
+            csv_export_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("external clients CSV export should succeed");
+    assert_eq!(csv_count, 2);
+    let csv_rows = read_csv_export(&csv_export_path);
+    assert_eq!(csv_rows.len(), 2);
+    let csv_text = std::fs::read_to_string(&csv_export_path).expect("CSV export should read");
+    assert!(csv_text.starts_with(
+        "id,name,client_type,permission_mode,enabled,created_at,updated_at,deleted_at,device_id\n"
+    ));
+    assert_eq!(
+        csv_rows
+            .iter()
+            .map(|row| row.get("id").expect("id should export").clone())
+            .collect::<Vec<_>>(),
+        expected_order
+    );
+    assert!(csv_rows
+        .iter()
+        .all(|row| row.get("id") != Some(&deleted.id)));
+    let csv_disabled_row = csv_rows
+        .iter()
+        .find(|row| row.get("id") == Some(&disabled.id))
+        .expect("disabled non-deleted placeholder should export");
+    assert_eq!(
+        csv_disabled_row.get("name"),
+        Some(&"Claude Desktop".to_string())
+    );
+    assert_eq!(
+        csv_disabled_row.get("permission_mode"),
+        Some(&"disabled".to_string())
+    );
+    assert_eq!(csv_disabled_row.get("enabled"), Some(&"false".to_string()));
+    assert_eq!(csv_disabled_row.get("deleted_at"), Some(&String::new()));
+    let csv_enabled_row = csv_rows
+        .iter()
+        .find(|row| row.get("id") == Some(&enabled.id))
+        .expect("enabled non-deleted client should export");
+    assert_eq!(
+        csv_enabled_row.get("name"),
+        Some(&"Local Script".to_string())
+    );
+    assert_eq!(
+        csv_enabled_row.get("client_type"),
+        Some(&"script".to_string())
+    );
+    assert_eq!(
+        csv_enabled_row.get("permission_mode"),
+        Some(&"read_only".to_string())
+    );
+    assert_eq!(csv_enabled_row.get("enabled"), Some(&"true".to_string()));
+    assert_eq!(
+        csv_enabled_row.get("created_at"),
+        Some(&"2026-06-24T08:00:00Z".to_string())
+    );
+    assert_eq!(csv_enabled_row.get("deleted_at"), Some(&String::new()));
+    assert_eq!(
+        csv_enabled_row.get("device_id"),
+        Some(&core.device_id().to_string())
+    );
+
+    let json_export_path = path.join("external-clients-export.json");
+    let json_count = core
+        .export_external_clients_json(
+            json_export_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("external clients JSON export should succeed");
+    assert_eq!(json_count, 2);
+    let json_rows = read_json_export(&json_export_path);
+    assert_eq!(
+        json_rows
+            .iter()
+            .map(|row| row["id"].as_str().expect("id should export").to_string())
+            .collect::<Vec<_>>(),
+        expected_order
+    );
+    assert!(json_rows.iter().all(|row| row["id"] != deleted.id));
+    let json_disabled_row = json_rows
+        .iter()
+        .find(|row| row["id"] == disabled.id)
+        .expect("disabled non-deleted placeholder should export");
+    assert_eq!(json_disabled_row["name"], "Claude Desktop");
+    assert_eq!(json_disabled_row["permission_mode"], "disabled");
+    assert_eq!(json_disabled_row["enabled"], false);
+    assert_eq!(json_disabled_row["deleted_at"], serde_json::Value::Null);
+    let json_enabled_row = json_rows
+        .iter()
+        .find(|row| row["id"] == enabled.id)
+        .expect("enabled non-deleted client should export");
+    assert_eq!(json_enabled_row["name"], "Local Script");
+    assert_eq!(json_enabled_row["client_type"], "script");
+    assert_eq!(json_enabled_row["permission_mode"], "read_only");
+    assert_eq!(json_enabled_row["enabled"], true);
+    assert_eq!(json_enabled_row["created_at"], "2026-06-24T08:00:00Z");
+    assert_eq!(json_enabled_row["updated_at"], "2026-06-24T08:15:00Z");
+    assert_eq!(json_enabled_row["deleted_at"], serde_json::Value::Null);
+    assert_eq!(json_enabled_row["device_id"], core.device_id());
+
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn create_organization_writes_organization_audit_and_sync() {
     let (mut core, path) = open_test_core();
 

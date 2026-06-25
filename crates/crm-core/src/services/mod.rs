@@ -67,6 +67,7 @@ mod backup;
 mod contacts;
 mod deal_relationships;
 mod external_client_permissions;
+mod external_clients;
 mod import_rollback;
 mod migration_readiness;
 mod notes_tags;
