@@ -854,6 +854,7 @@
                 <option value="tag_links">Tag links</option>
                 <option value="" disabled>Proposed actions (export only)</option>
                 <option value="" disabled>External clients (export only)</option>
+                <option value="" disabled>External client permissions (export only)</option>
               </select>
             </div>
 
@@ -1233,6 +1234,7 @@
                 <option value="audit_log">Audit log</option>
                 <option value="proposed_actions">Proposed actions</option>
                 <option value="external_clients">External clients</option>
+                <option value="external_client_permissions">External client permissions</option>
               </select>
             </div>
 

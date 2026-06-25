@@ -60,6 +60,23 @@ pub fn list_permissions_for_client(
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+pub fn list_all_permissions_for_export(
+    conn: &Connection,
+) -> CrmResult<Vec<ExternalClientPermission>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, client_id, tool_name, can_read, can_write,
+               requires_confirmation, created_at, updated_at
+        FROM external_client_permissions
+        ORDER BY client_id ASC, tool_name ASC, created_at ASC, id ASC
+        "#,
+    )?;
+
+    let rows = stmt.query_map([], map_permission_row)?;
+
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
 pub fn get_permission_for_tool(
     conn: &Connection,
     client_id: &str,

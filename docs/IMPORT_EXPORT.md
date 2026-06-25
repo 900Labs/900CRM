@@ -34,6 +34,12 @@ not importable, activatable, tokenized, permission-granting, executable, or
 connected to MCP, AI, sync, or remote-client behavior through the import/export
 surface.
 
+External client permissions are export-only diagnostic rows. They can be
+exported to local CSV or JSON for readiness review, but they are intentionally
+not importable and do not grant permissions, activate clients, create tokens or
+secrets, or connect to MCP, AI, sync, or remote-client behavior through the
+import/export surface.
+
 Import and export use local files selected by the user. There is no cloud import
 service, no remote export destination, and no automatic upload.
 
@@ -416,8 +422,8 @@ organizations, generic notes, tag definitions, custom field definitions, and
 tag links from the same import/export modal as CSV. Import uses an open dialog
 for `.json` files. Export uses a save dialog for `.json` files.
 
-Audit log, proposed action, and external client JSON are export-only from the
-export tab.
+Audit log, proposed action, external client, and external client permission
+JSON are export-only from the export tab.
 
 JSON exports are pretty-printed arrays of objects. They use the same flat fields
 as the matching CSV export:
@@ -442,7 +448,9 @@ as the matching CSV export:
   `proposed_output_json`, `status`, `created_at`, `decided_at`, `approved_at`,
   `rejected_at`, `executed_at`, `error_message`, and `device_id`;
 - external clients: `id`, `name`, `client_type`, `permission_mode`, `enabled`,
-  `created_at`, `updated_at`, `deleted_at`, and `device_id`.
+  `created_at`, `updated_at`, `deleted_at`, and `device_id`;
+- external client permissions: `id`, `client_id`, `tool_name`, `can_read`,
+  `can_write`, `requires_confirmation`, `created_at`, and `updated_at`.
 
 JSON export uses the same active-row listing boundaries as CSV export:
 
@@ -464,20 +472,23 @@ JSON export uses the same active-row listing boundaries as CSV export:
 - proposed action export includes all existing proposed action rows sorted by
   `created_at` ascending, then proposed action `id` ascending;
 - external client export includes non-deleted external client placeholders
-  sorted by `created_at` ascending, then external client `id` ascending.
+  sorted by `created_at` ascending, then external client `id` ascending;
+- external client permission export includes all existing permission rows
+  sorted by `client_id` ascending, `tool_name` ascending, `created_at`
+  ascending, then permission `id` ascending.
 
 JSON export for importable CRM records does not include record IDs, timestamps,
 deleted rows, device IDs, relationship rows beyond the optional local activity
 `contact_id` and `deal_id` mirror columns, tag relationship rows beyond the
 local tag link format, audit log entries, proposed actions, external clients,
-permissions, settings, or backup metadata. Generic note export intentionally
-uses only the parent `entity_type`, parent `entity_id`, and note `content`. Tag
-definition export intentionally uses only `name` and `color`; custom field
-definition export intentionally uses only `entity_type`, `field_name`,
-`field_type`, `field_options`, and `sort_order`; tag link export intentionally
-uses only `entity_type`, `entity_id`, and `tag_id`. For contacts, deals,
-activities, and organizations, JSON export does include active custom field
-values using `custom:` keys as described above.
+external client permissions, settings, or backup metadata. Generic note export
+intentionally uses only the parent `entity_type`, parent `entity_id`, and note
+`content`. Tag definition export intentionally uses only `name` and `color`;
+custom field definition export intentionally uses only `entity_type`,
+`field_name`, `field_type`, `field_options`, and `sort_order`; tag link export
+intentionally uses only `entity_type`, `entity_id`, and `tag_id`. For contacts,
+deals, activities, and organizations, JSON export does include active custom
+field values using `custom:` keys as described above.
 
 Audit log export is the exception to the portable flat-row rule: it preserves
 the full local audit row exactly so the file can be used for local review,
@@ -500,16 +511,24 @@ It preserves current local external-client placeholder fields: `id`, `name`,
 `deleted_at`, and `device_id`. Exporting external clients does not import or
 activate clients, grant permissions, create tokens or secrets, start MCP/AI
 behavior, start sync behavior, create pre-import backups, or write audit rows or
-sync changelog rows. `external_client_permissions` remains deferred and is not
-exported by this surface. `enabled` is runtime activation state, not export
-eligibility; disabled non-deleted readiness placeholders remain exportable for
-diagnostics.
+sync changelog rows. External client export does not include permission rows;
+those use the separate external client permissions export. `enabled` is runtime
+activation state, not export eligibility; disabled non-deleted readiness
+placeholders remain exportable for diagnostics.
+
+External client permission export is another export-only diagnostic exception.
+It preserves current local permission row fields: `id`, `client_id`,
+`tool_name`, `can_read`, `can_write`, `requires_confirmation`, `created_at`,
+and `updated_at`. Exporting external client permissions does not import or
+grant permissions, activate clients, create tokens or secrets, start MCP/AI
+behavior, start sync behavior, create pre-import backups, export external
+client placeholder rows, or write audit rows or sync changelog rows.
 
 JSON import has the same entity scope. It does not import record IDs, timestamps,
 deleted rows, device IDs, broad relationship rows, tag data beyond reusable tag
 definitions and local tag links, custom field data beyond definition rows and
 supported flat custom field values, audit log entries, proposed actions,
-external clients, permissions, settings, or backup metadata.
+external clients, external client permissions, settings, or backup metadata.
 Activity `contact_id` and `deal_id`, and generic note `entity_id`, are accepted
 only as existing active local database IDs. Tag link `entity_id` and `tag_id`
 are also accepted only as existing active local database IDs. For contacts,
@@ -779,6 +798,14 @@ client import, preview, preflight, backup, rollback, activation, token/secret
 creation, permission grant, MCP/client behavior, AI behavior, or sync behavior
 in the import/export surface.
 
+External client permission export writes local permission diagnostic state,
+including permission IDs, external client IDs, tool names, read/write flags,
+confirmation requirement flags, and timestamps. It is read-only and
+export-only; there is no permission import, preview, preflight, backup,
+rollback, permission grant UI, activation, token/secret creation, MCP/client
+behavior, AI behavior, sync-server behavior, audit-log mutation, or sync
+changelog mutation in the import/export surface.
+
 The Settings Data Management export action displays this disclosure before the
 user opens the export flow. Store exported files containing sensitive data in a
 trusted or encrypted location.
@@ -798,6 +825,10 @@ CSV import/export and JSON import/export are not a backup system.
 - External client export is useful for local readiness diagnostics and should
   not be treated as an importable backup, activation manifest, permission grant,
   token source, MCP runtime configuration, or sync setup.
+- External client permission export is useful for local readiness diagnostics
+  and should not be treated as an importable backup, permission grant manifest,
+  activation manifest, token source, MCP runtime configuration, AI behavior
+  input, or sync setup.
 - Local backup creates a SQLite snapshot plus metadata and is the safer way to
   preserve full application state before a destructive restore or risky import.
 - Supported desktop imports automatically create a local pre-import backup
@@ -840,5 +871,7 @@ The following are not implemented in the current import/export surface:
 - External client import, activation, permission grants, tokens/secrets,
   MCP/client behavior, AI behavior, or sync behavior through the import/export
   surface.
-- External client permissions, settings, sync changelog, or backup metadata
-  import/export.
+- External client permission import, permission-grant UI, activation,
+  tokens/secrets, MCP/client behavior, AI behavior, or sync behavior through the
+  import/export surface.
+- Settings, sync changelog, or backup metadata import/export.
