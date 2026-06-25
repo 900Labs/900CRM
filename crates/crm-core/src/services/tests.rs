@@ -221,6 +221,48 @@ fn count_external_client_sync_rows(core: &CrmCore, client_id: &str) -> i64 {
         .expect("external client sync row count should query")
 }
 
+fn count_external_client_evaluation_audit_rows(
+    core: &CrmCore,
+    action: &str,
+    actor_type: &str,
+    client_id: &str,
+) -> i64 {
+    core.db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = ?1 AND actor_type = ?2 AND entity_type = 'external_client' AND entity_id = ?3",
+            params![action, actor_type, client_id],
+            |row| row.get(0),
+        )
+        .expect("external client evaluation audit row count should query")
+}
+
+fn external_client_evaluation_audit_context(
+    core: &CrmCore,
+    action: &str,
+    actor_type: &str,
+    client_id: &str,
+) -> serde_json::Value {
+    let (entity_type, entity_id, after_json): (Option<String>, Option<String>, Option<String>) =
+        core.db
+            .conn
+            .query_row(
+                "SELECT entity_type, entity_id, after_json FROM audit_log WHERE action = ?1 AND actor_type = ?2 AND entity_id = ?3 ORDER BY created_at DESC, id DESC LIMIT 1",
+                params![action, actor_type, client_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("external client evaluation audit row should query");
+
+    assert_eq!(entity_type.as_deref(), Some("external_client"));
+    assert_eq!(entity_id.as_deref(), Some(client_id));
+    serde_json::from_str(
+        after_json
+            .as_deref()
+            .expect("audit after_json should exist"),
+    )
+    .expect("evaluation audit context should parse")
+}
+
 fn assert_permission_denial(error: CrmError, reason: &str) {
     match error {
         CrmError::InvalidInput(message) => {
@@ -1446,6 +1488,250 @@ fn external_client_permission_default_denies_without_rows() {
 }
 
 #[test]
+fn read_permission_evaluation_records_audit_context_without_sync_changelog() {
+    let (mut core, path) = open_test_core();
+    let client = create_test_external_client_with_mode(&mut core, "read_only");
+
+    core.upsert_external_client_tool_permission(&client.id, "contacts.search", true, false, true)
+        .expect("read permission should upsert");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let allowed = core
+        .evaluate_external_client_tool_read_permission(&client.id, "contacts.search")
+        .expect("allowed read evaluation should succeed");
+    assert!(allowed.allowed);
+
+    let allowed_context = external_client_evaluation_audit_context(
+        &core,
+        "evaluate_external_client_read_permission",
+        "desktop_app",
+        &client.id,
+    );
+    assert_eq!(
+        allowed_context["client_id"].as_str(),
+        Some(client.id.as_str())
+    );
+    assert_eq!(
+        allowed_context["tool_name"].as_str(),
+        Some("contacts.search")
+    );
+    assert_eq!(allowed_context["access_kind"].as_str(), Some("read"));
+    assert_eq!(allowed_context["mode"].as_str(), Some("read_only"));
+    assert_eq!(allowed_context["allowed"].as_bool(), Some(true));
+    assert_eq!(allowed_context["reason"].as_str(), Some("allowed"));
+    assert_eq!(allowed_context["status"].as_str(), Some("allowed"));
+    assert!(allowed_context.get("entity_scope").is_none());
+
+    let denied = core
+        .evaluate_external_client_tool_read_permission(&client.id, "contacts.detail")
+        .expect("denied read evaluation should still succeed");
+    assert!(!denied.allowed);
+    assert_eq!(
+        denied.reason,
+        ToolPermissionDecisionReason::MissingToolPermission
+    );
+
+    let denied_context = external_client_evaluation_audit_context(
+        &core,
+        "evaluate_external_client_read_permission",
+        "desktop_app",
+        &client.id,
+    );
+    assert_eq!(
+        denied_context["tool_name"].as_str(),
+        Some("contacts.detail")
+    );
+    assert_eq!(denied_context["access_kind"].as_str(), Some("read"));
+    assert_eq!(denied_context["mode"].as_str(), Some("read_only"));
+    assert_eq!(denied_context["allowed"].as_bool(), Some(false));
+    assert_eq!(
+        denied_context["reason"].as_str(),
+        Some("missing_tool_permission")
+    );
+    assert_eq!(denied_context["status"].as_str(), Some("denied"));
+    assert_eq!(
+        count_external_client_evaluation_audit_rows(
+            &core,
+            "evaluate_external_client_read_permission",
+            "desktop_app",
+            &client.id
+        ),
+        2
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn draft_permission_evaluation_records_audit_context_without_sync_changelog() {
+    let (mut core, path) = open_test_core();
+    let client = create_test_external_client_with_mode(&mut core, "draft_only");
+
+    core.upsert_external_client_tool_permission(
+        &client.id,
+        "create_activity_draft",
+        true,
+        true,
+        true,
+    )
+    .expect("draft permission should upsert");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let allowed = core
+        .evaluate_external_client_draft_permission(&client.id, "create_activity_draft")
+        .expect("allowed draft evaluation should succeed");
+    assert!(allowed.allowed);
+
+    let allowed_context = external_client_evaluation_audit_context(
+        &core,
+        "evaluate_external_client_draft_permission",
+        "desktop_app",
+        &client.id,
+    );
+    assert_eq!(
+        allowed_context["client_id"].as_str(),
+        Some(client.id.as_str())
+    );
+    assert_eq!(
+        allowed_context["tool_name"].as_str(),
+        Some("create_activity_draft")
+    );
+    assert_eq!(allowed_context["access_kind"].as_str(), Some("draft"));
+    assert_eq!(allowed_context["mode"].as_str(), Some("draft_only"));
+    assert_eq!(allowed_context["allowed"].as_bool(), Some(true));
+    assert_eq!(allowed_context["reason"].as_str(), Some("allowed"));
+    assert_eq!(allowed_context["status"].as_str(), Some("allowed"));
+    assert!(allowed_context.get("entity_scope").is_none());
+
+    let denied = core
+        .evaluate_external_client_draft_permission(&client.id, "contacts.search")
+        .expect("denied draft evaluation should still succeed");
+    assert!(!denied.allowed);
+    assert_eq!(
+        denied.reason,
+        ToolPermissionDecisionReason::MissingToolPermission
+    );
+
+    let denied_context = external_client_evaluation_audit_context(
+        &core,
+        "evaluate_external_client_draft_permission",
+        "desktop_app",
+        &client.id,
+    );
+    assert_eq!(
+        denied_context["tool_name"].as_str(),
+        Some("contacts.search")
+    );
+    assert_eq!(denied_context["access_kind"].as_str(), Some("draft"));
+    assert_eq!(denied_context["mode"].as_str(), Some("draft_only"));
+    assert_eq!(denied_context["allowed"].as_bool(), Some(false));
+    assert_eq!(
+        denied_context["reason"].as_str(),
+        Some("missing_tool_permission")
+    );
+    assert_eq!(denied_context["status"].as_str(), Some("denied"));
+    assert_eq!(
+        count_external_client_evaluation_audit_rows(
+            &core,
+            "evaluate_external_client_draft_permission",
+            "desktop_app",
+            &client.id
+        ),
+        2
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_client_evaluation_audits_unknown_and_deleted_client_attempts() {
+    let (mut core, path) = open_test_core();
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let unknown = core
+        .evaluate_external_client_tool_read_permission("missing-client", "contacts.search")
+        .expect_err("unknown client read evaluation should fail");
+    assert!(matches!(unknown, CrmError::NotFound(_)));
+
+    let unknown_context = external_client_evaluation_audit_context(
+        &core,
+        "evaluate_external_client_read_permission",
+        "desktop_app",
+        "missing-client",
+    );
+    assert_eq!(
+        unknown_context["client_id"].as_str(),
+        Some("missing-client")
+    );
+    assert_eq!(
+        unknown_context["tool_name"].as_str(),
+        Some("contacts.search")
+    );
+    assert_eq!(unknown_context["access_kind"].as_str(), Some("read"));
+    assert!(unknown_context.get("mode").is_none());
+    assert_eq!(unknown_context["allowed"].as_bool(), Some(false));
+    assert_eq!(
+        unknown_context["reason"].as_str(),
+        Some("client_not_found_or_deleted")
+    );
+    assert_eq!(unknown_context["status"].as_str(), Some("error"));
+
+    let client = create_test_external_client_with_mode(&mut core, "draft_only");
+    core.db
+        .conn
+        .execute(
+            "UPDATE external_clients SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
+            params![now_iso8601(), &client.id],
+        )
+        .expect("external client should be marked deleted");
+
+    let deleted = core
+        .evaluate_external_client_draft_permission(&client.id, "create_activity_draft")
+        .expect_err("deleted client draft evaluation should fail");
+    assert!(matches!(deleted, CrmError::NotFound(_)));
+
+    let deleted_context = external_client_evaluation_audit_context(
+        &core,
+        "evaluate_external_client_draft_permission",
+        "desktop_app",
+        &client.id,
+    );
+    assert_eq!(
+        deleted_context["client_id"].as_str(),
+        Some(client.id.as_str())
+    );
+    assert_eq!(
+        deleted_context["tool_name"].as_str(),
+        Some("create_activity_draft")
+    );
+    assert_eq!(deleted_context["access_kind"].as_str(), Some("draft"));
+    assert!(deleted_context.get("mode").is_none());
+    assert_eq!(deleted_context["allowed"].as_bool(), Some(false));
+    assert_eq!(
+        deleted_context["reason"].as_str(),
+        Some("client_not_found_or_deleted")
+    );
+    assert_eq!(deleted_context["status"].as_str(), Some("error"));
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn read_only_external_client_can_read_allowed_tool_but_cannot_create_draft() {
     let (mut core, path) = open_test_core();
     let client = create_test_external_client_with_mode(&mut core, "read_only");
@@ -1785,6 +2071,128 @@ fn create_external_proposed_action_enforces_client_permissions() {
     assert_eq!(
         allowed.client_id.as_deref(),
         Some(allowed_client.id.as_str())
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_proposed_action_stub_audits_denied_draft_permission_without_creating_action() {
+    let (mut core, path) = open_test_core();
+    let client = create_test_external_client_with_mode(&mut core, "draft_only");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+    let proposed_count_before = count(&core, "SELECT COUNT(*) FROM proposed_actions");
+
+    let denied = core
+        .create_external_proposed_action_stub(
+            Some(client.id.clone()),
+            "create_activity".to_string(),
+            "create_activity_draft".to_string(),
+            Some("activity".to_string()),
+            Some("activity-123".to_string()),
+            r#"{"title":"Blocked"}"#.to_string(),
+            None,
+        )
+        .expect_err("missing draft permission should fail");
+    assert_permission_denial(denied, "missing_tool_permission");
+
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM proposed_actions"),
+        proposed_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    let context = external_client_evaluation_audit_context(
+        &core,
+        "evaluate_external_client_draft_permission",
+        "mcp_client",
+        &client.id,
+    );
+    assert_eq!(context["client_id"].as_str(), Some(client.id.as_str()));
+    assert_eq!(context["tool_name"].as_str(), Some("create_activity_draft"));
+    assert_eq!(context["access_kind"].as_str(), Some("draft"));
+    assert_eq!(context["mode"].as_str(), Some("draft_only"));
+    assert_eq!(context["allowed"].as_bool(), Some(false));
+    assert_eq!(context["reason"].as_str(), Some("missing_tool_permission"));
+    assert_eq!(context["status"].as_str(), Some("denied"));
+    assert_eq!(
+        context["entity_scope"]["entity_type"].as_str(),
+        Some("activity")
+    );
+    assert_eq!(
+        context["entity_scope"]["entity_id"].as_str(),
+        Some("activity-123")
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_proposed_action_stub_audits_allowed_draft_permission_and_proposal() {
+    let (mut core, path) = open_test_core();
+    let client = create_test_external_client_with_mode(&mut core, "draft_only");
+    core.upsert_external_client_tool_permission(
+        &client.id,
+        "create_activity_draft",
+        true,
+        true,
+        true,
+    )
+    .expect("confirmed draft permission should upsert");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let proposed_action = core
+        .create_external_proposed_action_stub(
+            Some(client.id.clone()),
+            "create_activity".to_string(),
+            "create_activity_draft".to_string(),
+            Some("activity".to_string()),
+            Some("activity-456".to_string()),
+            r#"{"title":"Allowed"}"#.to_string(),
+            None,
+        )
+        .expect("allowed client proposed action should be created");
+
+    let context = external_client_evaluation_audit_context(
+        &core,
+        "evaluate_external_client_draft_permission",
+        "mcp_client",
+        &client.id,
+    );
+    assert_eq!(context["client_id"].as_str(), Some(client.id.as_str()));
+    assert_eq!(context["tool_name"].as_str(), Some("create_activity_draft"));
+    assert_eq!(context["access_kind"].as_str(), Some("draft"));
+    assert_eq!(context["mode"].as_str(), Some("draft_only"));
+    assert_eq!(context["allowed"].as_bool(), Some(true));
+    assert_eq!(context["reason"].as_str(), Some("allowed"));
+    assert_eq!(context["status"].as_str(), Some("allowed"));
+    assert_eq!(
+        context["entity_scope"]["entity_type"].as_str(),
+        Some("activity")
+    );
+    assert_eq!(
+        context["entity_scope"]["entity_id"].as_str(),
+        Some("activity-456")
+    );
+
+    let propose_audit_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'propose_action' AND actor_type = 'mcp_client' AND entity_type = 'proposed_action' AND entity_id = ?1",
+            params![&proposed_action.id],
+            |row| row.get(0),
+        )
+        .expect("proposed-action audit count should query");
+    assert_eq!(propose_audit_count, 1);
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
     );
 
     drop(core);

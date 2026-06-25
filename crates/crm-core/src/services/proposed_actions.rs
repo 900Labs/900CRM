@@ -15,12 +15,14 @@ use serde::Deserialize;
 
 use super::activity_relationships::add_activity_link_in_transaction;
 use super::external_client_permissions::{
-    ensure_external_client_draft_permission, required_external_client_field,
+    ensure_external_client_draft_permission, external_client_entity_scope,
+    required_external_client_field,
 };
 use super::{create_activity_in_transaction, record_audit_json, CrmCore};
 
 const CREATE_ACTIVITY_DRAFT_TOOL: &str = "create_activity_draft";
 const CREATE_ACTIVITY_COMPATIBLE_ACTION_TYPE: &str = "create_activity";
+const ACTOR_MCP_CLIENT: &str = "mcp_client";
 
 impl CrmCore {
     pub fn list_pending_proposed_actions(&self) -> CrmResult<Vec<ProposedAction>> {
@@ -83,7 +85,17 @@ impl CrmCore {
         let device_id = self.device_id.clone();
         let tx = self.db.conn.unchecked_transaction()?;
         if let Some(client_id) = client_id.as_deref() {
-            ensure_external_client_draft_permission(&tx, client_id, &tool_name)?;
+            if let Err(error) = ensure_external_client_draft_permission(
+                &tx,
+                ACTOR_MCP_CLIENT,
+                &device_id,
+                client_id,
+                &tool_name,
+                external_client_entity_scope(entity_type.as_deref(), entity_id.as_deref()),
+            ) {
+                tx.commit()?;
+                return Err(error);
+            }
         }
         let proposed_action = storage::proposed_actions::create_proposed_action(
             &tx,
@@ -98,7 +110,7 @@ impl CrmCore {
         )?;
         record_audit_json(
             &tx,
-            "mcp_client",
+            ACTOR_MCP_CLIENT,
             "propose_action",
             Some("proposed_action"),
             Some(&proposed_action.id),

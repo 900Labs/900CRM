@@ -85,11 +85,16 @@ External-client records, permissions, proposed actions, and audit entries are
 local readiness primitives. Settings can review and edit local activation mode
 and per-tool permission rows for external-client records, but local activation
 does not create tokens or secrets, start an MCP server/listener, enable sync
-server behavior, or run MCP/client code. Approving a supported
-`create_activity_draft` proposed action can create a local
-activity through `crm-core` and record local audit evidence. Rejection remains
-decision-only, unsupported proposed-action types remain pending with an explicit
-error, and approval does not run MCP/client code.
+server behavior, or run MCP/client code.
+
+Explicit local external-client read/draft permission evaluations and draft
+permission checks before external proposed-action creation write `audit_log`
+entries with client/tool/access-kind decision context. These audit-only
+evaluation entries do not create sync changelog rows. Approving a supported
+`create_activity_draft` proposed action can create a local activity through
+`crm-core` and record local audit evidence. Rejection remains decision-only,
+unsupported proposed-action types remain pending with an explicit error, and
+approval does not run MCP/client code.
 
 See [MCP Readiness Baseline](MCP_READINESS.md) for the detailed current MCP
 boundary.

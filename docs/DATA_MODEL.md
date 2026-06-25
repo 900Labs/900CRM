@@ -193,9 +193,10 @@ The `audit_log` table records accountable actions with:
 - optional JSON before/after snapshots;
 - `created_at` and `device_id`.
 
-Current mutating service paths record audit entries for user-visible data
-changes, import row creation, proposed-action decisions, and external-client
-permission changes.
+Current service paths record audit entries for user-visible data changes,
+import row creation, proposed-action decisions, external-client permission
+changes, explicit external-client read/draft permission evaluations, and draft
+permission checks performed before external proposed-action creation.
 
 Audit log entries can be exported locally to CSV or JSON for accountability
 review. The export includes every existing `audit_log` row with `id`,
@@ -246,11 +247,25 @@ Schema-reserved modes such as `write_with_confirmation` and `write_allowed`
 exist as stored values but are treated as unsupported by the current evaluation
 logic.
 
+Explicit permission evaluation services record local `audit_log` rows named
+`evaluate_external_client_read_permission` and
+`evaluate_external_client_draft_permission`. The audit entity is
+`external_client` with the attempted client ID when available. The JSON context
+records `client_id`, `tool_name`, access kind, mode when available, `allowed`,
+decision reason, result status, and optional entity scope for call paths that
+already have one. These evaluation-only audit entries do not create
+`sync_changelog` rows.
+
 ### Proposed Actions
 
 `proposed_actions` stores draft external-client actions for review. Important
 fields include client ID, action type, tool name, optional target entity, input
 JSON, proposed output JSON, status timestamps, and `device_id`.
+
+External proposed-action creation checks draft permission before inserting the
+proposed action row. That check records the same draft-evaluation audit context
+with actor `mcp_client`, including denied attempts. Denied checks return the
+existing permission/not-found error and do not create `proposed_actions` rows.
 
 Reject behavior records only the decision state and audit evidence. Approval of
 a supported `create_activity_draft` proposed action creates an activity through
