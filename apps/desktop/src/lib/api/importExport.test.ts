@@ -21,28 +21,36 @@ import {
   importContactsCsv,
   importContactsCsvWithMapping,
   importContactsJson,
+  importContactsJsonWithMapping,
   importCsv,
   importCsvWithMapping,
   importData,
   importDealsCsv,
   importDealsCsvWithMapping,
   importDealsJson,
+  importDealsJsonWithMapping,
+  importJsonWithMapping,
   importJson,
   importOrganizationsCsv,
   importOrganizationsCsvWithMapping,
   importOrganizationsJson,
+  importOrganizationsJsonWithMapping,
   preflightContactsCsvImport,
   preflightContactsCsvImportWithMapping,
   preflightContactsJsonImport,
+  preflightContactsJsonImportWithMapping,
   preflightCsv,
   preflightCsvWithMapping,
   preflightDealsCsvImport,
   preflightDealsCsvImportWithMapping,
   preflightDealsJsonImport,
+  preflightDealsJsonImportWithMapping,
   preflightJson,
+  preflightJsonWithMapping,
   preflightOrganizationsCsvImport,
   preflightOrganizationsCsvImportWithMapping,
   preflightOrganizationsJsonImport,
+  preflightOrganizationsJsonImportWithMapping,
   previewContactsJsonImport,
   previewDealsJsonImport,
   previewJson,
@@ -441,6 +449,39 @@ describe('import/export API', () => {
     );
   });
 
+  it('maps contact JSON import/preflight commands with field mappings', async () => {
+    const mapping = {
+      given: 'first_name',
+      surname: 'last_name',
+      mail: 'email',
+      ignore: null,
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await expect(importContactsJsonWithMapping('/tmp/contacts.json', mapping)).resolves.toEqual(
+      importWithBackup(1),
+    );
+    expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_json_with_mapping', {
+      file_path: '/tmp/contacts.json',
+      mapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'contacts',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightContactsJsonImportWithMapping('/tmp/contacts.json', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_contacts_json_import_with_mapping',
+      {
+        file_path: '/tmp/contacts.json',
+        mapping,
+      },
+    );
+  });
+
   it('maps organization CSV import/preflight commands with field mappings', async () => {
     const mapping = {
       Company: 'name',
@@ -472,6 +513,37 @@ describe('import/export API', () => {
     );
   });
 
+  it('maps organization JSON import/preflight commands with field mappings', async () => {
+    const mapping = {
+      company: 'name',
+      inbox: 'email',
+      telephone: 'phone',
+      skip: null,
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importOrganizationsJsonWithMapping('/tmp/organizations.json', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_organizations_json_with_mapping', {
+      file_path: '/tmp/organizations.json',
+      mapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'organizations',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightOrganizationsJsonImportWithMapping('/tmp/organizations.json', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_organizations_json_import_with_mapping',
+      {
+        file_path: '/tmp/organizations.json',
+        mapping,
+      },
+    );
+  });
+
   it('maps deal CSV import/preflight commands with field mappings', async () => {
     const mapping = {
       Opportunity: 'title',
@@ -498,6 +570,37 @@ describe('import/export API', () => {
       'preflight_deals_csv_import_with_mapping',
       {
         file_path: '/tmp/deals.csv',
+        mapping,
+      },
+    );
+  });
+
+  it('maps deal JSON import/preflight commands with field mappings', async () => {
+    const mapping = {
+      opportunity: 'title',
+      amount: 'value',
+      phase: 'stage',
+      skip: null,
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importDealsJsonWithMapping('/tmp/deals.json', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_deals_json_with_mapping', {
+      file_path: '/tmp/deals.json',
+      mapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'deals',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightDealsJsonImportWithMapping('/tmp/deals.json', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_deals_json_import_with_mapping',
+      {
+        file_path: '/tmp/deals.json',
         mapping,
       },
     );
@@ -554,6 +657,62 @@ describe('import/export API', () => {
       'preflight_deals_csv_import_with_mapping',
       {
         file_path: '/tmp/deals.csv',
+        mapping: dealMapping,
+      },
+    );
+  });
+
+  it('routes generic mapped JSON helpers by entity', async () => {
+    const mapping = {
+      company: 'name',
+      inbox: 'email',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importJsonWithMapping('organizations', '/tmp/orgs.json', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_organizations_json_with_mapping', {
+      file_path: '/tmp/orgs.json',
+      mapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'organizations',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightJsonWithMapping('organizations', '/tmp/orgs.json', mapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_organizations_json_import_with_mapping',
+      {
+        file_path: '/tmp/orgs.json',
+        mapping,
+      },
+    );
+
+    const dealMapping = {
+      opportunity: 'title',
+      amount: 'value',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importJsonWithMapping('deals', '/tmp/deals.json', dealMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_deals_json_with_mapping', {
+      file_path: '/tmp/deals.json',
+      mapping: dealMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'deals',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightJsonWithMapping('deals', '/tmp/deals.json', dealMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_deals_json_import_with_mapping',
+      {
+        file_path: '/tmp/deals.json',
         mapping: dealMapping,
       },
     );

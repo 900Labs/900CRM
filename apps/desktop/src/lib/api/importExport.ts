@@ -158,6 +158,18 @@ const preflightWithMappingCommands: Record<ImportPreflightEntity, string> = {
   organizations: 'preflight_organizations_csv_import_with_mapping',
 };
 
+const importJsonWithMappingCommands: Record<ImportPreflightEntity, string> = {
+  contacts: 'import_contacts_json_with_mapping',
+  deals: 'import_deals_json_with_mapping',
+  organizations: 'import_organizations_json_with_mapping',
+};
+
+const preflightJsonWithMappingCommands: Record<ImportPreflightEntity, string> = {
+  contacts: 'preflight_contacts_json_import_with_mapping',
+  deals: 'preflight_deals_json_import_with_mapping',
+  organizations: 'preflight_organizations_json_import_with_mapping',
+};
+
 function filePathArgs(filePath: string) {
   return { file_path: filePath };
 }
@@ -213,12 +225,32 @@ export async function importContactsCsvWithMapping(
   );
 }
 
+export async function importContactsJsonWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<ContactImportTargetField>,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
+    importJsonWithMappingCommands.contacts,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
 export async function preflightContactsCsvImportWithMapping(
   filePath: string,
   mapping: ImportColumnMapping<ContactImportTargetField>,
 ): Promise<ImportPreflightReport> {
   return invoke<ImportPreflightReport>(
     preflightWithMappingCommands.contacts,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
+export async function preflightContactsJsonImportWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<ContactImportTargetField>,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightJsonWithMappingCommands.contacts,
     filePathAndMappingArgs(filePath, mapping),
   );
 }
@@ -261,12 +293,32 @@ export async function importDealsCsvWithMapping(
   );
 }
 
+export async function importDealsJsonWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<DealImportTargetField>,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
+    importJsonWithMappingCommands.deals,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
 export async function preflightDealsCsvImportWithMapping(
   filePath: string,
   mapping: ImportColumnMapping<DealImportTargetField>,
 ): Promise<ImportPreflightReport> {
   return invoke<ImportPreflightReport>(
     preflightWithMappingCommands.deals,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
+export async function preflightDealsJsonImportWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<DealImportTargetField>,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightJsonWithMappingCommands.deals,
     filePathAndMappingArgs(filePath, mapping),
   );
 }
@@ -315,12 +367,32 @@ export async function importOrganizationsCsvWithMapping(
   );
 }
 
+export async function importOrganizationsJsonWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<OrganizationImportTargetField>,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
+    importJsonWithMappingCommands.organizations,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
 export async function preflightOrganizationsCsvImportWithMapping(
   filePath: string,
   mapping: ImportColumnMapping<OrganizationImportTargetField>,
 ): Promise<ImportPreflightReport> {
   return invoke<ImportPreflightReport>(
     preflightWithMappingCommands.organizations,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
+export async function preflightOrganizationsJsonImportWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<OrganizationImportTargetField>,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightJsonWithMappingCommands.organizations,
     filePathAndMappingArgs(filePath, mapping),
   );
 }
@@ -395,6 +467,17 @@ export async function importCsvWithMapping(
   );
 }
 
+export async function importJsonWithMapping(
+  entity: ImportPreflightEntity,
+  filePath: string,
+  mapping: ImportColumnMapping,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
+    importJsonWithMappingCommands[entity],
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
 export async function preflightCsvWithMapping(
   entity: ImportPreflightEntity,
   filePath: string,
@@ -402,6 +485,17 @@ export async function preflightCsvWithMapping(
 ): Promise<ImportPreflightReport> {
   return invoke<ImportPreflightReport>(
     preflightWithMappingCommands[entity],
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
+export async function preflightJsonWithMapping(
+  entity: ImportPreflightEntity,
+  filePath: string,
+  mapping: ImportColumnMapping,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightJsonWithMappingCommands[entity],
     filePathAndMappingArgs(filePath, mapping),
   );
 }

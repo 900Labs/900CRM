@@ -62,3 +62,4 @@
 | 058 | 2026-06-25 | `codex/pre-import-backup` | Automatic local app-data backup before supported desktop CSV, mapped CSV, and JSON imports, with typed result metadata, UI summary path, tests, and docs | Completed |
 | 059 | 2026-06-25 | `codex/import-summary-restore` | Import summary restore control for automatic pre-import backups with validation, destructive confirmation, focused component tests, and docs | Completed |
 | 060 | 2026-06-25 | `codex/json-import-preview` | Read-only browser-visible JSON import preview for contacts, deals, and organizations before duplicate preflight and confirmation without JSON field mapping or import/backup behavior changes | Completed |
+| 061 | 2026-06-25 | `codex/json-import-field-mapping` | JSON import field mapping for contacts, deals, and organizations reusing CSV mapping concepts before duplicate preflight and backed confirmed imports | Completed |

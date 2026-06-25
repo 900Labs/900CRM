@@ -45,7 +45,7 @@
 //! | `postal_code`   | no       | |
 //! | `description`   | no       | |
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io::{Read, Write};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -514,6 +514,39 @@ pub fn parse_contacts_json_with_row_numbers<R: Read>(
     )
 }
 
+/// Parses contact JSON data with frontend-provided source-field mapping.
+pub fn parse_contacts_json_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, ContactCsvRow)>> {
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let assignments = validate_import_mapping_sources(
+        &headers,
+        mapping,
+        CONTACT_IMPORT_TARGET_FIELDS,
+        "field",
+        "JSON",
+    )?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        let row = contact_row_from_mapped_json_object(object, &headers, &assignments);
+        if row.first_name.trim().is_empty() {
+            log::debug!("Skipping JSON row with blank first_name");
+            continue;
+        }
+        parsed_rows.push((row_number, row));
+    }
+
+    log::info!("Parsed {} mapped contact rows from JSON", parsed_rows.len());
+    Ok(parsed_rows)
+}
+
 /// Parses deal JSON data from a top-level array of flat row objects.
 ///
 /// Row numbers are reported with the same data-row offset as CSV imports:
@@ -527,6 +560,39 @@ pub fn parse_deals_json_with_row_numbers<R: Read>(
         "title",
         |row| row.title.trim().is_empty(),
     )
+}
+
+/// Parses deal JSON data with frontend-provided source-field mapping.
+pub fn parse_deals_json_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, DealCsvRow)>> {
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let assignments = validate_import_mapping_sources(
+        &headers,
+        mapping,
+        DEAL_IMPORT_TARGET_FIELDS,
+        "field",
+        "JSON",
+    )?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        let row = deal_row_from_mapped_json_object(object, &headers, &assignments);
+        if row.title.trim().is_empty() {
+            log::debug!("Skipping JSON row with blank title");
+            continue;
+        }
+        parsed_rows.push((row_number, row));
+    }
+
+    log::info!("Parsed {} mapped deal rows from JSON", parsed_rows.len());
+    Ok(parsed_rows)
 }
 
 /// Parses organization JSON data from a top-level array of flat row objects.
@@ -544,16 +610,52 @@ pub fn parse_organizations_json_with_row_numbers<R: Read>(
     )
 }
 
+/// Parses organization JSON data with frontend-provided source-field mapping.
+pub fn parse_organizations_json_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, OrganizationCsvRow)>> {
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let assignments = validate_import_mapping_sources(
+        &headers,
+        mapping,
+        ORGANIZATION_IMPORT_TARGET_FIELDS,
+        "field",
+        "JSON",
+    )?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        let row = organization_row_from_mapped_json_object(object, &headers, &assignments);
+        if row.name.trim().is_empty() {
+            log::debug!("Skipping JSON row with blank name");
+            continue;
+        }
+        parsed_rows.push((row_number, row));
+    }
+
+    log::info!(
+        "Parsed {} mapped organization rows from JSON",
+        parsed_rows.len()
+    );
+    Ok(parsed_rows)
+}
+
 pub fn preview_contacts_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
-    preview_json_import(reader, CONTACT_IMPORT_TARGET_FIELDS, "first_name")
+    preview_json_import(reader)
 }
 
 pub fn preview_deals_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
-    preview_json_import(reader, DEAL_IMPORT_TARGET_FIELDS, "title")
+    preview_json_import(reader)
 }
 
 pub fn preview_organizations_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
-    preview_json_import(reader, ORGANIZATION_IMPORT_TARGET_FIELDS, "name")
+    preview_json_import(reader)
 }
 
 fn parse_json_array_rows<R: Read>(reader: R) -> CrmResult<Vec<Value>> {
@@ -566,34 +668,18 @@ fn parse_json_array_rows<R: Read>(reader: R) -> CrmResult<Vec<Value>> {
     }
 }
 
-fn preview_json_import<R: Read>(
-    reader: R,
-    allowed_headers: &[&str],
-    required_field: &str,
-) -> CrmResult<JsonImportPreview> {
+fn preview_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
     const MAX_PREVIEW_ROWS: usize = 5;
-    const MAX_PREVIEW_COLUMNS: usize = 12;
 
     let rows = parse_json_array_rows(reader)?;
-    let headers = allowed_headers
-        .iter()
-        .take(MAX_PREVIEW_COLUMNS)
-        .map(|header| (*header).to_string())
-        .collect::<Vec<_>>();
+    let headers = collect_json_source_fields(&rows)?;
     let mut preview_rows = Vec::new();
-    let mut importable_rows = 0;
 
     for (index, value) in rows.iter().enumerate() {
         let row_number = index + 2;
         let object = value.as_object().ok_or_else(|| {
             CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
         })?;
-
-        if json_required_field_is_blank(object.get(required_field)) {
-            continue;
-        }
-
-        importable_rows += 1;
 
         if preview_rows.len() < MAX_PREVIEW_ROWS {
             let values = headers
@@ -610,18 +696,10 @@ fn preview_json_import<R: Read>(
     }
 
     Ok(JsonImportPreview {
-        total_rows: importable_rows,
+        total_rows: rows.len(),
         headers,
         rows: preview_rows,
     })
-}
-
-fn json_required_field_is_blank(value: Option<&Value>) -> bool {
-    match value {
-        Some(Value::String(value)) => value.trim().is_empty(),
-        Some(Value::Null) | None => true,
-        Some(value) => json_preview_cell(Some(value)).trim().is_empty(),
-    }
 }
 
 fn json_preview_cell(value: Option<&Value>) -> String {
@@ -632,6 +710,20 @@ fn json_preview_cell(value: Option<&Value>) -> String {
         Some(Value::Null) | None => String::new(),
         Some(value) => value.to_string(),
     }
+}
+
+fn collect_json_source_fields(rows: &[Value]) -> CrmResult<Vec<String>> {
+    let mut fields = BTreeSet::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        fields.extend(object.keys().cloned());
+    }
+
+    Ok(fields.into_iter().collect())
 }
 
 fn parse_json_rows_with_row_numbers<T, F>(
@@ -677,15 +769,26 @@ fn validate_import_mapping(
     mapping: &ImportColumnMapping,
     allowed_targets: &[&str],
 ) -> CrmResult<Vec<Option<String>>> {
-    let header_set: HashSet<&str> = headers.iter().collect();
+    let headers = headers.iter().map(str::to_string).collect::<Vec<_>>();
+    validate_import_mapping_sources(&headers, mapping, allowed_targets, "header", "CSV")
+}
+
+fn validate_import_mapping_sources(
+    headers: &[String],
+    mapping: &ImportColumnMapping,
+    allowed_targets: &[&str],
+    source_label: &str,
+    data_label: &str,
+) -> CrmResult<Vec<Option<String>>> {
+    let header_set: HashSet<&str> = headers.iter().map(String::as_str).collect();
     let allowed_target_set: HashSet<&str> = allowed_targets.iter().copied().collect();
     let mut assigned_targets: HashMap<String, String> = HashMap::new();
 
     for (source_header, target) in mapping {
         if !header_set.contains(source_header.as_str()) {
             return Err(CrmError::InvalidInput(format!(
-                "Mapped source header '{}' is not present in the CSV",
-                source_header
+                "Mapped source {} '{}' is not present in the {}",
+                source_label, source_header, data_label
             )));
         }
 
@@ -758,6 +861,46 @@ fn contact_row_from_mapped_record(
     row
 }
 
+fn contact_row_from_mapped_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+    assignments: &[Option<String>],
+) -> ContactCsvRow {
+    let mut row = ContactCsvRow {
+        first_name: String::new(),
+        last_name: None,
+        org_name: None,
+        email: None,
+        phone: None,
+        address: None,
+        city: None,
+        country: None,
+        notes: None,
+    };
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = json_preview_cell(object.get(headers[index].as_str()));
+        let value = value.trim();
+        match target {
+            "first_name" => row.first_name = value.to_string(),
+            "last_name" => row.last_name = optional_csv_value(value),
+            "org_name" => row.org_name = optional_csv_value(value),
+            "email" => row.email = optional_csv_value(value),
+            "phone" => row.phone = optional_csv_value(value),
+            "address" => row.address = optional_csv_value(value),
+            "city" => row.city = optional_csv_value(value),
+            "country" => row.country = optional_csv_value(value),
+            "notes" => row.notes = optional_csv_value(value),
+            _ => {}
+        }
+    }
+
+    row
+}
+
 fn organization_row_from_mapped_record(
     record: &csv::StringRecord,
     assignments: &[Option<String>],
@@ -800,6 +943,50 @@ fn organization_row_from_mapped_record(
     row
 }
 
+fn organization_row_from_mapped_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+    assignments: &[Option<String>],
+) -> OrganizationCsvRow {
+    let mut row = OrganizationCsvRow {
+        name: String::new(),
+        email: None,
+        phone: None,
+        website: None,
+        address_line1: None,
+        address_line2: None,
+        city: None,
+        region: None,
+        country: None,
+        postal_code: None,
+        description: None,
+    };
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = json_preview_cell(object.get(headers[index].as_str()));
+        let value = value.trim();
+        match target {
+            "name" => row.name = value.to_string(),
+            "email" => row.email = optional_csv_value(value),
+            "phone" => row.phone = optional_csv_value(value),
+            "website" => row.website = optional_csv_value(value),
+            "address_line1" => row.address_line1 = optional_csv_value(value),
+            "address_line2" => row.address_line2 = optional_csv_value(value),
+            "city" => row.city = optional_csv_value(value),
+            "region" => row.region = optional_csv_value(value),
+            "country" => row.country = optional_csv_value(value),
+            "postal_code" => row.postal_code = optional_csv_value(value),
+            "description" => row.description = optional_csv_value(value),
+            _ => {}
+        }
+    }
+
+    row
+}
+
 fn deal_row_from_mapped_record(
     record: &csv::StringRecord,
     assignments: &[Option<String>],
@@ -818,6 +1005,40 @@ fn deal_row_from_mapped_record(
             continue;
         };
         let value = record.get(index).unwrap_or_default().trim();
+        match target {
+            "title" => row.title = value.to_string(),
+            "value" => row.value = optional_csv_value(value),
+            "currency" => row.currency = optional_csv_value(value),
+            "stage" => row.stage = optional_csv_value(value),
+            "expected_close" => row.expected_close = optional_csv_value(value),
+            "notes" => row.notes = optional_csv_value(value),
+            _ => {}
+        }
+    }
+
+    row
+}
+
+fn deal_row_from_mapped_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+    assignments: &[Option<String>],
+) -> DealCsvRow {
+    let mut row = DealCsvRow {
+        title: String::new(),
+        value: None,
+        currency: None,
+        stage: None,
+        expected_close: None,
+        notes: None,
+    };
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = json_preview_cell(object.get(headers[index].as_str()));
+        let value = value.trim();
         match target {
             "title" => row.title = value.to_string(),
             "value" => row.value = optional_csv_value(value),

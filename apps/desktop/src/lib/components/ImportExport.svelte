@@ -18,14 +18,14 @@
   import {
     exportData,
     importCsv,
-    importData,
     importContactsCsvWithMapping,
     importDealsCsvWithMapping,
+    importJsonWithMapping,
     importOrganizationsCsvWithMapping,
-    preflightJson,
     previewJson,
     preflightContactsCsvImportWithMapping,
     preflightDealsCsvImportWithMapping,
+    preflightJsonWithMapping,
     preflightOrganizationsCsvImportWithMapping,
     type ExportFormat,
     type ContactImportTargetField,
@@ -89,18 +89,22 @@
 
   const previewRows = $derived(parseResult?.rows.slice(0, 5) ?? []);
   const jsonPreviewRows = $derived(jsonPreview?.rows ?? []);
-  const mappedPreviewRows = $derived(applyMapping(previewRows, columnMapping));
   const isMappedImport = $derived(
     importEntity === 'contacts' || importEntity === 'deals' || importEntity === 'organizations',
   );
   const isCsvImport = $derived(importFormat === 'csv');
   const isJsonImport = $derived(importFormat === 'json');
-  const showCsvWizard = $derived(isCsvImport && isMappedImport);
-  const showDuplicateReview = $derived(showCsvWizard || isJsonImport);
+  const showMappingWizard = $derived(isMappedImport && (isCsvImport || isJsonImport));
+  const showDuplicateReview = $derived(showMappingWizard);
   const mappedEntity = $derived(isMappedImport ? (importEntity as MappedImportEntity) : null);
   const importFieldOptions = $derived(mappedEntity ? getImportFieldOptions(mappedEntity) : []);
-  const canUseMappedCommands = $derived(Boolean(isCsvImport && fileSource === 'desktop' && selectedImportPath));
-  const fallbackImportBlocked = $derived(showCsvWizard && fileSource === 'browser');
+  const sourceHeaders = $derived(isJsonImport ? (jsonPreview?.headers ?? []) : (parseResult?.headers ?? []));
+  const sourcePreviewRows = $derived(
+    isJsonImport ? jsonPreviewRows.map((row) => row.values) : previewRows,
+  );
+  const mappedPreviewRows = $derived(applyMapping(sourcePreviewRows, columnMapping));
+  const canUseMappedCommands = $derived(Boolean(showMappingWizard && fileSource === 'desktop' && selectedImportPath));
+  const fallbackImportBlocked = $derived(showMappingWizard && isCsvImport && fileSource === 'browser');
   const duplicateWarnings = $derived(preflightReport?.warnings ?? []);
 
   async function handleFilePick() {
@@ -203,6 +207,9 @@
 
     try {
       jsonPreview = await previewJson(importEntity, path);
+      if (mappedEntity) {
+        columnMapping = suggestImportMapping(mappedEntity, jsonPreview.headers);
+      }
       importStep = 'preview';
     } catch {
       selectedImportPath = null;
@@ -262,7 +269,7 @@
   }
 
   function goToPreview() {
-    if (!parseResult) {
+    if (!parseResult && !jsonPreview) {
       uiStore.toastError(t('import.chooseFile'));
       return;
     }
@@ -270,7 +277,7 @@
   }
 
   function goToMapping() {
-    if (!parseResult) {
+    if (sourceHeaders.length === 0) {
       uiStore.toastError(t('import.chooseFile'));
       return;
     }
@@ -302,53 +309,6 @@
     }
   }
 
-  async function handleJsonImport() {
-    if (!selectedImportPath || !jsonPreview || isPreviewing) {
-      uiStore.toastError(t('import.chooseFile'));
-      return;
-    }
-
-    isImporting = true;
-    validationErrors = [];
-    try {
-      const result = await importData(importEntity, 'json', selectedImportPath);
-      applyImportResult(result);
-      importStep = 'summary';
-      const summary = result.import;
-
-      if (summary.skipped > 0) {
-        uiStore.toastWarning(`${t('import.success')} (${summary.created} created, ${summary.skipped} skipped)`);
-      } else {
-        uiStore.toastSuccess(`${t('import.success')} (${summary.created})`);
-      }
-    } catch {
-      validationErrors = [t('import.failed')];
-      uiStore.toastError(t('import.failed'));
-    } finally {
-      isImporting = false;
-    }
-  }
-
-  async function handleJsonPreflight() {
-    if (!selectedImportPath || !jsonPreview || isPreviewing) {
-      uiStore.toastError(t('import.chooseFile'));
-      return;
-    }
-
-    isPreflighting = true;
-    validationErrors = [];
-    preflightReport = null;
-    try {
-      preflightReport = await preflightJson(importEntity, selectedImportPath);
-      importStep = preflightReport.duplicate_warning_count > 0 ? 'duplicates' : 'confirm';
-    } catch {
-      validationErrors = [t('import.preflightFailed')];
-      uiStore.toastError(t('import.preflightFailed'));
-    } finally {
-      isPreflighting = false;
-    }
-  }
-
   async function handlePreflight() {
     if (!mappedEntity || !validateCurrentMapping()) {
       return;
@@ -363,7 +323,7 @@
     validationErrors = [];
     try {
       preflightReport = await runMappedPreflight(mappedEntity, selectedImportPath);
-      importStep = 'duplicates';
+      importStep = preflightReport.duplicate_warning_count > 0 ? 'duplicates' : 'confirm';
     } catch {
       validationErrors = [t('import.preflightFailed')];
     } finally {
@@ -398,6 +358,10 @@
     entity: MappedImportEntity,
     filePath: string,
   ): Promise<ImportPreflightReport> {
+    if (isJsonImport) {
+      return preflightJsonWithMapping(entity, filePath, toBackendMapping(columnMapping));
+    }
+
     if (entity === 'contacts') {
       return preflightContactsCsvImportWithMapping(
         filePath,
@@ -422,6 +386,10 @@
     entity: MappedImportEntity,
     filePath: string,
   ): Promise<ImportWithBackupResult> {
+    if (isJsonImport) {
+      return importJsonWithMapping(entity, filePath, toBackendMapping(columnMapping));
+    }
+
     if (entity === 'contacts') {
       return importContactsCsvWithMapping(
         filePath,
@@ -449,22 +417,10 @@
   }
 
   function backFromCurrentStep() {
-    if (isJsonImport) {
-      if (importStep === 'summary') {
-        importStep = 'confirm';
-      } else if (importStep === 'confirm') {
-        importStep = (preflightReport?.duplicate_warning_count ?? 0) > 0 ? 'duplicates' : 'preview';
-      } else if (importStep === 'duplicates') {
-        importStep = 'preview';
-      } else if (importStep === 'preview') {
-        importStep = 'select';
-      } else {
-        importStep = 'select';
-      }
-    } else if (importStep === 'summary') {
+    if (importStep === 'summary') {
       importStep = 'confirm';
     } else if (importStep === 'confirm') {
-      importStep = 'duplicates';
+      importStep = (preflightReport?.duplicate_warning_count ?? 0) > 0 ? 'duplicates' : 'mapping';
     } else if (importStep === 'duplicates') {
       importStep = 'mapping';
     } else if (importStep === 'mapping') {
@@ -613,7 +569,7 @@
               </select>
             </div>
 
-            {#if showCsvWizard}
+            {#if showMappingWizard}
               <ol class="wizard-steps" aria-label={t('import.wizardProgress')}>
                 <li class:active={importStep === 'select'} class:complete={importStep !== 'select'}>{t('import.stepSelect')}</li>
                 <li class:active={importStep === 'preview'} class:complete={['mapping', 'duplicates', 'confirm', 'summary'].includes(importStep)}>{t('import.stepPreview')}</li>
@@ -624,7 +580,7 @@
               </ol>
             {/if}
 
-            {#if !showCsvWizard || importStep === 'select'}
+            {#if !showMappingWizard || importStep === 'select'}
               <div class="form-group">
                 <label class="form-label" for="import-file-button">{t('import.chooseFile')}</label>
                 <button id="import-file-button" class="btn btn-secondary" onclick={handleFilePick} type="button">
@@ -656,7 +612,7 @@
               </div>
             {/if}
 
-            {#if parseResult && (!showCsvWizard || importStep === 'preview')}
+            {#if parseResult && (!showMappingWizard || importStep === 'preview')}
               <p class="import-stats">
                 {t('import.rowCount', { count: parseResult.count })}
                 {#if parseResult.warnings.length > 0}
@@ -727,18 +683,18 @@
               {/if}
             {/if}
 
-            {#if showCsvWizard && parseResult && importStep === 'mapping'}
+            {#if showMappingWizard && sourceHeaders.length > 0 && importStep === 'mapping'}
               <div class="mapping-panel">
                 <div class="mapping-header">
                   <span>{t('import.columnMapping')}</span>
                   <span>{t('import.targetField')}</span>
                 </div>
-                {#each parseResult.headers as h (h)}
+                {#each sourceHeaders as h (h)}
                   <div class="mapping-row">
                     <div class="source-column">
                       <span class="source-label">{h}</span>
-                      {#if previewRows[0]?.[h]}
-                        <span class="source-sample">{previewRows[0][h]}</span>
+                      {#if sourcePreviewRows[0]?.[h]}
+                        <span class="source-sample">{sourcePreviewRows[0][h]}</span>
                       {/if}
                     </div>
                     <select
@@ -823,7 +779,7 @@
             {#if showDuplicateReview && importStep === 'confirm'}
               <div class="confirm-panel">
                 <p class="import-stats">
-                  {t('import.confirmRows', { count: preflightReport?.total_rows ?? parseResult?.count ?? 0 })}
+                  {t('import.confirmRows', { count: preflightReport?.total_rows ?? (isJsonImport ? jsonPreview?.total_rows : parseResult?.count) ?? 0 })}
                 </p>
                 {#if (preflightReport?.duplicate_warning_count ?? 0) > 0}
                   <p class="import-warnings">
@@ -928,21 +884,25 @@
         {/if}
 
         {#if activeTab === 'import'}
-          {#if isJsonImport}
+          {#if showMappingWizard}
             {#if importStep === 'select'}
               <button
                 class="btn btn-primary"
-                onclick={handleJsonPreflight}
-                disabled={!selectedImportPath || !jsonPreview || isPreviewing || isPreflighting}
+                onclick={goToPreview}
+                disabled={!parseResult && !jsonPreview}
                 type="button"
               >
-                {isPreflighting ? t('import.checking') : t('import.detectDuplicates')}
+                {t('common.next')}
               </button>
             {:else if importStep === 'preview'}
+              <button class="btn btn-primary" onclick={goToMapping} type="button">
+                {t('common.next')}
+              </button>
+            {:else if importStep === 'mapping'}
               <button
                 class="btn btn-primary"
-                onclick={handleJsonPreflight}
-                disabled={!selectedImportPath || !jsonPreview || isPreviewing || isPreflighting}
+                onclick={handlePreflight}
+                disabled={isPreviewing || isPreflighting}
                 type="button"
               >
                 {isPreflighting ? t('import.checking') : t('import.detectDuplicates')}
@@ -954,7 +914,7 @@
             {:else if importStep === 'confirm'}
               <button
                 class="btn btn-primary"
-                onclick={handleJsonImport}
+                onclick={handleMappedImport}
                 disabled={isImporting}
                 type="button"
               >
@@ -969,41 +929,6 @@
               type="button"
             >
               {isImporting ? t('import.importing') : t('import.importButton')}
-            </button>
-          {:else if importStep === 'select'}
-            <button
-              class="btn btn-primary"
-              onclick={goToPreview}
-              disabled={!parseResult}
-              type="button"
-            >
-              {t('common.next')}
-            </button>
-          {:else if importStep === 'preview'}
-            <button class="btn btn-primary" onclick={goToMapping} type="button">
-              {t('common.next')}
-            </button>
-          {:else if importStep === 'mapping'}
-            <button
-              class="btn btn-primary"
-              onclick={handlePreflight}
-              disabled={isPreflighting}
-              type="button"
-            >
-              {isPreflighting ? t('import.checking') : t('import.detectDuplicates')}
-            </button>
-          {:else if importStep === 'duplicates'}
-            <button class="btn btn-primary" onclick={() => importStep = 'confirm'} type="button">
-              {t('import.continueDespiteWarnings')}
-            </button>
-          {:else if importStep === 'confirm'}
-            <button
-              class="btn btn-primary"
-              onclick={handleMappedImport}
-              disabled={isImporting}
-              type="button"
-            >
-              {isImporting ? t('import.importing') : t('import.confirmImport')}
             </button>
           {/if}
         {:else}
