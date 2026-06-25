@@ -22,6 +22,39 @@ fn count(core: &CrmCore, sql: &str) -> i64 {
         .expect("count query should succeed")
 }
 
+fn count_custom_field_audit_action(core: &CrmCore, value_id: &str, action: &str) -> i64 {
+    core.db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE entity_type = 'custom_field_value' AND entity_id = ?1 AND action = ?2",
+            params![value_id, action],
+            |row| row.get(0),
+        )
+        .expect("custom field audit count query should succeed")
+}
+
+fn count_custom_field_set_sync(core: &CrmCore, value_id: &str, new_value: &str) -> i64 {
+    core.db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'custom_field_value' AND entity_id = ?1 AND field_name = 'value' AND new_value = ?2",
+            params![value_id, new_value],
+            |row| row.get(0),
+        )
+        .expect("custom field set sync count query should succeed")
+}
+
+fn count_custom_field_delete_sync(core: &CrmCore, value_id: &str, old_value: &str) -> i64 {
+    core.db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'custom_field_value' AND entity_id = ?1 AND field_name = '__delete__' AND old_value = ?2 AND new_value IS NULL",
+            params![value_id, old_value],
+            |row| row.get(0),
+        )
+        .expect("custom field delete sync count query should succeed")
+}
+
 fn import_mapping(pairs: &[(&str, Option<&str>)]) -> ImportColumnMapping {
     pairs
         .iter()
@@ -5731,12 +5764,15 @@ fn import_rollback_restores_custom_field_value_changes() {
         .into_iter()
         .find(|contact| contact.email == "ada@example.com")
         .expect("imported contact should exist");
-    assert_eq!(
-        core.list_custom_field_values("contact", &imported_contact.id)
-            .expect("contact custom value should list")[0]
-            .field_def_id,
-        contact_field.id
-    );
+    let imported_contact_values = core
+        .list_custom_field_values("contact", &imported_contact.id)
+        .expect("contact custom value should list");
+    assert_eq!(imported_contact_values[0].field_def_id, contact_field.id);
+    let imported_contact_value_id = imported_contact_values[0].value_id.clone();
+    let created_contact_delete_audit_before =
+        count_custom_field_audit_action(&core, &imported_contact_value_id, "delete_value");
+    let created_contact_delete_sync_before =
+        count_custom_field_delete_sync(&core, &imported_contact_value_id, "Gold");
     let contact_rollback = core
         .rollback_completed_import(&contact_plan)
         .expect("created contact custom rollback should succeed");
@@ -5746,6 +5782,86 @@ fn import_rollback_restores_custom_field_value_changes() {
         .list_custom_field_values("contact", &imported_contact.id)
         .expect("rolled back contact custom values should list")
         .is_empty());
+    assert_eq!(
+        count_custom_field_audit_action(&core, &imported_contact_value_id, "delete_value"),
+        created_contact_delete_audit_before + 1
+    );
+    assert_eq!(
+        count_custom_field_delete_sync(&core, &imported_contact_value_id, "Gold"),
+        created_contact_delete_sync_before + 1
+    );
+
+    let blank_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Grace".to_string()),
+            None,
+            None,
+            Some("grace@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("blank custom contact should be created");
+    let blank_contact_value = core
+        .set_custom_field_value(
+            contact_field.id.clone(),
+            blank_contact.id.clone(),
+            "".to_string(),
+        )
+        .expect("blank contact custom value should be set");
+    let blank_contacts_csv_path = path.join("contacts-custom-blank-merge-rollback.csv");
+    std::fs::write(
+        &blank_contacts_csv_path,
+        "first_name,email,custom:VIP Tier\nGrace,grace@example.com,Silver\n",
+    )
+    .expect("blank contact rollback CSV fixture should write");
+    let blank_contact_result = core
+        .import_contacts_csv_with_options(
+            blank_contacts_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("blank contact custom merge import should succeed");
+    let blank_contact_plan = blank_contact_result
+        .rollback_plan
+        .clone()
+        .expect("blank contact custom merge import should return rollback plan");
+    assert_eq!(
+        core.list_custom_field_values("contact", &blank_contact.id)
+            .expect("filled contact custom value should list")[0]
+            .value,
+        "Silver"
+    );
+    let blank_contact_set_audit_before =
+        count_custom_field_audit_action(&core, &blank_contact_value.id, "set_value");
+    let blank_contact_set_sync_before =
+        count_custom_field_set_sync(&core, &blank_contact_value.id, "");
+    let blank_contact_rollback = core
+        .rollback_completed_import(&blank_contact_plan)
+        .expect("blank contact custom merge rollback should succeed");
+    assert_eq!(blank_contact_rollback.rolled_back, 1);
+    assert!(blank_contact_rollback.errors.is_empty());
+    assert_eq!(
+        core.list_custom_field_values("contact", &blank_contact.id)
+            .expect("restored blank contact custom value should list")[0]
+            .value,
+        ""
+    );
+    assert_eq!(
+        count_custom_field_audit_action(&core, &blank_contact_value.id, "set_value"),
+        blank_contact_set_audit_before + 1
+    );
+    assert_eq!(
+        count_custom_field_set_sync(&core, &blank_contact_value.id, ""),
+        blank_contact_set_sync_before + 1
+    );
 
     let existing_deal = core
         .create_deal(
@@ -5778,12 +5894,15 @@ fn import_rollback_restores_custom_field_value_changes() {
         .rollback_plan
         .clone()
         .expect("merged deal custom import should return rollback plan");
-    assert_eq!(
-        core.list_custom_field_values("deal", &existing_deal.id)
-            .expect("deal custom value should list")[0]
-            .field_def_id,
-        deal_field.id
-    );
+    let existing_deal_values = core
+        .list_custom_field_values("deal", &existing_deal.id)
+        .expect("deal custom value should list");
+    assert_eq!(existing_deal_values[0].field_def_id, deal_field.id);
+    let existing_deal_value_id = existing_deal_values[0].value_id.clone();
+    let deal_delete_audit_before =
+        count_custom_field_audit_action(&core, &existing_deal_value_id, "delete_value");
+    let deal_delete_sync_before =
+        count_custom_field_delete_sync(&core, &existing_deal_value_id, "Medium");
     let deal_rollback = core
         .rollback_completed_import(&deal_plan)
         .expect("merged deal custom rollback should succeed");
@@ -5793,6 +5912,14 @@ fn import_rollback_restores_custom_field_value_changes() {
         .list_custom_field_values("deal", &existing_deal.id)
         .expect("rolled back deal custom values should list")
         .is_empty());
+    assert_eq!(
+        count_custom_field_audit_action(&core, &existing_deal_value_id, "delete_value"),
+        deal_delete_audit_before + 1
+    );
+    assert_eq!(
+        count_custom_field_delete_sync(&core, &existing_deal_value_id, "Medium"),
+        deal_delete_sync_before + 1
+    );
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);

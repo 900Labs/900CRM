@@ -282,6 +282,36 @@ pub fn get_value(conn: &Connection, id: &str) -> CrmResult<CustomFieldValue> {
     })
 }
 
+pub fn get_value_for_entity_field(
+    conn: &Connection,
+    field_def_id: &str,
+    entity_id: &str,
+) -> CrmResult<Option<CustomFieldValue>> {
+    match conn.query_row(
+        r#"
+        SELECT id, field_def_id, entity_id, value, created_at, updated_at
+        FROM custom_field_values
+        WHERE field_def_id = ?1 AND entity_id = ?2
+        LIMIT 1
+        "#,
+        params![field_def_id, entity_id],
+        |row| {
+            Ok(CustomFieldValue {
+                id: row.get(0)?,
+                field_def_id: row.get(1)?,
+                entity_id: row.get(2)?,
+                value: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+            })
+        },
+    ) {
+        Ok(value) => Ok(Some(value)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(err) => Err(CrmError::Database(err.to_string())),
+    }
+}
+
 pub fn list_values_for_entity(
     conn: &Connection,
     entity_type: &str,

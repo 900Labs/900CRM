@@ -729,6 +729,76 @@ impl CrmCore {
         )
     }
 
+    fn restore_custom_field_value_for_rollback(
+        &mut self,
+        field_def_id: &str,
+        entity_id: &str,
+        value: &str,
+    ) -> CrmResult<()> {
+        self.set_custom_field_value(
+            field_def_id.to_string(),
+            entity_id.to_string(),
+            value.to_string(),
+        )?;
+        Ok(())
+    }
+
+    fn delete_custom_field_value_for_rollback(
+        &mut self,
+        field_def_id: &str,
+        entity_id: &str,
+    ) -> CrmResult<()> {
+        let device_id = self.device_id.clone();
+        let tx = self.db.conn.unchecked_transaction()?;
+        let Some(before) =
+            storage::custom_fields::get_value_for_entity_field(&tx, field_def_id, entity_id)?
+        else {
+            tx.commit()?;
+            return Ok(());
+        };
+
+        storage::custom_fields::delete_value_for_entity_field(&tx, field_def_id, entity_id)?;
+        storage::sync::record_change(
+            &tx,
+            "custom_field_value",
+            &before.id,
+            "__delete__",
+            Some(&before.value),
+            None,
+            &device_id,
+        )?;
+        record_audit_json(
+            &tx,
+            ACTOR_DESKTOP_APP,
+            "delete_value",
+            Some("custom_field_value"),
+            Some(&before.id),
+            Some(&before),
+            Option::<&CustomFieldValue>::None,
+            &device_id,
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn delete_custom_field_values_for_rollback(
+        &mut self,
+        entity_type: &str,
+        entity_id: &str,
+    ) -> CrmResult<()> {
+        let field_def_ids = self
+            .custom_field_snapshot(entity_type, entity_id)?
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        for field_def_id in field_def_ids {
+            self.delete_custom_field_value_for_rollback(&field_def_id, entity_id)?;
+        }
+
+        Ok(())
+    }
+
     fn apply_custom_field_import_updates(
         &mut self,
         entity_id: &str,

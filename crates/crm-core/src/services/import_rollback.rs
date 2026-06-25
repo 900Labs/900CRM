@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    storage::{contacts::Contact, custom_fields, deals::Deal, organizations::Organization},
+    storage::{contacts::Contact, deals::Deal, organizations::Organization},
     utils::{errors::CrmError, uuid::new_uuid},
 };
 
@@ -487,18 +487,16 @@ impl CrmCore {
         }
 
         match self.delete_contact(entity_id) {
-            Ok(()) => {
-                match custom_fields::delete_values_for_entity(&self.db.conn, "contact", entity_id) {
-                    Ok(_) => result.record_rolled_back(),
-                    Err(err) => result.record_error(
-                        "contact",
-                        entity_id,
-                        row_number,
-                        "rollback_failed",
-                        err.to_string(),
-                    ),
-                }
-            }
+            Ok(()) => match self.delete_custom_field_values_for_rollback("contact", entity_id) {
+                Ok(()) => result.record_rolled_back(),
+                Err(err) => result.record_error(
+                    "contact",
+                    entity_id,
+                    row_number,
+                    "rollback_failed",
+                    err.to_string(),
+                ),
+            },
             Err(CrmError::NotFound(message)) => {
                 result.record_skipped("contact", entity_id, row_number, "not_found", message)
             }
@@ -602,18 +600,16 @@ impl CrmCore {
         }
 
         match self.delete_deal(entity_id) {
-            Ok(()) => {
-                match custom_fields::delete_values_for_entity(&self.db.conn, "deal", entity_id) {
-                    Ok(_) => result.record_rolled_back(),
-                    Err(err) => result.record_error(
-                        "deal",
-                        entity_id,
-                        row_number,
-                        "rollback_failed",
-                        err.to_string(),
-                    ),
-                }
-            }
+            Ok(()) => match self.delete_custom_field_values_for_rollback("deal", entity_id) {
+                Ok(()) => result.record_rolled_back(),
+                Err(err) => result.record_error(
+                    "deal",
+                    entity_id,
+                    row_number,
+                    "rollback_failed",
+                    err.to_string(),
+                ),
+            },
             Err(CrmError::NotFound(message)) => {
                 result.record_skipped("deal", entity_id, row_number, "not_found", message)
             }
@@ -912,16 +908,16 @@ fn deal_snapshot_for_rollback(
 }
 
 fn restore_custom_field_changes(
-    core: &CrmCore,
+    core: &mut CrmCore,
     entity_id: &str,
     changed_fields: &[String],
     before_custom_fields: &BTreeMap<String, String>,
 ) -> CrmResult<()> {
     for field_def_id in changed_custom_field_ids(changed_fields) {
         if let Some(value) = before_custom_fields.get(&field_def_id) {
-            custom_fields::set_value(&core.db.conn, &field_def_id, entity_id, value)?;
+            core.restore_custom_field_value_for_rollback(&field_def_id, entity_id, value)?;
         } else {
-            custom_fields::delete_value_for_entity_field(&core.db.conn, &field_def_id, entity_id)?;
+            core.delete_custom_field_value_for_rollback(&field_def_id, entity_id)?;
         }
     }
 
