@@ -9123,6 +9123,245 @@ fn tag_definition_rollback_skips_when_tag_changed_after_import() {
 }
 
 #[test]
+fn custom_field_definition_import_export_and_rollback_are_local_and_idempotent() {
+    let (mut core, path) = open_test_core();
+    let csv_path = path.join("custom-field-definitions.csv");
+    std::fs::write(
+        &csv_path,
+        "entity_type,field_name,field_type,field_options,sort_order\ncontact,Status,select,\"[\"\"New\"\",\"\"Won\"\"]\",10\ndeal,Priority,text,,\n",
+    )
+    .expect("custom field definition CSV fixture should write");
+
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+    let preflight = core
+        .preflight_custom_field_definitions_csv_import(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+        )
+        .expect("custom field definition preflight should succeed");
+    assert_eq!(preflight.entity_type, "custom_field_definitions");
+    assert_eq!(preflight.total_rows, 2);
+    assert_eq!(preflight.duplicate_warning_count, 0);
+    assert!(preflight.warnings.is_empty());
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM custom_field_defs"), 0);
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    let result = core
+        .import_custom_field_definitions_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("custom field definition import should succeed");
+    assert_eq!(result.created, 2);
+    assert_eq!(result.merged, 0);
+    assert_eq!(result.skipped, 0);
+    assert!(result.errors.is_empty());
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("created custom field definitions should return rollback plan");
+
+    let definitions = core
+        .list_custom_field_defs(None)
+        .expect("custom field definitions should list after import");
+    assert_eq!(definitions.len(), 2);
+    let status = definitions
+        .iter()
+        .find(|definition| definition.field_name == "Status")
+        .expect("Status definition should import");
+    assert_eq!(status.entity_type, "contact");
+    assert_eq!(status.field_type, "select");
+    assert_eq!(status.field_options.as_deref(), Some("[\"New\",\"Won\"]"));
+    assert_eq!(status.sort_order, 10);
+
+    let csv_export_path = path.join("custom-field-definitions-export.csv");
+    assert_eq!(
+        core.export_custom_field_definitions_csv(
+            csv_export_path
+                .to_str()
+                .expect("path should be valid UTF-8")
+        )
+        .expect("custom field definition CSV export should succeed"),
+        2
+    );
+    let csv_rows = read_csv_export(&csv_export_path);
+    assert!(csv_rows.iter().any(|row| {
+        row.get("entity_type").map(String::as_str) == Some("contact")
+            && row.get("field_name").map(String::as_str) == Some("Status")
+            && row.get("field_type").map(String::as_str) == Some("select")
+            && row.get("field_options").map(String::as_str) == Some("[\"New\",\"Won\"]")
+            && row.get("sort_order").map(String::as_str) == Some("10")
+    }));
+
+    let json_export_path = path.join("custom-field-definitions-export.json");
+    assert_eq!(
+        core.export_custom_field_definitions_json(
+            json_export_path
+                .to_str()
+                .expect("path should be valid UTF-8")
+        )
+        .expect("custom field definition JSON export should succeed"),
+        2
+    );
+    let json_rows = read_json_export(&json_export_path);
+    assert!(json_rows.iter().any(|row| {
+        row.get("field_name").and_then(|value| value.as_str()) == Some("Status")
+            && row.get("sort_order").and_then(|value| value.as_str()) == Some("10")
+    }));
+
+    let idempotent_result = core
+        .import_custom_field_definitions_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("existing custom field definition import should succeed");
+    assert_eq!(idempotent_result.created, 0);
+    assert_eq!(idempotent_result.skipped, 2);
+    assert!(idempotent_result.errors.is_empty());
+
+    let conflict_csv_path = path.join("custom-field-definition-conflict.csv");
+    std::fs::write(
+        &conflict_csv_path,
+        "entity_type,field_name,field_type,field_options,sort_order\ncontact,Status,text,,10\n",
+    )
+    .expect("conflicting custom field definition CSV fixture should write");
+    let conflict = core
+        .preflight_custom_field_definitions_csv_import(
+            conflict_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect_err("preflight should reject conflicting definition shape");
+    assert!(conflict
+        .to_string()
+        .contains("already exists with different shape"));
+
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("custom field definition rollback should complete");
+    assert_eq!(rollback.rolled_back, 2);
+    assert_eq!(rollback.skipped, 0);
+    assert!(rollback.errors.is_empty());
+    assert!(core
+        .list_custom_field_defs(None)
+        .expect("custom field definitions should list")
+        .is_empty());
+
+    let json_path = path.join("custom-field-definitions-mapped.json");
+    std::fs::write(
+        &json_path,
+        r#"[{"Owner":"organization","Label":"Segment","Kind":"text","Order":"7"}]"#,
+    )
+    .expect("mapped custom field definition JSON fixture should write");
+    let mapping = import_mapping(&[
+        ("Owner", Some("entity_type")),
+        ("Label", Some("field_name")),
+        ("Kind", Some("field_type")),
+        ("Order", Some("sort_order")),
+    ]);
+    let json_preflight = core
+        .preflight_custom_field_definitions_json_import_with_mapping(
+            json_path.to_str().expect("path should be valid UTF-8"),
+            mapping.clone(),
+        )
+        .expect("mapped JSON preflight should succeed");
+    assert_eq!(json_preflight.total_rows, 1);
+    let json_result = core
+        .import_custom_field_definitions_json_with_mapping(
+            json_path.to_str().expect("path should be valid UTF-8"),
+            mapping,
+        )
+        .expect("mapped JSON custom field definition import should succeed");
+    assert_eq!(json_result.created, 1);
+    assert!(core
+        .list_custom_field_defs(Some("organization".to_string()))
+        .expect("organization definitions should list")
+        .iter()
+        .any(|definition| definition.field_name == "Segment" && definition.sort_order == 7));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn custom_field_definition_rollback_skips_modified_or_value_bearing_definitions() {
+    let (mut core, path) = open_test_core();
+    let csv_path = path.join("custom-field-definition-rollback-skip.csv");
+    std::fs::write(
+        &csv_path,
+        "entity_type,field_name,field_type,field_options,sort_order\ncontact,Tier,text,,1\ncontact,Region,text,,2\n",
+    )
+    .expect("custom field definition CSV fixture should write");
+    let result = core
+        .import_custom_field_definitions_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("custom field definition import should succeed");
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("created custom field definitions should have rollback plan");
+
+    let definitions = core
+        .list_custom_field_defs(Some("contact".to_string()))
+        .expect("contact definitions should list");
+    let tier = definitions
+        .iter()
+        .find(|definition| definition.field_name == "Tier")
+        .expect("Tier definition should exist")
+        .clone();
+    let region = definitions
+        .iter()
+        .find(|definition| definition.field_name == "Region")
+        .expect("Region definition should exist")
+        .clone();
+
+    core.update_custom_field_def(&tier.id, None, None, None, Some(5))
+        .expect("post-import definition edit should succeed");
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Value".to_string()),
+            Some("Bearing".to_string()),
+            None,
+            Some("value-bearing@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should create");
+    core.set_custom_field_value(region.id.clone(), contact.id, "North".to_string())
+        .expect("custom field value should create");
+
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("custom field definition rollback skip should complete");
+    assert_eq!(rollback.rolled_back, 0);
+    assert_eq!(rollback.skipped, 2);
+    assert_eq!(rollback.errors.len(), 2);
+    assert!(rollback.errors.iter().all(|error| error.code == "conflict"));
+    let remaining_definitions = core
+        .list_custom_field_defs(Some("contact".to_string()))
+        .expect("contact definitions should list after skipped rollback");
+    assert_eq!(
+        remaining_definitions
+            .iter()
+            .find(|definition| definition.id == tier.id)
+            .expect("modified definition should remain")
+            .sort_order,
+        5
+    );
+    assert!(remaining_definitions
+        .iter()
+        .any(|definition| definition.id == region.id));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn tag_link_import_export_preflight_and_rollback_use_local_ids() {
     let (mut core, path) = open_test_core();
     let contact = core

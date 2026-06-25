@@ -33,23 +33,28 @@ use crate::utils::{
         parse_activities_json_with_mapping_targets, parse_activities_json_with_row_numbers,
         parse_contacts_csv_with_mapping_targets, parse_contacts_csv_with_row_numbers,
         parse_contacts_json_with_mapping_targets, parse_contacts_json_with_row_numbers,
-        parse_deals_csv_with_mapping_targets, parse_deals_csv_with_row_numbers,
-        parse_deals_json_with_mapping_targets, parse_deals_json_with_row_numbers,
-        parse_notes_csv_with_mapping, parse_notes_csv_with_row_numbers,
-        parse_notes_json_with_mapping, parse_notes_json_with_row_numbers,
-        parse_organizations_csv_with_mapping_targets, parse_organizations_csv_with_row_numbers,
-        parse_organizations_json_with_mapping_targets, parse_organizations_json_with_row_numbers,
-        parse_tag_definitions_csv_with_mapping, parse_tag_definitions_csv_with_row_numbers,
-        parse_tag_definitions_json_with_mapping, parse_tag_definitions_json_with_row_numbers,
-        parse_tag_links_csv_with_mapping, parse_tag_links_csv_with_row_numbers,
-        parse_tag_links_json_with_mapping, parse_tag_links_json_with_row_numbers,
-        preview_activities_json_import, preview_contacts_json_import, preview_deals_json_import,
-        preview_notes_json_import, preview_organizations_json_import,
+        parse_custom_field_definitions_csv_with_mapping,
+        parse_custom_field_definitions_csv_with_row_numbers,
+        parse_custom_field_definitions_json_with_mapping,
+        parse_custom_field_definitions_json_with_row_numbers, parse_deals_csv_with_mapping_targets,
+        parse_deals_csv_with_row_numbers, parse_deals_json_with_mapping_targets,
+        parse_deals_json_with_row_numbers, parse_notes_csv_with_mapping,
+        parse_notes_csv_with_row_numbers, parse_notes_json_with_mapping,
+        parse_notes_json_with_row_numbers, parse_organizations_csv_with_mapping_targets,
+        parse_organizations_csv_with_row_numbers, parse_organizations_json_with_mapping_targets,
+        parse_organizations_json_with_row_numbers, parse_tag_definitions_csv_with_mapping,
+        parse_tag_definitions_csv_with_row_numbers, parse_tag_definitions_json_with_mapping,
+        parse_tag_definitions_json_with_row_numbers, parse_tag_links_csv_with_mapping,
+        parse_tag_links_csv_with_row_numbers, parse_tag_links_json_with_mapping,
+        parse_tag_links_json_with_row_numbers, preview_activities_json_import,
+        preview_contacts_json_import, preview_custom_field_definitions_json_import,
+        preview_deals_json_import, preview_notes_json_import, preview_organizations_json_import,
         preview_tag_definitions_json_import, preview_tag_links_json_import, write_activities_csv,
-        write_contacts_csv, write_deals_csv, write_notes_csv, write_organizations_csv,
-        write_tag_definitions_csv, write_tag_links_csv, ActivityCsvRow, ContactCsvRow, DealCsvRow,
-        ImportColumnMapping, JsonImportPreview, NoteCsvRow, OrganizationCsvRow,
-        TagDefinitionCsvRow, TagLinkCsvRow, CUSTOM_FIELD_PREFIX,
+        write_contacts_csv, write_custom_field_definitions_csv, write_deals_csv, write_notes_csv,
+        write_organizations_csv, write_tag_definitions_csv, write_tag_links_csv, ActivityCsvRow,
+        ContactCsvRow, CustomFieldDefinitionCsvRow, DealCsvRow, ImportColumnMapping,
+        JsonImportPreview, NoteCsvRow, OrganizationCsvRow, TagDefinitionCsvRow, TagLinkCsvRow,
+        CUSTOM_FIELD_PREFIX,
     },
     datetime::now_iso8601,
     errors::{CrmError, CrmResult as InternalCrmResult},
@@ -2544,6 +2549,295 @@ impl CrmCore {
             .collect())
     }
 
+    pub fn import_custom_field_definitions_csv(
+        &mut self,
+        file_path: &str,
+    ) -> CrmResult<ImportResult> {
+        self.import_custom_field_definitions_csv_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_custom_field_definitions_csv_with_options(
+        &mut self,
+        file_path: &str,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_custom_field_definitions_csv_with_row_numbers(file_content.as_slice())?;
+        self.import_custom_field_definition_rows(rows)
+    }
+
+    pub fn import_custom_field_definitions_csv_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        self.import_custom_field_definitions_csv_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_custom_field_definitions_csv_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows =
+            parse_custom_field_definitions_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_custom_field_definition_rows(rows)
+    }
+
+    pub fn import_custom_field_definitions_json(
+        &mut self,
+        file_path: &str,
+    ) -> CrmResult<ImportResult> {
+        self.import_custom_field_definitions_json_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_custom_field_definitions_json_with_options(
+        &mut self,
+        file_path: &str,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_custom_field_definitions_json_with_row_numbers(file_content.as_slice())?;
+        self.import_custom_field_definition_rows(rows)
+    }
+
+    pub fn import_custom_field_definitions_json_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        self.import_custom_field_definitions_json_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_custom_field_definitions_json_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows =
+            parse_custom_field_definitions_json_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_custom_field_definition_rows(rows)
+    }
+
+    pub fn preview_custom_field_definitions_json_import(
+        &self,
+        file_path: &str,
+    ) -> CrmResult<JsonImportPreview> {
+        let file_content = fs::read(file_path)?;
+        preview_custom_field_definitions_json_import(file_content.as_slice())
+    }
+
+    fn import_custom_field_definition_rows(
+        &mut self,
+        rows: Vec<(usize, CustomFieldDefinitionCsvRow)>,
+    ) -> CrmResult<ImportResult> {
+        let mut existing_by_key = self
+            .list_custom_field_defs(None)?
+            .into_iter()
+            .map(|definition| {
+                (
+                    custom_field_definition_import_key(
+                        &definition.entity_type,
+                        &definition.field_name,
+                    ),
+                    definition,
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        let mut created = 0u32;
+        let merged = 0u32;
+        let mut skipped = 0u32;
+        let mut errors = Vec::new();
+        let mut rollback_actions = Vec::new();
+
+        for (row_number, row) in rows {
+            let values = match validate_custom_field_definition_import_row(&row) {
+                Ok(values) => values,
+                Err(e) => {
+                    errors.push(format!("Row {}: {} ({})", row_number, e, row.field_name));
+                    skipped += 1;
+                    continue;
+                }
+            };
+            let key = custom_field_definition_import_key(&values.entity_type, &values.field_name);
+
+            if let Some(existing) = existing_by_key.get(&key) {
+                if custom_field_definition_matches_import(existing, &values) {
+                    skipped += 1;
+                } else {
+                    errors.push(format!(
+                        "Row {}: custom field definition already exists with different shape ({}:{})",
+                        row_number, values.entity_type, values.field_name
+                    ));
+                    skipped += 1;
+                }
+                continue;
+            }
+
+            match self.create_custom_field_def(
+                values.entity_type.clone(),
+                values.field_name.clone(),
+                values.field_type.clone(),
+                values.field_options.clone(),
+                Some(values.sort_order),
+            ) {
+                Ok(definition) => {
+                    existing_by_key.insert(key, definition.clone());
+                    rollback_actions.push(
+                        import_rollback::ImportRollbackAction::created_custom_field_definition(
+                            row_number,
+                            &definition,
+                        ),
+                    );
+                    let _ = storage::audit::record_audit(
+                        &self.db.conn,
+                        ACTOR_IMPORT,
+                        None,
+                        "import_row",
+                        Some("custom_field_def"),
+                        Some(&definition.id),
+                        None,
+                        None,
+                        &self.device_id,
+                    );
+                    created += 1;
+                }
+                Err(e) => {
+                    errors.push(format!("Row {}: {} ({})", row_number, e, row.field_name));
+                    skipped += 1;
+                }
+            }
+        }
+
+        Ok(ImportResult {
+            created,
+            merged,
+            skipped,
+            errors,
+            rollback_plan: import_rollback::ImportRollbackPlan::from_actions(rollback_actions),
+        })
+    }
+
+    pub fn preflight_custom_field_definitions_csv_import(
+        &self,
+        file_path: &str,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_custom_field_definitions_csv_with_row_numbers(file_content.as_slice())?;
+        self.preflight_custom_field_definition_rows(rows)
+    }
+
+    pub fn preflight_custom_field_definitions_csv_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows =
+            parse_custom_field_definitions_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.preflight_custom_field_definition_rows(rows)
+    }
+
+    pub fn preflight_custom_field_definitions_json_import(
+        &self,
+        file_path: &str,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_custom_field_definitions_json_with_row_numbers(file_content.as_slice())?;
+        self.preflight_custom_field_definition_rows(rows)
+    }
+
+    pub fn preflight_custom_field_definitions_json_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows =
+            parse_custom_field_definitions_json_with_mapping(file_content.as_slice(), &mapping)?;
+        self.preflight_custom_field_definition_rows(rows)
+    }
+
+    fn preflight_custom_field_definition_rows(
+        &self,
+        rows: Vec<(usize, CustomFieldDefinitionCsvRow)>,
+    ) -> CrmResult<ImportPreflightReport> {
+        let existing_by_key = self
+            .list_custom_field_defs(None)?
+            .into_iter()
+            .map(|definition| {
+                (
+                    custom_field_definition_import_key(
+                        &definition.entity_type,
+                        &definition.field_name,
+                    ),
+                    definition,
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        for (row_number, row) in &rows {
+            let values = validate_custom_field_definition_import_row(row)
+                .map_err(|e| CrmError::InvalidInput(format!("Row {}: {}", row_number, e)))?;
+            let key = custom_field_definition_import_key(&values.entity_type, &values.field_name);
+            if let Some(existing) = existing_by_key.get(&key) {
+                if !custom_field_definition_matches_import(existing, &values) {
+                    return Err(CrmError::InvalidInput(format!(
+                        "Row {}: custom field definition already exists with different shape ({}:{})",
+                        row_number, values.entity_type, values.field_name
+                    )));
+                }
+            }
+        }
+
+        Ok(import_preflight_report(
+            "custom_field_definitions",
+            rows.len(),
+            Vec::new(),
+        ))
+    }
+
+    pub fn export_custom_field_definitions_csv(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_custom_field_definition_rows()?;
+        let count = rows.len() as u32;
+        let file = fs::File::create(file_path)?;
+        write_custom_field_definitions_csv(BufWriter::new(file), &rows)?;
+        Ok(count)
+    }
+
+    pub fn export_custom_field_definitions_json(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_custom_field_definition_rows()?;
+        let count = rows.len() as u32;
+        write_json_export(file_path, &rows)?;
+        Ok(count)
+    }
+
+    fn export_custom_field_definition_rows(&self) -> CrmResult<Vec<CustomFieldDefinitionCsvRow>> {
+        Ok(self
+            .list_custom_field_defs(None)?
+            .into_iter()
+            .map(|definition| CustomFieldDefinitionCsvRow {
+                entity_type: definition.entity_type,
+                field_name: definition.field_name,
+                field_type: definition.field_type,
+                field_options: definition.field_options,
+                sort_order: Some(definition.sort_order.to_string()),
+            })
+            .collect())
+    }
+
     pub fn import_tag_links_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
         self.import_tag_links_csv_with_options(file_path, ImportOptions::default())
     }
@@ -3713,6 +4007,123 @@ fn validate_tag_definition_import_row(
         .filter(|value| !value.is_empty())
         .map(str::to_string);
     Ok((name, color))
+}
+
+struct CustomFieldDefinitionImportValues {
+    entity_type: String,
+    field_name: String,
+    field_type: String,
+    field_options: Option<String>,
+    sort_order: i32,
+}
+
+fn validate_custom_field_definition_import_row(
+    row: &CustomFieldDefinitionCsvRow,
+) -> CrmResult<CustomFieldDefinitionImportValues> {
+    const ENTITY_TYPES: [&str; 4] = ["contact", "deal", "activity", "organization"];
+    const FIELD_TYPES: [&str; 5] = ["text", "number", "date", "boolean", "select"];
+
+    let entity_type = row.entity_type.trim().to_ascii_lowercase();
+    if !ENTITY_TYPES.contains(&entity_type.as_str()) {
+        return Err(CrmError::InvalidInput(format!(
+            "Invalid entity_type '{}'. Expected one of: {}",
+            row.entity_type,
+            ENTITY_TYPES.join(", ")
+        )));
+    }
+
+    let field_name = normalize_required_note_import_field(&row.field_name, "field_name")?;
+    let field_type = row.field_type.trim().to_ascii_lowercase();
+    if !FIELD_TYPES.contains(&field_type.as_str()) {
+        return Err(CrmError::InvalidInput(format!(
+            "Invalid field_type '{}'. Expected one of: {}",
+            row.field_type,
+            FIELD_TYPES.join(", ")
+        )));
+    }
+
+    let field_options = row
+        .field_options
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    validate_custom_field_definition_options(&field_type, field_options.as_deref())?;
+
+    let sort_order = match row
+        .sort_order
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        Some(value) => value.parse::<i32>().map_err(|_| {
+            CrmError::InvalidInput(format!("sort_order must be an integer, got '{}'", value))
+        })?,
+        None => 0,
+    };
+
+    Ok(CustomFieldDefinitionImportValues {
+        entity_type,
+        field_name,
+        field_type,
+        field_options,
+        sort_order,
+    })
+}
+
+fn validate_custom_field_definition_options(
+    field_type: &str,
+    field_options: Option<&str>,
+) -> CrmResult<()> {
+    if field_type == "select" {
+        let raw = field_options.ok_or_else(|| {
+            CrmError::InvalidInput("field_options is required for select custom fields".to_string())
+        })?;
+        validate_custom_field_definition_options_json(raw)?;
+        return Ok(());
+    }
+
+    if let Some(raw) = field_options {
+        validate_custom_field_definition_options_json(raw)?;
+    }
+
+    Ok(())
+}
+
+fn validate_custom_field_definition_options_json(raw: &str) -> CrmResult<()> {
+    let parsed: serde_json::Value = serde_json::from_str(raw)?;
+    let items = parsed
+        .as_array()
+        .ok_or_else(|| CrmError::InvalidInput("field_options must be a JSON array".to_string()))?;
+
+    if items.is_empty() {
+        return Err(CrmError::InvalidInput(
+            "field_options must include at least one option".to_string(),
+        ));
+    }
+
+    if !items.iter().all(|item| item.is_string()) {
+        return Err(CrmError::InvalidInput(
+            "field_options entries must all be strings".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+fn custom_field_definition_import_key(entity_type: &str, field_name: &str) -> String {
+    format!("{}:{}", entity_type, field_name)
+}
+
+fn custom_field_definition_matches_import(
+    definition: &CustomFieldDefinition,
+    values: &CustomFieldDefinitionImportValues,
+) -> bool {
+    definition.entity_type == values.entity_type
+        && definition.field_name == values.field_name
+        && definition.field_type == values.field_type
+        && definition.field_options == values.field_options
+        && definition.sort_order == values.sort_order
 }
 
 fn validate_tag_link_import_row(

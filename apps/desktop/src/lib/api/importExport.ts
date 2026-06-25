@@ -11,6 +11,7 @@ export type ImportExportEntity =
   | 'organizations'
   | 'notes'
   | 'tag_definitions'
+  | 'custom_field_definitions'
   | 'tag_links';
 export type ImportPreflightEntity = ImportExportEntity;
 export type ImportFormat = 'csv' | 'json';
@@ -62,6 +63,12 @@ export type NoteImportTargetField =
   | 'entity_id'
   | 'content';
 export type TagDefinitionImportTargetField = 'name' | 'color';
+export type CustomFieldDefinitionImportTargetField =
+  | 'entity_type'
+  | 'field_name'
+  | 'field_type'
+  | 'field_options'
+  | 'sort_order';
 export type TagLinkImportTargetField = 'entity_type' | 'entity_id' | 'tag_id';
 export type ImportTargetField =
   | ContactImportTargetField
@@ -70,6 +77,7 @@ export type ImportTargetField =
   | OrganizationImportTargetField
   | NoteImportTargetField
   | TagDefinitionImportTargetField
+  | CustomFieldDefinitionImportTargetField
   | TagLinkImportTargetField;
 export type ImportColumnMapping<TTarget extends string = ImportTargetField> = Record<
   string,
@@ -163,6 +171,15 @@ export interface TagDefinitionImportRollbackSnapshot {
   updated_at: string;
 }
 
+export interface CustomFieldDefinitionImportRollbackSnapshot {
+  entity_type: 'contact' | 'organization' | 'deal' | 'activity';
+  field_name: string;
+  field_type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+  field_options?: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface TagLinkImportRollbackSnapshot {
   link_id: string;
   entity_type: 'contact' | 'organization' | 'deal' | 'activity';
@@ -225,6 +242,15 @@ export type ImportRollbackAction =
       changed_fields: string[];
       before_import?: TagDefinitionImportRollbackSnapshot | null;
       post_import: TagDefinitionImportRollbackSnapshot;
+    }
+  | {
+      entity_type: 'custom_field_definition';
+      row_number: number;
+      entity_id: string;
+      operation: ImportRollbackOperation;
+      changed_fields: string[];
+      before_import?: CustomFieldDefinitionImportRollbackSnapshot | null;
+      post_import: CustomFieldDefinitionImportRollbackSnapshot;
     }
   | {
       entity_type: 'tag_link';
@@ -314,6 +340,7 @@ const importCommands: Record<ImportFormat, Record<ImportExportEntity, string>> =
     organizations: 'import_organizations_csv',
     notes: 'import_notes_csv',
     tag_definitions: 'import_tag_definitions_csv',
+    custom_field_definitions: 'import_custom_field_definitions_csv',
     tag_links: 'import_tag_links_csv',
   },
   json: {
@@ -323,6 +350,7 @@ const importCommands: Record<ImportFormat, Record<ImportExportEntity, string>> =
     organizations: 'import_organizations_json',
     notes: 'import_notes_json',
     tag_definitions: 'import_tag_definitions_json',
+    custom_field_definitions: 'import_custom_field_definitions_json',
     tag_links: 'import_tag_links_json',
   },
 };
@@ -335,6 +363,7 @@ const exportCommands: Record<ExportFormat, Record<ImportExportEntity, string>> =
     organizations: 'export_organizations_csv',
     notes: 'export_notes_csv',
     tag_definitions: 'export_tag_definitions_csv',
+    custom_field_definitions: 'export_custom_field_definitions_csv',
     tag_links: 'export_tag_links_csv',
   },
   json: {
@@ -344,6 +373,7 @@ const exportCommands: Record<ExportFormat, Record<ImportExportEntity, string>> =
     organizations: 'export_organizations_json',
     notes: 'export_notes_json',
     tag_definitions: 'export_tag_definitions_json',
+    custom_field_definitions: 'export_custom_field_definitions_json',
     tag_links: 'export_tag_links_json',
   },
 };
@@ -355,6 +385,7 @@ const preflightCommands: Record<ImportPreflightEntity, string> = {
   organizations: 'preflight_organizations_csv_import',
   notes: 'preflight_notes_csv_import',
   tag_definitions: 'preflight_tag_definitions_csv_import',
+  custom_field_definitions: 'preflight_custom_field_definitions_csv_import',
   tag_links: 'preflight_tag_links_csv_import',
 };
 
@@ -365,6 +396,7 @@ const preflightJsonCommands: Record<ImportPreflightEntity, string> = {
   organizations: 'preflight_organizations_json_import',
   notes: 'preflight_notes_json_import',
   tag_definitions: 'preflight_tag_definitions_json_import',
+  custom_field_definitions: 'preflight_custom_field_definitions_json_import',
   tag_links: 'preflight_tag_links_json_import',
 };
 
@@ -375,6 +407,7 @@ const previewJsonCommands: Record<ImportPreflightEntity, string> = {
   organizations: 'preview_organizations_json_import',
   notes: 'preview_notes_json_import',
   tag_definitions: 'preview_tag_definitions_json_import',
+  custom_field_definitions: 'preview_custom_field_definitions_json_import',
   tag_links: 'preview_tag_links_json_import',
 };
 
@@ -385,6 +418,7 @@ const importWithMappingCommands: Record<ImportPreflightEntity, string> = {
   organizations: 'import_organizations_csv_with_mapping',
   notes: 'import_notes_csv_with_mapping',
   tag_definitions: 'import_tag_definitions_csv_with_mapping',
+  custom_field_definitions: 'import_custom_field_definitions_csv_with_mapping',
   tag_links: 'import_tag_links_csv_with_mapping',
 };
 
@@ -395,6 +429,7 @@ const preflightWithMappingCommands: Record<ImportPreflightEntity, string> = {
   organizations: 'preflight_organizations_csv_import_with_mapping',
   notes: 'preflight_notes_csv_import_with_mapping',
   tag_definitions: 'preflight_tag_definitions_csv_import_with_mapping',
+  custom_field_definitions: 'preflight_custom_field_definitions_csv_import_with_mapping',
   tag_links: 'preflight_tag_links_csv_import_with_mapping',
 };
 
@@ -405,6 +440,7 @@ const importJsonWithMappingCommands: Record<ImportPreflightEntity, string> = {
   organizations: 'import_organizations_json_with_mapping',
   notes: 'import_notes_json_with_mapping',
   tag_definitions: 'import_tag_definitions_json_with_mapping',
+  custom_field_definitions: 'import_custom_field_definitions_json_with_mapping',
   tag_links: 'import_tag_links_json_with_mapping',
 };
 
@@ -415,6 +451,7 @@ const preflightJsonWithMappingCommands: Record<ImportPreflightEntity, string> = 
   organizations: 'preflight_organizations_json_import_with_mapping',
   notes: 'preflight_notes_json_import_with_mapping',
   tag_definitions: 'preflight_tag_definitions_json_import_with_mapping',
+  custom_field_definitions: 'preflight_custom_field_definitions_json_import_with_mapping',
   tag_links: 'preflight_tag_links_json_import_with_mapping',
 };
 
@@ -856,6 +893,103 @@ export async function preflightTagDefinitionsJsonImportWithMapping(
 ): Promise<ImportPreflightReport> {
   return invoke<ImportPreflightReport>(
     preflightJsonWithMappingCommands.tag_definitions,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
+export async function importCustomFieldDefinitionsCsv(
+  filePath: string,
+  options?: ImportOptions,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
+    importCommands.csv.custom_field_definitions,
+    filePathArgs(filePath, options),
+  );
+}
+
+export async function importCustomFieldDefinitionsJson(
+  filePath: string,
+  options?: ImportOptions,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
+    importCommands.json.custom_field_definitions,
+    filePathArgs(filePath, options),
+  );
+}
+
+export async function exportCustomFieldDefinitionsCsv(filePath: string): Promise<number> {
+  return invoke<number>(exportCommands.csv.custom_field_definitions, filePathArgs(filePath));
+}
+
+export async function exportCustomFieldDefinitionsJson(filePath: string): Promise<number> {
+  return invoke<number>(exportCommands.json.custom_field_definitions, filePathArgs(filePath));
+}
+
+export async function preflightCustomFieldDefinitionsCsvImport(
+  filePath: string,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightCommands.custom_field_definitions,
+    filePathArgs(filePath),
+  );
+}
+
+export async function preflightCustomFieldDefinitionsJsonImport(
+  filePath: string,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightJsonCommands.custom_field_definitions,
+    filePathArgs(filePath),
+  );
+}
+
+export async function previewCustomFieldDefinitionsJsonImport(
+  filePath: string,
+): Promise<JsonImportPreview> {
+  return invoke<JsonImportPreview>(
+    previewJsonCommands.custom_field_definitions,
+    filePathArgs(filePath),
+  );
+}
+
+export async function importCustomFieldDefinitionsCsvWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<CustomFieldDefinitionImportTargetField>,
+  options?: ImportOptions,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
+    importWithMappingCommands.custom_field_definitions,
+    filePathAndMappingArgs(filePath, mapping, options),
+  );
+}
+
+export async function importCustomFieldDefinitionsJsonWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<CustomFieldDefinitionImportTargetField>,
+  options?: ImportOptions,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
+    importJsonWithMappingCommands.custom_field_definitions,
+    filePathAndMappingArgs(filePath, mapping, options),
+  );
+}
+
+export async function preflightCustomFieldDefinitionsCsvImportWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<CustomFieldDefinitionImportTargetField>,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightWithMappingCommands.custom_field_definitions,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
+export async function preflightCustomFieldDefinitionsJsonImportWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<CustomFieldDefinitionImportTargetField>,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightJsonWithMappingCommands.custom_field_definitions,
     filePathAndMappingArgs(filePath, mapping),
   );
 }

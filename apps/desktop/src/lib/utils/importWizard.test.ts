@@ -156,6 +156,26 @@ describe('import wizard helpers', () => {
     });
   });
 
+  it('suggests custom field definition mappings from local CSV headers', () => {
+    expect(
+      suggestImportMapping('custom_field_definitions', [
+        'Owner Type',
+        'Custom Field Name',
+        'Data Type',
+        'Select Options',
+        'Display Order',
+        'Ignore',
+      ]),
+    ).toEqual({
+      'Owner Type': 'entity_type',
+      'Custom Field Name': 'field_name',
+      'Data Type': 'field_type',
+      'Select Options': 'field_options',
+      'Display Order': 'sort_order',
+      Ignore: null,
+    });
+  });
+
   it('adds contact custom fields as mapping options and suggestions', () => {
     expect(getImportFieldOptions('contacts', contactCustomFields)).toContainEqual({
       value: 'custom:VIP Tier',
@@ -322,6 +342,18 @@ describe('import wizard helpers', () => {
     expect(definitionResult.valid).toBe(false);
     expect(definitionResult.errors).toContain('Name is required.');
     expect(definitionResult.errors).toContain('Color is mapped more than once: Hex, Color.');
+
+    const customFieldDefinitionResult = validateImportMapping('custom_field_definitions', {
+      Owner: 'entity_type',
+      Type: 'field_type',
+      DuplicateType: 'field_type',
+    });
+
+    expect(customFieldDefinitionResult.valid).toBe(false);
+    expect(customFieldDefinitionResult.errors).toContain('Field name is required.');
+    expect(customFieldDefinitionResult.errors).toContain(
+      'Field type is mapped more than once: Type, DuplicateType.',
+    );
 
     const linkResult = validateImportMapping('tag_links', {
       Type: 'entity_type',
