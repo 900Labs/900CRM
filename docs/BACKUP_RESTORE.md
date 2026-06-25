@@ -40,6 +40,12 @@ If the automatic backup cannot be created, the import is not run. The
 post-import summary displays the created backup path. Preflight duplicate checks
 remain read-only and do not create backups.
 
+When a post-import summary includes an automatic pre-import backup path, the
+summary also offers a destructive restore control. That control validates the
+backup path first, asks the user to confirm replacing the current local
+database, and then invokes the same local restore API used by Settings with
+`confirm_destructive_restore: true`.
+
 ## Validate a backup
 
 Validation is a read-only safety check. It verifies:
@@ -57,7 +63,11 @@ Validate a backup before attempting restore, especially after copying it across 
 
 Restore is destructive because it replaces the current local app database.
 
-The desktop UI allows restore only after the selected folder validates. The restore handler validates again, then asks for explicit confirmation before passing `confirm_destructive_restore: true` to the Tauri command.
+The desktop UI allows restore only after the selected folder validates. The
+Settings restore handler validates again, then asks for explicit confirmation
+before passing `confirm_destructive_restore: true` to the Tauri command. The
+Import/Export summary restore control follows the same validation and
+confirmation rule for the automatic pre-import backup path.
 
 Before restoring:
 
@@ -66,6 +76,9 @@ Before restoring:
 - close other tools that may be inspecting the app data database.
 
 During restore, the active `CrmCore` instance is closed, the validated backup database is copied into the app data directory, stale SQLite sidecars are removed, and `CrmCore` is reopened.
+
+Import summary restore is full database replacement. It is not row-level import
+rollback, partial restore, merge-back, or duplicate auto-merge.
 
 ## Developer API surface
 
