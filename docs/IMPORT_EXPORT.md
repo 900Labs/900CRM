@@ -316,6 +316,49 @@ backup folder first, asks for explicit destructive confirmation, then calls the
 same local restore path used by Settings. If validation or restore fails, the
 summary remains visible with the failure message.
 
+## Row-Level Import Rollback
+
+Completed desktop imports for contacts, deals, and organizations return a
+self-contained row-level rollback plan when the import creates rows or changes
+fields through duplicate auto-merge. The current Import/Export summary can use
+that plan to request rollback of the just-completed import.
+
+Rollback is available for CSV, mapped CSV, JSON, and mapped JSON imports. It is
+limited to the same flat contact, deal, and organization fields supported by
+import/export:
+
+- created rows are soft-deleted through the existing `crm-core` delete service
+  for the matching entity;
+- duplicate auto-merge rows restore only the fields that the import merge
+  changed, through the existing `crm-core` update service for the matching
+  entity.
+
+Rollback is conflict-safe. Before applying each row action, `crm-core` compares
+the current active row to the post-import state recorded in the rollback plan.
+If the row was edited, deleted, or otherwise no longer matches the expected
+post-import state, that row is skipped and reported as a row-level error. Later
+rollback rows continue to run.
+
+The rollback result reports:
+
+- `rolled_back`: number of row actions applied;
+- `skipped`: number of row actions skipped, including conflicts and rows that
+  were already deleted;
+- `errors`: row-level error objects with entity type, entity ID, row number,
+  code, and message.
+
+The rollback plan is intentionally summary-scoped. It is not persisted across an
+app restart and is not available after the current import summary is dismissed.
+The UI disables the row-level rollback button after a successful rollback
+command response. Reusing the same plan is still safe: already-rolled-back
+created rows are reported as skipped, and already-restored merge rows no longer
+match the post-import expected state.
+
+Row-level rollback is not full database restore. It does not roll back
+relationships, custom fields, notes-as-records, tags, activities, audit logs,
+sync changelog rows, proposed actions, external clients, permissions, settings,
+backup metadata, or schema changes.
+
 ## Export Behavior
 
 Exports write local CSV or JSON files selected by the user through the save
@@ -342,6 +385,8 @@ CSV import/export and JSON import/export are not a backup system.
   before writing rows.
 - Automatic pre-import backups are stored under the platform app data directory
   at `pre-import-backups/<timestamp-and-sequence>/`.
+- Current import summaries can run row-level rollback for created rows and
+  duplicate auto-merge field changes from the just-completed import.
 - Import summaries can validate and restore their automatic pre-import backup
   after explicit destructive confirmation.
 - Duplicate auto-merge writes use the same automatic pre-import backup guard as
@@ -349,16 +394,16 @@ CSV import/export and JSON import/export are not a backup system.
 - Restore validation applies to local backups, not CSV or JSON exports.
 
 Before large imports, confirm the automatic backup path in the import summary
-and move or copy that backup to durable encrypted storage if needed. Restoring
-the pre-import backup replaces the current local database; it does not perform a
-row-level rollback or merge. See [Backup and Restore](BACKUP_RESTORE.md) for the
-validated backup workflow.
+and move or copy that backup to durable encrypted storage if needed. Row-level
+rollback is useful for undoing flat rows from the current summary, while
+restoring the pre-import backup replaces the current local database and remains
+the full-state escape hatch. See [Backup and Restore](BACKUP_RESTORE.md) for
+the validated backup workflow.
 
 ## Not Yet Implemented
 
 The following are not implemented in the current import/export surface:
 
-- Import rollback for a completed multi-row import.
 - Remote import/export endpoints.
 - Cloud storage export destinations.
 - Scheduled export.
