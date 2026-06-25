@@ -148,6 +148,29 @@ pub fn get_notes_for_entity(
     Ok(notes)
 }
 
+/// Returns all active generic notes for supported parent entity types.
+///
+/// Notes are ordered by entity type, entity id, and creation time so exports are
+/// deterministic while staying independent of generated note ids.
+pub fn list_active_notes(conn: &Connection) -> CrmResult<Vec<Note>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, COALESCE(NULLIF(body, ''), content), entity_type, entity_id,
+               created_at, updated_at, deleted_at, device_id
+        FROM notes
+        WHERE deleted_at IS NULL
+          AND entity_type IN ('contact', 'organization', 'deal', 'activity')
+        ORDER BY entity_type ASC, entity_id ASC, created_at ASC, id ASC
+        "#,
+    )?;
+
+    let rows = stmt.query_map([], row_to_note)?;
+    let notes: Vec<Note> = rows.filter_map(|r| r.ok()).collect();
+
+    log::debug!("list_active_notes: {} results", notes.len());
+    Ok(notes)
+}
+
 /// Updates a note's content.
 ///
 /// # Errors

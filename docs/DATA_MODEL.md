@@ -102,6 +102,12 @@ reusable notes UI is wired for contacts and organizations; deal and activity
 note support exists at the service/API boundary but is not exposed through a
 dedicated visible panel today.
 
+Generic note import/export uses only `entity_type`, `entity_id`, and `content`.
+The `entity_id` value is a local active database ID for a contact,
+organization, deal, or activity. Import does not accept note IDs, timestamps,
+deleted rows, device IDs, tag links, or legacy flat `contacts.notes`/
+`deals.notes` values through the generic note format.
+
 The table has both legacy `content` and newer `body` columns. Current storage
 writes both columns and reads `body` when present, falling back to `content`.
 Notes are soft-deleted with `deleted_at`.

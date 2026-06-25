@@ -375,6 +375,83 @@ describe("ImportExport component", () => {
     await screen.findByText("Created");
   });
 
+  it("supports notes JSON imports through mapping and confirmation without duplicate review", async () => {
+    openDialogMock.mockResolvedValue("/tmp/notes.json");
+    previewJsonMock.mockResolvedValue({
+      total_rows: 1,
+      headers: ["Kind", "Target", "Body"],
+      rows: [
+        {
+          row_number: 2,
+          values: {
+            Kind: "organization",
+            Target: "organization-1",
+            Body: "Imported organization note",
+          },
+        },
+      ],
+    });
+    preflightJsonWithMappingMock.mockResolvedValue({
+      entity_type: "notes",
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    importJsonWithMappingMock.mockResolvedValue(importWithBackupResult);
+
+    render(ImportExport, { open: true });
+
+    await fireEvent.change(screen.getByLabelText("Type"), {
+      target: { value: "notes" },
+    });
+    await fireEvent.change(screen.getByLabelText("Format"), {
+      target: { value: "json" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+
+    await waitFor(() => {
+      expect(listCustomFieldDefinitionsMock).not.toHaveBeenCalled();
+      expect(previewJsonMock).toHaveBeenCalledWith("notes", "/tmp/notes.json");
+    });
+    await screen.findByText("Imported organization note");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Column Mapping")).toBeTruthy();
+    expect(screen.getByLabelText("Map to field: Kind")).toBeTruthy();
+    expect(screen.getByLabelText("Map to field: Target")).toBeTruthy();
+    expect(screen.getByLabelText("Map to field: Body")).toBeTruthy();
+    expect(screen.queryByLabelText("Merge duplicate rows into existing records")).toBeNull();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Review import" }));
+
+    await waitFor(() => {
+      expect(preflightJsonWithMappingMock).toHaveBeenCalledWith(
+        "notes",
+        "/tmp/notes.json",
+        {
+          Body: "content",
+          Kind: "entity_type",
+          Target: "entity_id",
+        },
+      );
+    });
+    expect(screen.getByText("Note imports do not run duplicate detection. Confirmed rows create new notes.")).toBeTruthy();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
+    await waitFor(() => {
+      expect(importJsonWithMappingMock).toHaveBeenCalledWith(
+        "notes",
+        "/tmp/notes.json",
+        {
+          Body: "content",
+          Kind: "entity_type",
+          Target: "entity_id",
+        },
+      );
+    });
+    await screen.findByText("Created");
+  });
+
   it("maps nonstandard JSON source fields before preflight and import", async () => {
     openDialogMock.mockResolvedValue("/tmp/contacts-custom.json");
     previewJsonMock.mockResolvedValue({

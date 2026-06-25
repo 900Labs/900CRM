@@ -43,7 +43,10 @@
     type ImportRollbackResult,
     type ImportWithBackupResult,
     type JsonImportPreview,
+    type NoteImportTargetField,
     type OrganizationImportTargetField,
+    importNotesCsvWithMapping,
+    preflightNotesCsvImportWithMapping,
   } from '$lib/api/importExport';
 
   let {
@@ -90,12 +93,14 @@
     deals: CustomFieldDefinition[];
     activities: CustomFieldDefinition[];
     organizations: CustomFieldDefinition[];
-  }>({ contacts: [], deals: [], activities: [], organizations: [] });
-  let loadedImportCustomFields = $state<{ contacts: boolean; deals: boolean; activities: boolean; organizations: boolean }>({
+    notes: CustomFieldDefinition[];
+  }>({ contacts: [], deals: [], activities: [], organizations: [], notes: [] });
+  let loadedImportCustomFields = $state<{ contacts: boolean; deals: boolean; activities: boolean; organizations: boolean; notes: boolean }>({
     contacts: false,
     deals: false,
     activities: false,
     organizations: false,
+    notes: true,
   });
 
   let exportEntity = $state<ImportExportEntity>('contacts');
@@ -118,12 +123,13 @@
     importEntity === 'contacts' ||
       importEntity === 'deals' ||
       importEntity === 'activities' ||
-      importEntity === 'organizations',
+      importEntity === 'organizations' ||
+      importEntity === 'notes',
   );
   const isCsvImport = $derived(importFormat === 'csv');
   const isJsonImport = $derived(importFormat === 'json');
   const showMappingWizard = $derived(isMappedImport && (isCsvImport || isJsonImport));
-  const usesDuplicatePreflight = $derived(importEntity !== 'activities');
+  const usesDuplicatePreflight = $derived(importEntity !== 'activities' && importEntity !== 'notes');
   const showDuplicateReview = $derived(showMappingWizard && usesDuplicatePreflight);
   const mappedEntity = $derived(isMappedImport ? (importEntity as MappedImportEntity) : null);
   const activeImportCustomFields = $derived(
@@ -133,7 +139,9 @@
         ? importCustomFieldDefinitions.deals
         : importEntity === 'activities'
           ? importCustomFieldDefinitions.activities
-          : importCustomFieldDefinitions.organizations,
+          : importEntity === 'organizations'
+            ? importCustomFieldDefinitions.organizations
+            : importCustomFieldDefinitions.notes,
   );
   const importFieldOptions = $derived(
     mappedEntity ? getImportFieldOptions(mappedEntity, activeImportCustomFields) : [],
@@ -153,6 +161,10 @@
   const importRollbackActionCount = $derived(importRollbackPlan?.actions.length ?? 0);
 
   async function ensureImportCustomFields(entity: ImportExportEntity): Promise<CustomFieldDefinition[]> {
+    if (entity === 'notes') {
+      return [];
+    }
+
     if (loadedImportCustomFields[entity]) {
       return importCustomFieldDefinitions[entity];
     }
@@ -477,6 +489,13 @@
       );
     }
 
+    if (entity === 'notes') {
+      return preflightNotesCsvImportWithMapping(
+        filePath,
+        toBackendMapping<NoteImportTargetField>(columnMapping),
+      );
+    }
+
     return preflightOrganizationsCsvImportWithMapping(
       filePath,
       toBackendMapping<OrganizationImportTargetField>(columnMapping),
@@ -515,6 +534,13 @@
       return importOptions
         ? importActivitiesCsvWithMapping(filePath, mapping, importOptions)
         : importActivitiesCsvWithMapping(filePath, mapping);
+    }
+
+    if (entity === 'notes') {
+      const mapping = toBackendMapping<NoteImportTargetField>(columnMapping);
+      return importOptions
+        ? importNotesCsvWithMapping(filePath, mapping, importOptions)
+        : importNotesCsvWithMapping(filePath, mapping);
     }
 
     const mapping = toBackendMapping<OrganizationImportTargetField>(columnMapping);
@@ -735,6 +761,7 @@
                 <option value="deals">{t('deals.title')}</option>
                 <option value="activities">{t('activities.title')}</option>
                 <option value="organizations">{t('organizations.title')}</option>
+                <option value="notes">{t('common.notes')}</option>
               </select>
             </div>
 
@@ -991,7 +1018,11 @@
                   </p>
                 {/if}
                 {#if !usesDuplicatePreflight}
-                  <p class="import-stats">{t('import.activitiesSkipDuplicates')}</p>
+                  <p class="import-stats">
+                    {importEntity === 'activities'
+                      ? t('import.activitiesSkipDuplicates')
+                      : t('import.notesSkipDuplicates')}
+                  </p>
                 {/if}
                 {#if validationErrors.length > 0}
                   <div class="validation-list" role="alert">
@@ -1097,6 +1128,7 @@
                 <option value="deals">{t('deals.title')}</option>
                 <option value="activities">{t('activities.title')}</option>
                 <option value="organizations">{t('organizations.title')}</option>
+                <option value="notes">{t('common.notes')}</option>
               </select>
             </div>
 

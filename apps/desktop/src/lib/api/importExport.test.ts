@@ -18,6 +18,8 @@ import {
   exportDealsCsv,
   exportDealsJson,
   exportJson,
+  exportNotesCsv,
+  exportNotesJson,
   exportOrganizationsCsv,
   exportOrganizationsJson,
   importContactsCsv,
@@ -37,6 +39,10 @@ import {
   importDealsJsonWithMapping,
   importJsonWithMapping,
   importJson,
+  importNotesCsv,
+  importNotesCsvWithMapping,
+  importNotesJson,
+  importNotesJsonWithMapping,
   importOrganizationsCsv,
   importOrganizationsCsvWithMapping,
   importOrganizationsJson,
@@ -57,6 +63,10 @@ import {
   preflightDealsJsonImportWithMapping,
   preflightJson,
   preflightJsonWithMapping,
+  preflightNotesCsvImport,
+  preflightNotesCsvImportWithMapping,
+  preflightNotesJsonImport,
+  preflightNotesJsonImportWithMapping,
   preflightOrganizationsCsvImport,
   preflightOrganizationsCsvImportWithMapping,
   preflightOrganizationsJsonImport,
@@ -65,6 +75,7 @@ import {
   previewContactsJsonImport,
   previewDealsJsonImport,
   previewJson,
+  previewNotesJsonImport,
   previewOrganizationsJsonImport,
   rollbackCompletedImport,
 } from './importExport';
@@ -205,6 +216,32 @@ describe('import/export API', () => {
     });
   });
 
+  it('maps note CSV import/export commands', async () => {
+    invokeMock.mockResolvedValueOnce(importWithBackup(2));
+    await expect(importNotesCsv('/tmp/notes.csv')).resolves.toEqual(importWithBackup(2));
+    expect(invokeMock).toHaveBeenLastCalledWith('import_notes_csv', {
+      file_path: '/tmp/notes.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(2));
+    await expect(importNotesJson('/tmp/notes.json')).resolves.toEqual(importWithBackup(2));
+    expect(invokeMock).toHaveBeenLastCalledWith('import_notes_json', {
+      file_path: '/tmp/notes.json',
+    });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await expect(exportNotesCsv('/tmp/notes-export.csv')).resolves.toBe(2);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_notes_csv', {
+      file_path: '/tmp/notes-export.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await expect(exportNotesJson('/tmp/notes-export.json')).resolves.toBe(2);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_notes_json', {
+      file_path: '/tmp/notes-export.json',
+    });
+  });
+
   it('routes generic CSV helpers by entity', async () => {
     invokeMock.mockResolvedValueOnce(importWithBackup(1));
     await importCsv('organizations', '/tmp/orgs.csv');
@@ -234,6 +271,18 @@ describe('import/export API', () => {
     await exportCsv('activities', '/tmp/activities-export.csv');
     expect(invokeMock).toHaveBeenLastCalledWith('export_activities_csv', {
       file_path: '/tmp/activities-export.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(2));
+    await importCsv('notes', '/tmp/notes.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('import_notes_csv', {
+      file_path: '/tmp/notes.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await exportCsv('notes', '/tmp/notes-export.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_notes_csv', {
+      file_path: '/tmp/notes-export.csv',
     });
   });
 
@@ -400,6 +449,20 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_activities_csv_import', {
       file_path: '/tmp/activities.csv',
     });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'notes',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await expect(preflightNotesCsvImport('/tmp/notes.csv')).resolves.toMatchObject({
+      entity_type: 'notes',
+      duplicate_warning_count: 0,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_notes_csv_import', {
+      file_path: '/tmp/notes.csv',
+    });
   });
 
   it('routes generic CSV preflight helpers by entity', async () => {
@@ -434,6 +497,17 @@ describe('import/export API', () => {
     await preflightCsv('activities', '/tmp/activities.csv');
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_activities_csv_import', {
       file_path: '/tmp/activities.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'notes',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightCsv('notes', '/tmp/notes.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_notes_csv_import', {
+      file_path: '/tmp/notes.csv',
     });
   });
 
@@ -504,6 +578,20 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_activities_json_import', {
       file_path: '/tmp/activities.json',
     });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'notes',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await expect(preflightNotesJsonImport('/tmp/notes.json')).resolves.toMatchObject({
+      entity_type: 'notes',
+      duplicate_warning_count: 0,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_notes_json_import', {
+      file_path: '/tmp/notes.json',
+    });
   });
 
   it('routes generic JSON preflight helpers by entity', async () => {
@@ -539,6 +627,17 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_activities_json_import', {
       file_path: '/tmp/activities.json',
     });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'notes',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightJson('notes', '/tmp/notes.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_notes_json_import', {
+      file_path: '/tmp/notes.json',
+    });
   });
 
   it('maps JSON preview commands', async () => {
@@ -571,6 +670,12 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('preview_organizations_json_import', {
       file_path: '/tmp/organizations.json',
     });
+
+    invokeMock.mockResolvedValueOnce({ ...preview, headers: ['entity_type', 'entity_id', 'content'] });
+    await previewNotesJsonImport('/tmp/notes.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preview_notes_json_import', {
+      file_path: '/tmp/notes.json',
+    });
   });
 
   it('routes generic JSON preview helpers by entity', async () => {
@@ -594,6 +699,17 @@ describe('import/export API', () => {
     await previewJson('activities', '/tmp/activities.json');
     expect(invokeMock).toHaveBeenLastCalledWith('preview_activities_json_import', {
       file_path: '/tmp/activities.json',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      total_rows: 1,
+      headers: ['entity_type', 'entity_id', 'content'],
+      rows: [{ row_number: 2, values: { entity_type: 'contact', entity_id: 'contact-1', content: 'Note' } }],
+    });
+
+    await previewJson('notes', '/tmp/notes.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preview_notes_json_import', {
+      file_path: '/tmp/notes.json',
     });
   });
 
@@ -880,6 +996,59 @@ describe('import/export API', () => {
     );
   });
 
+  it('maps note CSV and JSON import/preflight commands with field mappings', async () => {
+    const csvMapping = {
+      Kind: 'entity_type',
+      Target: 'entity_id',
+      Body: 'content',
+      Skip: null,
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importNotesCsvWithMapping('/tmp/notes.csv', csvMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_notes_csv_with_mapping', {
+      file_path: '/tmp/notes.csv',
+      mapping: csvMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'notes',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightNotesCsvImportWithMapping('/tmp/notes.csv', csvMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_notes_csv_import_with_mapping', {
+      file_path: '/tmp/notes.csv',
+      mapping: csvMapping,
+    });
+
+    const jsonMapping = {
+      kind: 'entity_type',
+      target: 'entity_id',
+      body: 'content',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importNotesJsonWithMapping('/tmp/notes.json', jsonMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_notes_json_with_mapping', {
+      file_path: '/tmp/notes.json',
+      mapping: jsonMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'notes',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightNotesJsonImportWithMapping('/tmp/notes.json', jsonMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_notes_json_import_with_mapping', {
+      file_path: '/tmp/notes.json',
+      mapping: jsonMapping,
+    });
+  });
+
   it('routes generic mapped CSV helpers by entity', async () => {
     const mapping = {
       Company: 'name',
@@ -964,6 +1133,31 @@ describe('import/export API', () => {
         mapping: activityMapping,
       },
     );
+
+    const noteMapping = {
+      Kind: 'entity_type',
+      Target: 'entity_id',
+      Body: 'content',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importCsvWithMapping('notes', '/tmp/notes.csv', noteMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_notes_csv_with_mapping', {
+      file_path: '/tmp/notes.csv',
+      mapping: noteMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'notes',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightCsvWithMapping('notes', '/tmp/notes.csv', noteMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_notes_csv_import_with_mapping', {
+      file_path: '/tmp/notes.csv',
+      mapping: noteMapping,
+    });
   });
 
   it('routes generic mapped JSON helpers by entity', async () => {
@@ -1050,6 +1244,31 @@ describe('import/export API', () => {
         mapping: activityMapping,
       },
     );
+
+    const noteMapping = {
+      kind: 'entity_type',
+      target: 'entity_id',
+      body: 'content',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importJsonWithMapping('notes', '/tmp/notes.json', noteMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_notes_json_with_mapping', {
+      file_path: '/tmp/notes.json',
+      mapping: noteMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'notes',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightJsonWithMapping('notes', '/tmp/notes.json', noteMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_notes_json_import_with_mapping', {
+      file_path: '/tmp/notes.json',
+      mapping: noteMapping,
+    });
   });
 
   it('maps row-level import rollback commands', async () => {

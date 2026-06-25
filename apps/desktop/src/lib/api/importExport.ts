@@ -4,8 +4,8 @@
 
 import { invoke } from '@tauri-apps/api/core';
 
-export type ImportExportEntity = 'contacts' | 'deals' | 'activities' | 'organizations';
-export type ImportPreflightEntity = 'contacts' | 'deals' | 'activities' | 'organizations';
+export type ImportExportEntity = 'contacts' | 'deals' | 'activities' | 'organizations' | 'notes';
+export type ImportPreflightEntity = 'contacts' | 'deals' | 'activities' | 'organizations' | 'notes';
 export type ImportFormat = 'csv' | 'json';
 export type ExportFormat = 'csv' | 'json';
 export type CustomFieldImportTargetField = `custom:${string}`;
@@ -50,11 +50,16 @@ export type ActivityImportTargetField =
   | 'contact_id'
   | 'deal_id'
   | CustomFieldImportTargetField;
+export type NoteImportTargetField =
+  | 'entity_type'
+  | 'entity_id'
+  | 'content';
 export type ImportTargetField =
   | ContactImportTargetField
   | DealImportTargetField
   | ActivityImportTargetField
-  | OrganizationImportTargetField;
+  | OrganizationImportTargetField
+  | NoteImportTargetField;
 export type ImportColumnMapping<TTarget extends string = ImportTargetField> = Record<
   string,
   TTarget | null
@@ -134,6 +139,13 @@ export interface OrganizationImportRollbackSnapshot {
   custom_fields?: Record<string, string>;
 }
 
+export interface NoteImportRollbackSnapshot {
+  entity_type: 'contact' | 'organization' | 'deal' | 'activity';
+  entity_id: string;
+  content: string;
+  updated_at: string;
+}
+
 export type ImportRollbackAction =
   | {
       entity_type: 'contact';
@@ -170,6 +182,15 @@ export type ImportRollbackAction =
       changed_fields: string[];
       before_import?: OrganizationImportRollbackSnapshot | null;
       post_import: OrganizationImportRollbackSnapshot;
+    }
+  | {
+      entity_type: 'note';
+      row_number: number;
+      entity_id: string;
+      operation: ImportRollbackOperation;
+      changed_fields: string[];
+      before_import?: NoteImportRollbackSnapshot | null;
+      post_import: NoteImportRollbackSnapshot;
     };
 
 export interface ImportRollbackPlan {
@@ -178,7 +199,7 @@ export interface ImportRollbackPlan {
 }
 
 export interface ImportRollbackRowError {
-  entity_type: 'contact' | 'deal' | 'activity' | 'organization';
+  entity_type: 'contact' | 'deal' | 'activity' | 'organization' | 'note';
   entity_id: string;
   row_number: number;
   code: string;
@@ -248,12 +269,14 @@ const importCommands: Record<ImportFormat, Record<ImportExportEntity, string>> =
     deals: 'import_deals_csv',
     activities: 'import_activities_csv',
     organizations: 'import_organizations_csv',
+    notes: 'import_notes_csv',
   },
   json: {
     contacts: 'import_contacts_json',
     deals: 'import_deals_json',
     activities: 'import_activities_json',
     organizations: 'import_organizations_json',
+    notes: 'import_notes_json',
   },
 };
 
@@ -263,12 +286,14 @@ const exportCommands: Record<ExportFormat, Record<ImportExportEntity, string>> =
     deals: 'export_deals_csv',
     activities: 'export_activities_csv',
     organizations: 'export_organizations_csv',
+    notes: 'export_notes_csv',
   },
   json: {
     contacts: 'export_contacts_json',
     deals: 'export_deals_json',
     activities: 'export_activities_json',
     organizations: 'export_organizations_json',
+    notes: 'export_notes_json',
   },
 };
 
@@ -277,6 +302,7 @@ const preflightCommands: Record<ImportPreflightEntity, string> = {
   deals: 'preflight_deals_csv_import',
   activities: 'preflight_activities_csv_import',
   organizations: 'preflight_organizations_csv_import',
+  notes: 'preflight_notes_csv_import',
 };
 
 const preflightJsonCommands: Record<ImportPreflightEntity, string> = {
@@ -284,6 +310,7 @@ const preflightJsonCommands: Record<ImportPreflightEntity, string> = {
   deals: 'preflight_deals_json_import',
   activities: 'preflight_activities_json_import',
   organizations: 'preflight_organizations_json_import',
+  notes: 'preflight_notes_json_import',
 };
 
 const previewJsonCommands: Record<ImportPreflightEntity, string> = {
@@ -291,6 +318,7 @@ const previewJsonCommands: Record<ImportPreflightEntity, string> = {
   deals: 'preview_deals_json_import',
   activities: 'preview_activities_json_import',
   organizations: 'preview_organizations_json_import',
+  notes: 'preview_notes_json_import',
 };
 
 const importWithMappingCommands: Record<ImportPreflightEntity, string> = {
@@ -298,6 +326,7 @@ const importWithMappingCommands: Record<ImportPreflightEntity, string> = {
   deals: 'import_deals_csv_with_mapping',
   activities: 'import_activities_csv_with_mapping',
   organizations: 'import_organizations_csv_with_mapping',
+  notes: 'import_notes_csv_with_mapping',
 };
 
 const preflightWithMappingCommands: Record<ImportPreflightEntity, string> = {
@@ -305,6 +334,7 @@ const preflightWithMappingCommands: Record<ImportPreflightEntity, string> = {
   deals: 'preflight_deals_csv_import_with_mapping',
   activities: 'preflight_activities_csv_import_with_mapping',
   organizations: 'preflight_organizations_csv_import_with_mapping',
+  notes: 'preflight_notes_csv_import_with_mapping',
 };
 
 const importJsonWithMappingCommands: Record<ImportPreflightEntity, string> = {
@@ -312,6 +342,7 @@ const importJsonWithMappingCommands: Record<ImportPreflightEntity, string> = {
   deals: 'import_deals_json_with_mapping',
   activities: 'import_activities_json_with_mapping',
   organizations: 'import_organizations_json_with_mapping',
+  notes: 'import_notes_json_with_mapping',
 };
 
 const preflightJsonWithMappingCommands: Record<ImportPreflightEntity, string> = {
@@ -319,6 +350,7 @@ const preflightJsonWithMappingCommands: Record<ImportPreflightEntity, string> = 
   deals: 'preflight_deals_json_import_with_mapping',
   activities: 'preflight_activities_json_import_with_mapping',
   organizations: 'preflight_organizations_json_import_with_mapping',
+  notes: 'preflight_notes_json_import_with_mapping',
 };
 
 function importOptionArgs(options?: ImportOptions) {
@@ -583,6 +615,88 @@ export async function preflightActivitiesJsonImportWithMapping(
 ): Promise<ImportPreflightReport> {
   return invoke<ImportPreflightReport>(
     preflightJsonWithMappingCommands.activities,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
+export async function importNotesCsv(
+  filePath: string,
+  options?: ImportOptions,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(importCommands.csv.notes, filePathArgs(filePath, options));
+}
+
+export async function importNotesJson(
+  filePath: string,
+  options?: ImportOptions,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(importCommands.json.notes, filePathArgs(filePath, options));
+}
+
+export async function exportNotesCsv(filePath: string): Promise<number> {
+  return invoke<number>(exportCommands.csv.notes, filePathArgs(filePath));
+}
+
+export async function exportNotesJson(filePath: string): Promise<number> {
+  return invoke<number>(exportCommands.json.notes, filePathArgs(filePath));
+}
+
+export async function preflightNotesCsvImport(
+  filePath: string,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(preflightCommands.notes, filePathArgs(filePath));
+}
+
+export async function preflightNotesJsonImport(
+  filePath: string,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(preflightJsonCommands.notes, filePathArgs(filePath));
+}
+
+export async function previewNotesJsonImport(
+  filePath: string,
+): Promise<JsonImportPreview> {
+  return invoke<JsonImportPreview>(previewJsonCommands.notes, filePathArgs(filePath));
+}
+
+export async function importNotesCsvWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<NoteImportTargetField>,
+  options?: ImportOptions,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
+    importWithMappingCommands.notes,
+    filePathAndMappingArgs(filePath, mapping, options),
+  );
+}
+
+export async function importNotesJsonWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<NoteImportTargetField>,
+  options?: ImportOptions,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(
+    importJsonWithMappingCommands.notes,
+    filePathAndMappingArgs(filePath, mapping, options),
+  );
+}
+
+export async function preflightNotesCsvImportWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<NoteImportTargetField>,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightWithMappingCommands.notes,
+    filePathAndMappingArgs(filePath, mapping),
+  );
+}
+
+export async function preflightNotesJsonImportWithMapping(
+  filePath: string,
+  mapping: ImportColumnMapping<NoteImportTargetField>,
+): Promise<ImportPreflightReport> {
+  return invoke<ImportPreflightReport>(
+    preflightJsonWithMappingCommands.notes,
     filePathAndMappingArgs(filePath, mapping),
   );
 }
