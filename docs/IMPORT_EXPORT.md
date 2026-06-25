@@ -246,12 +246,12 @@ Preflight warnings do not block import automatically. The UI lets the user
 continue despite warnings. The import then attempts to create each row and
 reports created, skipped, and error counts.
 
-## Contact And Organization Duplicate Auto-Merge
+## Duplicate Auto-Merge
 
-Contact and organization imports include an explicit opt-in checkbox to merge
-duplicate import rows into matching existing records. The option is available
-for contact and organization CSV, mapped CSV, JSON, and mapped JSON imports. It
-is not shown for deal imports, and it is off by default.
+Contact, deal, and organization imports include an explicit opt-in checkbox to
+merge duplicate import rows into matching existing records. The option is
+available for CSV, mapped CSV, JSON, and mapped JSON imports. It is off by
+default.
 
 Duplicate preflight still runs before confirmation when auto-merge is enabled.
 The confirmation copy states that duplicate warnings will be merged into
@@ -261,6 +261,7 @@ When enabled, duplicate matching uses the same active-record fields as
 preflight:
 
 - contacts match by case-insensitive email or trimmed phone;
+- deals match active deals by exact title after trimming, case-insensitively;
 - organizations match by case-insensitive name, case-insensitive email, or
   trimmed phone.
 
@@ -269,6 +270,15 @@ blank fields on that record without overwriting existing non-empty values.
 Existing IDs and active rows are preserved, and updates route through the
 existing `crm-core` update services so sync and audit behavior stays aligned
 with normal edits. Non-duplicate rows continue to create normally.
+
+Deal auto-merge is intentionally conservative. Existing deal titles are never
+overwritten. Imported `expected_close` and `notes` values fill only blank
+existing fields. Imported `value` fills only when the existing value is `0.0`
+and the imported value parses to a nonzero number. This value rule exists
+because the flat CSV/JSON row shape stores deal value as text and cannot
+distinguish a blank value from an explicit zero once it reaches the import row.
+Imported `currency` and `stage` do not overwrite existing deal values, including
+the default `USD` and `Lead` values.
 
 If one import row matches multiple existing records, that row is skipped with a
 row-numbered error rather than merged unsafely.
@@ -332,6 +342,8 @@ CSV import/export and JSON import/export are not a backup system.
   at `pre-import-backups/<timestamp-and-sequence>/`.
 - Import summaries can validate and restore their automatic pre-import backup
   after explicit destructive confirmation.
+- Duplicate auto-merge writes use the same automatic pre-import backup guard as
+  normal import creates.
 - Restore validation applies to local backups, not CSV or JSON exports.
 
 Before large imports, confirm the automatic backup path in the import summary
@@ -344,7 +356,6 @@ validated backup workflow.
 
 The following are not implemented in the current import/export surface:
 
-- Deal duplicate auto-merge during import.
 - Import rollback for a completed multi-row import.
 - Remote import/export endpoints.
 - Cloud storage export destinations.

@@ -1102,9 +1102,17 @@ impl CrmCore {
     }
 
     pub fn import_deals_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_deals_csv_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_deals_csv_with_options(
+        &mut self,
+        file_path: &str,
+        options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_deals_csv_with_row_numbers(file_content.as_slice())?;
-        self.import_deal_rows(rows)
+        self.import_deal_rows(rows, options)
     }
 
     pub fn import_deals_csv_with_mapping(
@@ -1112,15 +1120,32 @@ impl CrmCore {
         file_path: &str,
         mapping: ImportColumnMapping,
     ) -> CrmResult<ImportResult> {
+        self.import_deals_csv_with_mapping_and_options(file_path, mapping, ImportOptions::default())
+    }
+
+    pub fn import_deals_csv_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_deals_csv_with_mapping(file_content.as_slice(), &mapping)?;
-        self.import_deal_rows(rows)
+        self.import_deal_rows(rows, options)
     }
 
     pub fn import_deals_json(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_deals_json_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_deals_json_with_options(
+        &mut self,
+        file_path: &str,
+        options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_deals_json_with_row_numbers(file_content.as_slice())?;
-        self.import_deal_rows(rows)
+        self.import_deal_rows(rows, options)
     }
 
     pub fn import_deals_json_with_mapping(
@@ -1128,9 +1153,22 @@ impl CrmCore {
         file_path: &str,
         mapping: ImportColumnMapping,
     ) -> CrmResult<ImportResult> {
+        self.import_deals_json_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_deals_json_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_deals_json_with_mapping(file_content.as_slice(), &mapping)?;
-        self.import_deal_rows(rows)
+        self.import_deal_rows(rows, options)
     }
 
     pub fn preview_deals_json_import(&self, file_path: &str) -> CrmResult<JsonImportPreview> {
@@ -1138,12 +1176,50 @@ impl CrmCore {
         preview_deals_json_import(file_content.as_slice())
     }
 
-    fn import_deal_rows(&mut self, rows: Vec<(usize, DealCsvRow)>) -> CrmResult<ImportResult> {
+    fn import_deal_rows(
+        &mut self,
+        rows: Vec<(usize, DealCsvRow)>,
+        options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
         let mut created = 0u32;
+        let mut merged = 0u32;
         let mut skipped = 0u32;
         let mut errors = Vec::new();
 
         for (row_number, row) in rows {
+            if options.merge_duplicates {
+                match self.find_unique_deal_import_match(&row) {
+                    Ok(Some(deal)) => match self.merge_deal_import_row(&deal.id, &row) {
+                        Ok(()) => {
+                            let _ = storage::audit::record_audit(
+                                &self.db.conn,
+                                ACTOR_IMPORT,
+                                None,
+                                "import_row_merge",
+                                Some("deal"),
+                                Some(&deal.id),
+                                None,
+                                None,
+                                &self.device_id,
+                            );
+                            merged += 1;
+                            continue;
+                        }
+                        Err(e) => {
+                            errors.push(format!("Row {}: {} ({})", row_number, e, row.title));
+                            skipped += 1;
+                            continue;
+                        }
+                    },
+                    Ok(None) => {}
+                    Err(e) => {
+                        errors.push(format!("Row {}: {} ({})", row_number, e, row.title));
+                        skipped += 1;
+                        continue;
+                    }
+                }
+            }
+
             let value = row
                 .value
                 .as_deref()
@@ -1183,10 +1259,62 @@ impl CrmCore {
 
         Ok(ImportResult {
             created,
-            merged: 0,
+            merged,
             skipped,
             errors,
         })
+    }
+
+    fn find_unique_deal_import_match(
+        &self,
+        row: &DealCsvRow,
+    ) -> CrmResult<Option<storage::deals::Deal>> {
+        let title = row.title.trim().to_string();
+        if title.is_empty() {
+            return Ok(None);
+        }
+
+        let matches = storage::deals::find_active_deals_by_title(&self.db.conn, &title)?;
+
+        match matches.len() {
+            0 => Ok(None),
+            1 => Ok(matches.into_iter().next()),
+            _ => Err(CrmError::InvalidInput(format!(
+                "duplicate auto-merge skipped because multiple deals match title '{}': {}",
+                title,
+                matches
+                    .iter()
+                    .map(|deal| deal.id.clone())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))),
+        }
+    }
+
+    fn merge_deal_import_row(&mut self, deal_id: &str, row: &DealCsvRow) -> CrmResult<()> {
+        let existing = self.get_deal(deal_id)?;
+        let value = fill_zero_value(existing.value, row.value.as_ref());
+        let expected_close =
+            fill_blank_option(&existing.expected_close, row.expected_close.as_ref()).map(Some);
+        let notes = fill_blank_string(&existing.notes, row.notes.as_ref());
+
+        if value.is_none() && expected_close.is_none() && notes.is_none() {
+            return Ok(());
+        }
+
+        self.update_deal(
+            deal_id,
+            None,
+            value,
+            None,
+            None,
+            None,
+            expected_close,
+            None,
+            None,
+            notes,
+        )?;
+        Ok(())
     }
 
     pub fn preflight_deals_csv_import(&self, file_path: &str) -> CrmResult<ImportPreflightReport> {
@@ -1870,6 +1998,16 @@ fn fill_blank_option(existing: &Option<String>, incoming: Option<&String>) -> Op
     incoming
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+fn fill_zero_value(existing: f64, incoming: Option<&String>) -> Option<f64> {
+    if existing != 0.0 {
+        return None;
+    }
+
+    incoming
+        .and_then(|value| value.trim().parse::<f64>().ok())
+        .filter(|value| *value != 0.0)
 }
 
 fn import_preflight_report(

@@ -181,10 +181,6 @@ function importOptionArgs(options?: ImportOptions) {
     : { merge_duplicates: options.mergeDuplicates };
 }
 
-function entityImportOptions(entity: ImportExportEntity, options?: ImportOptions) {
-  return entity === 'deals' ? undefined : options;
-}
-
 function filePathArgs(filePath: string, options?: ImportOptions) {
   return { file_path: filePath, ...importOptionArgs(options) };
 }
@@ -279,12 +275,18 @@ export async function preflightContactsJsonImportWithMapping(
   );
 }
 
-export async function importDealsCsv(filePath: string): Promise<ImportWithBackupResult> {
-  return invoke<ImportWithBackupResult>(importCommands.csv.deals, filePathArgs(filePath));
+export async function importDealsCsv(
+  filePath: string,
+  options?: ImportOptions,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(importCommands.csv.deals, filePathArgs(filePath, options));
 }
 
-export async function importDealsJson(filePath: string): Promise<ImportWithBackupResult> {
-  return invoke<ImportWithBackupResult>(importCommands.json.deals, filePathArgs(filePath));
+export async function importDealsJson(
+  filePath: string,
+  options?: ImportOptions,
+): Promise<ImportWithBackupResult> {
+  return invoke<ImportWithBackupResult>(importCommands.json.deals, filePathArgs(filePath, options));
 }
 
 export async function exportDealsCsv(filePath: string): Promise<number> {
@@ -310,20 +312,22 @@ export async function previewDealsJsonImport(filePath: string): Promise<JsonImpo
 export async function importDealsCsvWithMapping(
   filePath: string,
   mapping: ImportColumnMapping<DealImportTargetField>,
+  options?: ImportOptions,
 ): Promise<ImportWithBackupResult> {
   return invoke<ImportWithBackupResult>(
     importWithMappingCommands.deals,
-    filePathAndMappingArgs(filePath, mapping),
+    filePathAndMappingArgs(filePath, mapping, options),
   );
 }
 
 export async function importDealsJsonWithMapping(
   filePath: string,
   mapping: ImportColumnMapping<DealImportTargetField>,
+  options?: ImportOptions,
 ): Promise<ImportWithBackupResult> {
   return invoke<ImportWithBackupResult>(
     importJsonWithMappingCommands.deals,
-    filePathAndMappingArgs(filePath, mapping),
+    filePathAndMappingArgs(filePath, mapping, options),
   );
 }
 
@@ -436,7 +440,7 @@ export async function importCsv(
 ): Promise<ImportWithBackupResult> {
   return invoke<ImportWithBackupResult>(
     importCommands.csv[entity],
-    filePathArgs(filePath, entityImportOptions(entity, options)),
+    filePathArgs(filePath, options),
   );
 }
 
@@ -447,7 +451,7 @@ export async function importJson(
 ): Promise<ImportWithBackupResult> {
   return invoke<ImportWithBackupResult>(
     importCommands.json[entity],
-    filePathArgs(filePath, entityImportOptions(entity, options)),
+    filePathArgs(filePath, options),
   );
 }
 
@@ -459,7 +463,7 @@ export async function importData(
 ): Promise<ImportWithBackupResult> {
   return invoke<ImportWithBackupResult>(
     importCommands[format][entity],
-    filePathArgs(filePath, entityImportOptions(entity, options)),
+    filePathArgs(filePath, options),
   );
 }
 
@@ -508,7 +512,7 @@ export async function importCsvWithMapping(
 ): Promise<ImportWithBackupResult> {
   return invoke<ImportWithBackupResult>(
     importWithMappingCommands[entity],
-    filePathAndMappingArgs(filePath, mapping, entityImportOptions(entity, options)),
+    filePathAndMappingArgs(filePath, mapping, options),
   );
 }
 
@@ -520,7 +524,7 @@ export async function importJsonWithMapping(
 ): Promise<ImportWithBackupResult> {
   return invoke<ImportWithBackupResult>(
     importJsonWithMappingCommands[entity],
-    filePathAndMappingArgs(filePath, mapping, entityImportOptions(entity, options)),
+    filePathAndMappingArgs(filePath, mapping, options),
   );
 }
 

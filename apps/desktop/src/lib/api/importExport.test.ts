@@ -219,7 +219,7 @@ describe('import/export API', () => {
     });
   });
 
-  it('passes duplicate auto-merge only for contact and organization imports when enabled', async () => {
+  it('passes duplicate auto-merge for contact, deal, and organization imports when enabled', async () => {
     invokeMock.mockResolvedValueOnce(importWithBackup(1));
     await importContactsCsv('/tmp/contacts.csv', { mergeDuplicates: true });
     expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_csv', {
@@ -246,9 +246,28 @@ describe('import/export API', () => {
     });
 
     invokeMock.mockResolvedValueOnce(importWithBackup(1));
-    await importData('deals', 'csv', '/tmp/deals.csv', { mergeDuplicates: true });
+    await importDealsCsv('/tmp/deals.csv', { mergeDuplicates: true });
     expect(invokeMock).toHaveBeenLastCalledWith('import_deals_csv', {
       file_path: '/tmp/deals.csv',
+      merge_duplicates: true,
+    });
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importData('deals', 'json', '/tmp/deals.json', { mergeDuplicates: true });
+    expect(invokeMock).toHaveBeenLastCalledWith('import_deals_json', {
+      file_path: '/tmp/deals.json',
+      merge_duplicates: true,
+    });
+
+    const dealMapping = { Opportunity: 'title', Amount: 'value' } as const;
+    invokeMock.mockResolvedValueOnce(importWithBackup(0));
+    await importDealsJsonWithMapping('/tmp/deals.json', dealMapping, {
+      mergeDuplicates: true,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('import_deals_json_with_mapping', {
+      file_path: '/tmp/deals.json',
+      mapping: dealMapping,
+      merge_duplicates: true,
     });
   });
 
@@ -673,10 +692,13 @@ describe('import/export API', () => {
     } as const;
 
     invokeMock.mockResolvedValueOnce(importWithBackup(1));
-    await importCsvWithMapping('deals', '/tmp/deals.csv', dealMapping);
+    await importCsvWithMapping('deals', '/tmp/deals.csv', dealMapping, {
+      mergeDuplicates: true,
+    });
     expect(invokeMock).toHaveBeenLastCalledWith('import_deals_csv_with_mapping', {
       file_path: '/tmp/deals.csv',
       mapping: dealMapping,
+      merge_duplicates: true,
     });
 
     invokeMock.mockResolvedValueOnce({
@@ -729,10 +751,13 @@ describe('import/export API', () => {
     } as const;
 
     invokeMock.mockResolvedValueOnce(importWithBackup(1));
-    await importJsonWithMapping('deals', '/tmp/deals.json', dealMapping);
+    await importJsonWithMapping('deals', '/tmp/deals.json', dealMapping, {
+      mergeDuplicates: true,
+    });
     expect(invokeMock).toHaveBeenLastCalledWith('import_deals_json_with_mapping', {
       file_path: '/tmp/deals.json',
       mapping: dealMapping,
+      merge_duplicates: true,
     });
 
     invokeMock.mockResolvedValueOnce({

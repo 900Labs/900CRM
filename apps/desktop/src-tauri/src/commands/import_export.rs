@@ -157,9 +157,11 @@ pub async fn export_contacts_json(
 pub async fn import_deals_csv(
     state: State<'_, AppState>,
     file_path: String,
+    merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
     import_with_pre_import_backup(&state, |core| {
-        core.import_deals_csv(&file_path).map_err(|e| e.to_string())
+        core.import_deals_csv_with_options(&file_path, import_options(merge_duplicates))
+            .map_err(|e| e.to_string())
     })
 }
 
@@ -168,10 +170,15 @@ pub async fn import_deals_csv_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
     mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
     import_with_pre_import_backup(&state, |core| {
-        core.import_deals_csv_with_mapping(&file_path, mapping)
-            .map_err(|e| e.to_string())
+        core.import_deals_csv_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
     })
 }
 
@@ -179,9 +186,10 @@ pub async fn import_deals_csv_with_mapping(
 pub async fn import_deals_json(
     state: State<'_, AppState>,
     file_path: String,
+    merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
     import_with_pre_import_backup(&state, |core| {
-        core.import_deals_json(&file_path)
+        core.import_deals_json_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
     })
 }
@@ -191,10 +199,15 @@ pub async fn import_deals_json_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
     mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
     import_with_pre_import_backup(&state, |core| {
-        core.import_deals_json_with_mapping(&file_path, mapping)
-            .map_err(|e| e.to_string())
+        core.import_deals_json_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
     })
 }
 
@@ -566,6 +579,66 @@ mod tests {
             .get_contact(&existing.id)
             .expect("active contact should remain after merge");
         assert_eq!(active_contact.phone, "+15550123");
+
+        fs::remove_dir_all(&app_data_dir).ok();
+    }
+
+    #[test]
+    fn backup_is_created_before_deal_auto_merge_import_writes() {
+        let app_data_dir = unique_test_dir("creates-before-deal-auto-merge");
+        let csv_path = app_data_dir.join("deals.csv");
+        fs::create_dir_all(&app_data_dir).expect("app data dir");
+
+        let mut core = CrmCore::open(&app_data_dir).expect("core opens");
+        let existing = core
+            .create_deal(
+                "Acme Renewal".to_string(),
+                Some(0.0),
+                Some("USD".to_string()),
+                Some("Lead".to_string()),
+                Some(10),
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("existing deal should be created");
+        write_csv(
+            &csv_path,
+            "title,value,currency,stage,expected_close,notes\n\
+             acme renewal,7500,EUR,Negotiation,2026-10-15,Imported note\n",
+        );
+
+        let backup_dir = app_data_dir
+            .join("pre-import-backups")
+            .join("before-deal-merge");
+        let result = create_backup_then_import(&mut core, &backup_dir, |core| {
+            core.import_deals_csv_with_options(
+                csv_path.to_str().expect("utf8 path"),
+                ImportOptions {
+                    merge_duplicates: true,
+                },
+            )
+            .map_err(|e| e.to_string())
+        })
+        .expect("backup and deal auto-merge import should succeed");
+
+        assert_eq!(result.import.created, 0);
+        assert_eq!(result.import.merged, 1);
+        assert!(backup_dir.join("900crm.db").is_file());
+
+        let backup_core = CrmCore::open(&backup_dir).expect("backup core opens");
+        let backup_deal = backup_core
+            .get_deal(&existing.id)
+            .expect("backup should contain pre-merge deal");
+        assert_eq!(backup_deal.value, 0.0);
+        assert_eq!(backup_deal.notes, "");
+
+        let active_deal = core
+            .get_deal(&existing.id)
+            .expect("active deal should remain after merge");
+        assert_eq!(active_deal.value, 7500.0);
+        assert_eq!(active_deal.notes, "Imported note");
 
         fs::remove_dir_all(&app_data_dir).ok();
     }
