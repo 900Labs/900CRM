@@ -2732,6 +2732,69 @@ fn import_contacts_duplicate_auto_merge_disabled_preserves_create_behavior() {
 }
 
 #[test]
+fn import_contacts_with_auto_merge_skips_ambiguous_matches_with_row_error() {
+    let (mut core, path) = open_test_core();
+    core.create_contact(
+        Some("person".to_string()),
+        Some("Ada".to_string()),
+        Some("Lovelace".to_string()),
+        None,
+        Some("ada@example.com".to_string()),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("email-matched contact should be created");
+    core.create_contact(
+        Some("person".to_string()),
+        Some("Grace".to_string()),
+        Some("Hopper".to_string()),
+        None,
+        None,
+        Some("+15550123".to_string()),
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("phone-matched contact should be created");
+
+    let csv_path = path.join("contacts-ambiguous-auto-merge.csv");
+    std::fs::write(
+        &csv_path,
+        "first_name,last_name,email,phone\nImported,Duplicate,ada@example.com,+15550123\n",
+    )
+    .expect("ambiguous contact CSV fixture should write");
+
+    let result = core
+        .import_contacts_csv_with_options(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("ambiguous contact auto-merge import should finish with row error");
+
+    assert_eq!(result.created, 0);
+    assert_eq!(result.merged, 0);
+    assert_eq!(result.skipped, 1);
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM contacts"), 2);
+    assert_eq!(result.errors.len(), 1);
+    assert!(result.errors[0].starts_with("Row 2:"));
+    assert!(
+        result.errors[0].contains("duplicate auto-merge skipped because multiple contacts match:")
+    );
+    assert!(result.errors[0].contains("(Imported)"));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn import_organizations_with_auto_merge_fills_blank_fields_without_overwriting() {
     let (mut core, path) = open_test_core();
     let existing = core
@@ -2802,6 +2865,74 @@ fn import_organizations_with_auto_merge_fills_blank_fields_without_overwriting()
     assert_eq!(merged.city.as_deref(), Some("Lagos"));
     assert_eq!(merged.description.as_deref(), Some("Imported description"));
     assert!(merged.deleted_at.is_none());
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_organizations_with_auto_merge_skips_ambiguous_matches_with_row_error() {
+    let (mut core, path) = open_test_core();
+    core.create_organization(
+        "Acme Health".to_string(),
+        Some("hello@acme.example".to_string()),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("email-matched organization should be created");
+    core.create_organization(
+        "Other Org".to_string(),
+        None,
+        Some("+2345550100".to_string()),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("phone-matched organization should be created");
+
+    let json_path = path.join("organizations-ambiguous-auto-merge.json");
+    std::fs::write(
+        &json_path,
+        r#"[
+  {
+    "name": "Imported Org",
+    "email": "hello@acme.example",
+    "phone": "+2345550100"
+  }
+]"#,
+    )
+    .expect("ambiguous organization JSON fixture should write");
+
+    let result = core
+        .import_organizations_json_with_options(
+            json_path.to_str().expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("ambiguous organization auto-merge import should finish with row error");
+
+    assert_eq!(result.created, 0);
+    assert_eq!(result.merged, 0);
+    assert_eq!(result.skipped, 1);
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM organizations"), 2);
+    assert_eq!(result.errors.len(), 1);
+    assert!(result.errors[0].starts_with("Row 2:"));
+    assert!(result.errors[0]
+        .contains("duplicate auto-merge skipped because multiple organizations match:"));
+    assert!(result.errors[0].contains("(Imported Org)"));
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);
