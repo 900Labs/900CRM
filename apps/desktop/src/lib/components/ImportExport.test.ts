@@ -203,6 +203,22 @@ describe("ImportExport component", () => {
     expect(exportSelect?.textContent).toContain("Audit log");
   });
 
+  it("shows proposed actions as export-only and disabled for import", async () => {
+    const { container } = render(ImportExport, { open: true });
+
+    const importOption = container.querySelector(
+      '#import-entity option[disabled]',
+    ) as HTMLOptionElement | null;
+    expect(importOption?.textContent).toContain("Proposed actions (export only)");
+    expect(importOption?.disabled).toBe(true);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Export" }));
+
+    const exportSelect = container.querySelector("#export-entity");
+    expect(exportSelect?.textContent).toContain("Proposed actions");
+    expect(container.querySelector('#export-entity option[value="proposed_actions"]')).not.toBeNull();
+  });
+
   it("previews JSON imports before duplicate preflight and confirmation", async () => {
     openDialogMock.mockResolvedValue("/tmp/contacts.json");
     previewJsonMock.mockResolvedValue({

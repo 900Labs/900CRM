@@ -1,5 +1,5 @@
 //! Flat import/export row helpers for contacts, deals, organizations, activities, notes, tags,
-//! and custom field definitions.
+//! custom field definitions, audit logs, and proposed actions.
 //!
 //! This module provides utilities for reading and writing CSV files and parsing
 //! JSON arrays used in the 900CRM import/export feature. It wraps the [`csv`]
@@ -89,6 +89,29 @@
 //! | `after_json`  | Optional post-change JSON payload |
 //! | `created_at`  | Audit row creation timestamp |
 //! | `device_id`   | Local device identifier |
+//!
+//! # Proposed Actions CSV Format
+//!
+//! | Column                 | Notes |
+//! |------------------------|-------|
+//! | `id`                   | Local proposed action UUID |
+//! | `external_client_id`   | External client ID alias for `client_id` |
+//! | `client_id`            | Local external client ID, when present |
+//! | `tool_name`            | Tool requested by the client or local stub |
+//! | `action_type`          | Requested action category |
+//! | `entity_type`          | Optional affected entity type |
+//! | `entity_id`            | Optional affected entity ID |
+//! | `payload_json`         | Input payload alias for `input_json` |
+//! | `input_json`           | Stored input payload JSON |
+//! | `proposed_output_json` | Optional proposed output JSON |
+//! | `status`               | Stored action status |
+//! | `created_at`           | Proposed action creation timestamp |
+//! | `decided_at`           | Approval or rejection timestamp, when decided |
+//! | `approved_at`          | Approval timestamp, when approved |
+//! | `rejected_at`          | Rejection timestamp, when rejected |
+//! | `executed_at`          | Execution timestamp, when executed |
+//! | `error_message`        | Reserved blank column; no current storage column |
+//! | `device_id`            | Local device identifier |
 //!
 //! # Organization CSV Format
 //!
@@ -469,6 +492,43 @@ pub struct AuditLogCsvRow {
     #[serde(default)]
     pub after_json: Option<String>,
     pub created_at: String,
+    pub device_id: String,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Proposed action CSV record
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A flat CSV/JSON row representing one local proposed action.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProposedActionCsvRow {
+    pub id: String,
+    #[serde(default)]
+    pub external_client_id: Option<String>,
+    #[serde(default)]
+    pub client_id: Option<String>,
+    pub tool_name: String,
+    pub action_type: String,
+    #[serde(default)]
+    pub entity_type: Option<String>,
+    #[serde(default)]
+    pub entity_id: Option<String>,
+    pub payload_json: String,
+    pub input_json: String,
+    #[serde(default)]
+    pub proposed_output_json: Option<String>,
+    pub status: String,
+    pub created_at: String,
+    #[serde(default)]
+    pub decided_at: Option<String>,
+    #[serde(default)]
+    pub approved_at: Option<String>,
+    #[serde(default)]
+    pub rejected_at: Option<String>,
+    #[serde(default)]
+    pub executed_at: Option<String>,
+    #[serde(default)]
+    pub error_message: Option<String>,
     pub device_id: String,
 }
 
@@ -2896,5 +2956,68 @@ pub fn write_audit_log_csv<W: Write>(writer: W, rows: &[AuditLogCsvRow]) -> CrmR
 
     wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
     log::info!("Wrote {} audit log rows to CSV", rows.len());
+    Ok(())
+}
+
+/// Serializes a slice of [`ProposedActionCsvRow`] to CSV bytes.
+///
+/// The output always includes read-only proposed action export columns in a
+/// deterministic order, including semantic aliases for current storage names.
+pub fn write_proposed_actions_csv<W: Write>(
+    writer: W,
+    rows: &[ProposedActionCsvRow],
+) -> CrmResult<()> {
+    let mut wtr = csv::WriterBuilder::new()
+        .has_headers(false)
+        .from_writer(writer);
+
+    wtr.write_record([
+        "id",
+        "external_client_id",
+        "client_id",
+        "tool_name",
+        "action_type",
+        "entity_type",
+        "entity_id",
+        "payload_json",
+        "input_json",
+        "proposed_output_json",
+        "status",
+        "created_at",
+        "decided_at",
+        "approved_at",
+        "rejected_at",
+        "executed_at",
+        "error_message",
+        "device_id",
+    ])
+    .map_err(|e| CrmError::Csv(e.to_string()))?;
+
+    for row in rows {
+        wtr.write_record([
+            &row.id,
+            row.external_client_id.as_deref().unwrap_or_default(),
+            row.client_id.as_deref().unwrap_or_default(),
+            &row.tool_name,
+            &row.action_type,
+            row.entity_type.as_deref().unwrap_or_default(),
+            row.entity_id.as_deref().unwrap_or_default(),
+            &row.payload_json,
+            &row.input_json,
+            row.proposed_output_json.as_deref().unwrap_or_default(),
+            &row.status,
+            &row.created_at,
+            row.decided_at.as_deref().unwrap_or_default(),
+            row.approved_at.as_deref().unwrap_or_default(),
+            row.rejected_at.as_deref().unwrap_or_default(),
+            row.executed_at.as_deref().unwrap_or_default(),
+            row.error_message.as_deref().unwrap_or_default(),
+            &row.device_id,
+        ])
+        .map_err(|e| CrmError::Csv(e.to_string()))?;
+    }
+
+    wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
+    log::info!("Wrote {} proposed action rows to CSV", rows.len());
     Ok(())
 }

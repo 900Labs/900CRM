@@ -23,6 +23,11 @@ for:
 Audit log entries are export-only. They can be exported to local CSV or JSON,
 but they are intentionally not importable.
 
+Proposed actions are also export-only. They can be exported to local CSV or
+JSON for diagnostics and portability, but they are intentionally not importable,
+replayable, approvable, rejectable, executable, or otherwise mutated through
+the import/export surface.
+
 Import and export use local files selected by the user. There is no cloud import
 service, no remote export destination, and no automatic upload.
 
@@ -442,7 +447,9 @@ JSON export uses the same active-row listing boundaries as CSV export:
 - tag links export active links for active `contact`, `organization`, `deal`,
   and `activity` parents through the tag link listing path;
 - audit log export includes all existing audit rows sorted by `created_at`
-  ascending, then audit row `id` ascending.
+  ascending, then audit row `id` ascending;
+- proposed action export includes all existing proposed action rows sorted by
+  `created_at` ascending, then proposed action `id` ascending.
 
 JSON export for importable CRM records does not include record IDs, timestamps,
 deleted rows, device IDs, relationship rows beyond the optional local activity
@@ -461,6 +468,16 @@ Audit log export is the exception to the portable flat-row rule: it preserves
 the full local audit row exactly so the file can be used for local review,
 accountability, and troubleshooting. Exporting the audit log does not create a
 new audit row.
+
+Proposed action export is another export-only diagnostic exception. It
+preserves local proposed-action fields including `id`, `external_client_id`
+(the export alias for stored `client_id`), `client_id`, `tool_name`,
+`action_type`, `entity_type`, `entity_id`, `payload_json` (the export alias for
+stored `input_json`), `input_json`, `proposed_output_json`, `status`,
+`created_at`, `decided_at`, `approved_at`, `rejected_at`, `executed_at`,
+`error_message`, and `device_id`. The current storage schema has no dedicated
+`error_message` column, so that export field is reserved and blank/null.
+Exporting proposed actions does not create audit rows or sync changelog rows.
 
 JSON import has the same entity scope. It does not import record IDs, timestamps,
 deleted rows, device IDs, broad relationship rows, tag data beyond reusable tag
@@ -722,6 +739,13 @@ timestamps, optional actor/entity IDs, JSON before/after snapshots, and
 `device_id`. It is read-only and export-only; there is no audit log import,
 preview, preflight, rollback, mapping flow, or pre-import backup.
 
+Proposed action export writes local diagnostic state, including proposed action
+IDs, optional external-client IDs, requested tool/action names, payload JSON,
+status, timestamps, and device ID. It is read-only and export-only; there is no
+proposed action import, preview, preflight, backup, rollback, replay, approval,
+rejection, execution, MCP/client behavior, or AI behavior in the import/export
+surface.
+
 The Settings Data Management export action displays this disclosure before the
 user opens the export flow. Store exported files containing sensitive data in a
 trusted or encrypted location.
@@ -735,6 +759,9 @@ CSV import/export and JSON import/export are not a backup system.
   flat entity fields.
 - Audit log export is useful for local accountability review and should not be
   treated as an importable backup or migration format.
+- Proposed action export is useful for local diagnostics and should not be
+  treated as an importable backup, replay log, approval queue, or execution
+  format.
 - Local backup creates a SQLite snapshot plus metadata and is the safer way to
   preserve full application state before a destructive restore or risky import.
 - Supported desktop imports automatically create a local pre-import backup
@@ -772,5 +799,7 @@ The following are not implemented in the current import/export surface:
   `deal_id` local ID columns, generic note parent `entity_type`/`entity_id`,
   and local tag link `entity_type`/`entity_id`/`tag_id`.
 - Audit log import.
-- Proposed actions, external clients, permissions, settings, sync changelog, or
-  backup metadata import/export.
+- Proposed action import, replay, approval, rejection, or execution through the
+  import/export surface.
+- External clients, permissions, settings, sync changelog, or backup metadata
+  import/export.

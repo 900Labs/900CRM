@@ -2599,6 +2599,174 @@ fn export_audit_log_csv_and_json_include_all_rows_in_chronological_order_without
 }
 
 #[test]
+fn export_proposed_actions_csv_and_json_include_all_rows_in_stable_order_without_mutation() {
+    let (mut core, path) = open_test_core();
+
+    let client = create_test_external_client_with_mode(&mut core, "draft_only");
+    core.upsert_external_client_tool_permission(
+        &client.id,
+        "create_activity_draft",
+        true,
+        true,
+        true,
+    )
+    .expect("client draft permission should be granted");
+
+    let client_action =
+        create_client_proposed_action(&mut core, &client.id, "create_activity_draft");
+    let local_action = create_test_proposed_action_with_input(
+        &mut core,
+        r#"{"title":"Local pending"}"#.to_string(),
+    );
+    let rejected_action = create_test_proposed_action_with_input(
+        &mut core,
+        r#"{"title":"Rejected draft"}"#.to_string(),
+    );
+    core.reject_proposed_action(rejected_action.id.clone())
+        .expect("proposed action should reject");
+
+    core.db
+        .conn
+        .execute(
+            "UPDATE proposed_actions SET created_at = '2026-06-24T09:00:00Z' WHERE id = ?1",
+            params![&client_action.id],
+        )
+        .expect("client action timestamp should update");
+    core.db
+        .conn
+        .execute(
+            "UPDATE proposed_actions SET created_at = '2026-06-24T09:00:00Z' WHERE id = ?1",
+            params![&local_action.id],
+        )
+        .expect("local action timestamp should update");
+    core.db
+        .conn
+        .execute(
+            "UPDATE proposed_actions SET created_at = '2026-06-24T08:00:00Z', rejected_at = '2026-06-24T10:00:00Z' WHERE id = ?1",
+            params![&rejected_action.id],
+        )
+        .expect("rejected action timestamps should update");
+
+    let mut tied_ids = [client_action.id.clone(), local_action.id.clone()];
+    tied_ids.sort();
+    let expected_order = vec![
+        rejected_action.id.clone(),
+        tied_ids[0].clone(),
+        tied_ids[1].clone(),
+    ];
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let csv_export_path = path.join("proposed-actions-export.csv");
+    let csv_count = core
+        .export_proposed_actions_csv(
+            csv_export_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("proposed actions CSV export should succeed");
+    assert_eq!(csv_count, 3);
+    let csv_rows = read_csv_export(&csv_export_path);
+    assert_eq!(csv_rows.len(), 3);
+    let csv_text = std::fs::read_to_string(&csv_export_path).expect("CSV export should read");
+    assert!(csv_text.starts_with(
+        "id,external_client_id,client_id,tool_name,action_type,entity_type,entity_id,payload_json,input_json,proposed_output_json,status,created_at,decided_at,approved_at,rejected_at,executed_at,error_message,device_id\n"
+    ));
+    assert_eq!(
+        csv_rows
+            .iter()
+            .map(|row| row.get("id").expect("id should export").clone())
+            .collect::<Vec<_>>(),
+        expected_order
+    );
+    let csv_client_row = csv_rows
+        .iter()
+        .find(|row| row.get("id") == Some(&client_action.id))
+        .expect("client action should export");
+    assert_eq!(csv_client_row.get("external_client_id"), Some(&client.id));
+    assert_eq!(csv_client_row.get("client_id"), Some(&client.id));
+    assert_eq!(
+        csv_client_row.get("payload_json"),
+        Some(&r#"{"title":"External draft"}"#.to_string())
+    );
+    assert_eq!(
+        csv_client_row.get("payload_json"),
+        csv_client_row.get("input_json")
+    );
+    assert_eq!(csv_client_row.get("error_message"), Some(&String::new()));
+    let csv_rejected_row = csv_rows
+        .iter()
+        .find(|row| row.get("id") == Some(&rejected_action.id))
+        .expect("rejected action should export");
+    assert_eq!(
+        csv_rejected_row.get("status"),
+        Some(&"rejected".to_string())
+    );
+    assert_eq!(
+        csv_rejected_row.get("decided_at"),
+        Some(&"2026-06-24T10:00:00Z".to_string())
+    );
+    assert_eq!(
+        csv_rejected_row.get("rejected_at"),
+        Some(&"2026-06-24T10:00:00Z".to_string())
+    );
+    assert_eq!(csv_rejected_row.get("executed_at"), Some(&String::new()));
+
+    let json_export_path = path.join("proposed-actions-export.json");
+    let json_count = core
+        .export_proposed_actions_json(
+            json_export_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("proposed actions JSON export should succeed");
+    assert_eq!(json_count, 3);
+    let json_rows = read_json_export(&json_export_path);
+    assert_eq!(
+        json_rows
+            .iter()
+            .map(|row| row["id"].as_str().expect("id should export").to_string())
+            .collect::<Vec<_>>(),
+        expected_order
+    );
+    let json_client_row = json_rows
+        .iter()
+        .find(|row| row["id"] == client_action.id)
+        .expect("client action should export");
+    assert_eq!(json_client_row["external_client_id"], client.id);
+    assert_eq!(json_client_row["client_id"], client.id);
+    assert_eq!(
+        json_client_row["payload_json"],
+        r#"{"title":"External draft"}"#
+    );
+    assert_eq!(
+        json_client_row["payload_json"],
+        json_client_row["input_json"]
+    );
+    assert_eq!(json_client_row["error_message"], serde_json::Value::Null);
+    let json_rejected_row = json_rows
+        .iter()
+        .find(|row| row["id"] == rejected_action.id)
+        .expect("rejected action should export");
+    assert_eq!(json_rejected_row["status"], "rejected");
+    assert_eq!(json_rejected_row["decided_at"], "2026-06-24T10:00:00Z");
+    assert_eq!(json_rejected_row["rejected_at"], "2026-06-24T10:00:00Z");
+    assert_eq!(json_rejected_row["executed_at"], serde_json::Value::Null);
+
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn create_organization_writes_organization_audit_and_sync() {
     let (mut core, path) = open_test_core();
 
