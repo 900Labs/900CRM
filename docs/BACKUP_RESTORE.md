@@ -25,6 +25,21 @@ The Settings Data Management backup panel warns before backup actions that
 local backup folders are unencrypted local files. Store backup folders
 containing sensitive data in a trusted or encrypted location.
 
+## Automatic pre-import backups
+
+Supported desktop imports for contacts, deals, and organizations create a local
+backup automatically before writing CSV, mapped CSV, or JSON rows. These
+pre-import backups use the same local backup format and are stored under the
+platform app data directory at:
+
+```text
+pre-import-backups/<timestamp-and-sequence>/
+```
+
+If the automatic backup cannot be created, the import is not run. The
+post-import summary displays the created backup path. Preflight duplicate checks
+remain read-only and do not create backups.
+
 ## Validate a backup
 
 Validation is a read-only safety check. It verifies:

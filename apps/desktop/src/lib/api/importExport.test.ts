@@ -45,28 +45,43 @@ import {
   preflightOrganizationsJsonImport,
 } from './importExport';
 
+const sampleBackup = {
+  backup_dir: '/tmp/app-data/pre-import-backups/backup-1',
+  database_path: '/tmp/app-data/pre-import-backups/backup-1/900crm.db',
+  metadata_path: '/tmp/app-data/pre-import-backups/backup-1/metadata.json',
+  metadata: {
+    backup_format_version: 1,
+    created_at: '2026-06-25T00:00:00Z',
+    app_version: '0.1.0',
+    schema_version: 1,
+    device_id: 'device-1',
+    database_file: '900crm.db',
+  },
+};
+
+function importWithBackup(created: number, skipped = 0, errors: string[] = []) {
+  return {
+    import: { created, skipped, errors },
+    backup: sampleBackup,
+  };
+}
+
 describe('import/export API', () => {
   beforeEach(() => {
     invokeMock.mockReset();
   });
 
   it('maps contact CSV import/export commands', async () => {
-    invokeMock.mockResolvedValueOnce({ created: 2, skipped: 1, errors: ['Row 4'] });
-    await expect(importContactsCsv('/tmp/contacts.csv')).resolves.toEqual({
-      created: 2,
-      skipped: 1,
-      errors: ['Row 4'],
-    });
+    invokeMock.mockResolvedValueOnce(importWithBackup(2, 1, ['Row 4']));
+    await expect(importContactsCsv('/tmp/contacts.csv')).resolves.toEqual(
+      importWithBackup(2, 1, ['Row 4']),
+    );
     expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_csv', {
       file_path: '/tmp/contacts.csv',
     });
 
-    invokeMock.mockResolvedValueOnce({ created: 2, skipped: 0, errors: [] });
-    await expect(importContactsJson('/tmp/contacts.json')).resolves.toEqual({
-      created: 2,
-      skipped: 0,
-      errors: [],
-    });
+    invokeMock.mockResolvedValueOnce(importWithBackup(2));
+    await expect(importContactsJson('/tmp/contacts.json')).resolves.toEqual(importWithBackup(2));
     expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_json', {
       file_path: '/tmp/contacts.json',
     });
@@ -85,22 +100,14 @@ describe('import/export API', () => {
   });
 
   it('maps deal CSV import/export commands', async () => {
-    invokeMock.mockResolvedValueOnce({ created: 3, skipped: 0, errors: [] });
-    await expect(importDealsCsv('/tmp/deals.csv')).resolves.toEqual({
-      created: 3,
-      skipped: 0,
-      errors: [],
-    });
+    invokeMock.mockResolvedValueOnce(importWithBackup(3));
+    await expect(importDealsCsv('/tmp/deals.csv')).resolves.toEqual(importWithBackup(3));
     expect(invokeMock).toHaveBeenLastCalledWith('import_deals_csv', {
       file_path: '/tmp/deals.csv',
     });
 
-    invokeMock.mockResolvedValueOnce({ created: 3, skipped: 0, errors: [] });
-    await expect(importDealsJson('/tmp/deals.json')).resolves.toEqual({
-      created: 3,
-      skipped: 0,
-      errors: [],
-    });
+    invokeMock.mockResolvedValueOnce(importWithBackup(3));
+    await expect(importDealsJson('/tmp/deals.json')).resolves.toEqual(importWithBackup(3));
     expect(invokeMock).toHaveBeenLastCalledWith('import_deals_json', {
       file_path: '/tmp/deals.json',
     });
@@ -119,22 +126,18 @@ describe('import/export API', () => {
   });
 
   it('maps organization CSV import/export commands', async () => {
-    invokeMock.mockResolvedValueOnce({ created: 1, skipped: 0, errors: [] });
-    await expect(importOrganizationsCsv('/tmp/organizations.csv')).resolves.toEqual({
-      created: 1,
-      skipped: 0,
-      errors: [],
-    });
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await expect(importOrganizationsCsv('/tmp/organizations.csv')).resolves.toEqual(
+      importWithBackup(1),
+    );
     expect(invokeMock).toHaveBeenLastCalledWith('import_organizations_csv', {
       file_path: '/tmp/organizations.csv',
     });
 
-    invokeMock.mockResolvedValueOnce({ created: 1, skipped: 0, errors: [] });
-    await expect(importOrganizationsJson('/tmp/organizations.json')).resolves.toEqual({
-      created: 1,
-      skipped: 0,
-      errors: [],
-    });
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await expect(importOrganizationsJson('/tmp/organizations.json')).resolves.toEqual(
+      importWithBackup(1),
+    );
     expect(invokeMock).toHaveBeenLastCalledWith('import_organizations_json', {
       file_path: '/tmp/organizations.json',
     });
@@ -153,7 +156,7 @@ describe('import/export API', () => {
   });
 
   it('routes generic CSV helpers by entity', async () => {
-    invokeMock.mockResolvedValueOnce({ created: 1, skipped: 0, errors: [] });
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
     await importCsv('organizations', '/tmp/orgs.csv');
     expect(invokeMock).toHaveBeenLastCalledWith('import_organizations_csv', {
       file_path: '/tmp/orgs.csv',
@@ -165,7 +168,7 @@ describe('import/export API', () => {
       file_path: '/tmp/orgs-export.csv',
     });
 
-    invokeMock.mockResolvedValueOnce({ created: 2, skipped: 0, errors: [] });
+    invokeMock.mockResolvedValueOnce(importWithBackup(2));
     await importJson('contacts', '/tmp/contacts.json');
     expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_json', {
       file_path: '/tmp/contacts.json',
@@ -173,13 +176,13 @@ describe('import/export API', () => {
   });
 
   it('routes generic import/export helpers by entity and format', async () => {
-    invokeMock.mockResolvedValueOnce({ created: 2, skipped: 0, errors: [] });
+    invokeMock.mockResolvedValueOnce(importWithBackup(2));
     await importData('deals', 'json', '/tmp/deals.json');
     expect(invokeMock).toHaveBeenLastCalledWith('import_deals_json', {
       file_path: '/tmp/deals.json',
     });
 
-    invokeMock.mockResolvedValueOnce({ created: 3, skipped: 0, errors: [] });
+    invokeMock.mockResolvedValueOnce(importWithBackup(3));
     await importData('contacts', 'csv', '/tmp/contacts.csv');
     expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_csv', {
       file_path: '/tmp/contacts.csv',
@@ -370,12 +373,10 @@ describe('import/export API', () => {
       Ignore: null,
     } as const;
 
-    invokeMock.mockResolvedValueOnce({ created: 1, skipped: 0, errors: [] });
-    await expect(importContactsCsvWithMapping('/tmp/contacts.csv', mapping)).resolves.toEqual({
-      created: 1,
-      skipped: 0,
-      errors: [],
-    });
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await expect(importContactsCsvWithMapping('/tmp/contacts.csv', mapping)).resolves.toEqual(
+      importWithBackup(1),
+    );
     expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_csv_with_mapping', {
       file_path: '/tmp/contacts.csv',
       mapping,
@@ -405,7 +406,7 @@ describe('import/export API', () => {
       Skip: null,
     } as const;
 
-    invokeMock.mockResolvedValueOnce({ created: 1, skipped: 0, errors: [] });
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
     await importOrganizationsCsvWithMapping('/tmp/organizations.csv', mapping);
     expect(invokeMock).toHaveBeenLastCalledWith('import_organizations_csv_with_mapping', {
       file_path: '/tmp/organizations.csv',
@@ -436,7 +437,7 @@ describe('import/export API', () => {
       Skip: null,
     } as const;
 
-    invokeMock.mockResolvedValueOnce({ created: 1, skipped: 0, errors: [] });
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
     await importDealsCsvWithMapping('/tmp/deals.csv', mapping);
     expect(invokeMock).toHaveBeenLastCalledWith('import_deals_csv_with_mapping', {
       file_path: '/tmp/deals.csv',
@@ -465,7 +466,7 @@ describe('import/export API', () => {
       Inbox: 'email',
     } as const;
 
-    invokeMock.mockResolvedValueOnce({ created: 1, skipped: 0, errors: [] });
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
     await importCsvWithMapping('organizations', '/tmp/orgs.csv', mapping);
     expect(invokeMock).toHaveBeenLastCalledWith('import_organizations_csv_with_mapping', {
       file_path: '/tmp/orgs.csv',
@@ -492,7 +493,7 @@ describe('import/export API', () => {
       Amount: 'value',
     } as const;
 
-    invokeMock.mockResolvedValueOnce({ created: 1, skipped: 0, errors: [] });
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
     await importCsvWithMapping('deals', '/tmp/deals.csv', dealMapping);
     expect(invokeMock).toHaveBeenLastCalledWith('import_deals_csv_with_mapping', {
       file_path: '/tmp/deals.csv',

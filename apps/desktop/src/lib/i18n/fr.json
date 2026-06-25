@@ -355,7 +355,8 @@
     "confirmImport": "Confirm import",
     "created": "Created",
     "skipped": "Skipped",
-    "errors": "Errors"
+    "errors": "Errors",
+    "preImportBackupCreated": "Automatic pre-import backup created at {path}"
   },
   "export": {
     "title": "Exporter",

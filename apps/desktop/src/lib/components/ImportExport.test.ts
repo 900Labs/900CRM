@@ -54,7 +54,22 @@ describe("ImportExport component", () => {
         },
       ],
     });
-    importDataMock.mockResolvedValue({ created: 1, skipped: 0, errors: [] });
+    importDataMock.mockResolvedValue({
+      import: { created: 1, skipped: 0, errors: [] },
+      backup: {
+        backup_dir: "/tmp/app-data/pre-import-backups/backup-1",
+        database_path: "/tmp/app-data/pre-import-backups/backup-1/900crm.db",
+        metadata_path: "/tmp/app-data/pre-import-backups/backup-1/metadata.json",
+        metadata: {
+          backup_format_version: 1,
+          created_at: "2026-06-25T00:00:00Z",
+          app_version: "0.1.0",
+          schema_version: 1,
+          device_id: "device-1",
+          database_file: "900crm.db",
+        },
+      },
+    });
 
     render(ImportExport, { open: true });
 
@@ -88,5 +103,11 @@ describe("ImportExport component", () => {
         "/tmp/contacts.json",
       );
     });
+
+    expect(
+      screen.getByText(
+        "Automatic pre-import backup created at /tmp/app-data/pre-import-backups/backup-1",
+      ),
+    ).toBeTruthy();
   });
 });

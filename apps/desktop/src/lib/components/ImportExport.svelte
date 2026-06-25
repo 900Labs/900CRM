@@ -32,6 +32,7 @@
     type ImportExportEntity,
     type ImportPreflightReport,
     type ImportResult,
+    type ImportWithBackupResult,
     type OrganizationImportTargetField,
   } from '$lib/api/importExport';
 
@@ -62,6 +63,7 @@
   let validationErrors = $state<string[]>([]);
   let preflightReport = $state<ImportPreflightReport | null>(null);
   let importSummary = $state<ImportResult | null>(null);
+  let importBackupPath = $state<string | null>(null);
 
   let exportEntity = $state<ImportExportEntity>('contacts');
   let exportFormat = $state<ExportFormat>('csv');
@@ -159,6 +161,7 @@
     parseResult = parseCSV(csvText);
     preflightReport = null;
     importSummary = null;
+    importBackupPath = null;
     validationErrors = [];
     importStep = parseResult.headers.length > 0 ? 'preview' : 'select';
 
@@ -177,6 +180,7 @@
     fileSource = 'desktop';
     preflightReport = null;
     importSummary = null;
+    importBackupPath = null;
     validationErrors = [];
     columnMapping = {};
     importStep = 'select';
@@ -195,6 +199,7 @@
     validationErrors = [];
     preflightReport = null;
     importSummary = null;
+    importBackupPath = null;
 
     if (!options.keepEntity) {
       importEntity = 'contacts';
@@ -210,6 +215,7 @@
     validationErrors = [];
     preflightReport = null;
     importSummary = null;
+    importBackupPath = null;
   }
 
   function validateCurrentMapping(): boolean {
@@ -247,11 +253,12 @@
     isImporting = true;
     try {
       const result = await importCsv(importEntity, selectedImportPath);
+      applyImportResult(result);
 
-      if (result.skipped > 0) {
-        uiStore.toastWarning(`${t('import.success')} (${result.created} created, ${result.skipped} skipped)`);
+      if (result.import.skipped > 0) {
+        uiStore.toastWarning(`${t('import.success')} (${result.import.created} created, ${result.import.skipped} skipped)`);
       } else {
-        uiStore.toastSuccess(`${t('import.success')} (${result.created})`);
+        uiStore.toastSuccess(`${t('import.success')} (${result.import.created})`);
       }
 
       close();
@@ -271,13 +278,15 @@
     isImporting = true;
     validationErrors = [];
     try {
-      importSummary = await importData(importEntity, 'json', selectedImportPath);
+      const result = await importData(importEntity, 'json', selectedImportPath);
+      applyImportResult(result);
       importStep = 'summary';
+      const summary = result.import;
 
-      if (importSummary.skipped > 0) {
-        uiStore.toastWarning(`${t('import.success')} (${importSummary.created} created, ${importSummary.skipped} skipped)`);
+      if (summary.skipped > 0) {
+        uiStore.toastWarning(`${t('import.success')} (${summary.created} created, ${summary.skipped} skipped)`);
       } else {
-        uiStore.toastSuccess(`${t('import.success')} (${importSummary.created})`);
+        uiStore.toastSuccess(`${t('import.success')} (${summary.created})`);
       }
     } catch {
       validationErrors = [t('import.failed')];
@@ -342,7 +351,7 @@
     isImporting = true;
     validationErrors = [];
     try {
-      importSummary = await runMappedImport(mappedEntity, selectedImportPath);
+      applyImportResult(await runMappedImport(mappedEntity, selectedImportPath));
       importStep = 'summary';
       uiStore.toastSuccess(t('import.success'));
     } catch {
@@ -379,7 +388,7 @@
   async function runMappedImport(
     entity: MappedImportEntity,
     filePath: string,
-  ): Promise<ImportResult> {
+  ): Promise<ImportWithBackupResult> {
     if (entity === 'contacts') {
       return importContactsCsvWithMapping(
         filePath,
@@ -431,6 +440,11 @@
   function doneImport() {
     close();
     resetImportState({ keepEntity: true });
+  }
+
+  function applyImportResult(result: ImportWithBackupResult) {
+    importSummary = result.import;
+    importBackupPath = result.backup.backup_dir;
   }
 
   async function handleExport() {
@@ -732,6 +746,11 @@
                     {/each}
                   </div>
                 {/if}
+                {#if importBackupPath}
+                  <p class="backup-summary">
+                    {t('import.preImportBackupCreated', { path: importBackupPath })}
+                  </p>
+                {/if}
               </div>
             {/if}
           </div>
@@ -907,6 +926,16 @@
   .import-warnings {
     color: var(--text-warning);
     font-size: var(--text-sm);
+  }
+
+  .backup-summary {
+    background-color: var(--surface-hover);
+    border-left: 3px solid var(--color-primary);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    margin: 0;
+    overflow-wrap: anywhere;
+    padding: var(--space-3);
   }
 
   .validation-message {
