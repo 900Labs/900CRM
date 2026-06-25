@@ -8980,6 +8980,411 @@ fn notes_and_tags_reject_unknown_entity_references() {
 }
 
 #[test]
+fn tag_definition_import_export_and_rollback_are_local_and_idempotent() {
+    let (mut core, path) = open_test_core();
+    let csv_path = path.join("tag-definitions.csv");
+    std::fs::write(&csv_path, "name,color\nVIP,#ef4444\nFollow-up,\n")
+        .expect("tag definition CSV fixture should write");
+
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+    let preflight = core
+        .preflight_tag_definitions_csv_import(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+        )
+        .expect("tag definition preflight should succeed");
+    assert_eq!(preflight.entity_type, "tag_definitions");
+    assert_eq!(preflight.total_rows, 2);
+    assert_eq!(preflight.duplicate_warning_count, 0);
+    assert!(preflight.warnings.is_empty());
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM tags"), 0);
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    let result = core
+        .import_tag_definitions_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("tag definition import should succeed");
+    assert_eq!(result.created, 2);
+    assert_eq!(result.merged, 0);
+    assert_eq!(result.skipped, 0);
+    assert!(result.errors.is_empty());
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("created tag definitions should return a rollback plan");
+
+    let tags = core.list_tags().expect("tags should list after import");
+    assert_eq!(tags.len(), 2);
+    let vip = tags
+        .iter()
+        .find(|tag| tag.name == "VIP")
+        .expect("VIP tag should import");
+    assert_eq!(vip.color, "#ef4444");
+    let follow_up = tags
+        .iter()
+        .find(|tag| tag.name == "Follow-up")
+        .expect("Follow-up tag should import");
+    assert_eq!(follow_up.color, crate::storage::tags::DEFAULT_TAG_COLOR);
+
+    let csv_export_path = path.join("tag-definitions-export.csv");
+    assert_eq!(
+        core.export_tag_definitions_csv(
+            csv_export_path
+                .to_str()
+                .expect("path should be valid UTF-8")
+        )
+        .expect("tag definition CSV export should succeed"),
+        2
+    );
+    let csv_rows = read_csv_export(&csv_export_path);
+    assert_eq!(csv_rows.len(), 2);
+    assert!(csv_rows.iter().any(|row| {
+        row.get("name").map(String::as_str) == Some("VIP")
+            && row.get("color").map(String::as_str) == Some("#ef4444")
+    }));
+
+    let json_export_path = path.join("tag-definitions-export.json");
+    assert_eq!(
+        core.export_tag_definitions_json(
+            json_export_path
+                .to_str()
+                .expect("path should be valid UTF-8")
+        )
+        .expect("tag definition JSON export should succeed"),
+        2
+    );
+    let json_rows = read_json_export(&json_export_path);
+    assert!(json_rows
+        .iter()
+        .any(|row| row.get("name").and_then(|value| value.as_str()) == Some("VIP")));
+
+    let idempotent_result = core
+        .import_tag_definitions_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("existing tag definition import should succeed");
+    assert_eq!(idempotent_result.created, 0);
+    assert_eq!(idempotent_result.skipped, 2);
+    assert!(idempotent_result.errors.is_empty());
+
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("tag definition rollback should complete");
+    assert_eq!(rollback.rolled_back, 2);
+    assert_eq!(rollback.skipped, 0);
+    assert!(rollback.errors.is_empty());
+    assert!(core.list_tags().expect("tags should list").is_empty());
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn tag_definition_rollback_skips_when_tag_changed_after_import() {
+    let (mut core, path) = open_test_core();
+    let csv_path = path.join("tag-definition-conflict.csv");
+    std::fs::write(&csv_path, "name,color\nVIP,#ef4444\n")
+        .expect("tag definition CSV fixture should write");
+
+    let result = core
+        .import_tag_definitions_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("tag definition import should succeed");
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("created tag should have rollback plan");
+    let tag = core.list_tags().expect("tags should list")[0].clone();
+    core.update_tag(
+        &tag.id,
+        None,
+        Some(TagColorUpdate::Set("#0f766e".to_string())),
+    )
+    .expect("post-import tag edit should succeed");
+
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("tag definition conflict rollback should complete");
+    assert_eq!(rollback.rolled_back, 0);
+    assert_eq!(rollback.skipped, 1);
+    assert_eq!(rollback.errors[0].code, "conflict");
+    assert_eq!(
+        core.get_tag(&tag.id)
+            .expect("changed tag should remain after skipped rollback")
+            .color,
+        "#0f766e"
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn tag_link_import_export_preflight_and_rollback_use_local_ids() {
+    let (mut core, path) = open_test_core();
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            Some("Lovelace".to_string()),
+            None,
+            Some("ada@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact fixture should be created");
+    let tag = core
+        .create_tag("VIP".to_string(), Some("#ef4444".to_string()))
+        .expect("tag fixture should be created");
+    let csv_path = path.join("tag-links.csv");
+    std::fs::write(
+        &csv_path,
+        format!(
+            "entity_type,entity_id,tag_id\ncontact,{},{}\n",
+            contact.id, tag.id
+        ),
+    )
+    .expect("tag link CSV fixture should write");
+
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+    let preflight = core
+        .preflight_tag_links_csv_import(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("tag link preflight should succeed");
+    assert_eq!(preflight.entity_type, "tag_links");
+    assert_eq!(preflight.total_rows, 1);
+    assert_eq!(preflight.duplicate_warning_count, 0);
+    assert!(preflight.warnings.is_empty());
+    assert!(core
+        .list_tags_for_entity("contact".to_string(), contact.id.clone())
+        .expect("contact tags should list")
+        .is_empty());
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    let result = core
+        .import_tag_links_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("tag link import should succeed");
+    assert_eq!(result.created, 1);
+    assert_eq!(result.merged, 0);
+    assert_eq!(result.skipped, 0);
+    assert!(result.errors.is_empty());
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("created tag link should have rollback plan");
+    assert_eq!(
+        core.list_tags_for_entity("contact".to_string(), contact.id.clone())
+            .expect("contact tags should list")
+            .len(),
+        1
+    );
+
+    let csv_export_path = path.join("tag-links-export.csv");
+    assert_eq!(
+        core.export_tag_links_csv(
+            csv_export_path
+                .to_str()
+                .expect("path should be valid UTF-8")
+        )
+        .expect("tag link CSV export should succeed"),
+        1
+    );
+    let csv_rows = read_csv_export(&csv_export_path);
+    assert_eq!(
+        csv_rows[0].get("entity_type").map(String::as_str),
+        Some("contact")
+    );
+    assert_eq!(
+        csv_rows[0].get("entity_id").map(String::as_str),
+        Some(contact.id.as_str())
+    );
+    assert_eq!(
+        csv_rows[0].get("tag_id").map(String::as_str),
+        Some(tag.id.as_str())
+    );
+
+    let json_export_path = path.join("tag-links-export.json");
+    assert_eq!(
+        core.export_tag_links_json(
+            json_export_path
+                .to_str()
+                .expect("path should be valid UTF-8")
+        )
+        .expect("tag link JSON export should succeed"),
+        1
+    );
+    let json_rows = read_json_export(&json_export_path);
+    assert_eq!(
+        json_rows[0].get("tag_id").and_then(|value| value.as_str()),
+        Some(tag.id.as_str())
+    );
+
+    let idempotent_result = core
+        .import_tag_links_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("existing tag link import should succeed");
+    assert_eq!(idempotent_result.created, 0);
+    assert_eq!(idempotent_result.skipped, 1);
+    assert!(idempotent_result.errors.is_empty());
+
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("tag link rollback should complete");
+    assert_eq!(rollback.rolled_back, 1);
+    assert_eq!(rollback.skipped, 0);
+    assert!(rollback.errors.is_empty());
+    assert!(core
+        .list_tags_for_entity("contact".to_string(), contact.id.clone())
+        .expect("contact tags should list after rollback")
+        .is_empty());
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn tag_link_rollback_skips_after_link_is_removed_and_reapplied() {
+    let (mut core, path) = open_test_core();
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Grace".to_string()),
+            Some("Hopper".to_string()),
+            None,
+            Some("grace@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact fixture should be created");
+    let tag = core
+        .create_tag("Reapplied".to_string(), Some("#0f766e".to_string()))
+        .expect("tag fixture should be created");
+    let csv_path = path.join("tag-link-reapply.csv");
+    std::fs::write(
+        &csv_path,
+        format!(
+            "entity_type,entity_id,tag_id\ncontact,{},{}\n",
+            contact.id, tag.id
+        ),
+    )
+    .expect("tag link CSV fixture should write");
+
+    let result = core
+        .import_tag_links_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("tag link import should succeed");
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("created tag link should have rollback plan");
+    assert_eq!(
+        core.list_tags_for_entity("contact".to_string(), contact.id.clone())
+            .expect("imported contact tag should list")
+            .len(),
+        1
+    );
+
+    core.remove_tag_from_entity("contact".to_string(), contact.id.clone(), tag.id.clone())
+        .expect("post-import user remove should succeed");
+    assert!(core
+        .list_tags_for_entity("contact".to_string(), contact.id.clone())
+        .expect("removed contact tags should list")
+        .is_empty());
+
+    core.apply_tag_to_entity("contact".to_string(), contact.id.clone(), tag.id.clone())
+        .expect("post-import user reapply should succeed");
+    assert_eq!(
+        core.list_tags_for_entity("contact".to_string(), contact.id.clone())
+            .expect("reapplied contact tag should list")
+            .len(),
+        1
+    );
+
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("stale tag link rollback should complete");
+    assert_eq!(rollback.rolled_back, 0);
+    assert_eq!(rollback.skipped, 1);
+    assert_eq!(rollback.errors.len(), 1);
+    assert_eq!(rollback.errors[0].code, "not_found");
+    assert_eq!(
+        core.list_tags_for_entity("contact".to_string(), contact.id.clone())
+            .expect("newer reapplied contact tag should remain")
+            .len(),
+        1
+    );
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM tag_links WHERE entity_type = 'contact' AND deleted_at IS NULL",
+        ),
+        1
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn tag_link_preflight_rejects_unknown_local_references_without_writes() {
+    let (mut core, path) = open_test_core();
+    let tag = core
+        .create_tag("VIP".to_string(), None)
+        .expect("tag fixture should be created");
+    let csv_path = path.join("tag-links-invalid.csv");
+    std::fs::write(
+        &csv_path,
+        format!(
+            "entity_type,entity_id,tag_id\ncontact,missing-contact,{}\n",
+            tag.id
+        ),
+    )
+    .expect("invalid tag link CSV fixture should write");
+
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+    let err = core
+        .preflight_tag_links_csv_import(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect_err("missing parent should fail preflight");
+    match err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("Row 2:"), "{message}");
+            assert!(message.contains("missing-contact"), "{message}");
+        }
+        other => panic!("expected InvalidInput for missing parent, got {other:?}"),
+    }
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM entity_tags"), 0);
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM tag_links"), 0);
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn external_clients_default_to_disabled() {
     let (mut core, path) = open_test_core();
 

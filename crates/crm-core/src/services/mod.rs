@@ -39,11 +39,17 @@ use crate::utils::{
         parse_notes_json_with_mapping, parse_notes_json_with_row_numbers,
         parse_organizations_csv_with_mapping_targets, parse_organizations_csv_with_row_numbers,
         parse_organizations_json_with_mapping_targets, parse_organizations_json_with_row_numbers,
+        parse_tag_definitions_csv_with_mapping, parse_tag_definitions_csv_with_row_numbers,
+        parse_tag_definitions_json_with_mapping, parse_tag_definitions_json_with_row_numbers,
+        parse_tag_links_csv_with_mapping, parse_tag_links_csv_with_row_numbers,
+        parse_tag_links_json_with_mapping, parse_tag_links_json_with_row_numbers,
         preview_activities_json_import, preview_contacts_json_import, preview_deals_json_import,
-        preview_notes_json_import, preview_organizations_json_import, write_activities_csv,
+        preview_notes_json_import, preview_organizations_json_import,
+        preview_tag_definitions_json_import, preview_tag_links_json_import, write_activities_csv,
         write_contacts_csv, write_deals_csv, write_notes_csv, write_organizations_csv,
-        ActivityCsvRow, ContactCsvRow, DealCsvRow, ImportColumnMapping, JsonImportPreview,
-        NoteCsvRow, OrganizationCsvRow, CUSTOM_FIELD_PREFIX,
+        write_tag_definitions_csv, write_tag_links_csv, ActivityCsvRow, ContactCsvRow, DealCsvRow,
+        ImportColumnMapping, JsonImportPreview, NoteCsvRow, OrganizationCsvRow,
+        TagDefinitionCsvRow, TagLinkCsvRow, CUSTOM_FIELD_PREFIX,
     },
     datetime::now_iso8601,
     errors::{CrmError, CrmResult as InternalCrmResult},
@@ -2309,6 +2315,492 @@ impl CrmCore {
             .collect())
     }
 
+    pub fn import_tag_definitions_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_tag_definitions_csv_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_tag_definitions_csv_with_options(
+        &mut self,
+        file_path: &str,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_definitions_csv_with_row_numbers(file_content.as_slice())?;
+        self.import_tag_definition_rows(rows)
+    }
+
+    pub fn import_tag_definitions_csv_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        self.import_tag_definitions_csv_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_tag_definitions_csv_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_definitions_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_tag_definition_rows(rows)
+    }
+
+    pub fn import_tag_definitions_json(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_tag_definitions_json_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_tag_definitions_json_with_options(
+        &mut self,
+        file_path: &str,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_definitions_json_with_row_numbers(file_content.as_slice())?;
+        self.import_tag_definition_rows(rows)
+    }
+
+    pub fn import_tag_definitions_json_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        self.import_tag_definitions_json_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_tag_definitions_json_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_definitions_json_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_tag_definition_rows(rows)
+    }
+
+    pub fn preview_tag_definitions_json_import(
+        &self,
+        file_path: &str,
+    ) -> CrmResult<JsonImportPreview> {
+        let file_content = fs::read(file_path)?;
+        preview_tag_definitions_json_import(file_content.as_slice())
+    }
+
+    fn import_tag_definition_rows(
+        &mut self,
+        rows: Vec<(usize, TagDefinitionCsvRow)>,
+    ) -> CrmResult<ImportResult> {
+        let mut existing_by_name = self
+            .list_tags()?
+            .into_iter()
+            .map(|tag| (tag.name.clone(), tag))
+            .collect::<BTreeMap<_, _>>();
+        let mut created = 0u32;
+        let merged = 0u32;
+        let mut skipped = 0u32;
+        let mut errors = Vec::new();
+        let mut rollback_actions = Vec::new();
+
+        for (row_number, row) in rows {
+            let (name, color) = match validate_tag_definition_import_row(&row) {
+                Ok(values) => values,
+                Err(e) => {
+                    errors.push(format!("Row {}: {} ({})", row_number, e, row.name));
+                    skipped += 1;
+                    continue;
+                }
+            };
+
+            if existing_by_name.contains_key(&name) {
+                skipped += 1;
+                continue;
+            }
+
+            match self.create_tag(name.clone(), color) {
+                Ok(tag) => {
+                    existing_by_name.insert(tag.name.clone(), tag.clone());
+                    rollback_actions.push(
+                        import_rollback::ImportRollbackAction::created_tag_definition(
+                            row_number, &tag,
+                        ),
+                    );
+                    let _ = storage::audit::record_audit(
+                        &self.db.conn,
+                        ACTOR_IMPORT,
+                        None,
+                        "import_row",
+                        Some("tag"),
+                        Some(&tag.id),
+                        None,
+                        None,
+                        &self.device_id,
+                    );
+                    created += 1;
+                }
+                Err(e) => {
+                    errors.push(format!("Row {}: {} ({})", row_number, e, row.name));
+                    skipped += 1;
+                }
+            }
+        }
+
+        Ok(ImportResult {
+            created,
+            merged,
+            skipped,
+            errors,
+            rollback_plan: import_rollback::ImportRollbackPlan::from_actions(rollback_actions),
+        })
+    }
+
+    pub fn preflight_tag_definitions_csv_import(
+        &self,
+        file_path: &str,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_definitions_csv_with_row_numbers(file_content.as_slice())?;
+        self.preflight_tag_definition_rows(rows)
+    }
+
+    pub fn preflight_tag_definitions_csv_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_definitions_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.preflight_tag_definition_rows(rows)
+    }
+
+    pub fn preflight_tag_definitions_json_import(
+        &self,
+        file_path: &str,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_definitions_json_with_row_numbers(file_content.as_slice())?;
+        self.preflight_tag_definition_rows(rows)
+    }
+
+    pub fn preflight_tag_definitions_json_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_definitions_json_with_mapping(file_content.as_slice(), &mapping)?;
+        self.preflight_tag_definition_rows(rows)
+    }
+
+    fn preflight_tag_definition_rows(
+        &self,
+        rows: Vec<(usize, TagDefinitionCsvRow)>,
+    ) -> CrmResult<ImportPreflightReport> {
+        for (row_number, row) in &rows {
+            validate_tag_definition_import_row(row)
+                .map_err(|e| CrmError::InvalidInput(format!("Row {}: {}", row_number, e)))?;
+        }
+
+        Ok(import_preflight_report(
+            "tag_definitions",
+            rows.len(),
+            Vec::new(),
+        ))
+    }
+
+    pub fn export_tag_definitions_csv(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_tag_definition_rows()?;
+        let count = rows.len() as u32;
+        let file = fs::File::create(file_path)?;
+        write_tag_definitions_csv(BufWriter::new(file), &rows)?;
+        Ok(count)
+    }
+
+    pub fn export_tag_definitions_json(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_tag_definition_rows()?;
+        let count = rows.len() as u32;
+        write_json_export(file_path, &rows)?;
+        Ok(count)
+    }
+
+    fn export_tag_definition_rows(&self) -> CrmResult<Vec<TagDefinitionCsvRow>> {
+        Ok(self
+            .list_tags()?
+            .into_iter()
+            .map(|tag| TagDefinitionCsvRow {
+                name: tag.name,
+                color: Some(tag.color),
+            })
+            .collect())
+    }
+
+    pub fn import_tag_links_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_tag_links_csv_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_tag_links_csv_with_options(
+        &mut self,
+        file_path: &str,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_links_csv_with_row_numbers(file_content.as_slice())?;
+        self.import_tag_link_rows(rows)
+    }
+
+    pub fn import_tag_links_csv_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        self.import_tag_links_csv_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_tag_links_csv_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_links_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_tag_link_rows(rows)
+    }
+
+    pub fn import_tag_links_json(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_tag_links_json_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_tag_links_json_with_options(
+        &mut self,
+        file_path: &str,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_links_json_with_row_numbers(file_content.as_slice())?;
+        self.import_tag_link_rows(rows)
+    }
+
+    pub fn import_tag_links_json_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        self.import_tag_links_json_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_tag_links_json_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_links_json_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_tag_link_rows(rows)
+    }
+
+    pub fn preview_tag_links_json_import(&self, file_path: &str) -> CrmResult<JsonImportPreview> {
+        let file_content = fs::read(file_path)?;
+        preview_tag_links_json_import(file_content.as_slice())
+    }
+
+    fn import_tag_link_rows(
+        &mut self,
+        rows: Vec<(usize, TagLinkCsvRow)>,
+    ) -> CrmResult<ImportResult> {
+        let mut created = 0u32;
+        let merged = 0u32;
+        let mut skipped = 0u32;
+        let mut errors = Vec::new();
+        let mut rollback_actions = Vec::new();
+
+        for (row_number, row) in rows {
+            let (entity_type, entity_id, tag_id) =
+                match validate_tag_link_import_row(&self.db.conn, &row) {
+                    Ok(values) => values,
+                    Err(e) => {
+                        errors.push(format!(
+                            "Row {}: {} ({})",
+                            row_number,
+                            e,
+                            tag_link_row_label(&row)
+                        ));
+                        skipped += 1;
+                        continue;
+                    }
+                };
+
+            match storage::tags::active_tag_link_exists(
+                &self.db.conn,
+                &entity_type,
+                &entity_id,
+                &tag_id,
+            ) {
+                Ok(true) => {
+                    skipped += 1;
+                    continue;
+                }
+                Ok(false) => {}
+                Err(e) => {
+                    errors.push(format!(
+                        "Row {}: {} ({})",
+                        row_number,
+                        e,
+                        tag_link_row_label(&row)
+                    ));
+                    skipped += 1;
+                    continue;
+                }
+            }
+
+            match self.apply_tag_to_entity(entity_type.clone(), entity_id.clone(), tag_id.clone()) {
+                Ok(()) => {
+                    let target_link = storage::tags::get_active_target_tag_link(
+                        &self.db.conn,
+                        &entity_type,
+                        &entity_id,
+                        &tag_id,
+                    )?
+                    .ok_or_else(|| {
+                        CrmError::Database(
+                            "Created tag link snapshot could not be found".to_string(),
+                        )
+                    })?;
+                    rollback_actions.push(import_rollback::ImportRollbackAction::created_tag_link(
+                        row_number,
+                        &target_link,
+                    ));
+                    let audit_entity_id =
+                        tag_link_rollback_entity_id(&entity_type, &entity_id, &tag_id);
+                    let _ = storage::audit::record_audit(
+                        &self.db.conn,
+                        ACTOR_IMPORT,
+                        None,
+                        "import_row",
+                        Some("tag_link"),
+                        Some(&audit_entity_id),
+                        None,
+                        None,
+                        &self.device_id,
+                    );
+                    created += 1;
+                }
+                Err(e) => {
+                    errors.push(format!(
+                        "Row {}: {} ({})",
+                        row_number,
+                        e,
+                        tag_link_row_label(&row)
+                    ));
+                    skipped += 1;
+                }
+            }
+        }
+
+        Ok(ImportResult {
+            created,
+            merged,
+            skipped,
+            errors,
+            rollback_plan: import_rollback::ImportRollbackPlan::from_actions(rollback_actions),
+        })
+    }
+
+    pub fn preflight_tag_links_csv_import(
+        &self,
+        file_path: &str,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_links_csv_with_row_numbers(file_content.as_slice())?;
+        self.preflight_tag_link_rows(rows)
+    }
+
+    pub fn preflight_tag_links_csv_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_links_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.preflight_tag_link_rows(rows)
+    }
+
+    pub fn preflight_tag_links_json_import(
+        &self,
+        file_path: &str,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_links_json_with_row_numbers(file_content.as_slice())?;
+        self.preflight_tag_link_rows(rows)
+    }
+
+    pub fn preflight_tag_links_json_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_tag_links_json_with_mapping(file_content.as_slice(), &mapping)?;
+        self.preflight_tag_link_rows(rows)
+    }
+
+    fn preflight_tag_link_rows(
+        &self,
+        rows: Vec<(usize, TagLinkCsvRow)>,
+    ) -> CrmResult<ImportPreflightReport> {
+        for (row_number, row) in &rows {
+            validate_tag_link_import_row(&self.db.conn, row)
+                .map_err(|e| CrmError::InvalidInput(format!("Row {}: {}", row_number, e)))?;
+        }
+
+        Ok(import_preflight_report("tag_links", rows.len(), Vec::new()))
+    }
+
+    pub fn export_tag_links_csv(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_tag_link_rows()?;
+        let count = rows.len() as u32;
+        let file = fs::File::create(file_path)?;
+        write_tag_links_csv(BufWriter::new(file), &rows)?;
+        Ok(count)
+    }
+
+    pub fn export_tag_links_json(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_tag_link_rows()?;
+        let count = rows.len() as u32;
+        write_json_export(file_path, &rows)?;
+        Ok(count)
+    }
+
+    fn export_tag_link_rows(&self) -> CrmResult<Vec<TagLinkCsvRow>> {
+        Ok(storage::tags::list_active_tag_links(&self.db.conn)?
+            .into_iter()
+            .map(|link| TagLinkCsvRow {
+                entity_type: link.entity_type,
+                entity_id: link.entity_id,
+                tag_id: link.tag_id,
+            })
+            .collect())
+    }
+
     pub fn import_organizations_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
         self.import_organizations_csv_with_options(file_path, ImportOptions::default())
     }
@@ -3208,6 +3700,46 @@ fn note_row_label(row: &NoteCsvRow) -> String {
     } else {
         format!("{}:{}", entity_type, entity_id)
     }
+}
+
+fn validate_tag_definition_import_row(
+    row: &TagDefinitionCsvRow,
+) -> CrmResult<(String, Option<String>)> {
+    let name = normalize_required_note_import_field(&row.name, "name")?;
+    let color = row
+        .color
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    Ok((name, color))
+}
+
+fn validate_tag_link_import_row(
+    conn: &Connection,
+    row: &TagLinkCsvRow,
+) -> CrmResult<(String, String, String)> {
+    let entity_type = normalize_note_import_entity_type(&row.entity_type)?;
+    let entity_id = normalize_required_note_import_field(&row.entity_id, "entity_id")?;
+    let tag_id = normalize_required_note_import_field(&row.tag_id, "tag_id")?;
+    ensure_note_import_entity_exists(conn, &entity_type, &entity_id)?;
+    storage::tags::get_tag(conn, &tag_id)?;
+    Ok((entity_type, entity_id, tag_id))
+}
+
+fn tag_link_row_label(row: &TagLinkCsvRow) -> String {
+    let entity_type = row.entity_type.trim();
+    let entity_id = row.entity_id.trim();
+    let tag_id = row.tag_id.trim();
+    if entity_type.is_empty() && entity_id.is_empty() && tag_id.is_empty() {
+        "tag link".to_string()
+    } else {
+        tag_link_rollback_entity_id(entity_type, entity_id, tag_id)
+    }
+}
+
+fn tag_link_rollback_entity_id(entity_type: &str, entity_id: &str, tag_id: &str) -> String {
+    format!("{}:{}:{}", entity_type, entity_id, tag_id)
 }
 
 #[allow(clippy::too_many_arguments)]
