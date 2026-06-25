@@ -108,7 +108,9 @@
   const canUseMappedCommands = $derived(Boolean(showMappingWizard && fileSource === 'desktop' && selectedImportPath));
   const fallbackImportBlocked = $derived(showMappingWizard && isCsvImport && fileSource === 'browser');
   const duplicateWarnings = $derived(preflightReport?.warnings ?? []);
-  const canAutoMergeDuplicates = $derived(importEntity === 'contacts' || importEntity === 'organizations');
+  const canAutoMergeDuplicates = $derived(
+    importEntity === 'contacts' || importEntity === 'deals' || importEntity === 'organizations',
+  );
 
   async function handleFilePick() {
     try {
@@ -161,9 +163,6 @@
   function handleImportEntityChange(e: Event) {
     importEntity = (e.target as HTMLSelectElement).value as ImportExportEntity;
     resetImportState({ keepEntity: true, keepFormat: true });
-    if (importEntity === 'deals') {
-      mergeDuplicateImportRows = false;
-    }
   }
 
   function handleImportFormatChange(e: Event) {
@@ -393,7 +392,7 @@
     entity: MappedImportEntity,
     filePath: string,
   ): Promise<ImportWithBackupResult> {
-    const importOptions = duplicateAutoMergeOptions(entity);
+    const importOptions = duplicateAutoMergeOptions();
 
     if (isJsonImport) {
       const mapping = toBackendMapping(columnMapping);
@@ -410,10 +409,10 @@
     }
 
     if (entity === 'deals') {
-      return importDealsCsvWithMapping(
-        filePath,
-        toBackendMapping<DealImportTargetField>(columnMapping),
-      );
+      const mapping = toBackendMapping<DealImportTargetField>(columnMapping);
+      return importOptions
+        ? importDealsCsvWithMapping(filePath, mapping, importOptions)
+        : importDealsCsvWithMapping(filePath, mapping);
     }
 
     const mapping = toBackendMapping<OrganizationImportTargetField>(columnMapping);
@@ -422,8 +421,8 @@
       : importOrganizationsCsvWithMapping(filePath, mapping);
   }
 
-  function duplicateAutoMergeOptions(entity: MappedImportEntity): ImportOptions | undefined {
-    if (entity === 'deals' || !mergeDuplicateImportRows) {
+  function duplicateAutoMergeOptions(): ImportOptions | undefined {
+    if (!mergeDuplicateImportRows) {
       return undefined;
     }
 

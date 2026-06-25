@@ -19,10 +19,10 @@ const importDuplicateAutoMergeCopy = {
   confirmDuplicateWarningsWithMerge:
     '{count} duplicate warnings will be merged into matching existing records where safe.',
   confirmAutoMergeEnabled:
-    'Duplicate auto-merge is enabled. Safe contact or organization matches will merge instead of creating duplicate records.',
+    'Duplicate auto-merge is enabled. Safe contact, deal, or organization matches will merge instead of creating duplicate records.',
   mergeDuplicates: 'Merge duplicate rows into existing records',
   mergeDuplicatesDescription:
-    'When enabled, matching contact or organization rows fill blank existing fields without overwriting existing values.',
+    'When enabled, matching contact, deal, or organization rows fill safe blank existing fields without overwriting existing values.',
   duplicateAutoMergeEnabled: 'Duplicate auto-merge is enabled for this import.',
   merged: 'Merged',
 };

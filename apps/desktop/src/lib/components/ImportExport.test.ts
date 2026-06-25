@@ -423,7 +423,7 @@ describe("ImportExport component", () => {
     expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("shows duplicate auto-merge only for contact and organization imports", async () => {
+  it("shows duplicate auto-merge for contact, deal, and organization imports", async () => {
     openDialogMock.mockResolvedValue("/tmp/import.json");
     previewJsonMock.mockResolvedValue({
       total_rows: 1,
@@ -466,7 +466,7 @@ describe("ImportExport component", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
     await screen.findByText("Renewal");
     await fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.queryByLabelText("Merge duplicate rows into existing records")).toBeNull();
+    expect(screen.getByLabelText("Merge duplicate rows into existing records")).toBeTruthy();
   });
 
   it("sends enabled duplicate auto-merge through import and shows merged summary", async () => {
@@ -517,7 +517,7 @@ describe("ImportExport component", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(
       screen.getByText(
-        "Duplicate auto-merge is enabled. Safe contact or organization matches will merge instead of creating duplicate records.",
+        "Duplicate auto-merge is enabled. Safe contact, deal, or organization matches will merge instead of creating duplicate records.",
       ),
     ).toBeTruthy();
     expect(
@@ -532,6 +532,72 @@ describe("ImportExport component", () => {
         {
           email: "email",
           first_name: "first_name",
+        },
+        { mergeDuplicates: true },
+      );
+    });
+    const mergedLabel = await screen.findByText("Merged");
+    expect(mergedLabel.nextElementSibling?.textContent).toBe("1");
+  });
+
+  it("sends enabled duplicate auto-merge through deal import", async () => {
+    openDialogMock.mockResolvedValue("/tmp/deals.json");
+    previewJsonMock.mockResolvedValue({
+      total_rows: 1,
+      headers: ["title", "value"],
+      rows: [
+        {
+          row_number: 2,
+          values: { title: "Acme Renewal", value: "7500" },
+        },
+      ],
+    });
+    preflightJsonWithMappingMock.mockResolvedValue({
+      entity_type: "deals",
+      total_rows: 1,
+      duplicate_warning_count: 1,
+      warnings: [
+        {
+          entity_type: "deals",
+          row_number: 2,
+          match_type: "title",
+          csv_value: "Acme Renewal",
+          existing_entity_type: "deal",
+          existing_entity_id: "deal-1",
+          existing_display_label: "Acme Renewal",
+          reason: "Title 'Acme Renewal' matches existing deal",
+        },
+      ],
+    });
+    importJsonWithMappingMock.mockResolvedValue({
+      import: { created: 0, merged: 1, skipped: 0, errors: [] },
+      backup: backupValidation,
+    });
+
+    render(ImportExport, { open: true });
+
+    await fireEvent.change(screen.getByLabelText("Type"), {
+      target: { value: "deals" },
+    });
+    await fireEvent.change(screen.getByLabelText("Format"), {
+      target: { value: "json" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+    await screen.findByText("Acme Renewal");
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await fireEvent.click(screen.getByLabelText("Merge duplicate rows into existing records"));
+    await fireEvent.click(screen.getByRole("button", { name: "Detect duplicates" }));
+    await screen.findByText("Duplicate auto-merge is enabled for this import.");
+    await fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
+
+    await waitFor(() => {
+      expect(importJsonWithMappingMock).toHaveBeenCalledWith(
+        "deals",
+        "/tmp/deals.json",
+        {
+          title: "title",
+          value: "value",
         },
         { mergeDuplicates: true },
       );
