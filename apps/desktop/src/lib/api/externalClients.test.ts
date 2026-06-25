@@ -14,6 +14,7 @@ import {
   evaluateExternalClientToolReadPermission,
   listExternalClientPermissions,
   listExternalClients,
+  updateExternalClientActivation,
   upsertExternalClientToolPermission,
   type ExternalClient,
   type ExternalClientPermission,
@@ -106,6 +107,35 @@ describe('external clients API', () => {
     });
     expect(created.enabled).toBe(false);
     expect(created.permissionMode).toBe('disabled');
+  });
+
+  it('maps updateExternalClientActivation to update_external_client_activation', async () => {
+    const backendUpdatedClient = {
+      ...backendClient,
+      permission_mode: 'read_only',
+      enabled: true,
+      updated_at: '2026-06-24T08:15:00Z',
+    };
+    invokeMock.mockResolvedValueOnce(backendUpdatedClient);
+
+    await expect(
+      updateExternalClientActivation({
+        clientId: 'client-1',
+        enabled: true,
+        permissionMode: 'read_only',
+      }),
+    ).resolves.toEqual({
+      ...client,
+      permissionMode: 'read_only',
+      enabled: true,
+      updatedAt: '2026-06-24T08:15:00Z',
+    });
+
+    expect(invokeMock).toHaveBeenCalledWith('update_external_client_activation', {
+      client_id: 'client-1',
+      enabled: true,
+      permission_mode: 'read_only',
+    });
   });
 
   it('maps listExternalClientPermissions to list_external_client_permissions', async () => {

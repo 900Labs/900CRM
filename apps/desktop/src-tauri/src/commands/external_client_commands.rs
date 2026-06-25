@@ -28,6 +28,18 @@ pub async fn create_external_client_placeholder(
 }
 
 #[tauri::command]
+pub async fn update_external_client_activation(
+    state: State<'_, AppState>,
+    client_id: String,
+    enabled: bool,
+    permission_mode: String,
+) -> Result<ExternalClient, String> {
+    let mut core = lock_core(&state)?;
+    core.update_external_client_activation(&client_id, enabled, &permission_mode)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn list_external_client_permissions(
     state: State<'_, AppState>,
     client_id: String,

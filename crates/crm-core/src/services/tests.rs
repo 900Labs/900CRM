@@ -199,6 +199,28 @@ fn count_permission_sync_rows(core: &CrmCore, permission_id: &str) -> i64 {
         .expect("permission sync row count should query")
 }
 
+fn count_external_client_activation_audit_rows(core: &CrmCore, client_id: &str) -> i64 {
+    core.db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'update_external_client_activation' AND entity_type = 'external_client' AND entity_id = ?1",
+            params![client_id],
+            |row| row.get(0),
+        )
+        .expect("external client activation audit row count should query")
+}
+
+fn count_external_client_sync_rows(core: &CrmCore, client_id: &str) -> i64 {
+    core.db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'external_client' AND entity_id = ?1 AND field_name = '__update__'",
+            params![client_id],
+            |row| row.get(0),
+        )
+        .expect("external client sync row count should query")
+}
+
 fn assert_permission_denial(error: CrmError, reason: &str) {
     match error {
         CrmError::InvalidInput(message) => {
@@ -10322,6 +10344,237 @@ fn external_clients_default_to_disabled() {
         )
         .expect("external client count should query");
     assert_eq!(disabled_count, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_client_activation_enables_read_only_and_records_audit_sync() {
+    let (mut core, path) = open_test_core();
+
+    let client = core
+        .create_external_client_placeholder("Claude Desktop", "mcp")
+        .expect("external client placeholder should be created");
+    core.db
+        .conn
+        .execute(
+            "UPDATE external_clients SET updated_at = '2026-06-24T08:00:00Z' WHERE id = ?1",
+            params![&client.id],
+        )
+        .expect("external client timestamp should be pinned");
+
+    let updated = core
+        .update_external_client_activation(&client.id, true, "read_only")
+        .expect("external client should enable read-only");
+
+    assert!(updated.enabled);
+    assert_eq!(updated.permission_mode, "read_only");
+    assert_ne!(updated.updated_at, "2026-06-24T08:00:00Z");
+    assert_eq!(
+        count(
+            &core,
+            "SELECT COUNT(*) FROM external_clients WHERE enabled = 1 AND permission_mode = 'read_only'"
+        ),
+        1
+    );
+    assert_eq!(
+        count_external_client_activation_audit_rows(&core, &client.id),
+        1
+    );
+    assert_eq!(count_external_client_sync_rows(&core, &client.id), 1);
+
+    let read = core
+        .evaluate_external_client_tool_read_permission(&client.id, "contacts.search")
+        .expect("read-only activation should be evaluable");
+    assert_eq!(
+        read.reason,
+        ToolPermissionDecisionReason::MissingToolPermission
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_client_activation_noop_preserves_timestamp_without_audit_or_sync() {
+    let (mut core, path) = open_test_core();
+
+    let client = core
+        .create_external_client_placeholder("Claude Desktop", "mcp")
+        .expect("external client placeholder should be created");
+    let first = core
+        .update_external_client_activation(&client.id, true, "read_only")
+        .expect("external client should enable read-only");
+    assert_eq!(
+        count_external_client_activation_audit_rows(&core, &client.id),
+        1
+    );
+    assert_eq!(count_external_client_sync_rows(&core, &client.id), 1);
+
+    let second = core
+        .update_external_client_activation(&client.id, true, "read_only")
+        .expect("same activation state should be idempotent");
+
+    assert_eq!(second.id, first.id);
+    assert!(second.enabled);
+    assert_eq!(second.permission_mode, "read_only");
+    assert_eq!(second.updated_at, first.updated_at);
+    assert_eq!(
+        count_external_client_activation_audit_rows(&core, &client.id),
+        1
+    );
+    assert_eq!(count_external_client_sync_rows(&core, &client.id), 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_client_activation_enables_draft_only() {
+    let (mut core, path) = open_test_core();
+
+    let client = core
+        .create_external_client_placeholder("Local Draft Client", "mcp")
+        .expect("external client placeholder should be created");
+
+    let updated = core
+        .update_external_client_activation(&client.id, true, "draft_only")
+        .expect("external client should enable draft-only");
+
+    assert!(updated.enabled);
+    assert_eq!(updated.permission_mode, "draft_only");
+    let draft = core
+        .evaluate_external_client_draft_permission(&client.id, "create_activity_draft")
+        .expect("draft-only activation should be evaluable");
+    assert_eq!(
+        draft.reason,
+        ToolPermissionDecisionReason::MissingToolPermission
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_client_activation_disables_client_and_keeps_evaluation_conservative() {
+    let (mut core, path) = open_test_core();
+
+    let client = create_test_external_client_with_mode(&mut core, "read_only");
+    core.upsert_external_client_tool_permission(&client.id, "contacts.search", true, false, true)
+        .expect("permission row should upsert before disabling");
+
+    let updated = core
+        .update_external_client_activation(&client.id, false, "disabled")
+        .expect("external client should disable");
+
+    assert!(!updated.enabled);
+    assert_eq!(updated.permission_mode, "disabled");
+    let read = core
+        .evaluate_external_client_tool_read_permission(&client.id, "contacts.search")
+        .expect("disabled client should still evaluate");
+    assert_eq!(read.reason, ToolPermissionDecisionReason::ClientDisabled);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_client_activation_rejects_future_permission_modes() {
+    for mode in ["write_with_confirmation", "write_allowed"] {
+        let (mut core, path) = open_test_core();
+        let client = core
+            .create_external_client_placeholder("Future Client", "mcp")
+            .expect("external client placeholder should be created");
+
+        let err = core
+            .update_external_client_activation(&client.id, true, mode)
+            .expect_err("future activation mode should be rejected");
+        match err {
+            CrmError::InvalidInput(message) => {
+                assert!(message.contains("reserved for future support"), "{message}");
+                assert!(message.contains(mode), "{message}");
+            }
+            other => panic!("expected InvalidInput for future mode, got {other:?}"),
+        }
+        assert_eq!(
+            count_external_client_activation_audit_rows(&core, &client.id),
+            0
+        );
+        assert_eq!(count_external_client_sync_rows(&core, &client.id), 0);
+
+        let stored = core
+            .list_external_clients()
+            .expect("external clients should list after rejected activation");
+        assert_eq!(stored[0].permission_mode, "disabled");
+        assert!(!stored[0].enabled);
+
+        drop(core);
+        let _ = std::fs::remove_dir_all(path);
+    }
+}
+
+#[test]
+fn external_client_activation_rejects_inconsistent_enabled_mode_pairs() {
+    let (mut core, path) = open_test_core();
+    let client = core
+        .create_external_client_placeholder("Inconsistent Client", "mcp")
+        .expect("external client placeholder should be created");
+
+    let enabled_disabled = core
+        .update_external_client_activation(&client.id, true, "disabled")
+        .expect_err("enabled disabled-mode client should be rejected");
+    match enabled_disabled {
+        CrmError::InvalidInput(message) => {
+            assert!(
+                message.contains("Enabled external clients must use"),
+                "{message}"
+            );
+        }
+        other => panic!("expected InvalidInput for enabled disabled mode, got {other:?}"),
+    }
+
+    let disabled_read_only = core
+        .update_external_client_activation(&client.id, false, "read_only")
+        .expect_err("disabled read-only client should be rejected");
+    match disabled_read_only {
+        CrmError::InvalidInput(message) => {
+            assert!(
+                message.contains("Disabled external clients must use"),
+                "{message}"
+            );
+        }
+        other => panic!("expected InvalidInput for disabled read-only mode, got {other:?}"),
+    }
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_client_activation_rejects_unknown_and_deleted_clients() {
+    let (mut core, path) = open_test_core();
+
+    let missing = core
+        .update_external_client_activation("missing-client", true, "read_only")
+        .expect_err("unknown client activation should fail");
+    assert!(matches!(missing, CrmError::NotFound(_)));
+
+    let client = core
+        .create_external_client_placeholder("Deleted Client", "mcp")
+        .expect("external client placeholder should be created");
+    core.db
+        .conn
+        .execute(
+            "UPDATE external_clients SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
+            params![now_iso8601(), &client.id],
+        )
+        .expect("external client should be marked deleted");
+
+    let deleted = core
+        .update_external_client_activation(&client.id, true, "read_only")
+        .expect_err("deleted client activation should fail");
+    assert!(matches!(deleted, CrmError::NotFound(_)));
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);

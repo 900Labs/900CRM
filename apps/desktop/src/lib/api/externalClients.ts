@@ -23,6 +23,8 @@ export type ExternalClientPermissionMode =
   | 'write_with_confirmation'
   | 'write_allowed';
 
+export type EditableExternalClientPermissionMode = 'disabled' | 'read_only' | 'draft_only';
+
 export type ToolPermissionDecisionReason =
   | 'allowed'
   | 'client_disabled'
@@ -56,6 +58,12 @@ export interface UpsertExternalClientToolPermissionInput {
   canRead: boolean;
   canWrite: boolean;
   requiresConfirmation: boolean;
+}
+
+export interface UpdateExternalClientActivationInput {
+  clientId: string;
+  enabled: boolean;
+  permissionMode: EditableExternalClientPermissionMode;
 }
 
 interface BackendExternalClient {
@@ -140,6 +148,18 @@ export async function createExternalClientPlaceholder(
   const client = await invoke<BackendExternalClient>('create_external_client_placeholder', {
     name,
     client_type: clientType,
+  });
+
+  return mapExternalClient(client);
+}
+
+export async function updateExternalClientActivation(
+  input: UpdateExternalClientActivationInput,
+): Promise<ExternalClient> {
+  const client = await invoke<BackendExternalClient>('update_external_client_activation', {
+    client_id: input.clientId,
+    enabled: input.enabled,
+    permission_mode: input.permissionMode,
   });
 
   return mapExternalClient(client);
