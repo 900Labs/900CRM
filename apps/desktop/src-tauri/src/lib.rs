@@ -131,6 +131,7 @@ pub fn run() {
             commands::audit_pending_commands::reject_proposed_action,
             commands::external_client_commands::list_external_clients,
             commands::external_client_commands::create_external_client_placeholder,
+            commands::external_client_commands::update_external_client_activation,
             commands::external_client_commands::list_external_client_permissions,
             commands::external_client_commands::upsert_external_client_tool_permission,
             commands::external_client_commands::evaluate_external_client_tool_read_permission,

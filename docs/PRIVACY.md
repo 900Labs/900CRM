@@ -82,10 +82,11 @@ listener, expose MCP tools/resources/prompts, manage MCP tokens, or call a
 model provider.
 
 External-client records, permissions, proposed actions, and audit entries are
-local readiness primitives. Settings can review and edit local per-tool
-permission rows for external-client records, but this does not activate clients,
-create tokens or secrets, start an MCP server/listener, or run MCP/client code.
-Approving a supported `create_activity_draft` proposed action can create a local
+local readiness primitives. Settings can review and edit local activation mode
+and per-tool permission rows for external-client records, but local activation
+does not create tokens or secrets, start an MCP server/listener, enable sync
+server behavior, or run MCP/client code. Approving a supported
+`create_activity_draft` proposed action can create a local
 activity through `crm-core` and record local audit evidence. Rejection remains
 decision-only, unsupported proposed-action types remain pending with an explicit
 error, and approval does not run MCP/client code.

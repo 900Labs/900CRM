@@ -32,6 +32,8 @@
   import {
     createExternalClientPlaceholder,
     listExternalClients,
+    updateExternalClientActivation,
+    type EditableExternalClientPermissionMode,
     type ExternalClient,
   } from '$lib/api/externalClients';
   import { testEmailServerConnection } from '$lib/api/email';
@@ -42,6 +44,7 @@
 
   type ThemeOption = 'light' | 'dark' | 'system';
   type DateFormat  = 'YYYY-MM-DD' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'MMM D, YYYY';
+  type ExternalClientActivationMode = EditableExternalClientPermissionMode;
 
   // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -74,6 +77,15 @@
     { value: 'MM/DD/YYYY',   example: '03/05/2026' },
     { value: 'DD/MM/YYYY',   example: '05/03/2026' },
     { value: 'YYYY-MM-DD',   example: '2026-03-05' },
+  ];
+
+  const EXTERNAL_CLIENT_ACTIVATION_MODES: {
+    value: ExternalClientActivationMode;
+    labelKey: string;
+  }[] = [
+    { value: 'disabled', labelKey: 'settings.externalClientActivationModeDisabled' },
+    { value: 'read_only', labelKey: 'settings.externalClientActivationModeReadOnly' },
+    { value: 'draft_only', labelKey: 'settings.externalClientActivationModeDraftOnly' },
   ];
 
   // ── State ────────────────────────────────────────────────────────────────────
@@ -117,6 +129,10 @@
   let externalClientType = $state('');
   let externalClientsListRequestSeq = 0;
   let externalClientsMutationSeq = 0;
+  let externalClientActivationModes = $state<Record<string, ExternalClientActivationMode>>({});
+  let externalClientActivationSaving = $state<Record<string, boolean>>({});
+  let externalClientActivationMessages = $state<Record<string, string>>({});
+  let externalClientActivationErrors = $state<Record<string, string>>({});
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -392,6 +408,56 @@
     }).format(parsed);
   }
 
+  function activationModeForClient(client: ExternalClient): ExternalClientActivationMode {
+    if (!client.enabled) return 'disabled';
+    if (client.permissionMode === 'read_only' || client.permissionMode === 'draft_only') {
+      return client.permissionMode;
+    }
+    return 'disabled';
+  }
+
+  function activationDraftModeForClient(client: ExternalClient): ExternalClientActivationMode {
+    return externalClientActivationModes[client.id] ?? activationModeForClient(client);
+  }
+
+  function activationDraftMatchesClient(client: ExternalClient): boolean {
+    const mode = activationDraftModeForClient(client);
+    return client.enabled === (mode !== 'disabled') && client.permissionMode === mode;
+  }
+
+  function resetExternalClientActivationDrafts(clients: ExternalClient[]) {
+    externalClientActivationModes = Object.fromEntries(
+      clients.map((client) => [client.id, activationModeForClient(client)]),
+    );
+  }
+
+  function setExternalClientActivationMessage(clientId: string, message: string | null) {
+    const next = { ...externalClientActivationMessages };
+    delete next[clientId];
+    externalClientActivationMessages = message ? { ...next, [clientId]: message } : next;
+  }
+
+  function setExternalClientActivationError(clientId: string, message: string | null) {
+    const next = { ...externalClientActivationErrors };
+    delete next[clientId];
+    externalClientActivationErrors = message ? { ...next, [clientId]: message } : next;
+  }
+
+  function setExternalClientActivationSaving(clientId: string, saving: boolean) {
+    const next = { ...externalClientActivationSaving };
+    delete next[clientId];
+    externalClientActivationSaving = saving ? { ...next, [clientId]: true } : next;
+  }
+
+  function handleExternalClientActivationModeChange(clientId: string, e: Event) {
+    externalClientActivationModes = {
+      ...externalClientActivationModes,
+      [clientId]: (e.target as HTMLSelectElement).value as ExternalClientActivationMode,
+    };
+    setExternalClientActivationMessage(clientId, null);
+    setExternalClientActivationError(clientId, null);
+  }
+
   async function loadExternalClients() {
     const requestSeq = ++externalClientsListRequestSeq;
     const mutationSeqAtStart = externalClientsMutationSeq;
@@ -401,6 +467,7 @@
       const clients = await listExternalClients();
       if (requestSeq === externalClientsListRequestSeq && mutationSeqAtStart === externalClientsMutationSeq) {
         externalClients = clients;
+        resetExternalClientActivationDrafts(clients);
       }
     } catch (err) {
       if (requestSeq === externalClientsListRequestSeq && mutationSeqAtStart === externalClientsMutationSeq) {
@@ -437,6 +504,7 @@
       const created = await createExternalClientPlaceholder(name, clientType);
       externalClientsMutationSeq += 1;
       externalClients = [created, ...externalClients.filter((client) => client.id !== created.id)];
+      resetExternalClientActivationDrafts(externalClients);
       externalClientsError = null;
       externalClientName = '';
       externalClientType = '';
@@ -447,6 +515,39 @@
       uiStore.toastError(`${t('settings.externalClientsCreateFailed')}: ${externalClientCreateError}`);
     } finally {
       externalClientCreateLoading = false;
+    }
+  }
+
+  async function handleUpdateExternalClientActivation(client: ExternalClient) {
+    if (externalClientActivationSaving[client.id]) return;
+
+    const permissionMode = activationDraftModeForClient(client);
+    setExternalClientActivationSaving(client.id, true);
+    setExternalClientActivationMessage(client.id, null);
+    setExternalClientActivationError(client.id, null);
+    try {
+      const updated = await updateExternalClientActivation({
+        clientId: client.id,
+        enabled: permissionMode !== 'disabled',
+        permissionMode,
+      });
+      externalClientsMutationSeq += 1;
+      externalClients = externalClients.map((existing) =>
+        existing.id === updated.id ? updated : existing,
+      );
+      externalClientActivationModes = {
+        ...externalClientActivationModes,
+        [updated.id]: activationModeForClient(updated),
+      };
+      const message = t('settings.externalClientActivationSaveSuccess', { name: updated.name });
+      setExternalClientActivationMessage(updated.id, message);
+      uiStore.toastSuccess(message);
+    } catch (err) {
+      const error = externalClientErrorMessage(err);
+      setExternalClientActivationError(client.id, error);
+      uiStore.toastError(`${t('settings.externalClientActivationSaveFailed')}: ${error}`);
+    } finally {
+      setExternalClientActivationSaving(client.id, false);
     }
   }
 
@@ -1172,6 +1273,41 @@
                       <dd>{formatExternalClientTimestamp(client.updatedAt)}</dd>
                     </div>
                   </dl>
+                  <div class="external-client-activation" aria-live="polite">
+                    <div class="external-client-activation-controls">
+                      <div class="field-row external-client-activation-field">
+                        <label class="field-label" for={`external-client-activation-${client.id}`}>
+                          {t('settings.externalClientActivationMode')}
+                        </label>
+                        <select
+                          id={`external-client-activation-${client.id}`}
+                          class="input"
+                          value={activationDraftModeForClient(client)}
+                          onchange={(e) => handleExternalClientActivationModeChange(client.id, e)}
+                          disabled={externalClientActivationSaving[client.id]}
+                        >
+                          {#each EXTERNAL_CLIENT_ACTIVATION_MODES as option}
+                            <option value={option.value}>{t(option.labelKey)}</option>
+                          {/each}
+                        </select>
+                      </div>
+                      <button
+                        class="btn btn-secondary btn-sm"
+                        type="button"
+                        onclick={() => handleUpdateExternalClientActivation(client)}
+                        disabled={externalClientActivationSaving[client.id] || activationDraftMatchesClient(client)}
+                      >
+                        {externalClientActivationSaving[client.id] ? t('common.loading') : t('settings.externalClientActivationSave')}
+                      </button>
+                    </div>
+                    <p class="external-client-activation-note">{t('settings.externalClientActivationDesc')}</p>
+                    {#if externalClientActivationMessages[client.id]}
+                      <p class="backup-status backup-status--success">{externalClientActivationMessages[client.id]}</p>
+                    {/if}
+                    {#if externalClientActivationErrors[client.id]}
+                      <p class="backup-status backup-status--error">{externalClientActivationErrors[client.id]}</p>
+                    {/if}
+                  </div>
                   <ExternalClientPermissions {client} />
                 </article>
               {/each}
@@ -1859,6 +1995,31 @@
     font-size: var(--text-xs);
     color: var(--text-primary);
     overflow-wrap: anywhere;
+  }
+
+  .external-client-activation {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding-top: var(--space-3);
+    border-top: var(--border-width) solid var(--border-default);
+  }
+
+  .external-client-activation-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-3);
+  }
+
+  .external-client-activation-field {
+    min-width: min(100%, 220px);
+  }
+
+  .external-client-activation-note {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
   }
 
   .external-client-empty {
