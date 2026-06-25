@@ -2458,6 +2458,147 @@ fn list_recent_audit_log_returns_latest_entries_with_storage_limit_floor() {
 }
 
 #[test]
+fn export_audit_log_csv_and_json_include_all_rows_in_chronological_order_without_auditing_export() {
+    let (mut core, path) = open_test_core();
+
+    let first_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("First".to_string()),
+            Some("Audit".to_string()),
+            None,
+            Some("first.audit.export@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("first contact should be created");
+    let second_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Second".to_string()),
+            Some("Audit".to_string()),
+            None,
+            Some("second.audit.export@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("second contact should be created");
+
+    core.db
+        .conn
+        .execute(
+            "UPDATE audit_log SET created_at = '2026-06-24T08:00:00Z' WHERE entity_id = ?1",
+            params![&first_contact.id],
+        )
+        .expect("first audit timestamp should update");
+    core.db
+        .conn
+        .execute(
+            "UPDATE audit_log SET created_at = '2026-06-24T08:00:00Z' WHERE entity_id = ?1",
+            params![&second_contact.id],
+        )
+        .expect("second audit timestamp should update");
+
+    let first_audit_id: String = core
+        .db
+        .conn
+        .query_row(
+            "SELECT id FROM audit_log WHERE entity_id = ?1",
+            params![&first_contact.id],
+            |row| row.get(0),
+        )
+        .expect("first audit id should query");
+    let second_audit_id: String = core
+        .db
+        .conn
+        .query_row(
+            "SELECT id FROM audit_log WHERE entity_id = ?1",
+            params![&second_contact.id],
+            |row| row.get(0),
+        )
+        .expect("second audit id should query");
+    let mut expected_pairs = [
+        (first_audit_id, first_contact.id.clone()),
+        (second_audit_id, second_contact.id.clone()),
+    ];
+    expected_pairs.sort_by(|left, right| left.0.cmp(&right.0));
+    let expected_order = expected_pairs
+        .into_iter()
+        .map(|(_, entity_id)| entity_id)
+        .collect::<Vec<_>>();
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+
+    let csv_export_path = path.join("audit-log-export.csv");
+    let csv_count = core
+        .export_audit_log_csv(
+            csv_export_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("audit log CSV export should succeed");
+    assert_eq!(csv_count, 2);
+    let csv_rows = read_csv_export(&csv_export_path);
+    assert_eq!(csv_rows.len(), 2);
+    let csv_text = std::fs::read_to_string(&csv_export_path).expect("CSV export should read");
+    assert!(csv_text.starts_with(
+        "id,actor_type,actor_id,action,entity_type,entity_id,before_json,after_json,created_at,device_id\n"
+    ));
+    assert_eq!(
+        csv_rows
+            .iter()
+            .map(|row| row
+                .get("entity_id")
+                .expect("entity_id should export")
+                .clone())
+            .collect::<Vec<_>>(),
+        expected_order
+    );
+
+    let json_export_path = path.join("audit-log-export.json");
+    let json_count = core
+        .export_audit_log_json(
+            json_export_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("audit log JSON export should succeed");
+    assert_eq!(json_count, 2);
+    let json_rows = read_json_export(&json_export_path);
+    assert_eq!(
+        json_rows
+            .iter()
+            .map(|row| row["entity_id"]
+                .as_str()
+                .expect("entity_id should export")
+                .to_string())
+            .collect::<Vec<_>>(),
+        expected_order
+    );
+    assert_eq!(json_rows[0]["actor_type"], "desktop_app");
+    assert_eq!(json_rows[0]["action"], "create");
+    assert_eq!(json_rows[0]["entity_type"], "contact");
+    assert_eq!(
+        json_rows[0]["created_at"],
+        serde_json::Value::String("2026-06-24T08:00:00Z".to_string())
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn create_organization_writes_organization_audit_and_sync() {
     let (mut core, path) = open_test_core();
 

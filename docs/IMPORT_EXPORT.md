@@ -20,6 +20,9 @@ for:
 - custom field definitions for contacts, deals, activities, and organizations;
 - local tag links for active contacts, organizations, deals, and activities.
 
+Audit log entries are export-only. They can be exported to local CSV or JSON,
+but they are intentionally not importable.
+
 Import and export use local files selected by the user. There is no cloud import
 service, no remote export destination, and no automatic upload.
 
@@ -402,6 +405,8 @@ organizations, generic notes, tag definitions, custom field definitions, and
 tag links from the same import/export modal as CSV. Import uses an open dialog
 for `.json` files. Export uses a save dialog for `.json` files.
 
+Audit log JSON is export-only from the export tab.
+
 JSON exports are pretty-printed arrays of objects. They use the same flat fields
 as the matching CSV export:
 
@@ -417,7 +422,9 @@ as the matching CSV export:
 - tag definitions: `name` and `color`;
 - custom field definitions: `entity_type`, `field_name`, `field_type`,
   `field_options`, and `sort_order`;
-- tag links: `entity_type`, `entity_id`, and `tag_id`.
+- tag links: `entity_type`, `entity_id`, and `tag_id`;
+- audit log entries: `id`, `actor_type`, `actor_id`, `action`, `entity_type`,
+  `entity_id`, `before_json`, `after_json`, `created_at`, and `device_id`.
 
 JSON export uses the same active-row listing boundaries as CSV export:
 
@@ -433,20 +440,27 @@ JSON export uses the same active-row listing boundaries as CSV export:
 - custom field definitions export definitions through the custom field
   definition listing path;
 - tag links export active links for active `contact`, `organization`, `deal`,
-  and `activity` parents through the tag link listing path.
+  and `activity` parents through the tag link listing path;
+- audit log export includes all existing audit rows sorted by `created_at`
+  ascending, then audit row `id` ascending.
 
-JSON export does not include record IDs, timestamps, deleted rows, device IDs,
-relationship rows beyond the optional local activity `contact_id` and `deal_id`
-mirror columns, tag relationship rows beyond the local tag link format, audit
-log entries, proposed actions, external clients, permissions, settings, or
-backup metadata. Generic note export intentionally uses only the parent
-`entity_type`, parent `entity_id`, and note `content`. Tag definition export
-intentionally uses only `name` and `color`; custom field definition export
-intentionally uses only `entity_type`, `field_name`, `field_type`,
-`field_options`, and `sort_order`; tag link export intentionally uses only
-`entity_type`, `entity_id`, and `tag_id`. For contacts, deals, activities, and
-organizations, JSON export does include active custom field values using
-`custom:` keys as described above.
+JSON export for importable CRM records does not include record IDs, timestamps,
+deleted rows, device IDs, relationship rows beyond the optional local activity
+`contact_id` and `deal_id` mirror columns, tag relationship rows beyond the
+local tag link format, audit log entries, proposed actions, external clients,
+permissions, settings, or backup metadata. Generic note export intentionally
+uses only the parent `entity_type`, parent `entity_id`, and note `content`. Tag
+definition export intentionally uses only `name` and `color`; custom field
+definition export intentionally uses only `entity_type`, `field_name`,
+`field_type`, `field_options`, and `sort_order`; tag link export intentionally
+uses only `entity_type`, `entity_id`, and `tag_id`. For contacts, deals,
+activities, and organizations, JSON export does include active custom field
+values using `custom:` keys as described above.
+
+Audit log export is the exception to the portable flat-row rule: it preserves
+the full local audit row exactly so the file can be used for local review,
+accountability, and troubleshooting. Exporting the audit log does not create a
+new audit row.
 
 JSON import has the same entity scope. It does not import record IDs, timestamps,
 deleted rows, device IDs, broad relationship rows, tag data beyond reusable tag
@@ -703,6 +717,11 @@ Exported files are plain text. They may contain personal, customer, sales, and
 business data. 900CRM does not encrypt exported files, upload them, or apply
 access controls after they are written.
 
+Audit log export writes accountability data, including local audit IDs,
+timestamps, optional actor/entity IDs, JSON before/after snapshots, and
+`device_id`. It is read-only and export-only; there is no audit log import,
+preview, preflight, rollback, mapping flow, or pre-import backup.
+
 The Settings Data Management export action displays this disclosure before the
 user opens the export flow. Store exported files containing sensitive data in a
 trusted or encrypted location.
@@ -714,6 +733,8 @@ CSV import/export and JSON import/export are not a backup system.
 - CSV export is useful for portability, spreadsheet use, and migration.
 - JSON import/export is useful for portability and inspection of the supported
   flat entity fields.
+- Audit log export is useful for local accountability review and should not be
+  treated as an importable backup or migration format.
 - Local backup creates a SQLite snapshot plus metadata and is the safer way to
   preserve full application state before a destructive restore or risky import.
 - Supported desktop imports automatically create a local pre-import backup
@@ -750,5 +771,6 @@ The following are not implemented in the current import/export surface:
 - Relationship import/export beyond optional activity `contact_id` and
   `deal_id` local ID columns, generic note parent `entity_type`/`entity_id`,
   and local tag link `entity_type`/`entity_id`/`tag_id`.
-- Audit log, proposed actions, external clients, permissions, settings, sync
-  changelog, or backup metadata import/export.
+- Audit log import.
+- Proposed actions, external clients, permissions, settings, sync changelog, or
+  backup metadata import/export.

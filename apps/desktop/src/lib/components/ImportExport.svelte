@@ -41,8 +41,9 @@
     type ActivityImportTargetField,
     type ContactImportTargetField,
     type DealImportTargetField,
+    type ExportEntity,
     type ImportFormat,
-    type ImportExportEntity,
+    type ImportEntity,
     type ImportOptions,
     type ImportPreflightReport,
     type ImportResult,
@@ -80,7 +81,7 @@
   let isImporting = $state(false);
   let isPreviewing = $state(false);
   let isPreflighting = $state(false);
-  let importEntity = $state<ImportExportEntity>('contacts');
+  let importEntity = $state<ImportEntity>('contacts');
   let importFormat = $state<ImportFormat>('csv');
   let importStep = $state<ImportStep>('select');
   let columnMapping = $state<ColumnMapping>({});
@@ -127,7 +128,7 @@
     tag_links: true,
   });
 
-  let exportEntity = $state<ImportExportEntity>('contacts');
+  let exportEntity = $state<ExportEntity>('contacts');
   let exportFormat = $state<ExportFormat>('csv');
   let isExporting = $state(false);
 
@@ -199,7 +200,7 @@
   const importRollbackPlan = $derived(importSummary?.rollback_plan ?? null);
   const importRollbackActionCount = $derived(importRollbackPlan?.actions.length ?? 0);
 
-  async function ensureImportCustomFields(entity: ImportExportEntity): Promise<CustomFieldDefinition[]> {
+  async function ensureImportCustomFields(entity: ImportEntity): Promise<CustomFieldDefinition[]> {
     if (
       entity === 'notes' ||
       entity === 'tag_definitions' ||
@@ -286,7 +287,7 @@
   }
 
   function handleImportEntityChange(e: Event) {
-    importEntity = (e.target as HTMLSelectElement).value as ImportExportEntity;
+    importEntity = (e.target as HTMLSelectElement).value as ImportEntity;
     resetImportState({ keepEntity: true, keepFormat: true });
   }
 
@@ -1227,6 +1228,7 @@
                 <option value="tag_definitions">Tag definitions</option>
                 <option value="custom_field_definitions">Custom field definitions</option>
                 <option value="tag_links">Tag links</option>
+                <option value="audit_log">Audit log</option>
               </select>
             </div>
 
