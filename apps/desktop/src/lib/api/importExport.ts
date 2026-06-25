@@ -4,7 +4,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 
-export type ImportExportEntity =
+export type ImportEntity =
   | 'contacts'
   | 'deals'
   | 'activities'
@@ -13,7 +13,9 @@ export type ImportExportEntity =
   | 'tag_definitions'
   | 'custom_field_definitions'
   | 'tag_links';
-export type ImportPreflightEntity = ImportExportEntity;
+export type ExportEntity = ImportEntity | 'audit_log';
+export type ImportExportEntity = ImportEntity;
+export type ImportPreflightEntity = ImportEntity;
 export type ImportFormat = 'csv' | 'json';
 export type ExportFormat = 'csv' | 'json';
 export type CustomFieldImportTargetField = `custom:${string}`;
@@ -355,7 +357,7 @@ const importCommands: Record<ImportFormat, Record<ImportExportEntity, string>> =
   },
 };
 
-const exportCommands: Record<ExportFormat, Record<ImportExportEntity, string>> = {
+const exportCommands: Record<ExportFormat, Record<ExportEntity, string>> = {
   csv: {
     contacts: 'export_contacts_csv',
     deals: 'export_deals_csv',
@@ -365,6 +367,7 @@ const exportCommands: Record<ExportFormat, Record<ImportExportEntity, string>> =
     tag_definitions: 'export_tag_definitions_csv',
     custom_field_definitions: 'export_custom_field_definitions_csv',
     tag_links: 'export_tag_links_csv',
+    audit_log: 'export_audit_log_csv',
   },
   json: {
     contacts: 'export_contacts_json',
@@ -375,6 +378,7 @@ const exportCommands: Record<ExportFormat, Record<ImportExportEntity, string>> =
     tag_definitions: 'export_tag_definitions_json',
     custom_field_definitions: 'export_custom_field_definitions_json',
     tag_links: 'export_tag_links_json',
+    audit_log: 'export_audit_log_json',
   },
 };
 
@@ -1196,16 +1200,24 @@ export async function importData(
   );
 }
 
-export async function exportCsv(entity: ImportExportEntity, filePath: string): Promise<number> {
+export async function exportAuditLogCsv(filePath: string): Promise<number> {
+  return invoke<number>(exportCommands.csv.audit_log, filePathArgs(filePath));
+}
+
+export async function exportAuditLogJson(filePath: string): Promise<number> {
+  return invoke<number>(exportCommands.json.audit_log, filePathArgs(filePath));
+}
+
+export async function exportCsv(entity: ExportEntity, filePath: string): Promise<number> {
   return invoke<number>(exportCommands.csv[entity], filePathArgs(filePath));
 }
 
-export async function exportJson(entity: ImportExportEntity, filePath: string): Promise<number> {
+export async function exportJson(entity: ExportEntity, filePath: string): Promise<number> {
   return invoke<number>(exportCommands.json[entity], filePathArgs(filePath));
 }
 
 export async function exportData(
-  entity: ImportExportEntity,
+  entity: ExportEntity,
   format: ExportFormat,
   filePath: string,
 ): Promise<number> {

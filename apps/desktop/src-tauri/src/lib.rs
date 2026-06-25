@@ -150,6 +150,8 @@ pub fn run() {
             commands::import_export::preflight_contacts_json_import_with_mapping,
             commands::import_export::export_contacts_csv,
             commands::import_export::export_contacts_json,
+            commands::import_export::export_audit_log_csv,
+            commands::import_export::export_audit_log_json,
             commands::import_export::import_deals_csv,
             commands::import_export::import_deals_csv_with_mapping,
             commands::import_export::import_deals_json,

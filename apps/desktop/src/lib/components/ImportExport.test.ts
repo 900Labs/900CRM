@@ -191,6 +191,18 @@ describe("ImportExport component", () => {
     validateLocalBackupMock.mockReset();
   });
 
+  it("shows audit log as export-only entity", async () => {
+    const { container } = render(ImportExport, { open: true });
+
+    const importSelect = container.querySelector("#import-entity");
+    expect(importSelect?.textContent).not.toContain("Audit log");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Export" }));
+
+    const exportSelect = container.querySelector("#export-entity");
+    expect(exportSelect?.textContent).toContain("Audit log");
+  });
+
   it("previews JSON imports before duplicate preflight and confirmation", async () => {
     openDialogMock.mockResolvedValue("/tmp/contacts.json");
     previewJsonMock.mockResolvedValue({

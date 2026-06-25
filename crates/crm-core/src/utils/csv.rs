@@ -75,6 +75,21 @@
 //! | `field_options` | no       | JSON string array; required for `select` fields |
 //! | `sort_order`    | no       | Integer display order; blank defaults to `0` |
 //!
+//! # Audit Log CSV Format
+//!
+//! | Column        | Notes |
+//! |---------------|-------|
+//! | `id`          | Local audit row UUID |
+//! | `actor_type`  | Actor category |
+//! | `actor_id`    | Optional actor identifier |
+//! | `action`      | Audited action |
+//! | `entity_type` | Optional affected entity type |
+//! | `entity_id`   | Optional affected entity ID |
+//! | `before_json` | Optional pre-change JSON payload |
+//! | `after_json`  | Optional post-change JSON payload |
+//! | `created_at`  | Audit row creation timestamp |
+//! | `device_id`   | Local device identifier |
+//!
 //! # Organization CSV Format
 //!
 //! | Column          | Required | Notes |
@@ -431,6 +446,30 @@ pub struct CustomFieldDefinitionCsvRow {
     /// Display order. Blank or missing values default to `0`.
     #[serde(default)]
     pub sort_order: Option<String>,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Audit log CSV record
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A flat CSV/JSON row representing one local audit log entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditLogCsvRow {
+    pub id: String,
+    pub actor_type: String,
+    #[serde(default)]
+    pub actor_id: Option<String>,
+    pub action: String,
+    #[serde(default)]
+    pub entity_type: Option<String>,
+    #[serde(default)]
+    pub entity_id: Option<String>,
+    #[serde(default)]
+    pub before_json: Option<String>,
+    #[serde(default)]
+    pub after_json: Option<String>,
+    pub created_at: String,
+    pub device_id: String,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2814,5 +2853,48 @@ pub fn write_custom_field_definitions_csv<W: Write>(
 
     wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
     log::info!("Wrote {} custom field definition rows to CSV", rows.len());
+    Ok(())
+}
+
+/// Serializes a slice of [`AuditLogCsvRow`] to CSV bytes.
+///
+/// The output always includes all audit log columns in storage order.
+pub fn write_audit_log_csv<W: Write>(writer: W, rows: &[AuditLogCsvRow]) -> CrmResult<()> {
+    let mut wtr = csv::WriterBuilder::new()
+        .has_headers(false)
+        .from_writer(writer);
+
+    wtr.write_record([
+        "id",
+        "actor_type",
+        "actor_id",
+        "action",
+        "entity_type",
+        "entity_id",
+        "before_json",
+        "after_json",
+        "created_at",
+        "device_id",
+    ])
+    .map_err(|e| CrmError::Csv(e.to_string()))?;
+
+    for row in rows {
+        wtr.write_record([
+            &row.id,
+            &row.actor_type,
+            row.actor_id.as_deref().unwrap_or_default(),
+            &row.action,
+            row.entity_type.as_deref().unwrap_or_default(),
+            row.entity_id.as_deref().unwrap_or_default(),
+            row.before_json.as_deref().unwrap_or_default(),
+            row.after_json.as_deref().unwrap_or_default(),
+            &row.created_at,
+            &row.device_id,
+        ])
+        .map_err(|e| CrmError::Csv(e.to_string()))?;
+    }
+
+    wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
+    log::info!("Wrote {} audit log rows to CSV", rows.len());
     Ok(())
 }
