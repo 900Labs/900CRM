@@ -248,6 +248,12 @@ Those paths record sync changelog entries and audit evidence. The import
 service also records an `import_row` audit entry for each successfully imported
 contact, deal, or organization.
 
+Desktop CSV, mapped CSV, and JSON imports for contacts, deals, and
+organizations first create an automatic local backup through
+`CrmCore::create_local_backup`. The backup is created immediately before import
+rows are written, and backup failure stops the import. The import summary shown
+in the UI includes the created backup path.
+
 ## Export Behavior
 
 Exports write local CSV or JSON files selected by the user through the save
@@ -270,10 +276,14 @@ CSV import/export and JSON import/export are not a backup system.
   flat entity fields.
 - Local backup creates a SQLite snapshot plus metadata and is the safer way to
   preserve full application state before a destructive restore or risky import.
-- Import does not create an automatic backup before writing rows.
+- Supported desktop imports automatically create a local pre-import backup
+  before writing rows.
+- Automatic pre-import backups are stored under the platform app data directory
+  at `pre-import-backups/<timestamp-and-sequence>/`.
 - Restore validation applies to local backups, not CSV or JSON exports.
 
-Before large imports, create a local backup from Settings. See
+Before large imports, confirm the automatic backup path in the import summary
+and move or copy that backup to durable encrypted storage if needed. See
 [Backup and Restore](BACKUP_RESTORE.md) for the validated backup workflow.
 
 ## Not Yet Implemented
@@ -284,7 +294,7 @@ The following are not implemented in the current import/export surface:
 - Contact or organization duplicate auto-merge during import.
 - Deal duplicate auto-merge during import.
 - Import rollback for a completed multi-row import.
-- Automatic backup before import.
+- Restore or rollback directly from an import summary.
 - Remote import/export endpoints.
 - Cloud storage export destinations.
 - Scheduled export.

@@ -41,6 +41,8 @@ encryption for those values today.
 Local backups and exports are user-controlled files.
 
 - Local backups contain a SQLite database snapshot and metadata.
+- Automatic pre-import backups are local backup folders created under app data
+  before supported desktop CSV, mapped CSV, or JSON imports write rows.
 - CSV exports contain plain CSV data for the selected entity type.
 - 900CRM does not upload backups or exports.
 - 900CRM does not encrypt backups or exports.
