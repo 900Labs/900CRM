@@ -2653,22 +2653,12 @@ fn preview_contacts_json_reports_headers_row_numbers_and_does_not_write() {
         .preview_contacts_json_import(json_path.to_str().expect("path should be valid UTF-8"))
         .expect("contact JSON preview should parse");
 
-    assert_eq!(preview.total_rows, 2);
+    assert_eq!(preview.total_rows, 3);
     assert_eq!(
         preview.headers,
-        vec![
-            "first_name",
-            "last_name",
-            "org_name",
-            "email",
-            "phone",
-            "address",
-            "city",
-            "country",
-            "notes",
-        ]
+        vec!["email", "first_name", "ignored", "last_name", "phone"]
     );
-    assert_eq!(preview.rows.len(), 2);
+    assert_eq!(preview.rows.len(), 3);
     assert_eq!(preview.rows[0].row_number, 2);
     assert_eq!(
         preview.rows[0].values.get("first_name").map(String::as_str),
@@ -2678,12 +2668,20 @@ fn preview_contacts_json_reports_headers_row_numbers_and_does_not_write() {
         preview.rows[0].values.get("email").map(String::as_str),
         Some("ada@example.com")
     );
-    assert_eq!(preview.rows[1].row_number, 4);
     assert_eq!(
-        preview.rows[1].values.get("phone").map(String::as_str),
+        preview.rows[0].values.get("ignored").map(String::as_str),
+        Some("not shown")
+    );
+    assert_eq!(preview.rows[1].row_number, 3);
+    assert_eq!(
+        preview.rows[1].values.get("first_name").map(String::as_str),
+        Some("   ")
+    );
+    assert_eq!(preview.rows[2].row_number, 4);
+    assert_eq!(
+        preview.rows[2].values.get("phone").map(String::as_str),
         Some("+15550100")
     );
-    assert!(!preview.rows[0].values.contains_key("ignored"));
 
     assert_eq!(
         count(&core, "SELECT COUNT(*) FROM contacts"),
@@ -2875,6 +2873,132 @@ fn import_contacts_json_reports_row_number_for_non_object_rows() {
         }
         other => panic!("expected InvalidInput for non-object JSON row, got {other:?}"),
     }
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn mapped_json_import_creates_contacts_deals_and_organizations() {
+    let (mut core, path) = open_test_core();
+
+    let contacts_path = path.join("contacts-mapped.json");
+    std::fs::write(
+        &contacts_path,
+        r#"[
+  {
+    "Given": "Ada",
+    "Surname": "Lovelace",
+    "Mail": "ada@example.com",
+    "Ignored": "ignored"
+  }
+]
+"#,
+    )
+    .expect("mapped contact JSON fixture should write");
+    let contact_mapping = import_mapping(&[
+        ("Given", Some("first_name")),
+        ("Surname", Some("last_name")),
+        ("Mail", Some("email")),
+        ("Ignored", None),
+    ]);
+
+    let contact_result = core
+        .import_contacts_json_with_mapping(
+            contacts_path.to_str().expect("path should be valid UTF-8"),
+            contact_mapping,
+        )
+        .expect("mapped contact JSON import should succeed");
+    assert_eq!(contact_result.created, 1);
+    assert_eq!(contact_result.skipped, 0);
+
+    let deals_path = path.join("deals-mapped.json");
+    std::fs::write(
+        &deals_path,
+        r#"[
+  {
+    "Opportunity": "Acme Renewal",
+    "Amount": 12500.5,
+    "Phase": "Proposal",
+    "Close": "2026-09-30"
+  }
+]
+"#,
+    )
+    .expect("mapped deal JSON fixture should write");
+    let deal_mapping = import_mapping(&[
+        ("Opportunity", Some("title")),
+        ("Amount", Some("value")),
+        ("Phase", Some("stage")),
+        ("Close", Some("expected_close")),
+    ]);
+
+    let deal_result = core
+        .import_deals_json_with_mapping(
+            deals_path.to_str().expect("path should be valid UTF-8"),
+            deal_mapping,
+        )
+        .expect("mapped deal JSON import should succeed");
+    assert_eq!(deal_result.created, 1);
+    assert_eq!(deal_result.skipped, 0);
+
+    let organizations_path = path.join("organizations-mapped.json");
+    std::fs::write(
+        &organizations_path,
+        r#"[
+  {
+    "Company": "Acme Health",
+    "Inbox": "hello@acme.example",
+    "Telephone": "+123456"
+  }
+]
+"#,
+    )
+    .expect("mapped organization JSON fixture should write");
+    let organization_mapping = import_mapping(&[
+        ("Company", Some("name")),
+        ("Inbox", Some("email")),
+        ("Telephone", Some("phone")),
+    ]);
+
+    let organization_result = core
+        .import_organizations_json_with_mapping(
+            organizations_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+            organization_mapping,
+        )
+        .expect("mapped organization JSON import should succeed");
+    assert_eq!(organization_result.created, 1);
+    assert_eq!(organization_result.skipped, 0);
+
+    let contacts = core
+        .list_contacts(None)
+        .expect("contacts should list after mapped JSON import");
+    assert_eq!(contacts.contacts.len(), 1);
+    assert_eq!(contacts.contacts[0].first_name, "Ada");
+    assert_eq!(contacts.contacts[0].last_name, "Lovelace");
+    assert_eq!(contacts.contacts[0].email, "ada@example.com");
+
+    let deals = core
+        .list_deals()
+        .expect("deals should list after mapped JSON import");
+    assert_eq!(deals.len(), 1);
+    assert_eq!(deals[0].title, "Acme Renewal");
+    assert_eq!(deals[0].value, 12500.5);
+    assert_eq!(deals[0].stage, "Proposal");
+    assert_eq!(deals[0].expected_close.as_deref(), Some("2026-09-30"));
+
+    let organizations = core
+        .list_organizations()
+        .expect("organizations should list after mapped JSON import");
+    assert_eq!(organizations.len(), 1);
+    assert_eq!(organizations[0].name, "Acme Health");
+    assert_eq!(
+        organizations[0].email.as_deref(),
+        Some("hello@acme.example")
+    );
+    assert_eq!(organizations[0].phone.as_deref(), Some("+123456"));
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);
@@ -3249,6 +3373,40 @@ fn mapped_import_rejects_invalid_target_fields_and_duplicate_assignments() {
         other => panic!("expected InvalidInput for duplicate target, got {other:?}"),
     }
 
+    let json_path = path.join("invalid-mapping.json");
+    std::fs::write(&json_path, r#"[{ "A": "one", "B": "two" }]"#)
+        .expect("invalid mapping JSON fixture should write");
+
+    let missing_source = import_mapping(&[("Missing", Some("first_name"))]);
+    let err = core
+        .preflight_contacts_json_import_with_mapping(
+            json_path.to_str().expect("path should be valid UTF-8"),
+            missing_source,
+        )
+        .expect_err("missing JSON source field should be rejected");
+    match err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("Mapped source field 'Missing' is not present in the JSON"));
+        }
+        other => panic!("expected InvalidInput for missing JSON source, got {other:?}"),
+    }
+
+    let duplicate_json_target =
+        import_mapping(&[("A", Some("first_name")), ("B", Some("first_name"))]);
+    let err = core
+        .preflight_contacts_json_import_with_mapping(
+            json_path.to_str().expect("path should be valid UTF-8"),
+            duplicate_json_target,
+        )
+        .expect_err("duplicate mapped JSON target should be rejected");
+    match err {
+        CrmError::InvalidInput(message) => {
+            assert!(message.contains("mapped more than once"));
+            assert!(message.contains("first_name"));
+        }
+        other => panic!("expected InvalidInput for duplicate JSON target, got {other:?}"),
+    }
+
     drop(core);
     let _ = std::fs::remove_dir_all(path);
 }
@@ -3297,6 +3455,82 @@ fn mapped_contact_preflight_is_read_only() {
             mapping,
         )
         .expect("mapped contact preflight should succeed");
+
+    assert_eq!(report.entity_type, "contacts");
+    assert_eq!(report.total_rows, 1);
+    assert_eq!(report.duplicate_warning_count, 2);
+    assert!(report
+        .warnings
+        .iter()
+        .all(|warning| warning.existing_entity_id == contact.id));
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM contacts"),
+        contact_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM audit_log"),
+        audit_count_before
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn mapped_contact_json_preflight_uses_mapped_values_and_is_read_only() {
+    let (mut core, path) = open_test_core();
+
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            Some("Lovelace".to_string()),
+            None,
+            Some("ada@example.com".to_string()),
+            Some("+15550100".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact fixture should be created");
+
+    let contact_count_before = count(&core, "SELECT COUNT(*) FROM contacts");
+    let audit_count_before = count(&core, "SELECT COUNT(*) FROM audit_log");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    let json_path = path.join("contacts-mapped-preflight.json");
+    std::fs::write(
+        &json_path,
+        r#"[
+  {
+    "Given": "Imported",
+    "Mail": "ADA@example.com",
+    "Telephone": "  +15550100  ",
+    "Ignored": "ignored"
+  }
+]
+"#,
+    )
+    .expect("mapped contact JSON preflight fixture should write");
+    let mapping = import_mapping(&[
+        ("Given", Some("first_name")),
+        ("Mail", Some("email")),
+        ("Telephone", Some("phone")),
+        ("Ignored", None),
+    ]);
+
+    let report = core
+        .preflight_contacts_json_import_with_mapping(
+            json_path.to_str().expect("path should be valid UTF-8"),
+            mapping,
+        )
+        .expect("mapped contact JSON preflight should succeed");
 
     assert_eq!(report.entity_type, "contacts");
     assert_eq!(report.total_rows, 1);

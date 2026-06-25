@@ -29,13 +29,14 @@ use crate::storage::{
 use crate::utils::{
     csv::{
         parse_contacts_csv_with_mapping, parse_contacts_csv_with_row_numbers,
-        parse_contacts_json_with_row_numbers, parse_deals_csv_with_mapping,
-        parse_deals_csv_with_row_numbers, parse_deals_json_with_row_numbers,
+        parse_contacts_json_with_mapping, parse_contacts_json_with_row_numbers,
+        parse_deals_csv_with_mapping, parse_deals_csv_with_row_numbers,
+        parse_deals_json_with_mapping, parse_deals_json_with_row_numbers,
         parse_organizations_csv_with_mapping, parse_organizations_csv_with_row_numbers,
-        parse_organizations_json_with_row_numbers, preview_contacts_json_import,
-        preview_deals_json_import, preview_organizations_json_import, write_contacts_csv,
-        write_deals_csv, write_organizations_csv, ContactCsvRow, DealCsvRow, ImportColumnMapping,
-        JsonImportPreview, OrganizationCsvRow,
+        parse_organizations_json_with_mapping, parse_organizations_json_with_row_numbers,
+        preview_contacts_json_import, preview_deals_json_import, preview_organizations_json_import,
+        write_contacts_csv, write_deals_csv, write_organizations_csv, ContactCsvRow, DealCsvRow,
+        ImportColumnMapping, JsonImportPreview, OrganizationCsvRow,
     },
     datetime::now_iso8601,
     errors::{CrmError, CrmResult as InternalCrmResult},
@@ -760,6 +761,16 @@ impl CrmCore {
         self.import_contact_rows(rows)
     }
 
+    pub fn import_contacts_json_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_contacts_json_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_contact_rows(rows)
+    }
+
     pub fn preview_contacts_json_import(&self, file_path: &str) -> CrmResult<JsonImportPreview> {
         let file_content = fs::read(file_path)?;
         preview_contacts_json_import(file_content.as_slice())
@@ -840,6 +851,16 @@ impl CrmCore {
     ) -> CrmResult<ImportPreflightReport> {
         let file_content = fs::read(file_path)?;
         let rows = parse_contacts_json_with_row_numbers(file_content.as_slice())?;
+        self.preflight_contact_rows(rows)
+    }
+
+    pub fn preflight_contacts_json_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_contacts_json_with_mapping(file_content.as_slice(), &mapping)?;
         self.preflight_contact_rows(rows)
     }
 
@@ -954,6 +975,16 @@ impl CrmCore {
         self.import_deal_rows(rows)
     }
 
+    pub fn import_deals_json_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_deals_json_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_deal_rows(rows)
+    }
+
     pub fn preview_deals_json_import(&self, file_path: &str) -> CrmResult<JsonImportPreview> {
         let file_content = fs::read(file_path)?;
         preview_deals_json_import(file_content.as_slice())
@@ -1031,6 +1062,16 @@ impl CrmCore {
         self.preflight_deal_rows(rows)
     }
 
+    pub fn preflight_deals_json_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_deals_json_with_mapping(file_content.as_slice(), &mapping)?;
+        self.preflight_deal_rows(rows)
+    }
+
     fn preflight_deal_rows(
         &self,
         rows: Vec<(usize, DealCsvRow)>,
@@ -1105,6 +1146,16 @@ impl CrmCore {
     pub fn import_organizations_json(&mut self, file_path: &str) -> CrmResult<ImportResult> {
         let file_content = fs::read(file_path)?;
         let rows = parse_organizations_json_with_row_numbers(file_content.as_slice())?;
+        self.import_organization_rows(rows)
+    }
+
+    pub fn import_organizations_json_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_organizations_json_with_mapping(file_content.as_slice(), &mapping)?;
         self.import_organization_rows(rows)
     }
 
@@ -1191,6 +1242,16 @@ impl CrmCore {
     ) -> CrmResult<ImportPreflightReport> {
         let file_content = fs::read(file_path)?;
         let rows = parse_organizations_json_with_row_numbers(file_content.as_slice())?;
+        self.preflight_organization_rows(rows)
+    }
+
+    pub fn preflight_organizations_json_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_organizations_json_with_mapping(file_content.as_slice(), &mapping)?;
         self.preflight_organization_rows(rows)
     }
 

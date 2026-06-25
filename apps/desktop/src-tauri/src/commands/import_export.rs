@@ -58,6 +58,18 @@ pub async fn import_contacts_json(
 }
 
 #[tauri::command]
+pub async fn import_contacts_json_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_contacts_json_with_mapping(&file_path, mapping)
+            .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
 pub async fn preview_contacts_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -95,6 +107,17 @@ pub async fn preflight_contacts_json_import(
 ) -> Result<ImportPreflightReport, String> {
     let core = super::lock_core(&state)?;
     core.preflight_contacts_json_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_contacts_json_import_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_contacts_json_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
 }
 
@@ -152,6 +175,18 @@ pub async fn import_deals_json(
 }
 
 #[tauri::command]
+pub async fn import_deals_json_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_deals_json_with_mapping(&file_path, mapping)
+            .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
 pub async fn preview_deals_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -189,6 +224,17 @@ pub async fn preflight_deals_json_import(
 ) -> Result<ImportPreflightReport, String> {
     let core = super::lock_core(&state)?;
     core.preflight_deals_json_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_deals_json_import_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_deals_json_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
 }
 
@@ -246,6 +292,18 @@ pub async fn import_organizations_json(
 }
 
 #[tauri::command]
+pub async fn import_organizations_json_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_organizations_json_with_mapping(&file_path, mapping)
+            .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
 pub async fn preview_organizations_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -283,6 +341,17 @@ pub async fn preflight_organizations_json_import(
 ) -> Result<ImportPreflightReport, String> {
     let core = super::lock_core(&state)?;
     core.preflight_organizations_json_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_organizations_json_import_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_organizations_json_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
 }
 
