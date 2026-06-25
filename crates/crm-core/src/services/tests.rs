@@ -5926,6 +5926,458 @@ fn import_rollback_restores_custom_field_value_changes() {
 }
 
 #[test]
+fn export_activities_csv_and_json_include_flat_fields_and_custom_values() {
+    let (mut core, path) = open_test_core();
+
+    let activity_field = core
+        .create_custom_field_def(
+            "activity".to_string(),
+            "Outcome".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("activity custom field should be created");
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Amina".to_string()),
+            Some("Diallo".to_string()),
+            None,
+            Some("amina@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+    let deal = core
+        .create_deal(
+            "Amina Renewal".to_string(),
+            Some(2500.0),
+            Some("USD".to_string()),
+            Some("Lead".to_string()),
+            Some(20),
+            None,
+            Some(contact.id.clone()),
+            None,
+            None,
+        )
+        .expect("deal should be created");
+    let activity = core
+        .create_activity(
+            "call".to_string(),
+            "Discovery call".to_string(),
+            Some("Discuss renewal scope".to_string()),
+            Some("2026-07-01T10:00:00Z".to_string()),
+            Some(contact.id.clone()),
+            Some(deal.id.clone()),
+        )
+        .expect("activity should be created");
+    let activity = core
+        .mark_activity_complete(&activity.id)
+        .expect("activity should be marked complete");
+    core.set_custom_field_value(
+        activity_field.id.clone(),
+        activity.id.clone(),
+        "Positive".to_string(),
+    )
+    .expect("activity custom value should be set");
+
+    let activities_json_path = path.join("activities-custom-export.json");
+    let activities_csv_path = path.join("activities-custom-export.csv");
+    assert_eq!(
+        core.export_activities_json(
+            activities_json_path
+                .to_str()
+                .expect("path should be valid UTF-8")
+        )
+        .expect("activity JSON export should succeed"),
+        1
+    );
+    assert_eq!(
+        core.export_activities_csv(
+            activities_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8")
+        )
+        .expect("activity CSV export should succeed"),
+        1
+    );
+
+    let json_rows = read_json_export(&activities_json_path);
+    assert_eq!(
+        json_rows[0]
+            .get("activity_type")
+            .and_then(|value| value.as_str()),
+        Some("call")
+    );
+    assert_eq!(
+        json_rows[0].get("title").and_then(|value| value.as_str()),
+        Some("Discovery call")
+    );
+    assert_eq!(
+        json_rows[0]
+            .get("description")
+            .and_then(|value| value.as_str()),
+        Some("Discuss renewal scope")
+    );
+    assert_eq!(
+        json_rows[0]
+            .get("completed")
+            .and_then(|value| value.as_bool()),
+        Some(true)
+    );
+    assert_eq!(
+        json_rows[0]
+            .get("contact_id")
+            .and_then(|value| value.as_str()),
+        Some(contact.id.as_str())
+    );
+    assert_eq!(
+        json_rows[0].get("deal_id").and_then(|value| value.as_str()),
+        Some(deal.id.as_str())
+    );
+    assert_eq!(
+        json_rows[0]
+            .get("custom:Outcome")
+            .and_then(|value| value.as_str()),
+        Some("Positive")
+    );
+
+    let csv_rows = read_csv_export(&activities_csv_path);
+    assert_eq!(
+        csv_rows[0].get("activity_type").map(String::as_str),
+        Some("call")
+    );
+    assert_eq!(
+        csv_rows[0].get("title").map(String::as_str),
+        Some("Discovery call")
+    );
+    assert_eq!(
+        csv_rows[0].get("completed").map(String::as_str),
+        Some("true")
+    );
+    assert_eq!(
+        csv_rows[0].get("contact_id").map(String::as_str),
+        Some(contact.id.as_str())
+    );
+    assert_eq!(
+        csv_rows[0].get("deal_id").map(String::as_str),
+        Some(deal.id.as_str())
+    );
+    assert_eq!(
+        csv_rows[0].get("custom:Outcome").map(String::as_str),
+        Some("Positive")
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_activities_csv_and_json_create_rows_and_links() {
+    let (mut core, path) = open_test_core();
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            Some("Lovelace".to_string()),
+            None,
+            Some("ada@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+    let deal = core
+        .create_deal(
+            "Ada Expansion".to_string(),
+            Some(5000.0),
+            Some("EUR".to_string()),
+            Some("Proposal".to_string()),
+            Some(60),
+            None,
+            Some(contact.id.clone()),
+            None,
+            None,
+        )
+        .expect("deal should be created");
+
+    let activities_csv_path = path.join("activities-import.csv");
+    std::fs::write(
+        &activities_csv_path,
+        format!(
+            "activity_type,title,description,due_date,completed,contact_id,deal_id\n\
+             task,Follow up,Send recap,2026-07-02,true,{},{}\n",
+            contact.id, deal.id
+        ),
+    )
+    .expect("activity CSV fixture should write");
+    let csv_result = core
+        .import_activities_csv(
+            activities_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("activity CSV import should succeed");
+    assert_eq!(csv_result.created, 1);
+    assert_eq!(csv_result.merged, 0);
+    assert_eq!(csv_result.skipped, 0);
+    assert!(csv_result.errors.is_empty());
+    assert!(csv_result.rollback_plan.is_some());
+
+    let imported_csv_activity = core
+        .list_activities()
+        .expect("activities should list")
+        .into_iter()
+        .find(|activity| activity.title == "Follow up")
+        .expect("CSV activity should exist");
+    assert!(imported_csv_activity.completed);
+    assert_eq!(
+        imported_csv_activity.contact_id.as_deref(),
+        Some(contact.id.as_str())
+    );
+    assert_eq!(
+        imported_csv_activity.deal_id.as_deref(),
+        Some(deal.id.as_str())
+    );
+    let links = core
+        .list_activity_links(&imported_csv_activity.id)
+        .expect("activity links should list");
+    assert!(links
+        .iter()
+        .any(|link| link.entity_type.as_str() == "contact" && link.entity_id == contact.id));
+    assert!(links
+        .iter()
+        .any(|link| link.entity_type.as_str() == "deal" && link.entity_id == deal.id));
+
+    let activities_json_path = path.join("activities-import.json");
+    std::fs::write(
+        &activities_json_path,
+        r#"[
+  {
+    "activity_type": "meeting",
+    "title": "Renewal review",
+    "description": "Review proposal",
+    "due_date": "2026-07-03",
+    "completed": false
+  }
+]"#,
+    )
+    .expect("activity JSON fixture should write");
+    let json_result = core
+        .import_activities_json(
+            activities_json_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("activity JSON import should succeed");
+    assert_eq!(json_result.created, 1);
+    assert_eq!(json_result.skipped, 0);
+    let imported_json_activity = core
+        .list_activities()
+        .expect("activities should list")
+        .into_iter()
+        .find(|activity| activity.title == "Renewal review")
+        .expect("JSON activity should exist");
+    assert!(!imported_json_activity.completed);
+    assert_eq!(imported_json_activity.contact_id, None);
+    assert_eq!(imported_json_activity.deal_id, None);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn mapped_activity_json_import_sets_custom_fields_without_duplicate_warnings() {
+    let (mut core, path) = open_test_core();
+
+    let activity_field = core
+        .create_custom_field_def(
+            "activity".to_string(),
+            "Outcome".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("activity custom field should be created");
+    let activities_json_path = path.join("activities-mapped-custom.json");
+    std::fs::write(
+        &activities_json_path,
+        r#"[{"Kind":"email","Subject":"Send update","Done":"yes","Outcome":"Sent"}]"#,
+    )
+    .expect("activity mapped JSON fixture should write");
+    let mapping = import_mapping(&[
+        ("Kind", Some("activity_type")),
+        ("Subject", Some("title")),
+        ("Done", Some("completed")),
+        ("Outcome", Some("custom:Outcome")),
+    ]);
+
+    let preflight = core
+        .preflight_activities_json_import_with_mapping(
+            activities_json_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+            mapping.clone(),
+        )
+        .expect("activity mapped JSON preflight should succeed");
+    assert_eq!(preflight.entity_type, "activities");
+    assert_eq!(preflight.total_rows, 1);
+    assert_eq!(preflight.duplicate_warning_count, 0);
+    assert!(preflight.warnings.is_empty());
+
+    let result = core
+        .import_activities_json_with_mapping(
+            activities_json_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+            mapping,
+        )
+        .expect("mapped activity JSON import should succeed");
+    assert_eq!(result.created, 1);
+    assert_eq!(result.skipped, 0);
+    let activity = core
+        .list_activities()
+        .expect("activities should list")
+        .into_iter()
+        .find(|activity| activity.title == "Send update")
+        .expect("mapped activity should exist");
+    assert_eq!(activity.activity_type, "email");
+    assert!(activity.completed);
+    let values = core
+        .list_custom_field_values("activity", &activity.id)
+        .expect("activity custom values should list");
+    assert_eq!(values.len(), 1);
+    assert_eq!(values[0].field_def_id, activity_field.id);
+    assert_eq!(values[0].value, "Sent");
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_rollback_soft_deletes_created_activity_rows_and_custom_values() {
+    let (mut core, path) = open_test_core();
+
+    let activity_field = core
+        .create_custom_field_def(
+            "activity".to_string(),
+            "Outcome".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("activity custom field should be created");
+    let activities_csv_path = path.join("activities-custom-rollback.csv");
+    std::fs::write(
+        &activities_csv_path,
+        "activity_type,title,custom:Outcome\ncall,Intro call,Positive\n",
+    )
+    .expect("activity rollback CSV fixture should write");
+    let result = core
+        .import_activities_csv(
+            activities_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("activity custom import should succeed");
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("created activity custom import should return rollback plan");
+    let imported_activity = core
+        .list_activities()
+        .expect("activities should list")
+        .into_iter()
+        .find(|activity| activity.title == "Intro call")
+        .expect("imported activity should exist");
+    let imported_activity_values = core
+        .list_custom_field_values("activity", &imported_activity.id)
+        .expect("activity custom value should list");
+    assert_eq!(imported_activity_values[0].field_def_id, activity_field.id);
+    let imported_activity_value_id = imported_activity_values[0].value_id.clone();
+    let delete_audit_before =
+        count_custom_field_audit_action(&core, &imported_activity_value_id, "delete_value");
+    let delete_sync_before =
+        count_custom_field_delete_sync(&core, &imported_activity_value_id, "Positive");
+
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("created activity custom rollback should succeed");
+    assert_eq!(rollback.rolled_back, 1);
+    assert_eq!(rollback.skipped, 0);
+    assert!(rollback.errors.is_empty());
+    assert!(core
+        .list_activities()
+        .expect("rolled back activities should list")
+        .is_empty());
+    assert!(core
+        .list_custom_field_values("activity", &imported_activity.id)
+        .expect("rolled back activity custom values should list")
+        .is_empty());
+    assert_eq!(
+        count_custom_field_audit_action(&core, &imported_activity_value_id, "delete_value"),
+        delete_audit_before + 1
+    );
+    assert_eq!(
+        count_custom_field_delete_sync(&core, &imported_activity_value_id, "Positive"),
+        delete_sync_before + 1
+    );
+
+    let conflict_csv_path = path.join("activities-conflict-rollback.csv");
+    std::fs::write(
+        &conflict_csv_path,
+        "activity_type,title\nmeeting,Conflict check\n",
+    )
+    .expect("activity conflict CSV fixture should write");
+    let conflict_result = core
+        .import_activities_csv(
+            conflict_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("activity conflict import should succeed");
+    let conflict_plan = conflict_result
+        .rollback_plan
+        .clone()
+        .expect("created activity import should return rollback plan");
+    let conflict_activity_id = match &conflict_plan.actions[0] {
+        super::import_rollback::ImportRollbackAction::Activity { entity_id, .. } => {
+            entity_id.clone()
+        }
+        other => panic!("expected activity rollback action, got {other:?}"),
+    };
+    core.update_activity(
+        &conflict_activity_id,
+        None,
+        Some("Edited conflict check".to_string()),
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("activity should be edited after import");
+    let conflict_rollback = core
+        .rollback_completed_import(&conflict_plan)
+        .expect("conflict activity rollback should complete");
+    assert_eq!(conflict_rollback.rolled_back, 0);
+    assert_eq!(conflict_rollback.skipped, 1);
+    assert_eq!(conflict_rollback.errors[0].code, "conflict");
+    assert!(core.get_activity(&conflict_activity_id).is_ok());
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn export_organizations_csv_writes_optional_fields() {
     let (mut core, path) = open_test_core();
 

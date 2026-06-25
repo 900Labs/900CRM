@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    storage::{contacts::Contact, deals::Deal, organizations::Organization},
+    storage::{activities::Activity, contacts::Contact, deals::Deal, organizations::Organization},
     utils::{errors::CrmError, uuid::new_uuid},
 };
 
@@ -48,6 +48,14 @@ pub enum ImportRollbackAction {
         changed_fields: Vec<String>,
         before_import: Option<DealImportRollbackSnapshot>,
         post_import: DealImportRollbackSnapshot,
+    },
+    Activity {
+        row_number: u32,
+        entity_id: String,
+        operation: ImportRollbackOperation,
+        changed_fields: Vec<String>,
+        before_import: Option<ActivityImportRollbackSnapshot>,
+        post_import: ActivityImportRollbackSnapshot,
     },
     Organization {
         row_number: u32,
@@ -151,6 +159,21 @@ impl ImportRollbackAction {
             )),
             post_import: DealImportRollbackSnapshot::from_deal(post_import, post_custom_fields),
         })
+    }
+
+    pub(crate) fn created_activity(
+        row_number: usize,
+        activity: &Activity,
+        custom_fields: BTreeMap<String, String>,
+    ) -> Self {
+        Self::Activity {
+            row_number: row_number as u32,
+            entity_id: activity.id.clone(),
+            operation: ImportRollbackOperation::Created,
+            changed_fields: Vec::new(),
+            before_import: None,
+            post_import: ActivityImportRollbackSnapshot::from_activity(activity, custom_fields),
+        }
     }
 
     pub(crate) fn created_organization(row_number: usize, organization: &Organization) -> Self {
@@ -273,6 +296,42 @@ impl DealImportRollbackSnapshot {
             organization_id: deal.organization_id.clone(),
             notes: deal.notes.clone(),
             updated_at: deal.updated_at.clone(),
+            custom_fields,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ActivityImportRollbackSnapshot {
+    pub activity_type: String,
+    pub title: String,
+    pub description: String,
+    pub due_date: Option<String>,
+    pub completed: bool,
+    pub contact_id: Option<String>,
+    pub deal_id: Option<String>,
+    pub updated_at: String,
+    #[serde(default)]
+    pub custom_fields: BTreeMap<String, String>,
+}
+
+impl From<&Activity> for ActivityImportRollbackSnapshot {
+    fn from(activity: &Activity) -> Self {
+        Self::from_activity(activity, BTreeMap::new())
+    }
+}
+
+impl ActivityImportRollbackSnapshot {
+    fn from_activity(activity: &Activity, custom_fields: BTreeMap<String, String>) -> Self {
+        Self {
+            activity_type: activity.activity_type.clone(),
+            title: activity.title.clone(),
+            description: activity.description.clone(),
+            due_date: activity.due_date.clone(),
+            completed: activity.completed,
+            contact_id: activity.contact_id.clone(),
+            deal_id: activity.deal_id.clone(),
+            updated_at: activity.updated_at.clone(),
             custom_fields,
         }
     }
@@ -432,6 +491,27 @@ impl CrmCore {
                         before_import.as_ref(),
                         post_import,
                         &mut result,
+                    ),
+                },
+                ImportRollbackAction::Activity {
+                    row_number,
+                    entity_id,
+                    operation,
+                    post_import,
+                    ..
+                } => match operation {
+                    ImportRollbackOperation::Created => self.rollback_created_activity(
+                        *row_number,
+                        entity_id,
+                        post_import,
+                        &mut result,
+                    ),
+                    ImportRollbackOperation::Merged => result.record_error(
+                        "activity",
+                        entity_id,
+                        *row_number,
+                        "invalid_plan",
+                        "activity merge rollback is not supported".to_string(),
                     ),
                 },
                 ImportRollbackAction::Organization {
@@ -696,6 +776,53 @@ impl CrmCore {
         }
     }
 
+    fn rollback_created_activity(
+        &mut self,
+        row_number: u32,
+        entity_id: &str,
+        post_import: &ActivityImportRollbackSnapshot,
+        result: &mut ImportRollbackResult,
+    ) {
+        let Some(current) = current_activity_for_rollback(self, row_number, entity_id, result)
+        else {
+            return;
+        };
+
+        let Some(current_snapshot) =
+            activity_snapshot_for_rollback(self, row_number, entity_id, &current, result)
+        else {
+            return;
+        };
+
+        if current_snapshot != *post_import {
+            record_conflict(result, "activity", entity_id, row_number);
+            return;
+        }
+
+        match self.delete_activity(entity_id) {
+            Ok(()) => match self.delete_custom_field_values_for_rollback("activity", entity_id) {
+                Ok(()) => result.record_rolled_back(),
+                Err(err) => result.record_error(
+                    "activity",
+                    entity_id,
+                    row_number,
+                    "rollback_failed",
+                    err.to_string(),
+                ),
+            },
+            Err(CrmError::NotFound(message)) => {
+                result.record_skipped("activity", entity_id, row_number, "not_found", message)
+            }
+            Err(err) => result.record_error(
+                "activity",
+                entity_id,
+                row_number,
+                "rollback_failed",
+                err.to_string(),
+            ),
+        }
+    }
+
     fn rollback_created_organization(
         &mut self,
         row_number: u32,
@@ -785,6 +912,31 @@ impl CrmCore {
     }
 }
 
+fn current_activity_for_rollback(
+    core: &CrmCore,
+    row_number: u32,
+    entity_id: &str,
+    result: &mut ImportRollbackResult,
+) -> Option<Activity> {
+    match core.get_activity(entity_id) {
+        Ok(activity) => Some(activity),
+        Err(CrmError::NotFound(message)) => {
+            result.record_skipped("activity", entity_id, row_number, "not_found", message);
+            None
+        }
+        Err(err) => {
+            result.record_error(
+                "activity",
+                entity_id,
+                row_number,
+                "read_failed",
+                err.to_string(),
+            );
+            None
+        }
+    }
+}
+
 fn current_contact_for_rollback(
     core: &CrmCore,
     row_number: u32,
@@ -850,6 +1002,31 @@ fn current_organization_for_rollback(
         Err(err) => {
             result.record_error(
                 "organization",
+                entity_id,
+                row_number,
+                "read_failed",
+                err.to_string(),
+            );
+            None
+        }
+    }
+}
+
+fn activity_snapshot_for_rollback(
+    core: &CrmCore,
+    row_number: u32,
+    entity_id: &str,
+    activity: &Activity,
+    result: &mut ImportRollbackResult,
+) -> Option<ActivityImportRollbackSnapshot> {
+    match core.custom_field_snapshot("activity", entity_id) {
+        Ok(custom_fields) => Some(ActivityImportRollbackSnapshot::from_activity(
+            activity,
+            custom_fields,
+        )),
+        Err(err) => {
+            result.record_error(
+                "activity",
                 entity_id,
                 row_number,
                 "read_failed",

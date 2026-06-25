@@ -343,6 +343,8 @@
     "preflightFailed": "Duplicate check failed",
     "checking": "Checking…",
     "detectDuplicates": "Detect duplicates",
+    "reviewImport": "Review import",
+    "activitiesSkipDuplicates": "Activity imports do not run duplicate detection. Confirmed rows create new activities.",
     "duplicateWarningCount": "{count} duplicate warnings",
     "row": "Row",
     "rowNumber": "Row {number}",

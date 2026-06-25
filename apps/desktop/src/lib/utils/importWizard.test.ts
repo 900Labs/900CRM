@@ -31,6 +31,17 @@ describe('import wizard helpers', () => {
       created_at: '2026-06-25T00:00:00Z',
     },
   ];
+  const activityCustomFields = [
+    {
+      id: 'field-outcome',
+      entity_type: 'activity' as const,
+      field_name: 'Outcome',
+      field_type: 'text' as const,
+      field_options: null,
+      sort_order: 0,
+      created_at: '2026-06-25T00:00:00Z',
+    },
+  ];
 
   it('suggests contact mappings from common CSV headers', () => {
     expect(
@@ -80,6 +91,26 @@ describe('import wizard helpers', () => {
     });
   });
 
+  it('suggests activity mappings from common CSV headers', () => {
+    expect(
+      suggestImportMapping('activities', [
+        'Type',
+        'Subject',
+        'Details',
+        'Due Date',
+        'Done',
+        'Local Contact ID',
+      ]),
+    ).toEqual({
+      Type: 'activity_type',
+      Subject: 'title',
+      Details: 'description',
+      'Due Date': 'due_date',
+      Done: 'completed',
+      'Local Contact ID': 'contact_id',
+    });
+  });
+
   it('adds contact custom fields as mapping options and suggestions', () => {
     expect(getImportFieldOptions('contacts', contactCustomFields)).toContainEqual({
       value: 'custom:VIP Tier',
@@ -91,6 +122,21 @@ describe('import wizard helpers', () => {
     ).toEqual({
       'First Name': 'first_name',
       'VIP Tier': 'custom:VIP Tier',
+    });
+  });
+
+  it('adds activity custom fields as mapping options and suggestions', () => {
+    expect(getImportFieldOptions('activities', activityCustomFields)).toContainEqual({
+      value: 'custom:Outcome',
+      label: 'Custom: Outcome',
+    });
+
+    expect(
+      suggestImportMapping('activities', ['Type', 'Subject', 'Outcome'], activityCustomFields),
+    ).toEqual({
+      Type: 'activity_type',
+      Subject: 'title',
+      Outcome: 'custom:Outcome',
     });
   });
 
@@ -189,6 +235,18 @@ describe('import wizard helpers', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Title is required.');
     expect(result.errors).toContain('Value is mapped more than once: Amount, Total.');
+  });
+
+  it('blocks missing required activity fields and duplicate activity targets', () => {
+    const result = validateImportMapping('activities', {
+      Subject: 'title',
+      Summary: 'title',
+      Done: 'completed',
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Activity type is required.');
+    expect(result.errors).toContain('Title is mapped more than once: Subject, Summary.');
   });
 
   it('accepts valid organization mappings with skipped columns', () => {

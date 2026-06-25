@@ -13,6 +13,7 @@ for:
 
 - contacts;
 - deals;
+- activities;
 - organizations.
 
 Import and export use local files selected by the user. There is no cloud import
@@ -27,13 +28,15 @@ directly or be mapped in the import wizard before duplicate preflight.
 The import/export modal is available from the desktop UI. The import tab asks
 the user to choose an entity type, import format, and local file.
 
-For CSV contacts, deals, and organizations, the current wizard flow is:
+For CSV contacts, deals, activities, and organizations, the current wizard flow is:
 
 1. Select entity type and CSV file.
 2. Preview parsed headers and the first rows.
 3. Map source CSV columns to supported CRM fields.
-4. Run duplicate preflight checks.
-5. Review duplicate warnings.
+4. Run preflight validation. Contacts, deals, and organizations also run
+   duplicate checks.
+5. Review duplicate warnings when the selected entity supports duplicate
+   preflight.
 6. Confirm import.
 7. Review the import summary.
 
@@ -41,14 +44,15 @@ Mapped imports require a desktop-selected file path so the Rust backend can read
 the same CSV file. The browser file-input fallback can preview text, but mapped
 backend import/preflight requires the desktop file picker path.
 
-For JSON contacts, deals, and organizations, the current flow reuses the same
-mapping and duplicate-gated confirmation concepts as CSV:
+For JSON contacts, deals, activities, and organizations, the current flow reuses
+the same mapping and confirmation concepts as CSV:
 
 1. Select entity type and JSON format.
 2. Select a local `.json` file.
 3. Preview the parsed JSON rows in the browser.
 4. Map source JSON fields to supported CRM fields.
-5. Run duplicate preflight checks.
+5. Run preflight validation. Contacts, deals, and organizations also run
+   duplicate checks.
 6. Review duplicate warnings if any are found.
 7. Confirm import.
 8. Review the import summary.
@@ -70,6 +74,7 @@ Rows with a blank required field are skipped by the parser:
 
 - contacts require `first_name`;
 - deals require `title`;
+- activities require `activity_type` and `title`;
 - organizations require `name`.
 
 ## JSON Import Parsing
@@ -80,6 +85,8 @@ fields as the matching JSON export:
 - contacts: `first_name`, `last_name`, `org_name`, `email`, `phone`, `address`,
   `city`, `country`, and `notes`;
 - deals: `title`, `value`, `currency`, `stage`, `expected_close`, and `notes`;
+- activities: `activity_type`, `title`, `description`, `due_date`,
+  `completed`, `contact_id`, and `deal_id`;
 - organizations: `name`, `email`, `phone`, `website`, `address_line1`,
   `address_line2`, `city`, `region`, `country`, `postal_code`, and
   `description`.
@@ -175,12 +182,41 @@ deals pass `None` for `contact_id` and `organization_id`.
 Deal export writes `title`, `value`, `currency`, `stage`, `expected_close`, and
 `notes` with a header row. Values are formatted with two decimal places.
 
-## Contact And Deal Custom Fields
+## Activity CSV
 
-Contact and deal import/export supports existing active custom field values using
-the stable target convention `custom:<field_name>` when the active field name is
-unique for that entity type. If two active custom fields for the same entity
-type share a name, those duplicate-name targets use
+Supported activity import fields:
+
+| Field | Required | Notes |
+|---|---|---|
+| `activity_type` | Yes | Blank rows are skipped. Values use the existing activity create validation. |
+| `title` | Yes | Blank rows are skipped. |
+| `description` | No | Imported as the activity description/body. |
+| `due_date` | No | Stored as provided by the create path. |
+| `completed` | No | `true`, `1`, `yes`, or `y` marks the created activity complete after creation. `false`, `0`, `no`, `n`, blank, or unrecognized values leave it incomplete. |
+| `contact_id` | No | Existing active local contact ID only. No lookup by name or portable relationship resolution is attempted. |
+| `deal_id` | No | Existing active local deal ID only. No lookup by name or portable relationship resolution is attempted. |
+
+Mapped activity import can accept arbitrary source headers as long as each
+source header is mapped to a supported target field or skipped. The UI suggests
+common aliases such as `type`, `subject`, `details`, `due date`, `done`,
+`local contact id`, and `local deal id`.
+
+Activity imports create rows through `CrmCore::create_activity`, so normal
+activity validation, audit, sync, and contact/deal mirror-link behavior apply.
+If `completed` is truthy, the import then marks the created activity complete
+through the normal completion service path.
+
+Activity export writes `activity_type`, `title`, `description`, `due_date`,
+`completed`, `contact_id`, and `deal_id` with a header row. `contact_id` and
+`deal_id` are local database IDs and are useful only when importing into a
+database that already has the same active IDs.
+
+## Contact, Deal, And Activity Custom Fields
+
+Contact, deal, and activity import/export supports existing active custom field
+values using the stable target convention `custom:<field_name>` when the active
+field name is unique for that entity type. If two active custom fields for the
+same entity type share a name, those duplicate-name targets use
 `custom:<field_name>#<field_id>`.
 Literal `%` and `#` characters in the field name portion are escaped as `%25`
 and `%23` so the duplicate-name suffix stays unambiguous.
@@ -191,7 +227,8 @@ definition export a blank value. Exports use the existing custom field storage
 definitions and values; they do not create, rename, or delete custom field
 definitions.
 
-CSV and JSON imports can set contact and deal custom values in two ways:
+CSV and JSON imports can set contact, deal, and activity custom values in two
+ways:
 
 - direct imports can use source columns or JSON object keys named
   with the supported `custom:` target;
@@ -199,8 +236,10 @@ CSV and JSON imports can set contact and deal custom values in two ways:
   `custom:` target shown in the import wizard.
 
 Blank custom field source values are ignored. Non-blank values are written
-through the existing custom field value upsert path after the contact or deal row
-is created or merged.
+through the existing custom field value upsert path after the contact, deal, or
+activity row is created or merged. Activity imports do not currently merge
+duplicates, so activity custom values are only set on newly created activity
+rows.
 
 Custom field names are user-readable and are not currently schema-unique. If two
 active custom field definitions for the same entity type share a field name, the
@@ -212,13 +251,12 @@ unescaped key by hand.
 
 Organization custom field import/export is not supported because organization
 custom field storage is not part of the current custom field validation surface.
-Activity import/export is not part of the current import/export surface.
 
 ## JSON Import And Export
 
-JSON import and export are available for contacts, deals, and organizations from
-the same import/export modal as CSV. Import uses an open dialog for `.json`
-files. Export uses a save dialog for `.json` files.
+JSON import and export are available for contacts, deals, activities, and
+organizations from the same import/export modal as CSV. Import uses an open
+dialog for `.json` files. Export uses a save dialog for `.json` files.
 
 JSON exports are pretty-printed arrays of objects. They use the same flat fields
 as the matching CSV export:
@@ -226,6 +264,8 @@ as the matching CSV export:
 - contacts: `first_name`, `last_name`, `org_name`, `email`, `phone`, `address`,
   `city`, `country`, and `notes`;
 - deals: `title`, `value`, `currency`, `stage`, `expected_close`, and `notes`;
+- activities: `activity_type`, `title`, `description`, `due_date`,
+  `completed`, `contact_id`, and `deal_id`;
 - organizations: `name`, `email`, `phone`, `website`, `address_line1`,
   `address_line2`, `city`, `region`, `country`, `postal_code`, and
   `description`.
@@ -235,21 +275,24 @@ JSON export uses the same active-row listing boundaries as CSV export:
 - contacts export up to 100,000 active contacts sorted by `first_name`
   ascending through the contact listing path;
 - deals export active deals through the deal listing path;
+- activities export active activities through the activity listing path;
 - organizations export active organizations through the organization listing
   path.
 
 JSON export does not include record IDs, timestamps, deleted rows, device IDs,
-relationship rows, separate note records, tags, activities, audit log entries,
-proposed actions, external clients, permissions, settings, or backup metadata.
-For contacts and deals, JSON export does include active custom field values using
-`custom:` keys as described above.
+relationship rows beyond the optional local activity `contact_id` and `deal_id`
+mirror columns, separate note records, tags, audit log entries, proposed
+actions, external clients, permissions, settings, or backup metadata. For
+contacts, deals, and activities, JSON export does include active custom field
+values using `custom:` keys as described above.
 
 JSON import has the same entity scope. It does not import record IDs, timestamps,
-deleted rows, device IDs, relationship rows, separate note records, tags,
-activities, audit log entries, proposed actions, external clients, permissions,
-settings, or backup metadata. For contacts and deals, JSON import can set
-existing custom field values using `custom:` keys or mapped custom
-field targets as described above.
+deleted rows, device IDs, broad relationship rows, separate note records, tags,
+audit log entries, proposed actions, external clients, permissions, settings, or
+backup metadata. Activity `contact_id` and `deal_id` are accepted only as
+existing active local database IDs. For contacts, deals, and activities, JSON
+import can set existing custom field values using `custom:` keys or mapped
+custom field targets as described above.
 
 JSON import preview is read-only and browser-visible in the import/export modal.
 It shows source object keys before the mapping step. Matching supported JSON
@@ -258,8 +301,10 @@ supported flat import fields before duplicate preflight and confirmed import.
 
 ## Duplicate Preflight
 
-Duplicate preflight is currently implemented for contacts, deals, and
-organizations.
+Duplicate detection is currently implemented for contacts, deals, and
+organizations. Activity imports run the same parse/mapping/custom-field
+validation preflight shape, but they return zero duplicate warnings because
+there is no safe activity duplicate rule in the current service layer.
 
 Contact preflight checks active contacts for:
 
@@ -277,16 +322,17 @@ Deal preflight checks active deals for:
 - case-insensitive exact title matches after trimming the imported title.
 
 Custom field values do not participate in duplicate detection. Preflight parses
-and validates supported contact/deal custom field targets, but duplicate warnings
-are based only on the flat fields listed above.
+and validates supported contact/deal/activity custom field targets, but duplicate
+warnings are based only on the flat fields listed above.
 
 Preflight returns warnings with the source row number, match type, source value,
 existing record ID, existing display label, and a human-readable reason. CSV
 imports use CSV data row numbers. JSON imports use the same offset as JSON
 import errors: the first array item is row 2.
 
-Duplicate preflight is read-only. It does not create contacts, deals, or
-organizations, and it does not write audit rows or sync changelog rows.
+Duplicate preflight is read-only. It does not create contacts, deals,
+activities, or organizations, and it does not write audit rows or sync changelog
+rows.
 
 Preflight warnings do not block import automatically. The UI lets the user
 continue despite warnings. The import then attempts to create each row and
@@ -298,6 +344,9 @@ Contact, deal, and organization imports include an explicit opt-in checkbox to
 merge duplicate import rows into matching existing records. The option is
 available for CSV, mapped CSV, JSON, and mapped JSON imports. It is off by
 default.
+
+Activity imports do not expose duplicate auto-merge. Confirmed activity rows
+always attempt to create new activities.
 
 Duplicate preflight still runs before confirmation when auto-merge is enabled.
 The confirmation copy states that duplicate warnings will be merged into
@@ -350,12 +399,12 @@ not included in the import result as row-level errors.
 Successful imported rows are written through normal `crm-core` create paths.
 Those paths record sync changelog entries and audit evidence. The import
 service also records an `import_row` audit entry for each successfully imported
-contact, deal, or organization. Successful duplicate auto-merge rows are
+contact, deal, activity, or organization. Successful duplicate auto-merge rows are
 updated through normal update services and also receive an `import_row_merge`
 audit entry.
 
-Desktop CSV, mapped CSV, JSON, and mapped JSON imports for contacts, deals, and
-organizations first create an automatic local backup through
+Desktop CSV, mapped CSV, JSON, and mapped JSON imports for contacts, deals,
+activities, and organizations first create an automatic local backup through
 `CrmCore::create_local_backup`. The backup is created immediately before import
 rows are written, and backup failure stops the import. The import summary shown
 in the UI includes the created backup path.
@@ -368,30 +417,36 @@ summary remains visible with the failure message.
 
 ## Row-Level Import Rollback
 
-Completed desktop imports for contacts, deals, and organizations return a
-self-contained row-level rollback plan when the import creates rows or changes
-fields through duplicate auto-merge. The current Import/Export summary can use
-that plan to request rollback of the just-completed import.
+Completed desktop imports for contacts, deals, activities, and organizations
+return a self-contained row-level rollback plan when the import creates rows or
+changes fields through duplicate auto-merge. The current Import/Export summary
+can use that plan to request rollback of the just-completed import.
 
 Rollback is available for CSV, mapped CSV, JSON, and mapped JSON imports. It is
-limited to the same contact, deal, and organization rows supported by
+limited to the same contact, deal, activity, and organization rows supported by
 import/export:
 
 - created rows are soft-deleted through the existing `crm-core` delete service
-  for the matching entity; contact/deal custom field values created by that
-  imported row are deleted after the row passes its rollback conflict check;
+  for the matching entity; contact/deal/activity custom field values created by
+  that imported row are deleted after the row passes its rollback conflict
+  check;
 - duplicate auto-merge rows restore only the fields that the import merge
   changed, through the existing `crm-core` update service for the matching
   entity; contact/deal custom field values changed by duplicate auto-merge are
   restored to their before-import value or removed if they did not exist before
   import.
 
+Activity rollback covers created activity rows only because activity imports do
+not implement duplicate auto-merge. It uses the existing `delete_activity`
+service behavior after confirming that the active activity and its activity
+custom values still match the post-import snapshot.
+
 Rollback is conflict-safe. Before applying each row action, `crm-core` compares
 the current active row to the post-import state recorded in the rollback plan.
 If the row was edited, deleted, or otherwise no longer matches the expected
 post-import state, that row is skipped and reported as a row-level error. For
-contacts and deals, the post-import comparison includes custom field values.
-Later rollback rows continue to run.
+contacts, deals, and activities, the post-import comparison includes custom
+field values. Later rollback rows continue to run.
 
 The rollback result reports:
 
@@ -409,9 +464,10 @@ created rows are reported as skipped, and already-restored merge rows no longer
 match the post-import expected state.
 
 Row-level rollback is not full database restore. It does not roll back
-relationships, organization custom fields, notes-as-records, tags, activities,
-audit logs, sync changelog rows, proposed actions, external clients,
-permissions, settings, backup metadata, or schema changes.
+relationships beyond the supported imported row behavior, organization custom
+fields, notes-as-records, tags, audit logs, sync changelog rows, proposed
+actions, external clients, permissions, settings, backup metadata, or schema
+changes.
 
 ## Export Behavior
 
@@ -463,6 +519,8 @@ The following are not implemented in the current import/export surface:
 - Scheduled export.
 - MCP/AI-driven import behavior.
 - Sync-server upload or download as part of import/export.
-- Organization or activity custom field import/export.
-- Notes, tags, activities, audit log, proposed actions, external clients, or
-  permissions import/export.
+- Organization custom field import/export.
+- Relationship import/export beyond optional activity `contact_id` and `deal_id`
+  local ID columns.
+- Notes, tags, audit log, proposed actions, external clients, or permissions
+  import/export.
