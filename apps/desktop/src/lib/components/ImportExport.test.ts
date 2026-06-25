@@ -224,6 +224,66 @@ describe("ImportExport component", () => {
     expect(screen.getByRole("button", { name: "Restore pre-import backup" })).toBeTruthy();
   });
 
+  it("does not allow JSON duplicate preflight while preview is loading", async () => {
+    let resolvePreview: (preview: {
+      total_rows: number;
+      headers: string[];
+      rows: Array<{ row_number: number; values: Record<string, string> }>;
+    }) => void = () => {};
+
+    openDialogMock.mockResolvedValue("/tmp/contacts.json");
+    previewJsonMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePreview = resolve;
+        }),
+    );
+    preflightJsonMock.mockResolvedValue({
+      entity_type: "contacts",
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+
+    render(ImportExport, { open: true });
+
+    await fireEvent.change(screen.getByLabelText("Format"), {
+      target: { value: "json" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+
+    await waitFor(() => {
+      expect(previewJsonMock).toHaveBeenCalledWith(
+        "contacts",
+        "/tmp/contacts.json",
+      );
+    });
+
+    const detectButton = screen.getByRole("button", { name: "Detect duplicates" }) as HTMLButtonElement;
+    expect(detectButton.disabled).toBe(true);
+    await fireEvent.click(detectButton);
+    expect(preflightJsonMock).not.toHaveBeenCalled();
+    expect(importDataMock).not.toHaveBeenCalled();
+
+    resolvePreview({
+      total_rows: 1,
+      headers: ["first_name"],
+      rows: [{ row_number: 2, values: { first_name: "Ada" } }],
+    });
+
+    await screen.findByText("Preview rows");
+    const readyDetectButton = screen.getByRole("button", { name: "Detect duplicates" }) as HTMLButtonElement;
+    expect(readyDetectButton.disabled).toBe(false);
+
+    await fireEvent.click(readyDetectButton);
+    await waitFor(() => {
+      expect(preflightJsonMock).toHaveBeenCalledWith(
+        "contacts",
+        "/tmp/contacts.json",
+      );
+    });
+  });
+
   it("keeps invalid JSON preview errors from running preflight or import", async () => {
     openDialogMock.mockResolvedValue("/tmp/contacts-invalid.json");
     previewJsonMock.mockRejectedValue(new Error("JSON import expects a top-level array"));

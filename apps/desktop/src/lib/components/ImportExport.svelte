@@ -59,6 +59,7 @@
   let selectedImportLabel = $state<string | null>(null);
   let fileSource = $state<FileSource | null>(null);
   let isImporting = $state(false);
+  let isPreviewing = $state(false);
   let isPreflighting = $state(false);
   let importEntity = $state<ImportExportEntity>('contacts');
   let importFormat = $state<ImportFormat>('csv');
@@ -165,6 +166,7 @@
     selectedImportLabel = label;
     selectedImportPath = path;
     fileSource = source;
+    isPreviewing = false;
     parseResult = parseCSV(csvText);
     jsonPreview = null;
     preflightReport = null;
@@ -189,6 +191,7 @@
     selectedImportLabel = label;
     selectedImportPath = path;
     fileSource = 'desktop';
+    isPreviewing = true;
     preflightReport = null;
     importSummary = null;
     importBackupPath = null;
@@ -205,6 +208,8 @@
       selectedImportPath = null;
       validationErrors = [t('import.previewFailed')];
       uiStore.toastError(t('import.previewFailed'));
+    } finally {
+      isPreviewing = false;
     }
   }
 
@@ -216,6 +221,7 @@
     selectedImportLabel = null;
     fileSource = null;
     isImporting = false;
+    isPreviewing = false;
     isPreflighting = false;
     importStep = 'select';
     columnMapping = {};
@@ -297,7 +303,7 @@
   }
 
   async function handleJsonImport() {
-    if (!selectedImportPath) {
+    if (!selectedImportPath || !jsonPreview || isPreviewing) {
       uiStore.toastError(t('import.chooseFile'));
       return;
     }
@@ -324,7 +330,7 @@
   }
 
   async function handleJsonPreflight() {
-    if (!selectedImportPath) {
+    if (!selectedImportPath || !jsonPreview || isPreviewing) {
       uiStore.toastError(t('import.chooseFile'));
       return;
     }
@@ -927,7 +933,7 @@
               <button
                 class="btn btn-primary"
                 onclick={handleJsonPreflight}
-                disabled={!selectedImportPath || isPreflighting}
+                disabled={!selectedImportPath || !jsonPreview || isPreviewing || isPreflighting}
                 type="button"
               >
                 {isPreflighting ? t('import.checking') : t('import.detectDuplicates')}
@@ -936,7 +942,7 @@
               <button
                 class="btn btn-primary"
                 onclick={handleJsonPreflight}
-                disabled={!selectedImportPath || isPreflighting}
+                disabled={!selectedImportPath || !jsonPreview || isPreviewing || isPreflighting}
                 type="button"
               >
                 {isPreflighting ? t('import.checking') : t('import.detectDuplicates')}
