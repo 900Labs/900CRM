@@ -3103,6 +3103,290 @@ fn import_deals_json_creates_valid_rows_and_skips_blank_titles() {
 }
 
 #[test]
+fn import_deals_csv_with_auto_merge_fills_safe_fields_without_overwriting_and_creates_new_rows() {
+    let (mut core, path) = open_test_core();
+    let existing = core
+        .create_deal(
+            "Acme Renewal".to_string(),
+            Some(0.0),
+            Some("EUR".to_string()),
+            Some("Proposal".to_string()),
+            Some(50),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("existing deal should be created");
+
+    let csv_path = path.join("deals-auto-merge.csv");
+    std::fs::write(
+        &csv_path,
+        "title,value,currency,stage,expected_close,notes\n\
+         acme renewal,12500.50,USD,Negotiation,2026-10-15,Imported note\n\
+         Lagos Expansion,9000,GBP,Lead,2026-11-01,New deal\n",
+    )
+    .expect("deal auto-merge CSV fixture should write");
+
+    let result = core
+        .import_deals_csv_with_options(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("deal auto-merge import should succeed");
+
+    assert_eq!(result.created, 1);
+    assert_eq!(result.merged, 1);
+    assert_eq!(result.skipped, 0);
+    assert!(result.errors.is_empty());
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM deals"), 2);
+
+    let merged = core
+        .get_deal(&existing.id)
+        .expect("merged deal should still exist");
+    assert_eq!(merged.title, "Acme Renewal");
+    assert_eq!(merged.value, 12500.50);
+    assert_eq!(merged.currency, "EUR");
+    assert_eq!(merged.stage, "Proposal");
+    assert_eq!(merged.expected_close.as_deref(), Some("2026-10-15"));
+    assert_eq!(merged.notes, "Imported note");
+    assert!(merged.contact_id.is_none());
+    assert!(merged.organization_id.is_none());
+    assert!(merged.deleted_at.is_none());
+
+    let import_merge_audit = count(
+        &core,
+        "SELECT COUNT(*) FROM audit_log WHERE actor_type = 'import' AND action = 'import_row_merge' AND entity_type = 'deal'",
+    );
+    assert_eq!(import_merge_audit, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_deals_duplicate_auto_merge_disabled_preserves_create_behavior() {
+    let (mut core, path) = open_test_core();
+    core.create_deal(
+        "Acme Renewal".to_string(),
+        Some(5000.0),
+        Some("USD".to_string()),
+        Some("Proposal".to_string()),
+        Some(50),
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("existing deal should be created");
+
+    let csv_path = path.join("deals-no-auto-merge.csv");
+    std::fs::write(
+        &csv_path,
+        "title,value,currency,stage,expected_close,notes\n\
+         acme renewal,7500,EUR,Negotiation,2026-10-15,Potential duplicate\n",
+    )
+    .expect("deal CSV fixture should write");
+
+    let result = core
+        .import_deals_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("default deal import should succeed");
+
+    assert_eq!(result.created, 1);
+    assert_eq!(result.merged, 0);
+    assert_eq!(result.skipped, 0);
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM deals"), 2);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_deals_json_with_auto_merge_fills_only_blank_or_default_safe_fields() {
+    let (mut core, path) = open_test_core();
+    let existing = core
+        .create_deal(
+            "Acme Renewal".to_string(),
+            Some(5000.0),
+            Some("USD".to_string()),
+            Some("Proposal".to_string()),
+            Some(50),
+            Some("2026-09-30".to_string()),
+            None,
+            None,
+            Some("Existing note".to_string()),
+        )
+        .expect("existing deal should be created");
+
+    let json_path = path.join("deals-auto-merge.json");
+    std::fs::write(
+        &json_path,
+        r#"[
+  {
+    "title": " acme renewal ",
+    "value": "7500",
+    "currency": "EUR",
+    "stage": "Negotiation",
+    "expected_close": "2026-10-15",
+    "notes": "Imported note"
+  }
+]
+"#,
+    )
+    .expect("deal auto-merge JSON fixture should write");
+
+    let result = core
+        .import_deals_json_with_options(
+            json_path.to_str().expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("deal JSON auto-merge import should succeed");
+
+    assert_eq!(result.created, 0);
+    assert_eq!(result.merged, 1);
+    assert_eq!(result.skipped, 0);
+    assert!(result.errors.is_empty());
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM deals"), 1);
+
+    let merged = core
+        .get_deal(&existing.id)
+        .expect("merged deal should still exist");
+    assert_eq!(merged.title, "Acme Renewal");
+    assert_eq!(merged.value, 5000.0);
+    assert_eq!(merged.currency, "USD");
+    assert_eq!(merged.stage, "Proposal");
+    assert_eq!(merged.expected_close.as_deref(), Some("2026-09-30"));
+    assert_eq!(merged.notes, "Existing note");
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_deals_mapped_csv_with_auto_merge_uses_title_duplicate_rule() {
+    let (mut core, path) = open_test_core();
+    let existing = core
+        .create_deal(
+            " Acme Renewal ".to_string(),
+            Some(0.0),
+            Some("USD".to_string()),
+            Some("Lead".to_string()),
+            Some(10),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("existing deal should be created");
+
+    let csv_path = path.join("deals-mapped-auto-merge.csv");
+    std::fs::write(
+        &csv_path,
+        "Opportunity,Amount,ISO,Phase,Close Date,Memo\n\
+         ACME RENEWAL,4250,EUR,Negotiation,2026-12-01,Mapped note\n",
+    )
+    .expect("mapped deal CSV fixture should write");
+
+    let result = core
+        .import_deals_csv_with_mapping_and_options(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            import_mapping(&[
+                ("Opportunity", Some("title")),
+                ("Amount", Some("value")),
+                ("ISO", Some("currency")),
+                ("Phase", Some("stage")),
+                ("Close Date", Some("expected_close")),
+                ("Memo", Some("notes")),
+            ]),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("mapped deal auto-merge import should succeed");
+
+    assert_eq!(result.created, 0);
+    assert_eq!(result.merged, 1);
+    assert_eq!(result.skipped, 0);
+    assert!(result.errors.is_empty());
+
+    let merged = core
+        .get_deal(&existing.id)
+        .expect("merged deal should still exist");
+    assert_eq!(merged.title, " Acme Renewal ");
+    assert_eq!(merged.value, 4250.0);
+    assert_eq!(merged.currency, "USD");
+    assert_eq!(merged.stage, "Lead");
+    assert_eq!(merged.expected_close.as_deref(), Some("2026-12-01"));
+    assert_eq!(merged.notes, "Mapped note");
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_deals_mapped_json_with_auto_merge_skips_ambiguous_title_matches() {
+    let (mut core, path) = open_test_core();
+    for stage in ["Lead", "Proposal"] {
+        core.create_deal(
+            "Acme Renewal".to_string(),
+            Some(1000.0),
+            Some("USD".to_string()),
+            Some(stage.to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("duplicate deal should be created");
+    }
+
+    let json_path = path.join("deals-mapped-ambiguous-auto-merge.json");
+    std::fs::write(
+        &json_path,
+        r#"[
+  {
+    "Opportunity": " acme renewal ",
+    "Amount": "7500",
+    "Memo": "Ambiguous duplicate"
+  }
+]
+"#,
+    )
+    .expect("mapped deal JSON fixture should write");
+
+    let result = core
+        .import_deals_json_with_mapping_and_options(
+            json_path.to_str().expect("path should be valid UTF-8"),
+            import_mapping(&[
+                ("Opportunity", Some("title")),
+                ("Amount", Some("value")),
+                ("Memo", Some("notes")),
+            ]),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("ambiguous deal auto-merge import should finish with row error");
+
+    assert_eq!(result.created, 0);
+    assert_eq!(result.merged, 0);
+    assert_eq!(result.skipped, 1);
+    assert_eq!(count(&core, "SELECT COUNT(*) FROM deals"), 2);
+    assert_eq!(result.errors.len(), 1);
+    assert!(result.errors[0].starts_with("Row 2:"));
+    assert!(result.errors[0].contains("duplicate auto-merge skipped because multiple deals match"));
+    assert!(result.errors[0].contains("(acme renewal)"));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn import_organizations_json_creates_valid_rows_and_skips_blank_names() {
     let (mut core, path) = open_test_core();
     let json_path = path.join("organizations.json");
