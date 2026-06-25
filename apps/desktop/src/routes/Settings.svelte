@@ -35,6 +35,7 @@
     type ExternalClient,
   } from '$lib/api/externalClients';
   import { testEmailServerConnection } from '$lib/api/email';
+  import ExternalClientPermissions from '$lib/components/ExternalClientPermissions.svelte';
   import ImportExport from '$lib/components/ImportExport.svelte';
 
   // ── Types ────────────────────────────────────────────────────────────────────
@@ -1171,6 +1172,7 @@
                       <dd>{formatExternalClientTimestamp(client.updatedAt)}</dd>
                     </div>
                   </dl>
+                  <ExternalClientPermissions {client} />
                 </article>
               {/each}
             </div>
