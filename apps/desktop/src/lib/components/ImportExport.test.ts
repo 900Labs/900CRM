@@ -4,17 +4,17 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
-  importDataMock,
+  importJsonWithMappingMock,
   openDialogMock,
-  preflightJsonMock,
+  preflightJsonWithMappingMock,
   previewJsonMock,
   restoreLocalBackupToAppDataMock,
   validateLocalBackupMock,
 } = vi.hoisted(
   () => ({
-    importDataMock: vi.fn(),
+    importJsonWithMappingMock: vi.fn(),
     openDialogMock: vi.fn(),
-    preflightJsonMock: vi.fn(),
+    preflightJsonWithMappingMock: vi.fn(),
     previewJsonMock: vi.fn(),
     restoreLocalBackupToAppDataMock: vi.fn(),
     validateLocalBackupMock: vi.fn(),
@@ -31,8 +31,8 @@ vi.mock("$lib/api/importExport", async (importOriginal) => {
 
   return {
     ...actual,
-    importData: importDataMock,
-    preflightJson: preflightJsonMock,
+    importJsonWithMapping: importJsonWithMappingMock,
+    preflightJsonWithMapping: preflightJsonWithMappingMock,
     previewJson: previewJsonMock,
   };
 });
@@ -75,7 +75,7 @@ async function renderJsonImportSummary(result = importWithBackupResult) {
       },
     ],
   });
-  preflightJsonMock.mockResolvedValue({
+  preflightJsonWithMappingMock.mockResolvedValue({
     entity_type: "contacts",
     total_rows: 1,
     duplicate_warning_count: 1,
@@ -92,7 +92,7 @@ async function renderJsonImportSummary(result = importWithBackupResult) {
       },
     ],
   });
-  importDataMock.mockResolvedValue(result);
+  importJsonWithMappingMock.mockResolvedValue(result);
 
   render(ImportExport, { open: true });
 
@@ -106,22 +106,31 @@ async function renderJsonImportSummary(result = importWithBackupResult) {
       "/tmp/contacts.json",
     );
   });
-  await screen.findByText("Preview rows");
+  await screen.findByText("Ada");
+  await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  await screen.findByText("Column Mapping");
   await fireEvent.click(await screen.findByRole("button", { name: "Detect duplicates" }));
   await waitFor(() => {
-    expect(preflightJsonMock).toHaveBeenCalledWith(
+    expect(preflightJsonWithMappingMock).toHaveBeenCalledWith(
       "contacts",
       "/tmp/contacts.json",
+      {
+        email: "email",
+        first_name: "first_name",
+      },
     );
   });
   await fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
   await fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
 
   await waitFor(() => {
-    expect(importDataMock).toHaveBeenCalledWith(
+    expect(importJsonWithMappingMock).toHaveBeenCalledWith(
       "contacts",
-      "json",
       "/tmp/contacts.json",
+      {
+        email: "email",
+        first_name: "first_name",
+      },
     );
   });
   await screen.findByText("Created");
@@ -130,9 +139,9 @@ async function renderJsonImportSummary(result = importWithBackupResult) {
 describe("ImportExport component", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    importDataMock.mockReset();
+    importJsonWithMappingMock.mockReset();
     openDialogMock.mockReset();
-    preflightJsonMock.mockReset();
+    preflightJsonWithMappingMock.mockReset();
     previewJsonMock.mockReset();
     restoreLocalBackupToAppDataMock.mockReset();
     validateLocalBackupMock.mockReset();
@@ -150,7 +159,7 @@ describe("ImportExport component", () => {
         },
       ],
     });
-    preflightJsonMock.mockResolvedValue({
+    preflightJsonWithMappingMock.mockResolvedValue({
       entity_type: "contacts",
       total_rows: 1,
       duplicate_warning_count: 1,
@@ -167,7 +176,7 @@ describe("ImportExport component", () => {
         },
       ],
     });
-    importDataMock.mockResolvedValue(importWithBackupResult);
+    importJsonWithMappingMock.mockResolvedValue(importWithBackupResult);
 
     render(ImportExport, { open: true });
 
@@ -182,37 +191,48 @@ describe("ImportExport component", () => {
         "/tmp/contacts.json",
       );
     });
-    expect(preflightJsonMock).not.toHaveBeenCalled();
-    expect(importDataMock).not.toHaveBeenCalled();
-    expect(await screen.findByText("Preview rows")).toBeTruthy();
-    expect(screen.getByText("Ada")).toBeTruthy();
+    expect(preflightJsonWithMappingMock).not.toHaveBeenCalled();
+    expect(importJsonWithMappingMock).not.toHaveBeenCalled();
+    expect(await screen.findByText("Ada")).toBeTruthy();
     expect(screen.getByText("ada@example.com")).toBeTruthy();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Column Mapping")).toBeTruthy();
+    expect(screen.getByLabelText("Map to field: first_name")).toBeTruthy();
+    expect(screen.getByLabelText("Map to field: email")).toBeTruthy();
 
     await fireEvent.click(screen.getByRole("button", { name: "Detect duplicates" }));
 
     await waitFor(() => {
-      expect(preflightJsonMock).toHaveBeenCalledWith(
+      expect(preflightJsonWithMappingMock).toHaveBeenCalledWith(
         "contacts",
         "/tmp/contacts.json",
+        {
+          email: "email",
+          first_name: "first_name",
+        },
       );
     });
 
-    expect(importDataMock).not.toHaveBeenCalled();
+    expect(importJsonWithMappingMock).not.toHaveBeenCalled();
     expect(screen.getByText("1 duplicate warnings")).toBeTruthy();
     expect(screen.getByText("Ada Lovelace")).toBeTruthy();
 
     await fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(importDataMock).not.toHaveBeenCalled();
+    expect(importJsonWithMappingMock).not.toHaveBeenCalled();
 
     await fireEvent.click(
       screen.getByRole("button", { name: "Confirm import" }),
     );
 
     await waitFor(() => {
-      expect(importDataMock).toHaveBeenCalledWith(
+      expect(importJsonWithMappingMock).toHaveBeenCalledWith(
         "contacts",
-        "json",
         "/tmp/contacts.json",
+        {
+          email: "email",
+          first_name: "first_name",
+        },
       );
     });
 
@@ -222,6 +242,101 @@ describe("ImportExport component", () => {
       ),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Restore pre-import backup" })).toBeTruthy();
+  });
+
+  it("maps nonstandard JSON source fields before preflight and import", async () => {
+    openDialogMock.mockResolvedValue("/tmp/contacts-custom.json");
+    previewJsonMock.mockResolvedValue({
+      total_rows: 1,
+      headers: ["Given", "Mail"],
+      rows: [
+        {
+          row_number: 2,
+          values: { Given: "Ada", Mail: "ada@example.com" },
+        },
+      ],
+    });
+    preflightJsonWithMappingMock.mockResolvedValue({
+      entity_type: "contacts",
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    importJsonWithMappingMock.mockResolvedValue(importWithBackupResult);
+
+    render(ImportExport, { open: true });
+
+    await fireEvent.change(screen.getByLabelText("Format"), {
+      target: { value: "json" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+    await screen.findByText("Ada");
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    await fireEvent.change(screen.getByLabelText("Map to field: Given"), {
+      target: { value: "first_name" },
+    });
+    await fireEvent.change(screen.getByLabelText("Map to field: Mail"), {
+      target: { value: "email" },
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Detect duplicates" }));
+    await waitFor(() => {
+      expect(preflightJsonWithMappingMock).toHaveBeenCalledWith(
+        "contacts",
+        "/tmp/contacts-custom.json",
+        {
+          Given: "first_name",
+          Mail: "email",
+        },
+      );
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
+    await waitFor(() => {
+      expect(importJsonWithMappingMock).toHaveBeenCalledWith(
+        "contacts",
+        "/tmp/contacts-custom.json",
+        {
+          Given: "first_name",
+          Mail: "email",
+        },
+      );
+    });
+  });
+
+  it("blocks duplicate JSON field mappings before preflight or import", async () => {
+    openDialogMock.mockResolvedValue("/tmp/contacts-duplicate-mapping.json");
+    previewJsonMock.mockResolvedValue({
+      total_rows: 1,
+      headers: ["First Name", "Given Name", "Email"],
+      rows: [
+        {
+          row_number: 2,
+          values: {
+            "First Name": "Ada",
+            "Given Name": "Augusta",
+            Email: "ada@example.com",
+          },
+        },
+      ],
+    });
+
+    render(ImportExport, { open: true });
+
+    await fireEvent.change(screen.getByLabelText("Format"), {
+      target: { value: "json" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+    await screen.findByText("Ada");
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Detect duplicates" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "First name is mapped more than once: First Name, Given Name.",
+    );
+    expect(preflightJsonWithMappingMock).not.toHaveBeenCalled();
+    expect(importJsonWithMappingMock).not.toHaveBeenCalled();
   });
 
   it("does not allow JSON duplicate preflight while preview is loading", async () => {
@@ -238,7 +353,7 @@ describe("ImportExport component", () => {
           resolvePreview = resolve;
         }),
     );
-    preflightJsonMock.mockResolvedValue({
+    preflightJsonWithMappingMock.mockResolvedValue({
       entity_type: "contacts",
       total_rows: 1,
       duplicate_warning_count: 0,
@@ -259,11 +374,11 @@ describe("ImportExport component", () => {
       );
     });
 
-    const detectButton = screen.getByRole("button", { name: "Detect duplicates" }) as HTMLButtonElement;
-    expect(detectButton.disabled).toBe(true);
-    await fireEvent.click(detectButton);
-    expect(preflightJsonMock).not.toHaveBeenCalled();
-    expect(importDataMock).not.toHaveBeenCalled();
+    const nextButton = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
+    expect(nextButton.disabled).toBe(true);
+    await fireEvent.click(nextButton);
+    expect(preflightJsonWithMappingMock).not.toHaveBeenCalled();
+    expect(importJsonWithMappingMock).not.toHaveBeenCalled();
 
     resolvePreview({
       total_rows: 1,
@@ -271,15 +386,20 @@ describe("ImportExport component", () => {
       rows: [{ row_number: 2, values: { first_name: "Ada" } }],
     });
 
-    await screen.findByText("Preview rows");
+    await screen.findByText("Ada");
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("Column Mapping");
     const readyDetectButton = screen.getByRole("button", { name: "Detect duplicates" }) as HTMLButtonElement;
     expect(readyDetectButton.disabled).toBe(false);
 
     await fireEvent.click(readyDetectButton);
     await waitFor(() => {
-      expect(preflightJsonMock).toHaveBeenCalledWith(
+      expect(preflightJsonWithMappingMock).toHaveBeenCalledWith(
         "contacts",
         "/tmp/contacts.json",
+        {
+          first_name: "first_name",
+        },
       );
     });
   });
@@ -298,9 +418,9 @@ describe("ImportExport component", () => {
     expect((await screen.findByRole("alert")).textContent).toContain(
       "JSON preview failed. Choose a valid JSON array of supported rows.",
     );
-    expect(preflightJsonMock).not.toHaveBeenCalled();
-    expect(importDataMock).not.toHaveBeenCalled();
-    expect((screen.getByRole("button", { name: "Detect duplicates" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(preflightJsonWithMappingMock).not.toHaveBeenCalled();
+    expect(importJsonWithMappingMock).not.toHaveBeenCalled();
+    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("does not show the restore control when the import summary has no backup path", async () => {

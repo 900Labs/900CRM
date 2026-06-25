@@ -18,8 +18,9 @@ for:
 Import and export use local files selected by the user. There is no cloud import
 service, no remote export destination, and no automatic upload.
 
-JSON import is intentionally limited to direct local `.json` files that match
-the flat array-of-objects shape produced by JSON export.
+JSON import is intentionally limited to direct local `.json` files containing a
+flat array of objects. Source object keys can match supported target fields
+directly or be mapped in the import wizard before duplicate preflight.
 
 ## Import Entry Point
 
@@ -40,18 +41,17 @@ Mapped imports require a desktop-selected file path so the Rust backend can read
 the same CSV file. The browser file-input fallback can preview text, but mapped
 backend import/preflight requires the desktop file picker path.
 
-For JSON contacts, deals, and organizations, the current flow is direct but
-still duplicate-gated:
+For JSON contacts, deals, and organizations, the current flow reuses the same
+mapping and duplicate-gated confirmation concepts as CSV:
 
 1. Select entity type and JSON format.
 2. Select a local `.json` file.
 3. Preview the parsed JSON rows in the browser.
-4. Run duplicate preflight checks.
-5. Review duplicate warnings if any are found.
-6. Confirm import.
-7. Review the import summary.
-
-JSON import does not include field mapping or the CSV mapping wizard.
+4. Map source JSON fields to supported CRM fields.
+5. Run duplicate preflight checks.
+6. Review duplicate warnings if any are found.
+7. Confirm import.
+8. Review the import summary.
 
 ## CSV Import Parsing
 
@@ -74,8 +74,8 @@ Rows with a blank required field are skipped by the parser:
 
 ## JSON Import Parsing
 
-JSON import accepts a top-level array of flat objects using the same fields as
-the matching JSON export:
+Direct JSON import accepts a top-level array of flat objects using the same
+fields as the matching JSON export:
 
 - contacts: `first_name`, `last_name`, `org_name`, `email`, `phone`, `address`,
   `city`, `country`, and `notes`;
@@ -85,18 +85,20 @@ the matching JSON export:
   `description`.
 
 JSON rows are parsed into the same flat row structs used by CSV import and then
-sent through the same `crm-core` create/import paths as CSV rows. Rows with a
-blank required field are skipped before create attempts, matching CSV behavior.
+sent through the same `crm-core` create/import paths as CSV rows. When source
+keys are nonstandard, the JSON mapping step maps object keys to those same flat
+target fields before duplicate preflight or import. Rows with a blank mapped
+required field are skipped before create attempts, matching CSV behavior.
 
 JSON row numbers are reported with the same data-row offset as CSV imports: the
 first JSON array item is row 2.
 
 The desktop UI parses JSON files through a read-only preview command before
-duplicate preflight or import confirmation. The preview shows the supported
-flat fields and up to the first five importable rows. Preview parsing does not
+mapping, duplicate preflight, or import confirmation. The preview shows source
+object keys and up to the first five JSON object rows. Preview parsing does not
 create automatic backups, create or update CRM rows, or write audit/sync rows.
-Invalid JSON or an unsupported shape blocks the duplicate preflight/import path
-and shows a preview error.
+Invalid JSON, non-object rows, or an unsupported shape blocks the duplicate
+preflight/import path and shows a preview error.
 
 ## Contact CSV
 
@@ -208,8 +210,9 @@ records, tags, activities, audit log entries, proposed actions, external
 clients, permissions, settings, or backup metadata.
 
 JSON import preview is read-only and browser-visible in the import/export modal.
-It uses the same supported flat fields as JSON import/export and does not add
-JSON field mapping.
+It shows source object keys before the mapping step. Matching supported JSON
+keys are auto-mapped, and nonstandard source keys can be mapped to the
+supported flat import fields before duplicate preflight and confirmed import.
 
 ## Duplicate Preflight
 
@@ -259,7 +262,7 @@ Those paths record sync changelog entries and audit evidence. The import
 service also records an `import_row` audit entry for each successfully imported
 contact, deal, or organization.
 
-Desktop CSV, mapped CSV, and JSON imports for contacts, deals, and
+Desktop CSV, mapped CSV, JSON, and mapped JSON imports for contacts, deals, and
 organizations first create an automatic local backup through
 `CrmCore::create_local_backup`. The backup is created immediately before import
 rows are written, and backup failure stops the import. The import summary shown
@@ -311,7 +314,6 @@ validated backup workflow.
 
 The following are not implemented in the current import/export surface:
 
-- JSON field mapping.
 - Contact or organization duplicate auto-merge during import.
 - Deal duplicate auto-merge during import.
 - Import rollback for a completed multi-row import.
