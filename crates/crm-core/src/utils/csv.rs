@@ -104,6 +104,19 @@
 //! | `deleted_at`      | Soft-delete timestamp, blank for exported active rows |
 //! | `device_id`       | Local device identifier |
 //!
+//! # External Client Permissions CSV Format
+//!
+//! | Column                  | Notes |
+//! |-------------------------|-------|
+//! | `id`                    | Local external client permission UUID |
+//! | `client_id`             | Local external client UUID |
+//! | `tool_name`             | Tool name governed by the row |
+//! | `can_read`              | Stored read permission flag |
+//! | `can_write`             | Stored write permission flag |
+//! | `requires_confirmation` | Stored confirmation requirement flag |
+//! | `created_at`            | Permission row creation timestamp |
+//! | `updated_at`            | Permission row update timestamp |
+//!
 //! # Proposed Actions CSV Format
 //!
 //! | Column                 | Notes |
@@ -526,6 +539,23 @@ pub struct ExternalClientCsvRow {
     #[serde(default)]
     pub deleted_at: Option<String>,
     pub device_id: String,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// External client permission CSV record
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A flat CSV/JSON row representing one local external client permission row.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExternalClientPermissionCsvRow {
+    pub id: String,
+    pub client_id: String,
+    pub tool_name: String,
+    pub can_read: bool,
+    pub can_write: bool,
+    pub requires_confirmation: bool,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3035,6 +3065,56 @@ pub fn write_external_clients_csv<W: Write>(
 
     wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
     log::info!("Wrote {} external client rows to CSV", rows.len());
+    Ok(())
+}
+
+/// Serializes a slice of [`ExternalClientPermissionCsvRow`] to CSV bytes.
+///
+/// The output always includes current external-client permission storage
+/// columns in a deterministic order. It is export-only and does not grant
+/// permissions.
+pub fn write_external_client_permissions_csv<W: Write>(
+    writer: W,
+    rows: &[ExternalClientPermissionCsvRow],
+) -> CrmResult<()> {
+    let mut wtr = csv::WriterBuilder::new()
+        .has_headers(false)
+        .from_writer(writer);
+
+    wtr.write_record([
+        "id",
+        "client_id",
+        "tool_name",
+        "can_read",
+        "can_write",
+        "requires_confirmation",
+        "created_at",
+        "updated_at",
+    ])
+    .map_err(|e| CrmError::Csv(e.to_string()))?;
+
+    for row in rows {
+        let can_read = row.can_read.to_string();
+        let can_write = row.can_write.to_string();
+        let requires_confirmation = row.requires_confirmation.to_string();
+        wtr.write_record([
+            &row.id,
+            &row.client_id,
+            &row.tool_name,
+            &can_read,
+            &can_write,
+            &requires_confirmation,
+            &row.created_at,
+            &row.updated_at,
+        ])
+        .map_err(|e| CrmError::Csv(e.to_string()))?;
+    }
+
+    wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
+    log::info!(
+        "Wrote {} external client permission rows to CSV",
+        rows.len()
+    );
     Ok(())
 }
 

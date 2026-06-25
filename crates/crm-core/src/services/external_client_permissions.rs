@@ -1,3 +1,5 @@
+use std::{fs, io::BufWriter};
+
 use rusqlite::Connection;
 
 use crate::audit::ACTOR_DESKTOP_APP;
@@ -9,7 +11,10 @@ use crate::result::CrmResult;
 use crate::storage::{
     self, external_client_permissions::ExternalClientPermission, external_clients::ExternalClient,
 };
-use crate::utils::errors::CrmError;
+use crate::utils::{
+    csv::{write_external_client_permissions_csv, ExternalClientPermissionCsvRow},
+    errors::CrmError,
+};
 
 use super::{record_audit_json, CrmCore};
 
@@ -22,6 +27,32 @@ impl CrmCore {
         require_existing_external_client(&self.db.conn, &client_id)?;
 
         storage::external_client_permissions::list_permissions_for_client(&self.db.conn, &client_id)
+    }
+
+    pub fn export_external_client_permissions_csv(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_external_client_permission_rows()?;
+        let count = rows.len() as u32;
+        let file = fs::File::create(file_path)?;
+        write_external_client_permissions_csv(BufWriter::new(file), &rows)?;
+        Ok(count)
+    }
+
+    pub fn export_external_client_permissions_json(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_external_client_permission_rows()?;
+        let count = rows.len() as u32;
+        super::write_json_export(file_path, &rows)?;
+        Ok(count)
+    }
+
+    fn export_external_client_permission_rows(
+        &self,
+    ) -> CrmResult<Vec<ExternalClientPermissionCsvRow>> {
+        Ok(
+            storage::external_client_permissions::list_all_permissions_for_export(&self.db.conn)?
+                .into_iter()
+                .map(external_client_permission_export_row)
+                .collect(),
+        )
     }
 
     pub fn upsert_external_client_tool_permission(
@@ -102,6 +133,21 @@ impl CrmCore {
         let tool_name = required_external_client_field("tool_name", tool_name)?;
 
         evaluate_external_client_draft_permission(&self.db.conn, &client_id, &tool_name)
+    }
+}
+
+fn external_client_permission_export_row(
+    permission: ExternalClientPermission,
+) -> ExternalClientPermissionCsvRow {
+    ExternalClientPermissionCsvRow {
+        id: permission.id,
+        client_id: permission.client_id,
+        tool_name: permission.tool_name,
+        can_read: permission.can_read,
+        can_write: permission.can_write,
+        requires_confirmation: permission.requires_confirmation,
+        created_at: permission.created_at,
+        updated_at: permission.updated_at,
     }
 }
 

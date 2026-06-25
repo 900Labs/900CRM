@@ -238,6 +238,30 @@ describe("ImportExport component", () => {
     expect(container.querySelector('#export-entity option[value="external_clients"]')).not.toBeNull();
   });
 
+  it("shows external client permissions as export-only and disabled for import", async () => {
+    const { container } = render(ImportExport, { open: true });
+
+    const importOptions = Array.from(
+      container.querySelectorAll("#import-entity option[disabled]"),
+    ) as HTMLOptionElement[];
+    const permissionImportOption = importOptions.find((option) =>
+      option.textContent?.includes("External client permissions (export only)"),
+    );
+    expect(permissionImportOption).toBeTruthy();
+    expect(permissionImportOption?.disabled).toBe(true);
+    expect(
+      container.querySelector('#import-entity option[value="external_client_permissions"]'),
+    ).toBeNull();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Export" }));
+
+    const exportSelect = container.querySelector("#export-entity");
+    expect(exportSelect?.textContent).toContain("External client permissions");
+    expect(
+      container.querySelector('#export-entity option[value="external_client_permissions"]'),
+    ).not.toBeNull();
+  });
+
   it("previews JSON imports before duplicate preflight and confirmation", async () => {
     openDialogMock.mockResolvedValue("/tmp/contacts.json");
     previewJsonMock.mockResolvedValue({

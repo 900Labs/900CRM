@@ -227,6 +227,26 @@ pub async fn export_external_clients_json(
 }
 
 #[tauri::command]
+pub async fn export_external_client_permissions_csv(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<u32, String> {
+    let core = super::lock_core(&state)?;
+    core.export_external_client_permissions_csv(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_external_client_permissions_json(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<u32, String> {
+    let core = super::lock_core(&state)?;
+    core.export_external_client_permissions_json(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn import_deals_csv(
     state: State<'_, AppState>,
     file_path: String,
