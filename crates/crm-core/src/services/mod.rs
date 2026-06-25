@@ -50,6 +50,7 @@ mod backup;
 mod contacts;
 mod deal_relationships;
 mod external_client_permissions;
+mod import_rollback;
 mod migration_readiness;
 mod notes_tags;
 mod organizations;
@@ -58,6 +59,7 @@ mod search;
 mod settings;
 
 pub use backup::{LocalBackup, LocalBackupMetadata, LocalBackupValidation, LocalRestoreResult};
+pub use import_rollback::{ImportRollbackPlan, ImportRollbackResult};
 pub use migration_readiness::NormalizationMigrationPreflight;
 pub use notes_tags::TagColorUpdate;
 
@@ -86,6 +88,8 @@ pub struct ImportResult {
     pub merged: u32,
     pub skipped: u32,
     pub errors: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rollback_plan: Option<ImportRollbackPlan>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -835,32 +839,41 @@ impl CrmCore {
         let mut merged = 0u32;
         let mut skipped = 0u32;
         let mut errors = Vec::new();
+        let mut rollback_actions = Vec::new();
 
         for (row_number, row) in rows {
             if options.merge_duplicates {
                 match self.find_unique_contact_import_match(&row) {
-                    Ok(Some(contact)) => match self.merge_contact_import_row(&contact.id, &row) {
-                        Ok(()) => {
-                            let _ = storage::audit::record_audit(
-                                &self.db.conn,
-                                ACTOR_IMPORT,
-                                None,
-                                "import_row_merge",
-                                Some("contact"),
-                                Some(&contact.id),
-                                None,
-                                None,
-                                &self.device_id,
-                            );
-                            merged += 1;
-                            continue;
+                    Ok(Some(contact)) => {
+                        match self.merge_contact_import_row(row_number, &contact.id, &row) {
+                            Ok(rollback_action) => {
+                                if let Some(action) = rollback_action {
+                                    rollback_actions.push(action);
+                                }
+                                let _ = storage::audit::record_audit(
+                                    &self.db.conn,
+                                    ACTOR_IMPORT,
+                                    None,
+                                    "import_row_merge",
+                                    Some("contact"),
+                                    Some(&contact.id),
+                                    None,
+                                    None,
+                                    &self.device_id,
+                                );
+                                merged += 1;
+                                continue;
+                            }
+                            Err(e) => {
+                                errors.push(format!(
+                                    "Row {}: {} ({})",
+                                    row_number, e, row.first_name
+                                ));
+                                skipped += 1;
+                                continue;
+                            }
                         }
-                        Err(e) => {
-                            errors.push(format!("Row {}: {} ({})", row_number, e, row.first_name));
-                            skipped += 1;
-                            continue;
-                        }
-                    },
+                    }
                     Ok(None) => {}
                     Err(e) => {
                         errors.push(format!("Row {}: {} ({})", row_number, e, row.first_name));
@@ -884,6 +897,9 @@ impl CrmCore {
                 row.notes.clone(),
             ) {
                 Ok(contact) => {
+                    rollback_actions.push(import_rollback::ImportRollbackAction::created_contact(
+                        row_number, &contact,
+                    ));
                     let _ = storage::audit::record_audit(
                         &self.db.conn,
                         ACTOR_IMPORT,
@@ -909,6 +925,7 @@ impl CrmCore {
             merged,
             skipped,
             errors,
+            rollback_plan: import_rollback::ImportRollbackPlan::from_actions(rollback_actions),
         })
     }
 
@@ -942,7 +959,12 @@ impl CrmCore {
         }
     }
 
-    fn merge_contact_import_row(&mut self, contact_id: &str, row: &ContactCsvRow) -> CrmResult<()> {
+    fn merge_contact_import_row(
+        &mut self,
+        row_number: usize,
+        contact_id: &str,
+        row: &ContactCsvRow,
+    ) -> CrmResult<Option<import_rollback::ImportRollbackAction>> {
         let existing = self.get_contact(contact_id)?;
         let first_name = fill_blank_string(&existing.first_name, Some(&row.first_name));
         let last_name = fill_blank_string(&existing.last_name, row.last_name.as_ref());
@@ -964,14 +986,16 @@ impl CrmCore {
             && country.is_none()
             && notes.is_none()
         {
-            return Ok(());
+            return Ok(None);
         }
 
-        self.update_contact(
+        let updated = self.update_contact(
             contact_id, None, first_name, last_name, org_name, email, phone, address, city,
             country, notes,
         )?;
-        Ok(())
+        Ok(import_rollback::ImportRollbackAction::merged_contact(
+            row_number, &existing, &updated,
+        ))
     }
 
     pub fn preflight_contacts_csv_import(
@@ -1185,32 +1209,38 @@ impl CrmCore {
         let mut merged = 0u32;
         let mut skipped = 0u32;
         let mut errors = Vec::new();
+        let mut rollback_actions = Vec::new();
 
         for (row_number, row) in rows {
             if options.merge_duplicates {
                 match self.find_unique_deal_import_match(&row) {
-                    Ok(Some(deal)) => match self.merge_deal_import_row(&deal.id, &row) {
-                        Ok(()) => {
-                            let _ = storage::audit::record_audit(
-                                &self.db.conn,
-                                ACTOR_IMPORT,
-                                None,
-                                "import_row_merge",
-                                Some("deal"),
-                                Some(&deal.id),
-                                None,
-                                None,
-                                &self.device_id,
-                            );
-                            merged += 1;
-                            continue;
+                    Ok(Some(deal)) => {
+                        match self.merge_deal_import_row(row_number, &deal.id, &row) {
+                            Ok(rollback_action) => {
+                                if let Some(action) = rollback_action {
+                                    rollback_actions.push(action);
+                                }
+                                let _ = storage::audit::record_audit(
+                                    &self.db.conn,
+                                    ACTOR_IMPORT,
+                                    None,
+                                    "import_row_merge",
+                                    Some("deal"),
+                                    Some(&deal.id),
+                                    None,
+                                    None,
+                                    &self.device_id,
+                                );
+                                merged += 1;
+                                continue;
+                            }
+                            Err(e) => {
+                                errors.push(format!("Row {}: {} ({})", row_number, e, row.title));
+                                skipped += 1;
+                                continue;
+                            }
                         }
-                        Err(e) => {
-                            errors.push(format!("Row {}: {} ({})", row_number, e, row.title));
-                            skipped += 1;
-                            continue;
-                        }
-                    },
+                    }
                     Ok(None) => {}
                     Err(e) => {
                         errors.push(format!("Row {}: {} ({})", row_number, e, row.title));
@@ -1237,6 +1267,9 @@ impl CrmCore {
                 row.notes.clone(),
             ) {
                 Ok(deal) => {
+                    rollback_actions.push(import_rollback::ImportRollbackAction::created_deal(
+                        row_number, &deal,
+                    ));
                     let _ = storage::audit::record_audit(
                         &self.db.conn,
                         ACTOR_IMPORT,
@@ -1262,6 +1295,7 @@ impl CrmCore {
             merged,
             skipped,
             errors,
+            rollback_plan: import_rollback::ImportRollbackPlan::from_actions(rollback_actions),
         })
     }
 
@@ -1291,7 +1325,12 @@ impl CrmCore {
         }
     }
 
-    fn merge_deal_import_row(&mut self, deal_id: &str, row: &DealCsvRow) -> CrmResult<()> {
+    fn merge_deal_import_row(
+        &mut self,
+        row_number: usize,
+        deal_id: &str,
+        row: &DealCsvRow,
+    ) -> CrmResult<Option<import_rollback::ImportRollbackAction>> {
         let existing = self.get_deal(deal_id)?;
         let value = fill_zero_value(existing.value, row.value.as_ref());
         let expected_close =
@@ -1299,10 +1338,10 @@ impl CrmCore {
         let notes = fill_blank_string(&existing.notes, row.notes.as_ref());
 
         if value.is_none() && expected_close.is_none() && notes.is_none() {
-            return Ok(());
+            return Ok(None);
         }
 
-        self.update_deal(
+        let updated = self.update_deal(
             deal_id,
             None,
             value,
@@ -1314,7 +1353,9 @@ impl CrmCore {
             None,
             notes,
         )?;
-        Ok(())
+        Ok(import_rollback::ImportRollbackAction::merged_deal(
+            row_number, &existing, &updated,
+        ))
     }
 
     pub fn preflight_deals_csv_import(&self, file_path: &str) -> CrmResult<ImportPreflightReport> {
@@ -1495,13 +1536,18 @@ impl CrmCore {
         let mut merged = 0u32;
         let mut skipped = 0u32;
         let mut errors = Vec::new();
+        let mut rollback_actions = Vec::new();
 
         for (row_number, row) in rows {
             if options.merge_duplicates {
                 match self.find_unique_organization_import_match(&row) {
                     Ok(Some(organization)) => {
-                        match self.merge_organization_import_row(&organization.id, &row) {
-                            Ok(()) => {
+                        match self.merge_organization_import_row(row_number, &organization.id, &row)
+                        {
+                            Ok(rollback_action) => {
+                                if let Some(action) = rollback_action {
+                                    rollback_actions.push(action);
+                                }
                                 let _ = storage::audit::record_audit(
                                     &self.db.conn,
                                     ACTOR_IMPORT,
@@ -1546,6 +1592,12 @@ impl CrmCore {
                 row.description.clone(),
             ) {
                 Ok(organization) => {
+                    rollback_actions.push(
+                        import_rollback::ImportRollbackAction::created_organization(
+                            row_number,
+                            &organization,
+                        ),
+                    );
                     let _ = storage::audit::record_audit(
                         &self.db.conn,
                         ACTOR_IMPORT,
@@ -1571,6 +1623,7 @@ impl CrmCore {
             merged,
             skipped,
             errors,
+            rollback_plan: import_rollback::ImportRollbackPlan::from_actions(rollback_actions),
         })
     }
 
@@ -1617,9 +1670,10 @@ impl CrmCore {
 
     fn merge_organization_import_row(
         &mut self,
+        row_number: usize,
         organization_id: &str,
         row: &OrganizationCsvRow,
-    ) -> CrmResult<()> {
+    ) -> CrmResult<Option<import_rollback::ImportRollbackAction>> {
         let existing = self.get_organization(organization_id)?;
         let email = fill_blank_option(&existing.email, row.email.as_ref()).map(Some);
         let phone = fill_blank_option(&existing.phone, row.phone.as_ref()).map(Some);
@@ -1647,10 +1701,10 @@ impl CrmCore {
             && postal_code.is_none()
             && description.is_none()
         {
-            return Ok(());
+            return Ok(None);
         }
 
-        self.update_organization(
+        let updated = self.update_organization(
             organization_id,
             None,
             email,
@@ -1664,7 +1718,9 @@ impl CrmCore {
             postal_code,
             description,
         )?;
-        Ok(())
+        Ok(import_rollback::ImportRollbackAction::merged_organization(
+            row_number, &existing, &updated,
+        ))
     }
 
     pub fn preflight_organizations_csv_import(

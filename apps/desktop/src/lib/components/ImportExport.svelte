@@ -22,6 +22,7 @@
     importDealsCsvWithMapping,
     importJsonWithMapping,
     importOrganizationsCsvWithMapping,
+    rollbackCompletedImport,
     previewJson,
     preflightContactsCsvImportWithMapping,
     preflightDealsCsvImportWithMapping,
@@ -35,6 +36,7 @@
     type ImportOptions,
     type ImportPreflightReport,
     type ImportResult,
+    type ImportRollbackResult,
     type ImportWithBackupResult,
     type JsonImportPreview,
     type OrganizationImportTargetField,
@@ -74,6 +76,11 @@
   let isRestoringImportBackup = $state(false);
   let importRestoreMessage = $state<string | null>(null);
   let importRestoreError = $state<string | null>(null);
+  let isRollingBackImportRows = $state(false);
+  let importRollbackMessage = $state<string | null>(null);
+  let importRollbackError = $state<string | null>(null);
+  let importRollbackResult = $state<ImportRollbackResult | null>(null);
+  let importRollbackCompleted = $state(false);
 
   let exportEntity = $state<ImportExportEntity>('contacts');
   let exportFormat = $state<ExportFormat>('csv');
@@ -111,6 +118,8 @@
   const canAutoMergeDuplicates = $derived(
     importEntity === 'contacts' || importEntity === 'deals' || importEntity === 'organizations',
   );
+  const importRollbackPlan = $derived(importSummary?.rollback_plan ?? null);
+  const importRollbackActionCount = $derived(importRollbackPlan?.actions.length ?? 0);
 
   async function handleFilePick() {
     try {
@@ -207,6 +216,11 @@
     importBackupPath = null;
     importRestoreMessage = null;
     importRestoreError = null;
+    isRollingBackImportRows = false;
+    importRollbackMessage = null;
+    importRollbackError = null;
+    importRollbackResult = null;
+    importRollbackCompleted = false;
     validationErrors = [];
     columnMapping = {};
     importStep = 'select';
@@ -262,6 +276,10 @@
     importBackupPath = null;
     importRestoreMessage = null;
     importRestoreError = null;
+    importRollbackMessage = null;
+    importRollbackError = null;
+    importRollbackResult = null;
+    importRollbackCompleted = false;
   }
 
   function validateCurrentMapping(): boolean {
@@ -459,6 +477,10 @@
     importBackupPath = result.backup.backup_dir;
     importRestoreMessage = null;
     importRestoreError = null;
+    importRollbackMessage = null;
+    importRollbackError = null;
+    importRollbackResult = null;
+    importRollbackCompleted = false;
   }
 
   function backupActionErrorMessage(err: unknown): string {
@@ -471,6 +493,54 @@
     }
 
     return t('import.preImportBackupRestoreFailed');
+  }
+
+  function rowRollbackErrorMessage(err: unknown): string {
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
+    }
+
+    if (typeof err === 'string' && err.trim()) {
+      return err;
+    }
+
+    return t('import.rowRollbackFailed');
+  }
+
+  async function rollbackImportRows() {
+    if (!importRollbackPlan || importRollbackCompleted) {
+      return;
+    }
+
+    const confirmed = window.confirm(t('import.rowRollbackConfirm'));
+    if (!confirmed) {
+      importRollbackMessage = t('import.rowRollbackCancelled');
+      importRollbackError = null;
+      return;
+    }
+
+    isRollingBackImportRows = true;
+    importRollbackMessage = null;
+    importRollbackError = null;
+    importRollbackResult = null;
+
+    try {
+      const result = await rollbackCompletedImport(importRollbackPlan);
+      importRollbackResult = result;
+      importRollbackCompleted = true;
+      const message = t('import.rowRollbackComplete', {
+        rolledBack: result.rolled_back,
+        skipped: result.skipped,
+        errors: result.errors.length,
+      });
+      importRollbackMessage = message;
+      uiStore.toastSuccess(message);
+    } catch (err) {
+      importRollbackError = rowRollbackErrorMessage(err);
+      uiStore.toastError(`${t('import.rowRollbackFailed')}: ${importRollbackError}`);
+    } finally {
+      isRollingBackImportRows = false;
+    }
   }
 
   async function restorePreImportBackup() {
@@ -863,6 +933,37 @@
                     {/each}
                   </div>
                 {/if}
+                {#if importRollbackPlan}
+                  <div class="rollback-summary">
+                    <div class="backup-summary-copy">
+                      <span>{t('import.rowRollbackAvailable', { count: importRollbackActionCount })}</span>
+                      <span class="rollback-summary-note">{t('import.rowRollbackDesc')}</span>
+                    </div>
+                    <button
+                      class="btn btn-secondary"
+                      onclick={rollbackImportRows}
+                      type="button"
+                      disabled={isRollingBackImportRows || importRollbackCompleted}
+                    >
+                      {isRollingBackImportRows ? t('import.rollingBackRows') : t('import.rollbackImportedRows')}
+                    </button>
+                  </div>
+                  {#if importRollbackMessage}
+                    <p class="backup-restore-status backup-restore-status--success">{importRollbackMessage}</p>
+                  {/if}
+                  {#if importRollbackError}
+                    <p class="backup-restore-status backup-restore-status--error" role="alert">
+                      {t('import.rowRollbackFailed')}: {importRollbackError}
+                    </p>
+                  {/if}
+                  {#if importRollbackResult?.errors.length}
+                    <div class="validation-list" role="alert">
+                      {#each importRollbackResult.errors.slice(0, 6) as error (`${error.entity_type}:${error.entity_id}:${error.row_number}:${error.code}`)}
+                        <p>{error.message}</p>
+                      {/each}
+                    </div>
+                  {/if}
+                {/if}
                 {#if importBackupPath}
                   <div class="backup-summary">
                     <div class="backup-summary-copy">
@@ -1093,6 +1194,25 @@
     font-size: var(--text-xs);
   }
 
+  .rollback-summary {
+    align-items: flex-start;
+    background-color: var(--surface-hover);
+    border-left: 3px solid var(--text-success);
+    color: var(--text-secondary);
+    display: flex;
+    gap: var(--space-3);
+    justify-content: space-between;
+    font-size: var(--text-sm);
+    margin: 0;
+    overflow-wrap: anywhere;
+    padding: var(--space-3);
+  }
+
+  .rollback-summary-note {
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+  }
+
   .backup-restore-status {
     border-left: 3px solid currentColor;
     font-size: var(--text-sm);
@@ -1289,7 +1409,8 @@
       grid-template-columns: 1fr;
     }
 
-    .backup-summary {
+    .backup-summary,
+    .rollback-summary {
       flex-direction: column;
     }
   }

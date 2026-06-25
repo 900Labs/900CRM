@@ -55,6 +55,7 @@ import {
   previewDealsJsonImport,
   previewJson,
   previewOrganizationsJsonImport,
+  rollbackCompletedImport,
 } from './importExport';
 
 const sampleBackup = {
@@ -774,5 +775,49 @@ describe('import/export API', () => {
         mapping: dealMapping,
       },
     );
+  });
+
+  it('maps row-level import rollback commands', async () => {
+    const rollbackPlan = {
+      token: 'rollback-token-1',
+      actions: [
+        {
+          entity_type: 'contact' as const,
+          row_number: 2,
+          entity_id: 'contact-1',
+          operation: 'created' as const,
+          changed_fields: [],
+          before_import: null,
+          post_import: {
+            contact_type: 'person',
+            first_name: 'Ada',
+            last_name: '',
+            org_name: '',
+            email: 'ada@example.com',
+            phone: '',
+            address: '',
+            city: '',
+            country: '',
+            org_id: null,
+            organization_id: null,
+            notes: '',
+            updated_at: '2026-06-25T00:00:00Z',
+          },
+        },
+      ],
+    };
+    const rollbackResult = {
+      token: 'rollback-token-1',
+      rolled_back: 1,
+      skipped: 0,
+      errors: [],
+    };
+
+    invokeMock.mockResolvedValueOnce(rollbackResult);
+
+    await expect(rollbackCompletedImport(rollbackPlan)).resolves.toEqual(rollbackResult);
+    expect(invokeMock).toHaveBeenLastCalledWith('rollback_completed_import', {
+      rollback_plan: rollbackPlan,
+    });
   });
 });
