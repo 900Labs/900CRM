@@ -51,10 +51,107 @@ export interface ImportResult {
   merged?: number;
   skipped: number;
   errors: string[];
+  rollback_plan?: ImportRollbackPlan | null;
 }
 
 export interface ImportOptions {
   mergeDuplicates?: boolean;
+}
+
+export type ImportRollbackOperation = 'created' | 'merged';
+
+export interface ContactImportRollbackSnapshot {
+  contact_type: string;
+  first_name: string;
+  last_name: string;
+  org_name: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  country: string;
+  org_id?: string | null;
+  organization_id?: string | null;
+  notes: string;
+  updated_at: string;
+}
+
+export interface DealImportRollbackSnapshot {
+  title: string;
+  value: number;
+  currency: string;
+  stage: string;
+  probability: number;
+  expected_close?: string | null;
+  contact_id?: string | null;
+  organization_id?: string | null;
+  notes: string;
+  updated_at: string;
+}
+
+export interface OrganizationImportRollbackSnapshot {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  region?: string | null;
+  country?: string | null;
+  postal_code?: string | null;
+  source?: string | null;
+  description?: string | null;
+  updated_at: string;
+}
+
+export type ImportRollbackAction =
+  | {
+      entity_type: 'contact';
+      row_number: number;
+      entity_id: string;
+      operation: ImportRollbackOperation;
+      changed_fields: string[];
+      before_import?: ContactImportRollbackSnapshot | null;
+      post_import: ContactImportRollbackSnapshot;
+    }
+  | {
+      entity_type: 'deal';
+      row_number: number;
+      entity_id: string;
+      operation: ImportRollbackOperation;
+      changed_fields: string[];
+      before_import?: DealImportRollbackSnapshot | null;
+      post_import: DealImportRollbackSnapshot;
+    }
+  | {
+      entity_type: 'organization';
+      row_number: number;
+      entity_id: string;
+      operation: ImportRollbackOperation;
+      changed_fields: string[];
+      before_import?: OrganizationImportRollbackSnapshot | null;
+      post_import: OrganizationImportRollbackSnapshot;
+    };
+
+export interface ImportRollbackPlan {
+  token: string;
+  actions: ImportRollbackAction[];
+}
+
+export interface ImportRollbackRowError {
+  entity_type: 'contact' | 'deal' | 'organization';
+  entity_id: string;
+  row_number: number;
+  code: string;
+  message: string;
+}
+
+export interface ImportRollbackResult {
+  token: string;
+  rolled_back: number;
+  skipped: number;
+  errors: ImportRollbackRowError[];
 }
 
 export interface LocalBackupMetadata {
@@ -231,6 +328,14 @@ export async function previewContactsJsonImport(
   filePath: string,
 ): Promise<JsonImportPreview> {
   return invoke<JsonImportPreview>(previewJsonCommands.contacts, filePathArgs(filePath));
+}
+
+export async function rollbackCompletedImport(
+  rollbackPlan: ImportRollbackPlan,
+): Promise<ImportRollbackResult> {
+  return invoke<ImportRollbackResult>('rollback_completed_import', {
+    rollback_plan: rollbackPlan,
+  });
 }
 
 export async function importContactsCsvWithMapping(

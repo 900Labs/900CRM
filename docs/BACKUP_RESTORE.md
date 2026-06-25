@@ -48,6 +48,13 @@ backup path first, asks the user to confirm replacing the current local
 database, and then invokes the same local restore API used by Settings with
 `confirm_destructive_restore: true`.
 
+The Import/Export summary may also offer row-level rollback for the
+just-completed import. That control is separate from backup restore: it uses a
+summary-scoped import rollback plan to soft-delete rows created by that import
+or restore only fields changed by duplicate auto-merge. It does not validate or
+restore a backup folder, and it is not available after app restart or after the
+summary is dismissed.
+
 ## Validate a backup
 
 Validation is a read-only safety check. It verifies:
@@ -79,8 +86,10 @@ Before restoring:
 
 During restore, the active `CrmCore` instance is closed, the validated backup database is copied into the app data directory, stale SQLite sidecars are removed, and `CrmCore` is reopened.
 
-Import summary restore is full database replacement. It is not row-level import
-rollback, partial restore, or merge-back.
+Import summary backup restore is full database replacement. It is not
+row-level import rollback, partial restore, or merge-back. Row-level import
+rollback is intentionally narrower: it only applies supported flat import rows
+from the current summary and skips records that changed after import.
 
 ## Developer API surface
 

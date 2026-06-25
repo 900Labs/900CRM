@@ -8,6 +8,7 @@ const {
   openDialogMock,
   preflightJsonWithMappingMock,
   previewJsonMock,
+  rollbackCompletedImportMock,
   restoreLocalBackupToAppDataMock,
   validateLocalBackupMock,
 } = vi.hoisted(
@@ -16,6 +17,7 @@ const {
     openDialogMock: vi.fn(),
     preflightJsonWithMappingMock: vi.fn(),
     previewJsonMock: vi.fn(),
+    rollbackCompletedImportMock: vi.fn(),
     restoreLocalBackupToAppDataMock: vi.fn(),
     validateLocalBackupMock: vi.fn(),
   }),
@@ -34,6 +36,7 @@ vi.mock("$lib/api/importExport", async (importOriginal) => {
     importJsonWithMapping: importJsonWithMappingMock,
     preflightJsonWithMapping: preflightJsonWithMappingMock,
     previewJson: previewJsonMock,
+    rollbackCompletedImport: rollbackCompletedImportMock,
   };
 });
 
@@ -60,6 +63,38 @@ const backupValidation = {
 };
 const importWithBackupResult = {
   import: { created: 1, skipped: 0, errors: [] },
+  backup: backupValidation,
+};
+const rollbackPlan = {
+  token: "rollback-token-1",
+  actions: [
+    {
+      entity_type: "contact",
+      row_number: 2,
+      entity_id: "contact-1",
+      operation: "created",
+      changed_fields: [],
+      before_import: null,
+      post_import: {
+        contact_type: "person",
+        first_name: "Ada",
+        last_name: "",
+        org_name: "",
+        email: "ada@example.com",
+        phone: "",
+        address: "",
+        city: "",
+        country: "",
+        org_id: null,
+        organization_id: null,
+        notes: "",
+        updated_at: "2026-06-25T00:00:00Z",
+      },
+    },
+  ],
+};
+const importWithRollbackResult = {
+  import: { created: 1, skipped: 0, errors: [], rollback_plan: rollbackPlan },
   backup: backupValidation,
 };
 
@@ -143,6 +178,7 @@ describe("ImportExport component", () => {
     openDialogMock.mockReset();
     preflightJsonWithMappingMock.mockReset();
     previewJsonMock.mockReset();
+    rollbackCompletedImportMock.mockReset();
     restoreLocalBackupToAppDataMock.mockReset();
     validateLocalBackupMock.mockReset();
   });
@@ -613,6 +649,43 @@ describe("ImportExport component", () => {
     });
 
     expect(screen.queryByRole("button", { name: "Restore pre-import backup" })).toBeNull();
+  });
+
+  it("rolls back rows from the current import summary after explicit confirmation", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    rollbackCompletedImportMock.mockResolvedValue({
+      token: "rollback-token-1",
+      rolled_back: 1,
+      skipped: 0,
+      errors: [],
+    });
+
+    await renderJsonImportSummary(importWithRollbackResult);
+
+    expect(screen.getByText("Row-level rollback is available for 1 imported rows.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Restore pre-import backup" })).toBeTruthy();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Rollback imported rows" }));
+
+    await waitFor(() => {
+      expect(rollbackCompletedImportMock).toHaveBeenCalledWith(rollbackPlan);
+    });
+    expect(
+      screen.getByText("Row rollback complete: 1 rolled back, 0 skipped, 0 row errors."),
+    ).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Rollback imported rows" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(validateLocalBackupMock).not.toHaveBeenCalled();
+  });
+
+  it("does not rollback imported rows when confirmation is cancelled", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    await renderJsonImportSummary(importWithRollbackResult);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Rollback imported rows" }));
+
+    expect(rollbackCompletedImportMock).not.toHaveBeenCalled();
+    expect(screen.getByText("Row rollback cancelled")).toBeTruthy();
   });
 
   it("does not restore the pre-import backup when confirmation is cancelled", async () => {

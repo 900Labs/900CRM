@@ -6,7 +6,10 @@ use std::{
 
 use crm_core::utils::csv::ImportColumnMapping;
 use crm_core::{
-    services::{ImportOptions, ImportPreflightReport, ImportResult, LocalBackup},
+    services::{
+        ImportOptions, ImportPreflightReport, ImportResult, ImportRollbackPlan,
+        ImportRollbackResult, LocalBackup,
+    },
     utils::csv::JsonImportPreview,
     CrmCore,
 };
@@ -21,6 +24,16 @@ static PRE_IMPORT_BACKUP_COUNTER: AtomicU64 = AtomicU64::new(0);
 pub struct ImportWithBackupResult {
     pub import: ImportResult,
     pub backup: LocalBackup,
+}
+
+#[tauri::command]
+pub async fn rollback_completed_import(
+    state: State<'_, AppState>,
+    rollback_plan: ImportRollbackPlan,
+) -> Result<ImportRollbackResult, String> {
+    let mut core = super::lock_core(&state)?;
+    core.rollback_completed_import(&rollback_plan)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

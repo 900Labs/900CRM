@@ -2694,6 +2694,209 @@ fn import_contacts_with_auto_merge_fills_blank_fields_without_overwriting_and_cr
 }
 
 #[test]
+fn import_rollback_soft_deletes_created_contact_rows_once() {
+    let (mut core, path) = open_test_core();
+    let csv_path = path.join("contacts-created-rollback.csv");
+    std::fs::write(
+        &csv_path,
+        "first_name,last_name,email\nAda,Lovelace,ada@example.com\n",
+    )
+    .expect("contact CSV fixture should write");
+
+    let result = core
+        .import_contacts_csv(csv_path.to_str().expect("path should be valid UTF-8"))
+        .expect("contact import should succeed");
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("created import should return a rollback plan");
+
+    assert_eq!(rollback_plan.actions.len(), 1);
+    assert_eq!(
+        core.list_contacts(None)
+            .expect("contacts list")
+            .contacts
+            .len(),
+        1
+    );
+
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("created row rollback should complete");
+
+    assert_eq!(rollback.rolled_back, 1);
+    assert_eq!(rollback.skipped, 0);
+    assert!(rollback.errors.is_empty());
+    assert_eq!(
+        core.list_contacts(None)
+            .expect("contacts list")
+            .contacts
+            .len(),
+        0
+    );
+
+    let repeated = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("repeated rollback should be safe");
+    assert_eq!(repeated.rolled_back, 0);
+    assert_eq!(repeated.skipped, 1);
+    assert_eq!(repeated.errors[0].code, "not_found");
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_rollback_soft_deletes_created_deal_and_organization_rows() {
+    let (mut core, path) = open_test_core();
+    let deal_json_path = path.join("deals-created-rollback.json");
+    std::fs::write(
+        &deal_json_path,
+        r#"[
+  {
+    "title": "Acme Renewal",
+    "value": "12500.50",
+    "currency": "EUR",
+    "stage": "Proposal",
+    "expected_close": "2026-09-30",
+    "notes": "Renewal path"
+  }
+]
+"#,
+    )
+    .expect("deal JSON fixture should write");
+
+    let deal_result = core
+        .import_deals_json(deal_json_path.to_str().expect("path should be valid UTF-8"))
+        .expect("deal import should succeed");
+    let deal_rollback_plan = deal_result
+        .rollback_plan
+        .clone()
+        .expect("created deal import should return a rollback plan");
+    assert_eq!(deal_rollback_plan.actions.len(), 1);
+    assert_eq!(core.list_deals().expect("deals list").len(), 1);
+
+    let deal_rollback = core
+        .rollback_completed_import(&deal_rollback_plan)
+        .expect("created deal rollback should complete");
+    assert_eq!(deal_rollback.rolled_back, 1);
+    assert_eq!(deal_rollback.skipped, 0);
+    assert!(deal_rollback.errors.is_empty());
+    assert_eq!(core.list_deals().expect("deals list").len(), 0);
+
+    let organization_csv_path = path.join("organizations-created-rollback.csv");
+    std::fs::write(
+        &organization_csv_path,
+        "name,email,phone\nAcme Health,hello@acme.example,+2345550100\n",
+    )
+    .expect("organization CSV fixture should write");
+
+    let organization_result = core
+        .import_organizations_csv(
+            organization_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("organization import should succeed");
+    let organization_rollback_plan = organization_result
+        .rollback_plan
+        .clone()
+        .expect("created organization import should return a rollback plan");
+    assert_eq!(organization_rollback_plan.actions.len(), 1);
+    assert_eq!(
+        core.list_organizations().expect("organizations list").len(),
+        1
+    );
+
+    let organization_rollback = core
+        .rollback_completed_import(&organization_rollback_plan)
+        .expect("created organization rollback should complete");
+    assert_eq!(organization_rollback.rolled_back, 1);
+    assert_eq!(organization_rollback.skipped, 0);
+    assert!(organization_rollback.errors.is_empty());
+    assert_eq!(
+        core.list_organizations().expect("organizations list").len(),
+        0
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_rollback_restores_only_changed_contact_merge_fields() {
+    let (mut core, path) = open_test_core();
+    let existing = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            Some("Lovelace".to_string()),
+            None,
+            Some("ada@example.com".to_string()),
+            None,
+            Some("Existing address".to_string()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("existing contact should be created");
+
+    let csv_path = path.join("contacts-merge-rollback.csv");
+    std::fs::write(
+        &csv_path,
+        "first_name,last_name,email,phone,address,city,notes\n\
+         Imported,Overwrite,ADA@example.com,+15550123,Incoming address,London,Imported note\n",
+    )
+    .expect("contact auto-merge CSV fixture should write");
+
+    let result = core
+        .import_contacts_csv_with_options(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("contact auto-merge import should succeed");
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("merge import should return a rollback plan");
+
+    let merged = core
+        .get_contact(&existing.id)
+        .expect("merged contact should exist");
+    assert_eq!(merged.first_name, "Ada");
+    assert_eq!(merged.last_name, "Lovelace");
+    assert_eq!(merged.email, "ada@example.com");
+    assert_eq!(merged.phone, "+15550123");
+    assert_eq!(merged.address, "Existing address");
+    assert_eq!(merged.city, "London");
+    assert_eq!(merged.notes, "Imported note");
+
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("merge rollback should complete");
+    assert_eq!(rollback.rolled_back, 1);
+    assert_eq!(rollback.skipped, 0);
+    assert!(rollback.errors.is_empty());
+
+    let restored = core
+        .get_contact(&existing.id)
+        .expect("contact should still exist after rollback");
+    assert_eq!(restored.first_name, "Ada");
+    assert_eq!(restored.last_name, "Lovelace");
+    assert_eq!(restored.email, "ada@example.com");
+    assert_eq!(restored.phone, "");
+    assert_eq!(restored.address, "Existing address");
+    assert_eq!(restored.city, "");
+    assert_eq!(restored.notes, "");
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn import_contacts_duplicate_auto_merge_disabled_preserves_create_behavior() {
     let (mut core, path) = open_test_core();
     core.create_contact(
@@ -2865,6 +3068,83 @@ fn import_organizations_with_auto_merge_fills_blank_fields_without_overwriting()
     assert_eq!(merged.city.as_deref(), Some("Lagos"));
     assert_eq!(merged.description.as_deref(), Some("Imported description"));
     assert!(merged.deleted_at.is_none());
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_rollback_restores_changed_organization_merge_fields() {
+    let (mut core, path) = open_test_core();
+    let existing = core
+        .create_organization(
+            "Acme Health".to_string(),
+            Some("hello@acme.example".to_string()),
+            None,
+            None,
+            Some("Dock 4".to_string()),
+            None,
+            Some("Lagos".to_string()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("existing organization should be created");
+
+    let json_path = path.join("organizations-merge-rollback.json");
+    std::fs::write(
+        &json_path,
+        r#"[
+  {
+    "name": "acme health",
+    "email": "new@acme.example",
+    "phone": "+2345550100",
+    "website": "https://acme.example",
+    "address_line1": "Incoming address",
+    "description": "Imported description"
+  }
+]"#,
+    )
+    .expect("organization auto-merge JSON fixture should write");
+
+    let result = core
+        .import_organizations_json_with_options(
+            json_path.to_str().expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("organization auto-merge import should succeed");
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("organization merge import should return a rollback plan");
+
+    let merged = core
+        .get_organization(&existing.id)
+        .expect("organization should still exist");
+    assert_eq!(merged.email.as_deref(), Some("hello@acme.example"));
+    assert_eq!(merged.phone.as_deref(), Some("+2345550100"));
+    assert_eq!(merged.website.as_deref(), Some("https://acme.example"));
+    assert_eq!(merged.address_line1.as_deref(), Some("Dock 4"));
+    assert_eq!(merged.description.as_deref(), Some("Imported description"));
+
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("organization merge rollback should complete");
+    assert_eq!(rollback.rolled_back, 1);
+    assert_eq!(rollback.skipped, 0);
+    assert!(rollback.errors.is_empty());
+
+    let restored = core
+        .get_organization(&existing.id)
+        .expect("organization should still exist after rollback");
+    assert_eq!(restored.email.as_deref(), Some("hello@acme.example"));
+    assert_eq!(restored.phone, None);
+    assert_eq!(restored.website, None);
+    assert_eq!(restored.address_line1.as_deref(), Some("Dock 4"));
+    assert_eq!(restored.description, None);
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);
@@ -3161,6 +3441,146 @@ fn import_deals_csv_with_auto_merge_fills_safe_fields_without_overwriting_and_cr
         "SELECT COUNT(*) FROM audit_log WHERE actor_type = 'import' AND action = 'import_row_merge' AND entity_type = 'deal'",
     );
     assert_eq!(import_merge_audit, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_rollback_restores_changed_deal_merge_fields() {
+    let (mut core, path) = open_test_core();
+    let existing = core
+        .create_deal(
+            "Acme Renewal".to_string(),
+            Some(0.0),
+            Some("EUR".to_string()),
+            Some("Proposal".to_string()),
+            Some(50),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("existing deal should be created");
+
+    let csv_path = path.join("deals-merge-rollback.csv");
+    std::fs::write(
+        &csv_path,
+        "title,value,currency,stage,expected_close,notes\n\
+         acme renewal,12500.50,USD,Negotiation,2026-10-15,Imported note\n",
+    )
+    .expect("deal auto-merge CSV fixture should write");
+
+    let result = core
+        .import_deals_csv_with_options(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("deal auto-merge import should succeed");
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("deal merge import should return a rollback plan");
+
+    let merged = core
+        .get_deal(&existing.id)
+        .expect("merged deal should still exist");
+    assert_eq!(merged.title, "Acme Renewal");
+    assert_eq!(merged.value, 12500.50);
+    assert_eq!(merged.currency, "EUR");
+    assert_eq!(merged.stage, "Proposal");
+    assert_eq!(merged.expected_close.as_deref(), Some("2026-10-15"));
+    assert_eq!(merged.notes, "Imported note");
+
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("deal merge rollback should complete");
+    assert_eq!(rollback.rolled_back, 1);
+    assert_eq!(rollback.skipped, 0);
+    assert!(rollback.errors.is_empty());
+
+    let restored = core
+        .get_deal(&existing.id)
+        .expect("deal should still exist after rollback");
+    assert_eq!(restored.title, "Acme Renewal");
+    assert_eq!(restored.value, 0.0);
+    assert_eq!(restored.currency, "EUR");
+    assert_eq!(restored.stage, "Proposal");
+    assert_eq!(restored.expected_close, None);
+    assert_eq!(restored.notes, "");
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_rollback_skips_merge_when_deal_changed_after_import() {
+    let (mut core, path) = open_test_core();
+    let existing = core
+        .create_deal(
+            "Acme Renewal".to_string(),
+            Some(0.0),
+            Some("EUR".to_string()),
+            Some("Proposal".to_string()),
+            Some(50),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("existing deal should be created");
+
+    let csv_path = path.join("deals-merge-conflict-rollback.csv");
+    std::fs::write(
+        &csv_path,
+        "title,value,currency,stage,expected_close,notes\n\
+         acme renewal,12500.50,USD,Negotiation,2026-10-15,Imported note\n",
+    )
+    .expect("deal auto-merge CSV fixture should write");
+
+    let result = core
+        .import_deals_csv_with_options(
+            csv_path.to_str().expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("deal auto-merge import should succeed");
+    let rollback_plan = result
+        .rollback_plan
+        .clone()
+        .expect("merge import should return a rollback plan");
+
+    core.update_deal(
+        &existing.id,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        Some("User edited note".to_string()),
+    )
+    .expect("post-import user edit should succeed");
+
+    let rollback = core
+        .rollback_completed_import(&rollback_plan)
+        .expect("conflicted merge rollback should complete");
+
+    assert_eq!(rollback.rolled_back, 0);
+    assert_eq!(rollback.skipped, 1);
+    assert_eq!(rollback.errors[0].code, "conflict");
+
+    let deal = core
+        .get_deal(&existing.id)
+        .expect("deal should remain after skipped rollback");
+    assert_eq!(deal.value, 12500.50);
+    assert_eq!(deal.expected_close.as_deref(), Some("2026-10-15"));
+    assert_eq!(deal.notes, "User edited note");
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);
