@@ -128,6 +128,14 @@ Apply/remove paths keep both representations aligned where possible. Removing a
 tag link physically deletes the legacy `entity_tags` row and soft-deletes the
 target `tag_links` row.
 
+Tag definition import/export uses the flat local fields `name` and `color` for
+active reusable tags. Tag link import/export uses `entity_type`, `entity_id`,
+and `tag_id` only. Those IDs are local active database IDs; the tag link format
+does not accept `tag_name` or parent display names because those values are
+user-editable and do not provide deterministic portable identity semantics.
+Tag link export is filtered to active tags and active contact, organization,
+deal, or activity parent rows.
+
 ### Custom Fields
 
 Custom field definitions live in `custom_field_defs`; values live in

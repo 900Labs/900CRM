@@ -142,6 +142,20 @@ describe('import wizard helpers', () => {
     });
   });
 
+  it('suggests tag definition and tag link mappings from local CSV headers', () => {
+    expect(suggestImportMapping('tag_definitions', ['Tag Name', 'Hex Color', 'Ignore'])).toEqual({
+      'Tag Name': 'name',
+      'Hex Color': 'color',
+      Ignore: null,
+    });
+
+    expect(suggestImportMapping('tag_links', ['Parent Type', 'Parent ID', 'Local Tag ID'])).toEqual({
+      'Parent Type': 'entity_type',
+      'Parent ID': 'entity_id',
+      'Local Tag ID': 'tag_id',
+    });
+  });
+
   it('adds contact custom fields as mapping options and suggestions', () => {
     expect(getImportFieldOptions('contacts', contactCustomFields)).toContainEqual({
       value: 'custom:VIP Tier',
@@ -297,6 +311,27 @@ describe('import wizard helpers', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Entity ID is required.');
     expect(result.errors).toContain('Entity type is mapped more than once: Kind, Type.');
+  });
+
+  it('blocks missing required tag fields and duplicate tag targets', () => {
+    const definitionResult = validateImportMapping('tag_definitions', {
+      Hex: 'color',
+      Color: 'color',
+    });
+
+    expect(definitionResult.valid).toBe(false);
+    expect(definitionResult.errors).toContain('Name is required.');
+    expect(definitionResult.errors).toContain('Color is mapped more than once: Hex, Color.');
+
+    const linkResult = validateImportMapping('tag_links', {
+      Type: 'entity_type',
+      Parent: 'entity_id',
+      DuplicateParent: 'entity_id',
+    });
+
+    expect(linkResult.valid).toBe(false);
+    expect(linkResult.errors).toContain('Tag ID is required.');
+    expect(linkResult.errors).toContain('Entity ID is mapped more than once: Parent, DuplicateParent.');
   });
 
   it('accepts valid organization mappings with skipped columns', () => {

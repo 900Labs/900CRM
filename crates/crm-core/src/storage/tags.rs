@@ -15,7 +15,7 @@
 //! - Legacy `entity_tags` links are physically deleted on remove; target
 //!   `tag_links` rows are soft-deleted.
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 use crate::utils::{
@@ -53,6 +53,38 @@ pub struct Tag {
 
     /// ID of the device that created or last modified this record.
     pub device_id: String,
+}
+
+/// A local active relationship between one tag and one CRM entity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TagLink {
+    /// Parent entity type: `"contact"`, `"organization"`, `"deal"`, or `"activity"`.
+    pub entity_type: String,
+
+    /// Existing active local parent entity UUID.
+    pub entity_id: String,
+
+    /// Existing active local tag UUID.
+    pub tag_id: String,
+}
+
+/// Exact target `tag_links` row used for conflict-safe rollback.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TargetTagLink {
+    /// UUID primary key of the target `tag_links` row.
+    pub id: String,
+
+    /// Parent entity type: `"contact"`, `"organization"`, `"deal"`, or `"activity"`.
+    pub entity_type: String,
+
+    /// Existing active local parent entity UUID.
+    pub entity_id: String,
+
+    /// Existing active local tag UUID.
+    pub tag_id: String,
+
+    /// ISO 8601 creation timestamp for the target link row.
+    pub created_at: String,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -354,6 +386,160 @@ pub fn get_tags_for_entity(
     let tags: Vec<Tag> = rows.filter_map(|r| r.ok()).collect();
 
     Ok(tags)
+}
+
+/// Returns active tag links with active tags and active parent rows.
+///
+/// The returned rows are local identities only: no portable identity semantics
+/// are inferred from tag names or parent display labels.
+pub fn list_active_tag_links(conn: &Connection) -> CrmResult<Vec<TagLink>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT DISTINCT source.entity_type, source.entity_id, source.tag_id
+        FROM (
+            SELECT entity_type, entity_id, tag_id
+            FROM entity_tags
+            UNION ALL
+            SELECT entity_type, entity_id, tag_id
+            FROM tag_links
+            WHERE deleted_at IS NULL
+        ) source
+        JOIN tags t ON t.id = source.tag_id AND t.deleted_at IS NULL
+        WHERE (
+            source.entity_type = 'contact'
+            AND EXISTS (
+                SELECT 1 FROM contacts c
+                WHERE c.id = source.entity_id AND c.deleted_at IS NULL
+            )
+        ) OR (
+            source.entity_type = 'organization'
+            AND EXISTS (
+                SELECT 1 FROM organizations o
+                WHERE o.id = source.entity_id AND o.deleted_at IS NULL
+            )
+        ) OR (
+            source.entity_type = 'deal'
+            AND EXISTS (
+                SELECT 1 FROM deals d
+                WHERE d.id = source.entity_id AND d.deleted_at IS NULL
+            )
+        ) OR (
+            source.entity_type = 'activity'
+            AND EXISTS (
+                SELECT 1 FROM activities a
+                WHERE a.id = source.entity_id AND a.deleted_at IS NULL
+            )
+        )
+        ORDER BY source.entity_type ASC, source.entity_id ASC, t.name ASC, source.tag_id ASC
+        "#,
+    )?;
+
+    let rows = stmt.query_map([], |row| {
+        Ok(TagLink {
+            entity_type: row.get(0)?,
+            entity_id: row.get(1)?,
+            tag_id: row.get(2)?,
+        })
+    })?;
+
+    let links: Vec<TagLink> = rows.filter_map(|row| row.ok()).collect();
+    Ok(links)
+}
+
+/// Returns whether an active tag link currently exists.
+pub fn active_tag_link_exists(
+    conn: &Connection,
+    entity_type: &str,
+    entity_id: &str,
+    tag_id: &str,
+) -> CrmResult<bool> {
+    Ok(list_active_tag_links(conn)?.iter().any(|link| {
+        link.entity_type == entity_type && link.entity_id == entity_id && link.tag_id == tag_id
+    }))
+}
+
+/// Returns whether an active tag is currently applied to any active parent row.
+pub fn tag_has_active_links(conn: &Connection, tag_id: &str) -> CrmResult<bool> {
+    Ok(list_active_tag_links(conn)?
+        .iter()
+        .any(|link| link.tag_id == tag_id))
+}
+
+/// Returns the active target `tag_links` row for a local triple, if one exists.
+pub fn get_active_target_tag_link(
+    conn: &Connection,
+    entity_type: &str,
+    entity_id: &str,
+    tag_id: &str,
+) -> CrmResult<Option<TargetTagLink>> {
+    conn.query_row(
+        r#"
+        SELECT id, entity_type, entity_id, tag_id, created_at
+        FROM tag_links
+        WHERE entity_type = ?1
+          AND entity_id = ?2
+          AND tag_id = ?3
+          AND deleted_at IS NULL
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+        "#,
+        params![entity_type, entity_id, tag_id],
+        |row| {
+            Ok(TargetTagLink {
+                id: row.get(0)?,
+                entity_type: row.get(1)?,
+                entity_id: row.get(2)?,
+                tag_id: row.get(3)?,
+                created_at: row.get(4)?,
+            })
+        },
+    )
+    .optional()
+    .map_err(|e| CrmError::Database(e.to_string()))
+}
+
+/// Soft-deletes one exact target `tag_links` row if it still matches the snapshot.
+pub fn soft_delete_exact_target_tag_link(
+    conn: &Connection,
+    link: &TargetTagLink,
+) -> CrmResult<bool> {
+    let changed = conn.execute(
+        r#"
+        UPDATE tag_links
+        SET deleted_at = ?6
+        WHERE id = ?1
+          AND entity_type = ?2
+          AND entity_id = ?3
+          AND tag_id = ?4
+          AND created_at = ?5
+          AND deleted_at IS NULL
+        "#,
+        params![
+            link.id,
+            link.entity_type,
+            link.entity_id,
+            link.tag_id,
+            link.created_at,
+            now_iso8601()
+        ],
+    )?;
+
+    Ok(changed > 0)
+}
+
+/// Removes the legacy compatibility link for a local tag triple.
+pub fn delete_legacy_tag_link(
+    conn: &Connection,
+    entity_type: &str,
+    entity_id: &str,
+    tag_id: &str,
+) -> CrmResult<bool> {
+    let changed = conn.execute(
+        "DELETE FROM entity_tags WHERE entity_type = ?1 AND entity_id = ?2 AND tag_id = ?3",
+        params![entity_type, entity_id, tag_id],
+    )?;
+
+    Ok(changed > 0)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

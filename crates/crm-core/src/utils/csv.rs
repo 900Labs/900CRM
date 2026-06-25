@@ -1,4 +1,4 @@
-//! Flat import/export row helpers for contacts, deals, organizations, activities, and notes.
+//! Flat import/export row helpers for contacts, deals, organizations, activities, notes, and tags.
 //!
 //! This module provides utilities for reading and writing CSV files and parsing
 //! JSON arrays used in the 900CRM import/export feature. It wraps the [`csv`]
@@ -48,6 +48,21 @@
 //! | `entity_type` | yes      | `contact`, `organization`, `deal`, or `activity` |
 //! | `entity_id`   | yes      | Existing active local entity UUID |
 //! | `content`     | yes      | Note body |
+//!
+//! # Tag Definition CSV Format
+//!
+//! | Column  | Required | Notes |
+//! |---------|----------|-------|
+//! | `name`  | yes      | Local unique tag name |
+//! | `color` | no       | CSS color string; blank uses the default tag color |
+//!
+//! # Tag Link CSV Format
+//!
+//! | Column        | Required | Notes |
+//! |---------------|----------|-------|
+//! | `entity_type` | yes      | `contact`, `organization`, `deal`, or `activity` |
+//! | `entity_id`   | yes      | Existing active local entity UUID |
+//! | `tag_id`      | yes      | Existing active local tag UUID |
 //!
 //! # Organization CSV Format
 //!
@@ -141,6 +156,10 @@ const ACTIVITY_IMPORT_TARGET_FIELDS: &[&str] = &[
 ];
 
 const NOTE_IMPORT_TARGET_FIELDS: &[&str] = &["entity_type", "entity_id", "content"];
+
+const TAG_DEFINITION_IMPORT_TARGET_FIELDS: &[&str] = &["name", "color"];
+
+const TAG_LINK_IMPORT_TARGET_FIELDS: &[&str] = &["entity_type", "entity_id", "tag_id"];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Contact CSV record
@@ -340,6 +359,34 @@ pub struct NoteCsvRow {
 
     /// Note content/body.
     pub content: String,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tag CSV records
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A flat CSV record representing one reusable local tag definition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TagDefinitionCsvRow {
+    /// Local unique tag name. Required.
+    pub name: String,
+
+    /// CSS color string. Blank or missing values use the service default.
+    #[serde(default)]
+    pub color: Option<String>,
+}
+
+/// A flat CSV record representing one local entity-tag link.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TagLinkCsvRow {
+    /// Parent entity type: `"contact"`, `"organization"`, `"deal"`, or `"activity"`.
+    pub entity_type: String,
+
+    /// Existing active local parent entity UUID.
+    pub entity_id: String,
+
+    /// Existing active local tag UUID.
+    pub tag_id: String,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -762,6 +809,121 @@ pub fn parse_notes_csv_with_mapping<R: Read>(
     Ok(rows)
 }
 
+/// Parses tag definition CSV data and preserves source row numbers.
+pub fn parse_tag_definitions_csv_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, TagDefinitionCsvRow)>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .trim(csv::Trim::All)
+        .flexible(true)
+        .from_reader(reader);
+
+    let headers = rdr.headers()?.clone();
+    require_csv_header(&headers, "name")?;
+
+    let mut rows = Vec::new();
+    for (index, result) in rdr.records().enumerate() {
+        let row_number = index + 2;
+        let record = result.map_err(|e| CrmError::Csv(e.to_string()))?;
+        let row = tag_definition_row_from_record(&headers, &record);
+        if row.name.trim().is_empty() {
+            log::debug!("Skipping CSV row with blank tag name");
+            continue;
+        }
+        rows.push((row_number, row));
+    }
+
+    log::info!("Parsed {} tag definition rows from CSV", rows.len());
+    Ok(rows)
+}
+
+/// Parses arbitrary-header tag definition CSV data with a frontend-provided mapping.
+pub fn parse_tag_definitions_csv_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, TagDefinitionCsvRow)>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .trim(csv::Trim::All)
+        .flexible(true)
+        .from_reader(reader);
+
+    let headers = rdr.headers()?.clone();
+    let assignments =
+        validate_import_mapping(&headers, mapping, TAG_DEFINITION_IMPORT_TARGET_FIELDS, &[])?;
+
+    let mut rows = Vec::new();
+    for (index, result) in rdr.records().enumerate() {
+        let row_number = index + 2;
+        let record = result.map_err(|e| CrmError::Csv(e.to_string()))?;
+        let row = tag_definition_row_from_mapped_record(&record, &assignments);
+        if row.name.trim().is_empty() {
+            log::debug!("Skipping mapped CSV row with blank tag name");
+            continue;
+        }
+        rows.push((row_number, row));
+    }
+
+    log::info!("Parsed {} mapped tag definition rows from CSV", rows.len());
+    Ok(rows)
+}
+
+/// Parses tag link CSV data and preserves source row numbers.
+pub fn parse_tag_links_csv_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, TagLinkCsvRow)>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .trim(csv::Trim::All)
+        .flexible(true)
+        .from_reader(reader);
+
+    let headers = rdr.headers()?.clone();
+    require_csv_header(&headers, "entity_type")?;
+    require_csv_header(&headers, "entity_id")?;
+    require_csv_header(&headers, "tag_id")?;
+
+    let mut rows = Vec::new();
+    for (index, result) in rdr.records().enumerate() {
+        let row_number = index + 2;
+        let record = result.map_err(|e| CrmError::Csv(e.to_string()))?;
+        rows.push((row_number, tag_link_row_from_record(&headers, &record)));
+    }
+
+    log::info!("Parsed {} tag link rows from CSV", rows.len());
+    Ok(rows)
+}
+
+/// Parses arbitrary-header tag link CSV data with a frontend-provided mapping.
+pub fn parse_tag_links_csv_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, TagLinkCsvRow)>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .trim(csv::Trim::All)
+        .flexible(true)
+        .from_reader(reader);
+
+    let headers = rdr.headers()?.clone();
+    let assignments =
+        validate_import_mapping(&headers, mapping, TAG_LINK_IMPORT_TARGET_FIELDS, &[])?;
+
+    let mut rows = Vec::new();
+    for (index, result) in rdr.records().enumerate() {
+        let row_number = index + 2;
+        let record = result.map_err(|e| CrmError::Csv(e.to_string()))?;
+        rows.push((
+            row_number,
+            tag_link_row_from_mapped_record(&record, &assignments),
+        ));
+    }
+
+    log::info!("Parsed {} mapped tag link rows from CSV", rows.len());
+    Ok(rows)
+}
+
 /// Parses contact JSON data from a top-level array of flat row objects.
 ///
 /// Row numbers are reported with the same data-row offset as CSV imports:
@@ -1103,6 +1265,123 @@ pub fn parse_notes_json_with_mapping<R: Read>(
     Ok(parsed_rows)
 }
 
+/// Parses tag definition JSON data from a top-level array of flat row objects.
+pub fn parse_tag_definitions_json_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, TagDefinitionCsvRow)>> {
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        let row = tag_definition_row_from_json_object(object, &headers);
+        if row.name.trim().is_empty() {
+            log::debug!("Skipping JSON row with blank tag name");
+            continue;
+        }
+        parsed_rows.push((row_number, row));
+    }
+
+    log::info!("Parsed {} tag definition rows from JSON", parsed_rows.len());
+    Ok(parsed_rows)
+}
+
+/// Parses tag definition JSON data with frontend-provided source-field mapping.
+pub fn parse_tag_definitions_json_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, TagDefinitionCsvRow)>> {
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let assignments = validate_import_mapping_sources(
+        &headers,
+        mapping,
+        TAG_DEFINITION_IMPORT_TARGET_FIELDS,
+        &[],
+        "field",
+        "JSON",
+    )?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        let row = tag_definition_row_from_mapped_json_object(object, &headers, &assignments);
+        if row.name.trim().is_empty() {
+            log::debug!("Skipping mapped JSON row with blank tag name");
+            continue;
+        }
+        parsed_rows.push((row_number, row));
+    }
+
+    log::info!(
+        "Parsed {} mapped tag definition rows from JSON",
+        parsed_rows.len()
+    );
+    Ok(parsed_rows)
+}
+
+/// Parses tag link JSON data from a top-level array of flat row objects.
+pub fn parse_tag_links_json_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, TagLinkCsvRow)>> {
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        parsed_rows.push((row_number, tag_link_row_from_json_object(object, &headers)));
+    }
+
+    log::info!("Parsed {} tag link rows from JSON", parsed_rows.len());
+    Ok(parsed_rows)
+}
+
+/// Parses tag link JSON data with frontend-provided source-field mapping.
+pub fn parse_tag_links_json_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, TagLinkCsvRow)>> {
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let assignments = validate_import_mapping_sources(
+        &headers,
+        mapping,
+        TAG_LINK_IMPORT_TARGET_FIELDS,
+        &[],
+        "field",
+        "JSON",
+    )?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        parsed_rows.push((
+            row_number,
+            tag_link_row_from_mapped_json_object(object, &headers, &assignments),
+        ));
+    }
+
+    log::info!(
+        "Parsed {} mapped tag link rows from JSON",
+        parsed_rows.len()
+    );
+    Ok(parsed_rows)
+}
+
 pub fn preview_contacts_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
     preview_json_import(reader)
 }
@@ -1120,6 +1399,14 @@ pub fn preview_organizations_json_import<R: Read>(reader: R) -> CrmResult<JsonIm
 }
 
 pub fn preview_notes_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
+    preview_json_import(reader)
+}
+
+pub fn preview_tag_definitions_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
+    preview_json_import(reader)
+}
+
+pub fn preview_tag_links_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
     preview_json_import(reader)
 }
 
@@ -1709,6 +1996,164 @@ fn assign_note_value(row: &mut NoteCsvRow, target: &str, value: &str) {
     }
 }
 
+fn tag_definition_row_from_record(
+    headers: &csv::StringRecord,
+    record: &csv::StringRecord,
+) -> TagDefinitionCsvRow {
+    let mut row = default_tag_definition_row();
+
+    for (index, header) in headers.iter().enumerate() {
+        let value = record.get(index).unwrap_or_default().trim();
+        assign_tag_definition_value(&mut row, header.trim(), value);
+    }
+
+    row
+}
+
+fn tag_definition_row_from_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+) -> TagDefinitionCsvRow {
+    let mut row = default_tag_definition_row();
+
+    for header in headers {
+        let value = json_preview_cell(object.get(header.as_str()));
+        assign_tag_definition_value(&mut row, header.trim(), value.trim());
+    }
+
+    row
+}
+
+fn tag_definition_row_from_mapped_record(
+    record: &csv::StringRecord,
+    assignments: &[Option<String>],
+) -> TagDefinitionCsvRow {
+    let mut row = default_tag_definition_row();
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = record.get(index).unwrap_or_default().trim();
+        assign_tag_definition_value(&mut row, target, value);
+    }
+
+    row
+}
+
+fn tag_definition_row_from_mapped_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+    assignments: &[Option<String>],
+) -> TagDefinitionCsvRow {
+    let mut row = default_tag_definition_row();
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = json_preview_cell(object.get(headers[index].as_str()));
+        assign_tag_definition_value(&mut row, target, value.trim());
+    }
+
+    row
+}
+
+fn default_tag_definition_row() -> TagDefinitionCsvRow {
+    TagDefinitionCsvRow {
+        name: String::new(),
+        color: None,
+    }
+}
+
+fn assign_tag_definition_value(row: &mut TagDefinitionCsvRow, target: &str, value: &str) {
+    match target {
+        "name" => row.name = value.to_string(),
+        "color" => row.color = optional_csv_value(value),
+        _ => {}
+    }
+}
+
+fn tag_link_row_from_record(
+    headers: &csv::StringRecord,
+    record: &csv::StringRecord,
+) -> TagLinkCsvRow {
+    let mut row = default_tag_link_row();
+
+    for (index, header) in headers.iter().enumerate() {
+        let value = record.get(index).unwrap_or_default().trim();
+        assign_tag_link_value(&mut row, header.trim(), value);
+    }
+
+    row
+}
+
+fn tag_link_row_from_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+) -> TagLinkCsvRow {
+    let mut row = default_tag_link_row();
+
+    for header in headers {
+        let value = json_preview_cell(object.get(header.as_str()));
+        assign_tag_link_value(&mut row, header.trim(), value.trim());
+    }
+
+    row
+}
+
+fn tag_link_row_from_mapped_record(
+    record: &csv::StringRecord,
+    assignments: &[Option<String>],
+) -> TagLinkCsvRow {
+    let mut row = default_tag_link_row();
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = record.get(index).unwrap_or_default().trim();
+        assign_tag_link_value(&mut row, target, value);
+    }
+
+    row
+}
+
+fn tag_link_row_from_mapped_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+    assignments: &[Option<String>],
+) -> TagLinkCsvRow {
+    let mut row = default_tag_link_row();
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = json_preview_cell(object.get(headers[index].as_str()));
+        assign_tag_link_value(&mut row, target, value.trim());
+    }
+
+    row
+}
+
+fn default_tag_link_row() -> TagLinkCsvRow {
+    TagLinkCsvRow {
+        entity_type: String::new(),
+        entity_id: String::new(),
+        tag_id: String::new(),
+    }
+}
+
+fn assign_tag_link_value(row: &mut TagLinkCsvRow, target: &str, value: &str) {
+    match target {
+        "entity_type" => row.entity_type = value.to_string(),
+        "entity_id" => row.entity_id = value.to_string(),
+        "tag_id" => row.tag_id = value.to_string(),
+        _ => {}
+    }
+}
+
 fn default_deal_row() -> DealCsvRow {
     DealCsvRow {
         title: String::new(),
@@ -2019,5 +2464,51 @@ pub fn write_notes_csv<W: Write>(writer: W, rows: &[NoteCsvRow]) -> CrmResult<()
 
     wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
     log::info!("Wrote {} note rows to CSV", rows.len());
+    Ok(())
+}
+
+/// Serializes a slice of [`TagDefinitionCsvRow`] to CSV bytes.
+///
+/// The output always includes a header row with `name` and `color`.
+pub fn write_tag_definitions_csv<W: Write>(
+    writer: W,
+    rows: &[TagDefinitionCsvRow],
+) -> CrmResult<()> {
+    let mut wtr = csv::WriterBuilder::new()
+        .has_headers(false)
+        .from_writer(writer);
+
+    wtr.write_record(["name", "color"])
+        .map_err(|e| CrmError::Csv(e.to_string()))?;
+
+    for row in rows {
+        wtr.write_record([&row.name, row.color.as_deref().unwrap_or_default()])
+            .map_err(|e| CrmError::Csv(e.to_string()))?;
+    }
+
+    wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
+    log::info!("Wrote {} tag definition rows to CSV", rows.len());
+    Ok(())
+}
+
+/// Serializes a slice of [`TagLinkCsvRow`] to CSV bytes.
+///
+/// The output always includes local `entity_type`, `entity_id`, and `tag_id`
+/// columns. The format intentionally does not infer portable tag-name identity.
+pub fn write_tag_links_csv<W: Write>(writer: W, rows: &[TagLinkCsvRow]) -> CrmResult<()> {
+    let mut wtr = csv::WriterBuilder::new()
+        .has_headers(false)
+        .from_writer(writer);
+
+    wtr.write_record(["entity_type", "entity_id", "tag_id"])
+        .map_err(|e| CrmError::Csv(e.to_string()))?;
+
+    for row in rows {
+        wtr.write_record([&row.entity_type, &row.entity_id, &row.tag_id])
+            .map_err(|e| CrmError::Csv(e.to_string()))?;
+    }
+
+    wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
+    log::info!("Wrote {} tag link rows to CSV", rows.len());
     Ok(())
 }
