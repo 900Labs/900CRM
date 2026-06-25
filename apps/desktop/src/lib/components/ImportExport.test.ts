@@ -504,6 +504,80 @@ describe("ImportExport component", () => {
     });
   });
 
+  it("includes organization custom field targets in JSON mapping payloads", async () => {
+    listCustomFieldDefinitionsMock.mockResolvedValue([
+      {
+        id: "field-segment",
+        entity_type: "organization",
+        field_name: "Segment",
+        field_type: "text",
+        field_options: null,
+        sort_order: 0,
+        created_at: "2026-06-25T00:00:00Z",
+      },
+    ]);
+    openDialogMock.mockResolvedValue("/tmp/organizations-custom-fields.json");
+    previewJsonMock.mockResolvedValue({
+      total_rows: 1,
+      headers: ["Company", "Segment"],
+      rows: [
+        {
+          row_number: 2,
+          values: { Company: "Acme Health", Segment: "Enterprise" },
+        },
+      ],
+    });
+    preflightJsonWithMappingMock.mockResolvedValue({
+      entity_type: "organizations",
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    importJsonWithMappingMock.mockResolvedValue(importWithBackupResult);
+
+    render(ImportExport, { open: true });
+
+    await fireEvent.change(screen.getByLabelText("Type"), {
+      target: { value: "organizations" },
+    });
+    await fireEvent.change(screen.getByLabelText("Format"), {
+      target: { value: "json" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+    await waitFor(() => {
+      expect(listCustomFieldDefinitionsMock).toHaveBeenCalledWith("organization");
+    });
+    await screen.findByText("Enterprise");
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(screen.getByLabelText("Map to field: Segment")).toBeTruthy();
+    expect(screen.getAllByRole("option", { name: "Custom: Segment" }).length).toBeGreaterThan(0);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Detect duplicates" }));
+    await waitFor(() => {
+      expect(preflightJsonWithMappingMock).toHaveBeenCalledWith(
+        "organizations",
+        "/tmp/organizations-custom-fields.json",
+        {
+          Company: "name",
+          Segment: "custom:Segment",
+        },
+      );
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
+    await waitFor(() => {
+      expect(importJsonWithMappingMock).toHaveBeenCalledWith(
+        "organizations",
+        "/tmp/organizations-custom-fields.json",
+        {
+          Company: "name",
+          Segment: "custom:Segment",
+        },
+      );
+    });
+  });
+
   it("blocks duplicate JSON field mappings before preflight or import", async () => {
     openDialogMock.mockResolvedValue("/tmp/contacts-duplicate-mapping.json");
     previewJsonMock.mockResolvedValue({

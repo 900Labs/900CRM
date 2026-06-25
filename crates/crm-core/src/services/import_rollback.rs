@@ -176,14 +176,21 @@ impl ImportRollbackAction {
         }
     }
 
-    pub(crate) fn created_organization(row_number: usize, organization: &Organization) -> Self {
+    pub(crate) fn created_organization(
+        row_number: usize,
+        organization: &Organization,
+        custom_fields: BTreeMap<String, String>,
+    ) -> Self {
         Self::Organization {
             row_number: row_number as u32,
             entity_id: organization.id.clone(),
             operation: ImportRollbackOperation::Created,
             changed_fields: Vec::new(),
             before_import: None,
-            post_import: OrganizationImportRollbackSnapshot::from(organization),
+            post_import: OrganizationImportRollbackSnapshot::from_organization(
+                organization,
+                custom_fields,
+            ),
         }
     }
 
@@ -191,8 +198,15 @@ impl ImportRollbackAction {
         row_number: usize,
         before_import: &Organization,
         post_import: &Organization,
+        before_custom_fields: BTreeMap<String, String>,
+        post_custom_fields: BTreeMap<String, String>,
     ) -> Option<Self> {
-        let changed_fields = changed_organization_import_fields(before_import, post_import);
+        let changed_fields = changed_organization_import_fields(
+            before_import,
+            post_import,
+            &before_custom_fields,
+            &post_custom_fields,
+        );
         if changed_fields.is_empty() {
             return None;
         }
@@ -202,8 +216,14 @@ impl ImportRollbackAction {
             entity_id: post_import.id.clone(),
             operation: ImportRollbackOperation::Merged,
             changed_fields,
-            before_import: Some(OrganizationImportRollbackSnapshot::from(before_import)),
-            post_import: OrganizationImportRollbackSnapshot::from(post_import),
+            before_import: Some(OrganizationImportRollbackSnapshot::from_organization(
+                before_import,
+                before_custom_fields,
+            )),
+            post_import: OrganizationImportRollbackSnapshot::from_organization(
+                post_import,
+                post_custom_fields,
+            ),
         })
     }
 }
@@ -352,10 +372,21 @@ pub struct OrganizationImportRollbackSnapshot {
     pub source: Option<String>,
     pub description: Option<String>,
     pub updated_at: String,
+    #[serde(default)]
+    pub custom_fields: BTreeMap<String, String>,
 }
 
 impl From<&Organization> for OrganizationImportRollbackSnapshot {
     fn from(organization: &Organization) -> Self {
+        Self::from_organization(organization, BTreeMap::new())
+    }
+}
+
+impl OrganizationImportRollbackSnapshot {
+    fn from_organization(
+        organization: &Organization,
+        custom_fields: BTreeMap<String, String>,
+    ) -> Self {
         Self {
             name: organization.name.clone(),
             email: organization.email.clone(),
@@ -370,6 +401,7 @@ impl From<&Organization> for OrganizationImportRollbackSnapshot {
             source: organization.source.clone(),
             description: organization.description.clone(),
             updated_at: organization.updated_at.clone(),
+            custom_fields,
         }
     }
 }
@@ -835,13 +867,29 @@ impl CrmCore {
             return;
         };
 
-        if OrganizationImportRollbackSnapshot::from(&current) != *post_import {
+        let Some(current_snapshot) =
+            organization_snapshot_for_rollback(self, row_number, entity_id, &current, result)
+        else {
+            return;
+        };
+
+        if current_snapshot != *post_import {
             record_conflict(result, "organization", entity_id, row_number);
             return;
         }
 
         match self.delete_organization(entity_id) {
-            Ok(()) => result.record_rolled_back(),
+            Ok(()) => match self.delete_custom_field_values_for_rollback("organization", entity_id)
+            {
+                Ok(()) => result.record_rolled_back(),
+                Err(err) => result.record_error(
+                    "organization",
+                    entity_id,
+                    row_number,
+                    "rollback_failed",
+                    err.to_string(),
+                ),
+            },
             Err(CrmError::NotFound(message)) => {
                 result.record_skipped("organization", entity_id, row_number, "not_found", message)
             }
@@ -873,7 +921,13 @@ impl CrmCore {
             return;
         };
 
-        if OrganizationImportRollbackSnapshot::from(&current) != *post_import {
+        let Some(current_snapshot) =
+            organization_snapshot_for_rollback(self, row_number, entity_id, &current, result)
+        else {
+            return;
+        };
+
+        if current_snapshot != *post_import {
             record_conflict(result, "organization", entity_id, row_number);
             return;
         }
@@ -900,7 +954,21 @@ impl CrmCore {
             option_string_field_update(changed_fields, "postal_code", &before_import.postal_code),
             option_string_field_update(changed_fields, "description", &before_import.description),
         ) {
-            Ok(_) => result.record_rolled_back(),
+            Ok(_) => match restore_custom_field_changes(
+                self,
+                entity_id,
+                changed_fields,
+                &before_import.custom_fields,
+            ) {
+                Ok(()) => result.record_rolled_back(),
+                Err(err) => result.record_error(
+                    "organization",
+                    entity_id,
+                    row_number,
+                    "rollback_failed",
+                    err.to_string(),
+                ),
+            },
             Err(err) => result.record_error(
                 "organization",
                 entity_id,
@@ -1084,6 +1152,31 @@ fn deal_snapshot_for_rollback(
     }
 }
 
+fn organization_snapshot_for_rollback(
+    core: &CrmCore,
+    row_number: u32,
+    entity_id: &str,
+    organization: &Organization,
+    result: &mut ImportRollbackResult,
+) -> Option<OrganizationImportRollbackSnapshot> {
+    match core.custom_field_snapshot("organization", entity_id) {
+        Ok(custom_fields) => Some(OrganizationImportRollbackSnapshot::from_organization(
+            organization,
+            custom_fields,
+        )),
+        Err(err) => {
+            result.record_error(
+                "organization",
+                entity_id,
+                row_number,
+                "read_failed",
+                err.to_string(),
+            );
+            None
+        }
+    }
+}
+
 fn restore_custom_field_changes(
     core: &mut CrmCore,
     entity_id: &str,
@@ -1209,7 +1302,12 @@ fn changed_deal_import_fields(
     fields
 }
 
-fn changed_organization_import_fields(before: &Organization, after: &Organization) -> Vec<String> {
+fn changed_organization_import_fields(
+    before: &Organization,
+    after: &Organization,
+    before_custom_fields: &BTreeMap<String, String>,
+    after_custom_fields: &BTreeMap<String, String>,
+) -> Vec<String> {
     let mut fields = Vec::new();
     push_changed_option_string(&mut fields, "email", &before.email, &after.email);
     push_changed_option_string(&mut fields, "phone", &before.phone, &after.phone);
@@ -1241,6 +1339,7 @@ fn changed_organization_import_fields(before: &Organization, after: &Organizatio
         &before.description,
         &after.description,
     );
+    push_changed_custom_fields(&mut fields, before_custom_fields, after_custom_fields);
     fields
 }
 

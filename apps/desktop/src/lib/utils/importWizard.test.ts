@@ -42,6 +42,17 @@ describe('import wizard helpers', () => {
       created_at: '2026-06-25T00:00:00Z',
     },
   ];
+  const organizationCustomFields = [
+    {
+      id: 'field-segment',
+      entity_type: 'organization' as const,
+      field_name: 'Segment',
+      field_type: 'text' as const,
+      field_options: null,
+      sort_order: 0,
+      created_at: '2026-06-25T00:00:00Z',
+    },
+  ];
 
   it('suggests contact mappings from common CSV headers', () => {
     expect(
@@ -206,10 +217,17 @@ describe('import wizard helpers', () => {
     });
   });
 
-  it('does not add organization custom field mapping options', () => {
-    expect(getImportFieldOptions('organizations', contactCustomFields)).not.toContainEqual({
-      value: 'custom:VIP Tier',
-      label: 'Custom: VIP Tier',
+  it('adds organization custom fields as mapping options and suggestions', () => {
+    expect(getImportFieldOptions('organizations', organizationCustomFields)).toContainEqual({
+      value: 'custom:Segment',
+      label: 'Custom: Segment',
+    });
+
+    expect(
+      suggestImportMapping('organizations', ['Company Name', 'Segment'], organizationCustomFields),
+    ).toEqual({
+      'Company Name': 'name',
+      Segment: 'custom:Segment',
     });
   });
 

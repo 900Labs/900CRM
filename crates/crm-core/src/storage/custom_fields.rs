@@ -2,7 +2,7 @@
 //!
 //! This module provides CRUD operations for `custom_field_defs` and
 //! `custom_field_values`, which power user-defined fields on contacts,
-//! deals, and activities.
+//! deals, activities, and organizations.
 
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,7 @@ use crate::utils::{
     uuid::new_uuid,
 };
 
-const ENTITY_TYPES: [&str; 3] = ["contact", "deal", "activity"];
+const ENTITY_TYPES: [&str; 4] = ["contact", "deal", "activity", "organization"];
 const FIELD_TYPES: [&str; 5] = ["text", "number", "date", "boolean", "select"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
