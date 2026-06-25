@@ -336,6 +336,8 @@
     "desktopPickerRequired": "Use the desktop file picker to import. Browser file selection can preview only.",
     "parseWarnings": "warnings",
     "previewRows": "Preview rows",
+    "previewFailed": "JSON preview failed. Choose a valid JSON array of supported rows.",
+    "noPreviewRows": "No importable rows to preview.",
     "targetField": "Target field",
     "mappedPreview": "Mapped preview",
     "preflightFailed": "Duplicate check failed",

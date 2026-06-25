@@ -43,6 +43,10 @@ import {
   preflightOrganizationsCsvImport,
   preflightOrganizationsCsvImportWithMapping,
   preflightOrganizationsJsonImport,
+  previewContactsJsonImport,
+  previewDealsJsonImport,
+  previewJson,
+  previewOrganizationsJsonImport,
 } from './importExport';
 
 const sampleBackup = {
@@ -362,6 +366,45 @@ describe('import/export API', () => {
     await preflightJson('deals', '/tmp/deals.json');
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_deals_json_import', {
       file_path: '/tmp/deals.json',
+    });
+  });
+
+  it('maps JSON preview commands', async () => {
+    const preview = {
+      total_rows: 1,
+      headers: ['first_name', 'email'],
+      rows: [{ row_number: 2, values: { first_name: 'Ada', email: 'ada@example.com' } }],
+    };
+
+    invokeMock.mockResolvedValueOnce(preview);
+    await expect(previewContactsJsonImport('/tmp/contacts.json')).resolves.toEqual(preview);
+    expect(invokeMock).toHaveBeenLastCalledWith('preview_contacts_json_import', {
+      file_path: '/tmp/contacts.json',
+    });
+
+    invokeMock.mockResolvedValueOnce({ ...preview, headers: ['title'] });
+    await previewDealsJsonImport('/tmp/deals.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preview_deals_json_import', {
+      file_path: '/tmp/deals.json',
+    });
+
+    invokeMock.mockResolvedValueOnce({ ...preview, headers: ['name'] });
+    await previewOrganizationsJsonImport('/tmp/organizations.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preview_organizations_json_import', {
+      file_path: '/tmp/organizations.json',
+    });
+  });
+
+  it('routes generic JSON preview helpers by entity', async () => {
+    invokeMock.mockResolvedValueOnce({
+      total_rows: 1,
+      headers: ['name'],
+      rows: [{ row_number: 2, values: { name: 'Acme' } }],
+    });
+
+    await previewJson('organizations', '/tmp/orgs.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preview_organizations_json_import', {
+      file_path: '/tmp/orgs.json',
     });
   });
 
