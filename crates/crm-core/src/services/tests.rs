@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use rusqlite::params;
 
 use super::{CrmCore, ImportOptions, TagColorUpdate};
@@ -20,6 +22,39 @@ fn count(core: &CrmCore, sql: &str) -> i64 {
         .expect("count query should succeed")
 }
 
+fn count_custom_field_audit_action(core: &CrmCore, value_id: &str, action: &str) -> i64 {
+    core.db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE entity_type = 'custom_field_value' AND entity_id = ?1 AND action = ?2",
+            params![value_id, action],
+            |row| row.get(0),
+        )
+        .expect("custom field audit count query should succeed")
+}
+
+fn count_custom_field_set_sync(core: &CrmCore, value_id: &str, new_value: &str) -> i64 {
+    core.db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'custom_field_value' AND entity_id = ?1 AND field_name = 'value' AND new_value = ?2",
+            params![value_id, new_value],
+            |row| row.get(0),
+        )
+        .expect("custom field set sync count query should succeed")
+}
+
+fn count_custom_field_delete_sync(core: &CrmCore, value_id: &str, old_value: &str) -> i64 {
+    core.db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sync_changelog WHERE entity_type = 'custom_field_value' AND entity_id = ?1 AND field_name = '__delete__' AND old_value = ?2 AND new_value IS NULL",
+            params![value_id, old_value],
+            |row| row.get(0),
+        )
+        .expect("custom field delete sync count query should succeed")
+}
+
 fn import_mapping(pairs: &[(&str, Option<&str>)]) -> ImportColumnMapping {
     pairs
         .iter()
@@ -34,6 +69,28 @@ fn read_json_export(path: &std::path::Path) -> Vec<serde_json::Value> {
         "JSON export should be pretty-printed"
     );
     serde_json::from_str::<Vec<serde_json::Value>>(&json).expect("JSON export should parse")
+}
+
+fn read_csv_export(path: &std::path::Path) -> Vec<HashMap<String, String>> {
+    let mut reader = csv::Reader::from_path(path).expect("CSV export should read");
+    let headers = reader
+        .headers()
+        .expect("CSV export should include headers")
+        .iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+
+    reader
+        .records()
+        .map(|record| {
+            let record = record.expect("CSV export row should parse");
+            headers
+                .iter()
+                .cloned()
+                .zip(record.iter().map(str::to_string))
+                .collect()
+        })
+        .collect()
 }
 
 fn create_test_proposed_action(core: &mut CrmCore, title: &str) -> ProposedAction {
@@ -5150,6 +5207,719 @@ fn export_deals_json_writes_active_flat_rows() {
     assert!(!rows
         .iter()
         .any(|row| row.get("title").and_then(|value| value.as_str()) == Some("Deleted Renewal")));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn export_contacts_and_deals_include_custom_field_values() {
+    let (mut core, path) = open_test_core();
+
+    let contact_field = core
+        .create_custom_field_def(
+            "contact".to_string(),
+            "VIP Tier".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("contact custom field should be created");
+    let escaped_contact_field = core
+        .create_custom_field_def(
+            "contact".to_string(),
+            "Plan #".to_string(),
+            "text".to_string(),
+            None,
+            Some(1),
+        )
+        .expect("escaped-name contact custom field should be created");
+    let deal_field = core
+        .create_custom_field_def(
+            "deal".to_string(),
+            "Risk Band".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("deal custom field should be created");
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            Some("Lovelace".to_string()),
+            None,
+            Some("ada@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+    let deal = core
+        .create_deal(
+            "Acme Renewal".to_string(),
+            Some(12500.0),
+            Some("EUR".to_string()),
+            Some("Proposal".to_string()),
+            Some(55),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("deal should be created");
+    core.set_custom_field_value(
+        contact_field.id.clone(),
+        contact.id.clone(),
+        "Gold".to_string(),
+    )
+    .expect("contact custom value should be set");
+    core.set_custom_field_value(
+        escaped_contact_field.id.clone(),
+        contact.id.clone(),
+        "Enterprise".to_string(),
+    )
+    .expect("escaped-name contact custom value should be set");
+    core.set_custom_field_value(deal_field.id.clone(), deal.id.clone(), "Medium".to_string())
+        .expect("deal custom value should be set");
+
+    let contacts_json_path = path.join("contacts-custom-export.json");
+    let contacts_csv_path = path.join("contacts-custom-export.csv");
+    let deals_json_path = path.join("deals-custom-export.json");
+    let deals_csv_path = path.join("deals-custom-export.csv");
+
+    assert_eq!(
+        core.export_contacts_json(
+            contacts_json_path
+                .to_str()
+                .expect("path should be valid UTF-8")
+        )
+        .expect("contact JSON export should succeed"),
+        1
+    );
+    assert_eq!(
+        core.export_contacts_csv(
+            contacts_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8")
+        )
+        .expect("contact CSV export should succeed"),
+        1
+    );
+    assert_eq!(
+        core.export_deals_json(
+            deals_json_path
+                .to_str()
+                .expect("path should be valid UTF-8")
+        )
+        .expect("deal JSON export should succeed"),
+        1
+    );
+    assert_eq!(
+        core.export_deals_csv(deals_csv_path.to_str().expect("path should be valid UTF-8"))
+            .expect("deal CSV export should succeed"),
+        1
+    );
+
+    let contact_json_rows = read_json_export(&contacts_json_path);
+    assert_eq!(
+        contact_json_rows[0]
+            .get("custom:VIP Tier")
+            .and_then(|value| value.as_str()),
+        Some("Gold")
+    );
+    assert_eq!(
+        contact_json_rows[0]
+            .get("custom:Plan %23")
+            .and_then(|value| value.as_str()),
+        Some("Enterprise")
+    );
+    let contact_csv_rows = read_csv_export(&contacts_csv_path);
+    assert_eq!(
+        contact_csv_rows[0]
+            .get("custom:VIP Tier")
+            .map(String::as_str),
+        Some("Gold")
+    );
+    assert_eq!(
+        contact_csv_rows[0]
+            .get("custom:Plan %23")
+            .map(String::as_str),
+        Some("Enterprise")
+    );
+
+    let deal_json_rows = read_json_export(&deals_json_path);
+    assert_eq!(
+        deal_json_rows[0]
+            .get("custom:Risk Band")
+            .and_then(|value| value.as_str()),
+        Some("Medium")
+    );
+    let deal_csv_rows = read_csv_export(&deals_csv_path);
+    assert_eq!(
+        deal_csv_rows[0].get("custom:Risk Band").map(String::as_str),
+        Some("Medium")
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn duplicate_custom_field_names_use_deterministic_targets() {
+    let (mut core, path) = open_test_core();
+
+    let primary_field = core
+        .create_custom_field_def(
+            "contact".to_string(),
+            "Region".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("primary contact custom field should be created");
+    let secondary_field = core
+        .create_custom_field_def(
+            "contact".to_string(),
+            "Region".to_string(),
+            "text".to_string(),
+            None,
+            Some(1),
+        )
+        .expect("secondary contact custom field should be created");
+    let primary_target = format!("custom:Region#{}", primary_field.id);
+    let secondary_target = format!("custom:Region#{}", secondary_field.id);
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            None,
+            None,
+            Some("ada@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+
+    core.set_custom_field_value(
+        primary_field.id.clone(),
+        contact.id.clone(),
+        "North".to_string(),
+    )
+    .expect("primary custom value should be set");
+    core.set_custom_field_value(
+        secondary_field.id.clone(),
+        contact.id.clone(),
+        "West".to_string(),
+    )
+    .expect("secondary custom value should be set");
+
+    let contacts_json_path = path.join("contacts-duplicate-custom-export.json");
+    core.export_contacts_json(
+        contacts_json_path
+            .to_str()
+            .expect("path should be valid UTF-8"),
+    )
+    .expect("contact JSON export should succeed");
+    let contact_json_rows = read_json_export(&contacts_json_path);
+    assert!(contact_json_rows[0].get("custom:Region").is_none());
+    assert_eq!(
+        contact_json_rows[0]
+            .get(&primary_target)
+            .and_then(|value| value.as_str()),
+        Some("North")
+    );
+    assert_eq!(
+        contact_json_rows[0]
+            .get(&secondary_target)
+            .and_then(|value| value.as_str()),
+        Some("West")
+    );
+
+    let contacts_csv_path = path.join("contacts-duplicate-custom-import.csv");
+    std::fs::write(
+        &contacts_csv_path,
+        format!(
+            "first_name,email,{primary_target},{secondary_target}\nGrace,grace@example.com,East,South\n"
+        ),
+    )
+    .expect("contact custom CSV fixture should write");
+    let import_result = core
+        .import_contacts_csv(
+            contacts_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("contact custom CSV import should succeed");
+    assert_eq!(import_result.created, 1);
+    let imported_contact = core
+        .list_contacts(None)
+        .expect("contacts should list")
+        .contacts
+        .into_iter()
+        .find(|contact| contact.email == "grace@example.com")
+        .expect("imported contact should exist");
+    let values: std::collections::BTreeMap<_, _> = core
+        .list_custom_field_values("contact", &imported_contact.id)
+        .expect("contact custom values should list")
+        .into_iter()
+        .map(|value| (value.field_def_id, value.value))
+        .collect();
+    assert_eq!(
+        values.get(&primary_field.id).map(String::as_str),
+        Some("East")
+    );
+    assert_eq!(
+        values.get(&secondary_field.id).map(String::as_str),
+        Some("South")
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_contacts_csv_and_mapped_deal_json_set_custom_field_values() {
+    let (mut core, path) = open_test_core();
+
+    let contact_field = core
+        .create_custom_field_def(
+            "contact".to_string(),
+            "VIP Tier".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("contact custom field should be created");
+    let deal_field = core
+        .create_custom_field_def(
+            "deal".to_string(),
+            "Risk Band".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("deal custom field should be created");
+
+    let contacts_csv_path = path.join("contacts-custom-import.csv");
+    std::fs::write(
+        &contacts_csv_path,
+        "first_name,email,custom:VIP Tier\nAda,ada@example.com,Gold\n",
+    )
+    .expect("contact custom CSV fixture should write");
+    let contact_result = core
+        .import_contacts_csv(
+            contacts_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("contact custom CSV import should succeed");
+    assert_eq!(contact_result.created, 1);
+    let contacts = core
+        .list_contacts(None)
+        .expect("contacts should list")
+        .contacts;
+    let contact_values = core
+        .list_custom_field_values("contact", &contacts[0].id)
+        .expect("contact custom values should list");
+    assert_eq!(contact_values.len(), 1);
+    assert_eq!(contact_values[0].field_def_id, contact_field.id);
+    assert_eq!(contact_values[0].value, "Gold");
+
+    let deals_json_path = path.join("deals-custom-import.json");
+    std::fs::write(
+        &deals_json_path,
+        r#"[{"Opportunity":"Acme Renewal","Risk":"Medium"}]"#,
+    )
+    .expect("deal custom JSON fixture should write");
+    let deal_result = core
+        .import_deals_json_with_mapping(
+            deals_json_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+            import_mapping(&[
+                ("Opportunity", Some("title")),
+                ("Risk", Some("custom:Risk Band")),
+            ]),
+        )
+        .expect("mapped deal custom JSON import should succeed");
+    assert_eq!(deal_result.created, 1);
+    let deals = core.list_deals().expect("deals should list");
+    let deal_values = core
+        .list_custom_field_values("deal", &deals[0].id)
+        .expect("deal custom values should list");
+    assert_eq!(deal_values.len(), 1);
+    assert_eq!(deal_values[0].field_def_id, deal_field.id);
+    assert_eq!(deal_values[0].value, "Medium");
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn duplicate_auto_merge_fills_missing_custom_values_without_overwriting() {
+    let (mut core, path) = open_test_core();
+
+    let contact_field = core
+        .create_custom_field_def(
+            "contact".to_string(),
+            "VIP Tier".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("contact custom field should be created");
+    let deal_field = core
+        .create_custom_field_def(
+            "deal".to_string(),
+            "Risk Band".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("deal custom field should be created");
+    let missing_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            None,
+            None,
+            Some("ada@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("missing custom contact should be created");
+    let existing_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Grace".to_string()),
+            None,
+            None,
+            Some("grace@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("existing custom contact should be created");
+    core.set_custom_field_value(
+        contact_field.id.clone(),
+        existing_contact.id.clone(),
+        "Platinum".to_string(),
+    )
+    .expect("existing contact custom value should be set");
+
+    let missing_deal = core
+        .create_deal(
+            "Acme Renewal".to_string(),
+            Some(0.0),
+            Some("USD".to_string()),
+            Some("Lead".to_string()),
+            Some(0),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("missing custom deal should be created");
+    let existing_deal = core
+        .create_deal(
+            "Enterprise Expansion".to_string(),
+            Some(0.0),
+            Some("USD".to_string()),
+            Some("Lead".to_string()),
+            Some(0),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("existing custom deal should be created");
+    core.set_custom_field_value(
+        deal_field.id.clone(),
+        existing_deal.id.clone(),
+        "Low".to_string(),
+    )
+    .expect("existing deal custom value should be set");
+
+    let contacts_csv_path = path.join("contacts-custom-auto-merge.csv");
+    std::fs::write(
+        &contacts_csv_path,
+        "first_name,email,custom:VIP Tier\nAda,ada@example.com,Gold\nGrace,grace@example.com,Silver\n",
+    )
+    .expect("contact custom auto-merge CSV fixture should write");
+    let contact_result = core
+        .import_contacts_csv_with_options(
+            contacts_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("contact custom auto-merge should succeed");
+    assert_eq!(contact_result.merged, 2);
+    assert_eq!(
+        core.list_custom_field_values("contact", &missing_contact.id)
+            .expect("missing contact custom value should list")[0]
+            .value,
+        "Gold"
+    );
+    assert_eq!(
+        core.list_custom_field_values("contact", &existing_contact.id)
+            .expect("existing contact custom value should list")[0]
+            .value,
+        "Platinum"
+    );
+
+    let deals_csv_path = path.join("deals-custom-auto-merge.csv");
+    std::fs::write(
+        &deals_csv_path,
+        "title,custom:Risk Band\nAcme Renewal,Medium\nEnterprise Expansion,High\n",
+    )
+    .expect("deal custom auto-merge CSV fixture should write");
+    let deal_result = core
+        .import_deals_csv_with_options(
+            deals_csv_path.to_str().expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("deal custom auto-merge should succeed");
+    assert_eq!(deal_result.merged, 2);
+    assert_eq!(
+        core.list_custom_field_values("deal", &missing_deal.id)
+            .expect("missing deal custom value should list")[0]
+            .value,
+        "Medium"
+    );
+    assert_eq!(
+        core.list_custom_field_values("deal", &existing_deal.id)
+            .expect("existing deal custom value should list")[0]
+            .value,
+        "Low"
+    );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn import_rollback_restores_custom_field_value_changes() {
+    let (mut core, path) = open_test_core();
+
+    let contact_field = core
+        .create_custom_field_def(
+            "contact".to_string(),
+            "VIP Tier".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("contact custom field should be created");
+    let deal_field = core
+        .create_custom_field_def(
+            "deal".to_string(),
+            "Risk Band".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("deal custom field should be created");
+
+    let contacts_csv_path = path.join("contacts-custom-rollback.csv");
+    std::fs::write(
+        &contacts_csv_path,
+        "first_name,email,custom:VIP Tier\nAda,ada@example.com,Gold\n",
+    )
+    .expect("contact rollback CSV fixture should write");
+    let contact_result = core
+        .import_contacts_csv(
+            contacts_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+        )
+        .expect("contact custom import should succeed");
+    let contact_plan = contact_result
+        .rollback_plan
+        .clone()
+        .expect("created contact custom import should return rollback plan");
+    let imported_contact = core
+        .list_contacts(None)
+        .expect("contacts should list")
+        .contacts
+        .into_iter()
+        .find(|contact| contact.email == "ada@example.com")
+        .expect("imported contact should exist");
+    let imported_contact_values = core
+        .list_custom_field_values("contact", &imported_contact.id)
+        .expect("contact custom value should list");
+    assert_eq!(imported_contact_values[0].field_def_id, contact_field.id);
+    let imported_contact_value_id = imported_contact_values[0].value_id.clone();
+    let created_contact_delete_audit_before =
+        count_custom_field_audit_action(&core, &imported_contact_value_id, "delete_value");
+    let created_contact_delete_sync_before =
+        count_custom_field_delete_sync(&core, &imported_contact_value_id, "Gold");
+    let contact_rollback = core
+        .rollback_completed_import(&contact_plan)
+        .expect("created contact custom rollback should succeed");
+    assert_eq!(contact_rollback.rolled_back, 1);
+    assert!(contact_rollback.errors.is_empty());
+    assert!(core
+        .list_custom_field_values("contact", &imported_contact.id)
+        .expect("rolled back contact custom values should list")
+        .is_empty());
+    assert_eq!(
+        count_custom_field_audit_action(&core, &imported_contact_value_id, "delete_value"),
+        created_contact_delete_audit_before + 1
+    );
+    assert_eq!(
+        count_custom_field_delete_sync(&core, &imported_contact_value_id, "Gold"),
+        created_contact_delete_sync_before + 1
+    );
+
+    let blank_contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Grace".to_string()),
+            None,
+            None,
+            Some("grace@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("blank custom contact should be created");
+    let blank_contact_value = core
+        .set_custom_field_value(
+            contact_field.id.clone(),
+            blank_contact.id.clone(),
+            "".to_string(),
+        )
+        .expect("blank contact custom value should be set");
+    let blank_contacts_csv_path = path.join("contacts-custom-blank-merge-rollback.csv");
+    std::fs::write(
+        &blank_contacts_csv_path,
+        "first_name,email,custom:VIP Tier\nGrace,grace@example.com,Silver\n",
+    )
+    .expect("blank contact rollback CSV fixture should write");
+    let blank_contact_result = core
+        .import_contacts_csv_with_options(
+            blank_contacts_csv_path
+                .to_str()
+                .expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("blank contact custom merge import should succeed");
+    let blank_contact_plan = blank_contact_result
+        .rollback_plan
+        .clone()
+        .expect("blank contact custom merge import should return rollback plan");
+    assert_eq!(
+        core.list_custom_field_values("contact", &blank_contact.id)
+            .expect("filled contact custom value should list")[0]
+            .value,
+        "Silver"
+    );
+    let blank_contact_set_audit_before =
+        count_custom_field_audit_action(&core, &blank_contact_value.id, "set_value");
+    let blank_contact_set_sync_before =
+        count_custom_field_set_sync(&core, &blank_contact_value.id, "");
+    let blank_contact_rollback = core
+        .rollback_completed_import(&blank_contact_plan)
+        .expect("blank contact custom merge rollback should succeed");
+    assert_eq!(blank_contact_rollback.rolled_back, 1);
+    assert!(blank_contact_rollback.errors.is_empty());
+    assert_eq!(
+        core.list_custom_field_values("contact", &blank_contact.id)
+            .expect("restored blank contact custom value should list")[0]
+            .value,
+        ""
+    );
+    assert_eq!(
+        count_custom_field_audit_action(&core, &blank_contact_value.id, "set_value"),
+        blank_contact_set_audit_before + 1
+    );
+    assert_eq!(
+        count_custom_field_set_sync(&core, &blank_contact_value.id, ""),
+        blank_contact_set_sync_before + 1
+    );
+
+    let existing_deal = core
+        .create_deal(
+            "Acme Renewal".to_string(),
+            Some(0.0),
+            Some("USD".to_string()),
+            Some("Lead".to_string()),
+            Some(0),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("existing deal should be created");
+    let deals_csv_path = path.join("deals-custom-merge-rollback.csv");
+    std::fs::write(
+        &deals_csv_path,
+        "title,custom:Risk Band\nAcme Renewal,Medium\n",
+    )
+    .expect("deal rollback CSV fixture should write");
+    let deal_result = core
+        .import_deals_csv_with_options(
+            deals_csv_path.to_str().expect("path should be valid UTF-8"),
+            ImportOptions {
+                merge_duplicates: true,
+            },
+        )
+        .expect("deal custom merge import should succeed");
+    let deal_plan = deal_result
+        .rollback_plan
+        .clone()
+        .expect("merged deal custom import should return rollback plan");
+    let existing_deal_values = core
+        .list_custom_field_values("deal", &existing_deal.id)
+        .expect("deal custom value should list");
+    assert_eq!(existing_deal_values[0].field_def_id, deal_field.id);
+    let existing_deal_value_id = existing_deal_values[0].value_id.clone();
+    let deal_delete_audit_before =
+        count_custom_field_audit_action(&core, &existing_deal_value_id, "delete_value");
+    let deal_delete_sync_before =
+        count_custom_field_delete_sync(&core, &existing_deal_value_id, "Medium");
+    let deal_rollback = core
+        .rollback_completed_import(&deal_plan)
+        .expect("merged deal custom rollback should succeed");
+    assert_eq!(deal_rollback.rolled_back, 1);
+    assert!(deal_rollback.errors.is_empty());
+    assert!(core
+        .list_custom_field_values("deal", &existing_deal.id)
+        .expect("rolled back deal custom values should list")
+        .is_empty());
+    assert_eq!(
+        count_custom_field_audit_action(&core, &existing_deal_value_id, "delete_value"),
+        deal_delete_audit_before + 1
+    );
+    assert_eq!(
+        count_custom_field_delete_sync(&core, &existing_deal_value_id, "Medium"),
+        deal_delete_sync_before + 1
+    );
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);

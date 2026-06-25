@@ -282,6 +282,36 @@ pub fn get_value(conn: &Connection, id: &str) -> CrmResult<CustomFieldValue> {
     })
 }
 
+pub fn get_value_for_entity_field(
+    conn: &Connection,
+    field_def_id: &str,
+    entity_id: &str,
+) -> CrmResult<Option<CustomFieldValue>> {
+    match conn.query_row(
+        r#"
+        SELECT id, field_def_id, entity_id, value, created_at, updated_at
+        FROM custom_field_values
+        WHERE field_def_id = ?1 AND entity_id = ?2
+        LIMIT 1
+        "#,
+        params![field_def_id, entity_id],
+        |row| {
+            Ok(CustomFieldValue {
+                id: row.get(0)?,
+                field_def_id: row.get(1)?,
+                entity_id: row.get(2)?,
+                value: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+            })
+        },
+    ) {
+        Ok(value) => Ok(Some(value)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(err) => Err(CrmError::Database(err.to_string())),
+    }
+}
+
 pub fn list_values_for_entity(
     conn: &Connection,
     entity_type: &str,
@@ -354,6 +384,42 @@ pub fn list_values_for_entity_type(
     })?;
 
     Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+pub fn delete_value_for_entity_field(
+    conn: &Connection,
+    field_def_id: &str,
+    entity_id: &str,
+) -> CrmResult<bool> {
+    let deleted = conn.execute(
+        "DELETE FROM custom_field_values WHERE field_def_id = ?1 AND entity_id = ?2",
+        params![field_def_id, entity_id],
+    )?;
+
+    Ok(deleted > 0)
+}
+
+pub fn delete_values_for_entity(
+    conn: &Connection,
+    entity_type: &str,
+    entity_id: &str,
+) -> CrmResult<usize> {
+    validate_entity_type(entity_type)?;
+
+    let deleted = conn.execute(
+        r#"
+        DELETE FROM custom_field_values
+        WHERE entity_id = ?1
+          AND field_def_id IN (
+              SELECT id
+              FROM custom_field_defs
+              WHERE entity_type = ?2
+          )
+        "#,
+        params![entity_id, entity_type],
+    )?;
+
+    Ok(deleted)
 }
 
 fn row_to_definition(row: &rusqlite::Row<'_>) -> rusqlite::Result<CustomFieldDefinition> {
