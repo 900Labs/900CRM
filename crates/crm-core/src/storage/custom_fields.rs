@@ -205,6 +205,16 @@ pub fn delete_definition(conn: &Connection, id: &str) -> CrmResult<()> {
     Ok(())
 }
 
+pub fn definition_has_values(conn: &Connection, id: &str) -> CrmResult<bool> {
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM custom_field_values WHERE field_def_id = ?1",
+        params![id],
+        |row| row.get(0),
+    )?;
+
+    Ok(count > 0)
+}
+
 pub fn set_value(
     conn: &Connection,
     field_def_id: &str,

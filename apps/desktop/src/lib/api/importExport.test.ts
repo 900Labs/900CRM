@@ -14,6 +14,8 @@ import {
   exportContactsCsv,
   exportContactsJson,
   exportCsv,
+  exportCustomFieldDefinitionsCsv,
+  exportCustomFieldDefinitionsJson,
   exportData,
   exportDealsCsv,
   exportDealsJson,
@@ -32,6 +34,10 @@ import {
   importContactsJsonWithMapping,
   importCsv,
   importCsvWithMapping,
+  importCustomFieldDefinitionsCsv,
+  importCustomFieldDefinitionsCsvWithMapping,
+  importCustomFieldDefinitionsJson,
+  importCustomFieldDefinitionsJsonWithMapping,
   importData,
   importActivitiesCsv,
   importActivitiesCsvWithMapping,
@@ -69,6 +75,10 @@ import {
   preflightContactsJsonImportWithMapping,
   preflightCsv,
   preflightCsvWithMapping,
+  preflightCustomFieldDefinitionsCsvImport,
+  preflightCustomFieldDefinitionsCsvImportWithMapping,
+  preflightCustomFieldDefinitionsJsonImport,
+  preflightCustomFieldDefinitionsJsonImportWithMapping,
   preflightDealsCsvImport,
   preflightDealsCsvImportWithMapping,
   preflightDealsJsonImport,
@@ -93,6 +103,7 @@ import {
   preflightTagLinksJsonImportWithMapping,
   previewActivitiesJsonImport,
   previewContactsJsonImport,
+  previewCustomFieldDefinitionsJsonImport,
   previewDealsJsonImport,
   previewJson,
   previewNotesJsonImport,
@@ -291,6 +302,40 @@ describe('import/export API', () => {
     await expect(exportTagDefinitionsJson('/tmp/tag-definitions-export.json')).resolves.toBe(2);
     expect(invokeMock).toHaveBeenLastCalledWith('export_tag_definitions_json', {
       file_path: '/tmp/tag-definitions-export.json',
+    });
+  });
+
+  it('maps custom field definition CSV import/export commands', async () => {
+    invokeMock.mockResolvedValueOnce(importWithBackup(2));
+    await expect(
+      importCustomFieldDefinitionsCsv('/tmp/custom-field-definitions.csv'),
+    ).resolves.toEqual(importWithBackup(2));
+    expect(invokeMock).toHaveBeenLastCalledWith('import_custom_field_definitions_csv', {
+      file_path: '/tmp/custom-field-definitions.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(2));
+    await expect(
+      importCustomFieldDefinitionsJson('/tmp/custom-field-definitions.json'),
+    ).resolves.toEqual(importWithBackup(2));
+    expect(invokeMock).toHaveBeenLastCalledWith('import_custom_field_definitions_json', {
+      file_path: '/tmp/custom-field-definitions.json',
+    });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await expect(
+      exportCustomFieldDefinitionsCsv('/tmp/custom-field-definitions-export.csv'),
+    ).resolves.toBe(2);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_custom_field_definitions_csv', {
+      file_path: '/tmp/custom-field-definitions-export.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await expect(
+      exportCustomFieldDefinitionsJson('/tmp/custom-field-definitions-export.json'),
+    ).resolves.toBe(2);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_custom_field_definitions_json', {
+      file_path: '/tmp/custom-field-definitions-export.json',
     });
   });
 
@@ -1326,6 +1371,91 @@ describe('import/export API', () => {
       {
         file_path: '/tmp/tag-definitions.json',
         mapping: jsonMapping,
+      },
+    );
+  });
+
+  it('maps custom field definition CSV and JSON import/preflight commands with field mappings', async () => {
+    const csvMapping = {
+      Owner: 'entity_type',
+      Label: 'field_name',
+      Kind: 'field_type',
+      Options: 'field_options',
+      Order: 'sort_order',
+      Skip: null,
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importCustomFieldDefinitionsCsvWithMapping('/tmp/custom-field-definitions.csv', csvMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'import_custom_field_definitions_csv_with_mapping',
+      {
+        file_path: '/tmp/custom-field-definitions.csv',
+        mapping: csvMapping,
+      },
+    );
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'custom_field_definitions',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightCustomFieldDefinitionsCsvImportWithMapping(
+      '/tmp/custom-field-definitions.csv',
+      csvMapping,
+    );
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_custom_field_definitions_csv_import_with_mapping',
+      {
+        file_path: '/tmp/custom-field-definitions.csv',
+        mapping: csvMapping,
+      },
+    );
+
+    const jsonMapping = {
+      owner: 'entity_type',
+      label: 'field_name',
+      kind: 'field_type',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importCustomFieldDefinitionsJsonWithMapping(
+      '/tmp/custom-field-definitions.json',
+      jsonMapping,
+    );
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'import_custom_field_definitions_json_with_mapping',
+      {
+        file_path: '/tmp/custom-field-definitions.json',
+        mapping: jsonMapping,
+      },
+    );
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'custom_field_definitions',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightCustomFieldDefinitionsJsonImportWithMapping(
+      '/tmp/custom-field-definitions.json',
+      jsonMapping,
+    );
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_custom_field_definitions_json_import_with_mapping',
+      {
+        file_path: '/tmp/custom-field-definitions.json',
+        mapping: jsonMapping,
+      },
+    );
+
+    invokeMock.mockResolvedValueOnce({ total_rows: 1, headers: ['field_name'], rows: [] });
+    await previewCustomFieldDefinitionsJsonImport('/tmp/custom-field-definitions.json');
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preview_custom_field_definitions_json_import',
+      {
+        file_path: '/tmp/custom-field-definitions.json',
       },
     );
   });

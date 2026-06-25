@@ -24,6 +24,7 @@
     importDealsCsvWithMapping,
     importJsonWithMapping,
     importOrganizationsCsvWithMapping,
+    importCustomFieldDefinitionsCsvWithMapping,
     importTagDefinitionsCsvWithMapping,
     importTagLinksCsvWithMapping,
     rollbackCompletedImport,
@@ -33,6 +34,7 @@
     preflightDealsCsvImportWithMapping,
     preflightJsonWithMapping,
     preflightOrganizationsCsvImportWithMapping,
+    preflightCustomFieldDefinitionsCsvImportWithMapping,
     preflightTagDefinitionsCsvImportWithMapping,
     preflightTagLinksCsvImportWithMapping,
     type ExportFormat,
@@ -47,6 +49,7 @@
     type ImportRollbackResult,
     type ImportWithBackupResult,
     type JsonImportPreview,
+    type CustomFieldDefinitionImportTargetField,
     type NoteImportTargetField,
     type OrganizationImportTargetField,
     type TagDefinitionImportTargetField,
@@ -101,15 +104,26 @@
     organizations: CustomFieldDefinition[];
     notes: CustomFieldDefinition[];
     tag_definitions: CustomFieldDefinition[];
+    custom_field_definitions: CustomFieldDefinition[];
     tag_links: CustomFieldDefinition[];
-  }>({ contacts: [], deals: [], activities: [], organizations: [], notes: [], tag_definitions: [], tag_links: [] });
-  let loadedImportCustomFields = $state<{ contacts: boolean; deals: boolean; activities: boolean; organizations: boolean; notes: boolean; tag_definitions: boolean; tag_links: boolean }>({
+  }>({
+    contacts: [],
+    deals: [],
+    activities: [],
+    organizations: [],
+    notes: [],
+    tag_definitions: [],
+    custom_field_definitions: [],
+    tag_links: [],
+  });
+  let loadedImportCustomFields = $state<{ contacts: boolean; deals: boolean; activities: boolean; organizations: boolean; notes: boolean; tag_definitions: boolean; custom_field_definitions: boolean; tag_links: boolean }>({
     contacts: false,
     deals: false,
     activities: false,
     organizations: false,
     notes: true,
     tag_definitions: true,
+    custom_field_definitions: true,
     tag_links: true,
   });
 
@@ -136,6 +150,7 @@
       importEntity === 'organizations' ||
       importEntity === 'notes' ||
       importEntity === 'tag_definitions' ||
+      importEntity === 'custom_field_definitions' ||
       importEntity === 'tag_links',
   );
   const isCsvImport = $derived(importFormat === 'csv');
@@ -145,6 +160,7 @@
     importEntity !== 'activities' &&
       importEntity !== 'notes' &&
       importEntity !== 'tag_definitions' &&
+      importEntity !== 'custom_field_definitions' &&
       importEntity !== 'tag_links',
   );
   const showDuplicateReview = $derived(showMappingWizard && usesDuplicatePreflight);
@@ -162,7 +178,9 @@
                 ? importCustomFieldDefinitions.notes
                 : importEntity === 'tag_definitions'
                   ? importCustomFieldDefinitions.tag_definitions
-                  : importCustomFieldDefinitions.tag_links,
+                  : importEntity === 'custom_field_definitions'
+                    ? importCustomFieldDefinitions.custom_field_definitions
+                    : importCustomFieldDefinitions.tag_links,
   );
   const importFieldOptions = $derived(
     mappedEntity ? getImportFieldOptions(mappedEntity, activeImportCustomFields) : [],
@@ -182,7 +200,12 @@
   const importRollbackActionCount = $derived(importRollbackPlan?.actions.length ?? 0);
 
   async function ensureImportCustomFields(entity: ImportExportEntity): Promise<CustomFieldDefinition[]> {
-    if (entity === 'notes' || entity === 'tag_definitions' || entity === 'tag_links') {
+    if (
+      entity === 'notes' ||
+      entity === 'tag_definitions' ||
+      entity === 'custom_field_definitions' ||
+      entity === 'tag_links'
+    ) {
       return [];
     }
 
@@ -524,6 +547,13 @@
       );
     }
 
+    if (entity === 'custom_field_definitions') {
+      return preflightCustomFieldDefinitionsCsvImportWithMapping(
+        filePath,
+        toBackendMapping<CustomFieldDefinitionImportTargetField>(columnMapping),
+      );
+    }
+
     if (entity === 'tag_links') {
       return preflightTagLinksCsvImportWithMapping(
         filePath,
@@ -583,6 +613,13 @@
       return importOptions
         ? importTagDefinitionsCsvWithMapping(filePath, mapping, importOptions)
         : importTagDefinitionsCsvWithMapping(filePath, mapping);
+    }
+
+    if (entity === 'custom_field_definitions') {
+      const mapping = toBackendMapping<CustomFieldDefinitionImportTargetField>(columnMapping);
+      return importOptions
+        ? importCustomFieldDefinitionsCsvWithMapping(filePath, mapping, importOptions)
+        : importCustomFieldDefinitionsCsvWithMapping(filePath, mapping);
     }
 
     if (entity === 'tag_links') {
@@ -812,6 +849,7 @@
                 <option value="organizations">{t('organizations.title')}</option>
                 <option value="notes">{t('common.notes')}</option>
                 <option value="tag_definitions">Tag definitions</option>
+                <option value="custom_field_definitions">Custom field definitions</option>
                 <option value="tag_links">Tag links</option>
               </select>
             </div>
@@ -1076,7 +1114,9 @@
                         ? t('import.notesSkipDuplicates')
                         : importEntity === 'tag_definitions'
                           ? 'Tag definition imports do not run duplicate detection. Existing tag names are skipped.'
-                          : 'Tag link imports do not run duplicate detection. Existing active local links are skipped.'}
+                          : importEntity === 'custom_field_definitions'
+                            ? 'Custom field definition imports do not run duplicate detection. Exact existing definitions are skipped; conflicting definitions are reported.'
+                            : 'Tag link imports do not run duplicate detection. Existing active local links are skipped.'}
                   </p>
                 {/if}
                 {#if validationErrors.length > 0}
@@ -1185,6 +1225,7 @@
                 <option value="organizations">{t('organizations.title')}</option>
                 <option value="notes">{t('common.notes')}</option>
                 <option value="tag_definitions">Tag definitions</option>
+                <option value="custom_field_definitions">Custom field definitions</option>
                 <option value="tag_links">Tag links</option>
               </select>
             </div>

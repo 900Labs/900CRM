@@ -147,6 +147,15 @@ and `select`. Custom field value writes validate that the referenced entity is
 an existing active row for the definition's entity type before storing the
 value.
 
+Custom field definition import/export uses the flat portable fields
+`entity_type`, `field_name`, `field_type`, `field_options`, and `sort_order`.
+Imported definition rows create missing definitions through the existing custom
+field service. Exact existing definitions are skipped, and definitions with the
+same `entity_type` and `field_name` but a different shape are reported instead
+of updated silently. Created-definition rollback deletes only the exact created
+definition when it still matches the post-import snapshot and has no attached
+custom field values.
+
 ### Settings
 
 Application settings are stored as string key-value pairs in `settings`.

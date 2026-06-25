@@ -8,6 +8,7 @@ use crate::{
         self,
         activities::Activity,
         contacts::Contact,
+        custom_fields::CustomFieldDefinition,
         deals::Deal,
         notes::Note,
         organizations::Organization,
@@ -89,6 +90,14 @@ pub enum ImportRollbackAction {
         changed_fields: Vec<String>,
         before_import: Option<TagDefinitionImportRollbackSnapshot>,
         post_import: TagDefinitionImportRollbackSnapshot,
+    },
+    CustomFieldDefinition {
+        row_number: u32,
+        entity_id: String,
+        operation: ImportRollbackOperation,
+        changed_fields: Vec<String>,
+        before_import: Option<CustomFieldDefinitionImportRollbackSnapshot>,
+        post_import: CustomFieldDefinitionImportRollbackSnapshot,
     },
     TagLink {
         row_number: u32,
@@ -246,6 +255,20 @@ impl ImportRollbackAction {
             changed_fields: Vec::new(),
             before_import: None,
             post_import: TagDefinitionImportRollbackSnapshot::from(tag),
+        }
+    }
+
+    pub(crate) fn created_custom_field_definition(
+        row_number: usize,
+        definition: &CustomFieldDefinition,
+    ) -> Self {
+        Self::CustomFieldDefinition {
+            row_number: row_number as u32,
+            entity_id: definition.id.clone(),
+            operation: ImportRollbackOperation::Created,
+            changed_fields: Vec::new(),
+            before_import: None,
+            post_import: CustomFieldDefinitionImportRollbackSnapshot::from(definition),
         }
     }
 
@@ -519,6 +542,29 @@ impl From<&Tag> for TagDefinitionImportRollbackSnapshot {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CustomFieldDefinitionImportRollbackSnapshot {
+    pub entity_type: String,
+    pub field_name: String,
+    pub field_type: String,
+    pub field_options: Option<String>,
+    pub sort_order: i32,
+    pub created_at: String,
+}
+
+impl From<&CustomFieldDefinition> for CustomFieldDefinitionImportRollbackSnapshot {
+    fn from(definition: &CustomFieldDefinition) -> Self {
+        Self {
+            entity_type: definition.entity_type.clone(),
+            field_name: definition.field_name.clone(),
+            field_type: definition.field_type.clone(),
+            field_options: definition.field_options.clone(),
+            sort_order: definition.sort_order,
+            created_at: definition.created_at.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TagLinkImportRollbackSnapshot {
     pub link_id: String,
     pub entity_type: String,
@@ -739,6 +785,28 @@ impl CrmCore {
                         *row_number,
                         "invalid_plan",
                         "tag definition merge rollback is not supported".to_string(),
+                    ),
+                },
+                ImportRollbackAction::CustomFieldDefinition {
+                    row_number,
+                    entity_id,
+                    operation,
+                    post_import,
+                    ..
+                } => match operation {
+                    ImportRollbackOperation::Created => self
+                        .rollback_created_custom_field_definition(
+                            *row_number,
+                            entity_id,
+                            post_import,
+                            &mut result,
+                        ),
+                    ImportRollbackOperation::Merged => result.record_error(
+                        "custom_field_definition",
+                        entity_id,
+                        *row_number,
+                        "invalid_plan",
+                        "custom field definition merge rollback is not supported".to_string(),
                     ),
                 },
                 ImportRollbackAction::TagLink {
@@ -1178,6 +1246,68 @@ impl CrmCore {
         }
     }
 
+    fn rollback_created_custom_field_definition(
+        &mut self,
+        row_number: u32,
+        entity_id: &str,
+        post_import: &CustomFieldDefinitionImportRollbackSnapshot,
+        result: &mut ImportRollbackResult,
+    ) {
+        let Some(current) =
+            current_custom_field_definition_for_rollback(self, row_number, entity_id, result)
+        else {
+            return;
+        };
+
+        let current_snapshot = CustomFieldDefinitionImportRollbackSnapshot::from(&current);
+        if current_snapshot != *post_import {
+            record_conflict(result, "custom_field_definition", entity_id, row_number);
+            return;
+        }
+
+        match storage::custom_fields::definition_has_values(&self.db.conn, entity_id) {
+            Ok(true) => {
+                result.record_skipped(
+                    "custom_field_definition",
+                    entity_id,
+                    row_number,
+                    "conflict",
+                    "created custom field definition now has values".to_string(),
+                );
+                return;
+            }
+            Ok(false) => {}
+            Err(err) => {
+                result.record_error(
+                    "custom_field_definition",
+                    entity_id,
+                    row_number,
+                    "read_failed",
+                    err.to_string(),
+                );
+                return;
+            }
+        }
+
+        match self.delete_custom_field_def(entity_id) {
+            Ok(()) => result.record_rolled_back(),
+            Err(CrmError::NotFound(message)) => result.record_skipped(
+                "custom_field_definition",
+                entity_id,
+                row_number,
+                "not_found",
+                message,
+            ),
+            Err(err) => result.record_error(
+                "custom_field_definition",
+                entity_id,
+                row_number,
+                "rollback_failed",
+                err.to_string(),
+            ),
+        }
+    }
+
     fn rollback_created_tag_link(
         &mut self,
         row_number: u32,
@@ -1464,6 +1594,37 @@ fn current_tag_for_rollback(
         }
         Err(err) => {
             result.record_error("tag", entity_id, row_number, "read_failed", err.to_string());
+            None
+        }
+    }
+}
+
+fn current_custom_field_definition_for_rollback(
+    core: &CrmCore,
+    row_number: u32,
+    entity_id: &str,
+    result: &mut ImportRollbackResult,
+) -> Option<CustomFieldDefinition> {
+    match storage::custom_fields::get_definition(&core.db.conn, entity_id) {
+        Ok(definition) => Some(definition),
+        Err(CrmError::NotFound(message)) => {
+            result.record_skipped(
+                "custom_field_definition",
+                entity_id,
+                row_number,
+                "not_found",
+                message,
+            );
+            None
+        }
+        Err(err) => {
+            result.record_error(
+                "custom_field_definition",
+                entity_id,
+                row_number,
+                "read_failed",
+                err.to_string(),
+            );
             None
         }
     }
