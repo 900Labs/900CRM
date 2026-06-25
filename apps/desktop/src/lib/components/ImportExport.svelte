@@ -24,6 +24,8 @@
     importDealsCsvWithMapping,
     importJsonWithMapping,
     importOrganizationsCsvWithMapping,
+    importTagDefinitionsCsvWithMapping,
+    importTagLinksCsvWithMapping,
     rollbackCompletedImport,
     previewJson,
     preflightActivitiesCsvImportWithMapping,
@@ -31,6 +33,8 @@
     preflightDealsCsvImportWithMapping,
     preflightJsonWithMapping,
     preflightOrganizationsCsvImportWithMapping,
+    preflightTagDefinitionsCsvImportWithMapping,
+    preflightTagLinksCsvImportWithMapping,
     type ExportFormat,
     type ActivityImportTargetField,
     type ContactImportTargetField,
@@ -45,6 +49,8 @@
     type JsonImportPreview,
     type NoteImportTargetField,
     type OrganizationImportTargetField,
+    type TagDefinitionImportTargetField,
+    type TagLinkImportTargetField,
     importNotesCsvWithMapping,
     preflightNotesCsvImportWithMapping,
   } from '$lib/api/importExport';
@@ -94,13 +100,17 @@
     activities: CustomFieldDefinition[];
     organizations: CustomFieldDefinition[];
     notes: CustomFieldDefinition[];
-  }>({ contacts: [], deals: [], activities: [], organizations: [], notes: [] });
-  let loadedImportCustomFields = $state<{ contacts: boolean; deals: boolean; activities: boolean; organizations: boolean; notes: boolean }>({
+    tag_definitions: CustomFieldDefinition[];
+    tag_links: CustomFieldDefinition[];
+  }>({ contacts: [], deals: [], activities: [], organizations: [], notes: [], tag_definitions: [], tag_links: [] });
+  let loadedImportCustomFields = $state<{ contacts: boolean; deals: boolean; activities: boolean; organizations: boolean; notes: boolean; tag_definitions: boolean; tag_links: boolean }>({
     contacts: false,
     deals: false,
     activities: false,
     organizations: false,
     notes: true,
+    tag_definitions: true,
+    tag_links: true,
   });
 
   let exportEntity = $state<ImportExportEntity>('contacts');
@@ -124,12 +134,19 @@
       importEntity === 'deals' ||
       importEntity === 'activities' ||
       importEntity === 'organizations' ||
-      importEntity === 'notes',
+      importEntity === 'notes' ||
+      importEntity === 'tag_definitions' ||
+      importEntity === 'tag_links',
   );
   const isCsvImport = $derived(importFormat === 'csv');
   const isJsonImport = $derived(importFormat === 'json');
   const showMappingWizard = $derived(isMappedImport && (isCsvImport || isJsonImport));
-  const usesDuplicatePreflight = $derived(importEntity !== 'activities' && importEntity !== 'notes');
+  const usesDuplicatePreflight = $derived(
+    importEntity !== 'activities' &&
+      importEntity !== 'notes' &&
+      importEntity !== 'tag_definitions' &&
+      importEntity !== 'tag_links',
+  );
   const showDuplicateReview = $derived(showMappingWizard && usesDuplicatePreflight);
   const mappedEntity = $derived(isMappedImport ? (importEntity as MappedImportEntity) : null);
   const activeImportCustomFields = $derived(
@@ -138,10 +155,14 @@
       : importEntity === 'deals'
         ? importCustomFieldDefinitions.deals
         : importEntity === 'activities'
-          ? importCustomFieldDefinitions.activities
-          : importEntity === 'organizations'
-            ? importCustomFieldDefinitions.organizations
-            : importCustomFieldDefinitions.notes,
+            ? importCustomFieldDefinitions.activities
+            : importEntity === 'organizations'
+              ? importCustomFieldDefinitions.organizations
+              : importEntity === 'notes'
+                ? importCustomFieldDefinitions.notes
+                : importEntity === 'tag_definitions'
+                  ? importCustomFieldDefinitions.tag_definitions
+                  : importCustomFieldDefinitions.tag_links,
   );
   const importFieldOptions = $derived(
     mappedEntity ? getImportFieldOptions(mappedEntity, activeImportCustomFields) : [],
@@ -161,7 +182,7 @@
   const importRollbackActionCount = $derived(importRollbackPlan?.actions.length ?? 0);
 
   async function ensureImportCustomFields(entity: ImportExportEntity): Promise<CustomFieldDefinition[]> {
-    if (entity === 'notes') {
+    if (entity === 'notes' || entity === 'tag_definitions' || entity === 'tag_links') {
       return [];
     }
 
@@ -496,6 +517,20 @@
       );
     }
 
+    if (entity === 'tag_definitions') {
+      return preflightTagDefinitionsCsvImportWithMapping(
+        filePath,
+        toBackendMapping<TagDefinitionImportTargetField>(columnMapping),
+      );
+    }
+
+    if (entity === 'tag_links') {
+      return preflightTagLinksCsvImportWithMapping(
+        filePath,
+        toBackendMapping<TagLinkImportTargetField>(columnMapping),
+      );
+    }
+
     return preflightOrganizationsCsvImportWithMapping(
       filePath,
       toBackendMapping<OrganizationImportTargetField>(columnMapping),
@@ -541,6 +576,20 @@
       return importOptions
         ? importNotesCsvWithMapping(filePath, mapping, importOptions)
         : importNotesCsvWithMapping(filePath, mapping);
+    }
+
+    if (entity === 'tag_definitions') {
+      const mapping = toBackendMapping<TagDefinitionImportTargetField>(columnMapping);
+      return importOptions
+        ? importTagDefinitionsCsvWithMapping(filePath, mapping, importOptions)
+        : importTagDefinitionsCsvWithMapping(filePath, mapping);
+    }
+
+    if (entity === 'tag_links') {
+      const mapping = toBackendMapping<TagLinkImportTargetField>(columnMapping);
+      return importOptions
+        ? importTagLinksCsvWithMapping(filePath, mapping, importOptions)
+        : importTagLinksCsvWithMapping(filePath, mapping);
     }
 
     const mapping = toBackendMapping<OrganizationImportTargetField>(columnMapping);
@@ -762,6 +811,8 @@
                 <option value="activities">{t('activities.title')}</option>
                 <option value="organizations">{t('organizations.title')}</option>
                 <option value="notes">{t('common.notes')}</option>
+                <option value="tag_definitions">Tag definitions</option>
+                <option value="tag_links">Tag links</option>
               </select>
             </div>
 
@@ -1021,7 +1072,11 @@
                   <p class="import-stats">
                     {importEntity === 'activities'
                       ? t('import.activitiesSkipDuplicates')
-                      : t('import.notesSkipDuplicates')}
+                      : importEntity === 'notes'
+                        ? t('import.notesSkipDuplicates')
+                        : importEntity === 'tag_definitions'
+                          ? 'Tag definition imports do not run duplicate detection. Existing tag names are skipped.'
+                          : 'Tag link imports do not run duplicate detection. Existing active local links are skipped.'}
                   </p>
                 {/if}
                 {#if validationErrors.length > 0}
@@ -1129,6 +1184,8 @@
                 <option value="activities">{t('activities.title')}</option>
                 <option value="organizations">{t('organizations.title')}</option>
                 <option value="notes">{t('common.notes')}</option>
+                <option value="tag_definitions">Tag definitions</option>
+                <option value="tag_links">Tag links</option>
               </select>
             </div>
 

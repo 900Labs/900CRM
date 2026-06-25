@@ -22,6 +22,10 @@ import {
   exportNotesJson,
   exportOrganizationsCsv,
   exportOrganizationsJson,
+  exportTagDefinitionsCsv,
+  exportTagDefinitionsJson,
+  exportTagLinksCsv,
+  exportTagLinksJson,
   importContactsCsv,
   importContactsCsvWithMapping,
   importContactsJson,
@@ -47,6 +51,14 @@ import {
   importOrganizationsCsvWithMapping,
   importOrganizationsJson,
   importOrganizationsJsonWithMapping,
+  importTagDefinitionsCsv,
+  importTagDefinitionsCsvWithMapping,
+  importTagDefinitionsJson,
+  importTagDefinitionsJsonWithMapping,
+  importTagLinksCsv,
+  importTagLinksCsvWithMapping,
+  importTagLinksJson,
+  importTagLinksJsonWithMapping,
   preflightActivitiesCsvImport,
   preflightActivitiesCsvImportWithMapping,
   preflightActivitiesJsonImport,
@@ -71,12 +83,22 @@ import {
   preflightOrganizationsCsvImportWithMapping,
   preflightOrganizationsJsonImport,
   preflightOrganizationsJsonImportWithMapping,
+  preflightTagDefinitionsCsvImport,
+  preflightTagDefinitionsCsvImportWithMapping,
+  preflightTagDefinitionsJsonImport,
+  preflightTagDefinitionsJsonImportWithMapping,
+  preflightTagLinksCsvImport,
+  preflightTagLinksCsvImportWithMapping,
+  preflightTagLinksJsonImport,
+  preflightTagLinksJsonImportWithMapping,
   previewActivitiesJsonImport,
   previewContactsJsonImport,
   previewDealsJsonImport,
   previewJson,
   previewNotesJsonImport,
   previewOrganizationsJsonImport,
+  previewTagDefinitionsJsonImport,
+  previewTagLinksJsonImport,
   rollbackCompletedImport,
 } from './importExport';
 
@@ -242,6 +264,62 @@ describe('import/export API', () => {
     });
   });
 
+  it('maps tag definition CSV import/export commands', async () => {
+    invokeMock.mockResolvedValueOnce(importWithBackup(2));
+    await expect(importTagDefinitionsCsv('/tmp/tag-definitions.csv')).resolves.toEqual(
+      importWithBackup(2),
+    );
+    expect(invokeMock).toHaveBeenLastCalledWith('import_tag_definitions_csv', {
+      file_path: '/tmp/tag-definitions.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(2));
+    await expect(importTagDefinitionsJson('/tmp/tag-definitions.json')).resolves.toEqual(
+      importWithBackup(2),
+    );
+    expect(invokeMock).toHaveBeenLastCalledWith('import_tag_definitions_json', {
+      file_path: '/tmp/tag-definitions.json',
+    });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await expect(exportTagDefinitionsCsv('/tmp/tag-definitions-export.csv')).resolves.toBe(2);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_tag_definitions_csv', {
+      file_path: '/tmp/tag-definitions-export.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await expect(exportTagDefinitionsJson('/tmp/tag-definitions-export.json')).resolves.toBe(2);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_tag_definitions_json', {
+      file_path: '/tmp/tag-definitions-export.json',
+    });
+  });
+
+  it('maps tag link CSV import/export commands', async () => {
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await expect(importTagLinksCsv('/tmp/tag-links.csv')).resolves.toEqual(importWithBackup(1));
+    expect(invokeMock).toHaveBeenLastCalledWith('import_tag_links_csv', {
+      file_path: '/tmp/tag-links.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await expect(importTagLinksJson('/tmp/tag-links.json')).resolves.toEqual(importWithBackup(1));
+    expect(invokeMock).toHaveBeenLastCalledWith('import_tag_links_json', {
+      file_path: '/tmp/tag-links.json',
+    });
+
+    invokeMock.mockResolvedValueOnce(1);
+    await expect(exportTagLinksCsv('/tmp/tag-links-export.csv')).resolves.toBe(1);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_tag_links_csv', {
+      file_path: '/tmp/tag-links-export.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(1);
+    await expect(exportTagLinksJson('/tmp/tag-links-export.json')).resolves.toBe(1);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_tag_links_json', {
+      file_path: '/tmp/tag-links-export.json',
+    });
+  });
+
   it('routes generic CSV helpers by entity', async () => {
     invokeMock.mockResolvedValueOnce(importWithBackup(1));
     await importCsv('organizations', '/tmp/orgs.csv');
@@ -283,6 +361,18 @@ describe('import/export API', () => {
     await exportCsv('notes', '/tmp/notes-export.csv');
     expect(invokeMock).toHaveBeenLastCalledWith('export_notes_csv', {
       file_path: '/tmp/notes-export.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importCsv('tag_definitions', '/tmp/tag-definitions.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('import_tag_definitions_csv', {
+      file_path: '/tmp/tag-definitions.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(1);
+    await exportCsv('tag_links', '/tmp/tag-links-export.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_tag_links_csv', {
+      file_path: '/tmp/tag-links-export.csv',
     });
   });
 
@@ -463,6 +553,34 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_notes_csv_import', {
       file_path: '/tmp/notes.csv',
     });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_definitions',
+      total_rows: 2,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await expect(preflightTagDefinitionsCsvImport('/tmp/tag-definitions.csv')).resolves.toMatchObject({
+      entity_type: 'tag_definitions',
+      duplicate_warning_count: 0,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_tag_definitions_csv_import', {
+      file_path: '/tmp/tag-definitions.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_links',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await expect(preflightTagLinksCsvImport('/tmp/tag-links.csv')).resolves.toMatchObject({
+      entity_type: 'tag_links',
+      duplicate_warning_count: 0,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_tag_links_csv_import', {
+      file_path: '/tmp/tag-links.csv',
+    });
   });
 
   it('routes generic CSV preflight helpers by entity', async () => {
@@ -508,6 +626,28 @@ describe('import/export API', () => {
     await preflightCsv('notes', '/tmp/notes.csv');
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_notes_csv_import', {
       file_path: '/tmp/notes.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_definitions',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightCsv('tag_definitions', '/tmp/tag-definitions.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_tag_definitions_csv_import', {
+      file_path: '/tmp/tag-definitions.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_links',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightCsv('tag_links', '/tmp/tag-links.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_tag_links_csv_import', {
+      file_path: '/tmp/tag-links.csv',
     });
   });
 
@@ -592,6 +732,34 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_notes_json_import', {
       file_path: '/tmp/notes.json',
     });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_definitions',
+      total_rows: 2,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await expect(preflightTagDefinitionsJsonImport('/tmp/tag-definitions.json')).resolves.toMatchObject({
+      entity_type: 'tag_definitions',
+      duplicate_warning_count: 0,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_tag_definitions_json_import', {
+      file_path: '/tmp/tag-definitions.json',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_links',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await expect(preflightTagLinksJsonImport('/tmp/tag-links.json')).resolves.toMatchObject({
+      entity_type: 'tag_links',
+      duplicate_warning_count: 0,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_tag_links_json_import', {
+      file_path: '/tmp/tag-links.json',
+    });
   });
 
   it('routes generic JSON preflight helpers by entity', async () => {
@@ -638,6 +806,28 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('preflight_notes_json_import', {
       file_path: '/tmp/notes.json',
     });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_definitions',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightJson('tag_definitions', '/tmp/tag-definitions.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_tag_definitions_json_import', {
+      file_path: '/tmp/tag-definitions.json',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_links',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightJson('tag_links', '/tmp/tag-links.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preflight_tag_links_json_import', {
+      file_path: '/tmp/tag-links.json',
+    });
   });
 
   it('maps JSON preview commands', async () => {
@@ -676,6 +866,18 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('preview_notes_json_import', {
       file_path: '/tmp/notes.json',
     });
+
+    invokeMock.mockResolvedValueOnce(preview);
+    await previewTagDefinitionsJsonImport('/tmp/tag-definitions.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preview_tag_definitions_json_import', {
+      file_path: '/tmp/tag-definitions.json',
+    });
+
+    invokeMock.mockResolvedValueOnce(preview);
+    await previewTagLinksJsonImport('/tmp/tag-links.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preview_tag_links_json_import', {
+      file_path: '/tmp/tag-links.json',
+    });
   });
 
   it('routes generic JSON preview helpers by entity', async () => {
@@ -710,6 +912,28 @@ describe('import/export API', () => {
     await previewJson('notes', '/tmp/notes.json');
     expect(invokeMock).toHaveBeenLastCalledWith('preview_notes_json_import', {
       file_path: '/tmp/notes.json',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      total_rows: 1,
+      headers: ['name', 'color'],
+      rows: [{ row_number: 2, values: { name: 'VIP', color: '#ef4444' } }],
+    });
+
+    await previewJson('tag_definitions', '/tmp/tag-definitions.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preview_tag_definitions_json_import', {
+      file_path: '/tmp/tag-definitions.json',
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      total_rows: 1,
+      headers: ['entity_type', 'entity_id', 'tag_id'],
+      rows: [{ row_number: 2, values: { entity_type: 'contact', entity_id: 'contact-1', tag_id: 'tag-1' } }],
+    });
+
+    await previewJson('tag_links', '/tmp/tag-links.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('preview_tag_links_json_import', {
+      file_path: '/tmp/tag-links.json',
     });
   });
 
@@ -1049,6 +1273,122 @@ describe('import/export API', () => {
     });
   });
 
+  it('maps tag definition CSV and JSON import/preflight commands with field mappings', async () => {
+    const csvMapping = {
+      Label: 'name',
+      Hex: 'color',
+      Skip: null,
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importTagDefinitionsCsvWithMapping('/tmp/tag-definitions.csv', csvMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_tag_definitions_csv_with_mapping', {
+      file_path: '/tmp/tag-definitions.csv',
+      mapping: csvMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_definitions',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightTagDefinitionsCsvImportWithMapping('/tmp/tag-definitions.csv', csvMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_tag_definitions_csv_import_with_mapping',
+      {
+        file_path: '/tmp/tag-definitions.csv',
+        mapping: csvMapping,
+      },
+    );
+
+    const jsonMapping = {
+      label: 'name',
+      hex: 'color',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importTagDefinitionsJsonWithMapping('/tmp/tag-definitions.json', jsonMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_tag_definitions_json_with_mapping', {
+      file_path: '/tmp/tag-definitions.json',
+      mapping: jsonMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_definitions',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightTagDefinitionsJsonImportWithMapping('/tmp/tag-definitions.json', jsonMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_tag_definitions_json_import_with_mapping',
+      {
+        file_path: '/tmp/tag-definitions.json',
+        mapping: jsonMapping,
+      },
+    );
+  });
+
+  it('maps tag link CSV and JSON import/preflight commands with field mappings', async () => {
+    const csvMapping = {
+      Type: 'entity_type',
+      Parent: 'entity_id',
+      Tag: 'tag_id',
+      Skip: null,
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importTagLinksCsvWithMapping('/tmp/tag-links.csv', csvMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_tag_links_csv_with_mapping', {
+      file_path: '/tmp/tag-links.csv',
+      mapping: csvMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_links',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightTagLinksCsvImportWithMapping('/tmp/tag-links.csv', csvMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_tag_links_csv_import_with_mapping',
+      {
+        file_path: '/tmp/tag-links.csv',
+        mapping: csvMapping,
+      },
+    );
+
+    const jsonMapping = {
+      type: 'entity_type',
+      parent: 'entity_id',
+      tag: 'tag_id',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importTagLinksJsonWithMapping('/tmp/tag-links.json', jsonMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_tag_links_json_with_mapping', {
+      file_path: '/tmp/tag-links.json',
+      mapping: jsonMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_links',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightTagLinksJsonImportWithMapping('/tmp/tag-links.json', jsonMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_tag_links_json_import_with_mapping',
+      {
+        file_path: '/tmp/tag-links.json',
+        mapping: jsonMapping,
+      },
+    );
+  });
+
   it('routes generic mapped CSV helpers by entity', async () => {
     const mapping = {
       Company: 'name',
@@ -1158,6 +1498,61 @@ describe('import/export API', () => {
       file_path: '/tmp/notes.csv',
       mapping: noteMapping,
     });
+
+    const tagDefinitionMapping = {
+      Label: 'name',
+      Hex: 'color',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importCsvWithMapping('tag_definitions', '/tmp/tag-definitions.csv', tagDefinitionMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_tag_definitions_csv_with_mapping', {
+      file_path: '/tmp/tag-definitions.csv',
+      mapping: tagDefinitionMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_definitions',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightCsvWithMapping('tag_definitions', '/tmp/tag-definitions.csv', tagDefinitionMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_tag_definitions_csv_import_with_mapping',
+      {
+        file_path: '/tmp/tag-definitions.csv',
+        mapping: tagDefinitionMapping,
+      },
+    );
+
+    const tagLinkMapping = {
+      Type: 'entity_type',
+      Parent: 'entity_id',
+      Tag: 'tag_id',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importCsvWithMapping('tag_links', '/tmp/tag-links.csv', tagLinkMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_tag_links_csv_with_mapping', {
+      file_path: '/tmp/tag-links.csv',
+      mapping: tagLinkMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_links',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightCsvWithMapping('tag_links', '/tmp/tag-links.csv', tagLinkMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_tag_links_csv_import_with_mapping',
+      {
+        file_path: '/tmp/tag-links.csv',
+        mapping: tagLinkMapping,
+      },
+    );
   });
 
   it('routes generic mapped JSON helpers by entity', async () => {
@@ -1269,6 +1664,61 @@ describe('import/export API', () => {
       file_path: '/tmp/notes.json',
       mapping: noteMapping,
     });
+
+    const tagDefinitionMapping = {
+      label: 'name',
+      hex: 'color',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importJsonWithMapping('tag_definitions', '/tmp/tag-definitions.json', tagDefinitionMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_tag_definitions_json_with_mapping', {
+      file_path: '/tmp/tag-definitions.json',
+      mapping: tagDefinitionMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_definitions',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightJsonWithMapping('tag_definitions', '/tmp/tag-definitions.json', tagDefinitionMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_tag_definitions_json_import_with_mapping',
+      {
+        file_path: '/tmp/tag-definitions.json',
+        mapping: tagDefinitionMapping,
+      },
+    );
+
+    const tagLinkMapping = {
+      type: 'entity_type',
+      parent: 'entity_id',
+      tag: 'tag_id',
+    } as const;
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importJsonWithMapping('tag_links', '/tmp/tag-links.json', tagLinkMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith('import_tag_links_json_with_mapping', {
+      file_path: '/tmp/tag-links.json',
+      mapping: tagLinkMapping,
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      entity_type: 'tag_links',
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    await preflightJsonWithMapping('tag_links', '/tmp/tag-links.json', tagLinkMapping);
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'preflight_tag_links_json_import_with_mapping',
+      {
+        file_path: '/tmp/tag-links.json',
+        mapping: tagLinkMapping,
+      },
+    );
   });
 
   it('maps row-level import rollback commands', async () => {

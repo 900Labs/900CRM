@@ -452,6 +452,82 @@ describe("ImportExport component", () => {
     await screen.findByText("Created");
   });
 
+  it("supports tag link JSON imports through local ID mapping without duplicate review", async () => {
+    openDialogMock.mockResolvedValue("/tmp/tag-links.json");
+    previewJsonMock.mockResolvedValue({
+      total_rows: 1,
+      headers: ["Parent Type", "Parent ID", "Local Tag ID"],
+      rows: [
+        {
+          row_number: 2,
+          values: {
+            "Parent Type": "contact",
+            "Parent ID": "contact-1",
+            "Local Tag ID": "tag-1",
+          },
+        },
+      ],
+    });
+    preflightJsonWithMappingMock.mockResolvedValue({
+      entity_type: "tag_links",
+      total_rows: 1,
+      duplicate_warning_count: 0,
+      warnings: [],
+    });
+    importJsonWithMappingMock.mockResolvedValue(importWithBackupResult);
+
+    render(ImportExport, { open: true });
+
+    await fireEvent.change(screen.getByLabelText("Type"), {
+      target: { value: "tag_links" },
+    });
+    await fireEvent.change(screen.getByLabelText("Format"), {
+      target: { value: "json" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+
+    await waitFor(() => {
+      expect(listCustomFieldDefinitionsMock).not.toHaveBeenCalled();
+      expect(previewJsonMock).toHaveBeenCalledWith("tag_links", "/tmp/tag-links.json");
+    });
+    await screen.findByText("tag-1");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByLabelText("Map to field: Parent Type")).toBeTruthy();
+    expect(screen.getByLabelText("Map to field: Parent ID")).toBeTruthy();
+    expect(screen.getByLabelText("Map to field: Local Tag ID")).toBeTruthy();
+    expect(screen.queryByLabelText("Merge duplicate rows into existing records")).toBeNull();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Review import" }));
+
+    await waitFor(() => {
+      expect(preflightJsonWithMappingMock).toHaveBeenCalledWith(
+        "tag_links",
+        "/tmp/tag-links.json",
+        {
+          "Local Tag ID": "tag_id",
+          "Parent ID": "entity_id",
+          "Parent Type": "entity_type",
+        },
+      );
+    });
+    expect(screen.getByText("Tag link imports do not run duplicate detection. Existing active local links are skipped.")).toBeTruthy();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
+    await waitFor(() => {
+      expect(importJsonWithMappingMock).toHaveBeenCalledWith(
+        "tag_links",
+        "/tmp/tag-links.json",
+        {
+          "Local Tag ID": "tag_id",
+          "Parent ID": "entity_id",
+          "Parent Type": "entity_type",
+        },
+      );
+    });
+    await screen.findByText("Created");
+  });
+
   it("maps nonstandard JSON source fields before preflight and import", async () => {
     openDialogMock.mockResolvedValue("/tmp/contacts-custom.json");
     previewJsonMock.mockResolvedValue({

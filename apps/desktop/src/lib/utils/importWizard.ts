@@ -10,6 +10,8 @@ import type {
   ImportTargetField,
   NoteImportTargetField,
   OrganizationImportTargetField,
+  TagDefinitionImportTargetField,
+  TagLinkImportTargetField,
 } from '$lib/api/importExport';
 
 export type MappedImportEntity = ImportPreflightEntity;
@@ -74,6 +76,17 @@ export const NOTE_IMPORT_FIELDS: ImportFieldOption<NoteImportTargetField>[] = [
   { value: 'entity_type', label: 'Entity type', required: true },
   { value: 'entity_id', label: 'Entity ID', required: true },
   { value: 'content', label: 'Content', required: true },
+];
+
+export const TAG_DEFINITION_IMPORT_FIELDS: ImportFieldOption<TagDefinitionImportTargetField>[] = [
+  { value: 'name', label: 'Name', required: true },
+  { value: 'color', label: 'Color' },
+];
+
+export const TAG_LINK_IMPORT_FIELDS: ImportFieldOption<TagLinkImportTargetField>[] = [
+  { value: 'entity_type', label: 'Entity type', required: true },
+  { value: 'entity_id', label: 'Entity ID', required: true },
+  { value: 'tag_id', label: 'Tag ID', required: true },
 ];
 
 type CustomImportEntity = 'contacts' | 'deals' | 'activities' | 'organizations';
@@ -206,6 +219,33 @@ const NOTE_ALIASES: Record<string, NoteImportTargetField> = {
   text: 'content',
 };
 
+const TAG_DEFINITION_ALIASES: Record<string, TagDefinitionImportTargetField> = {
+  name: 'name',
+  tag: 'name',
+  tagname: 'name',
+  label: 'name',
+  color: 'color',
+  colour: 'color',
+  hex: 'color',
+  hexcolor: 'color',
+  hexcolour: 'color',
+};
+
+const TAG_LINK_ALIASES: Record<string, TagLinkImportTargetField> = {
+  entitytype: 'entity_type',
+  type: 'entity_type',
+  parenttype: 'entity_type',
+  parententitytype: 'entity_type',
+  entityid: 'entity_id',
+  id: 'entity_id',
+  targetid: 'entity_id',
+  localtargetid: 'entity_id',
+  parentid: 'entity_id',
+  parententityid: 'entity_id',
+  tagid: 'tag_id',
+  localtagid: 'tag_id',
+};
+
 export function getImportFieldOptions(
   entity: MappedImportEntity,
   customFields: CustomFieldDefinition[] = [],
@@ -233,6 +273,14 @@ export function getImportFieldOptions(
 
   if (entity === 'notes') {
     return NOTE_IMPORT_FIELDS;
+  }
+
+  if (entity === 'tag_definitions') {
+    return TAG_DEFINITION_IMPORT_FIELDS;
+  }
+
+  if (entity === 'tag_links') {
+    return TAG_LINK_IMPORT_FIELDS;
   }
 
   return [
@@ -285,6 +333,14 @@ function getImportAliases(entity: MappedImportEntity): Record<string, ImportTarg
 
   if (entity === 'notes') {
     return NOTE_ALIASES;
+  }
+
+  if (entity === 'tag_definitions') {
+    return TAG_DEFINITION_ALIASES;
+  }
+
+  if (entity === 'tag_links') {
+    return TAG_LINK_ALIASES;
   }
 
   return ORGANIZATION_ALIASES;
@@ -363,6 +419,10 @@ function getCustomImportAliases(
   customFields: CustomFieldDefinition[],
 ): Record<string, CustomFieldImportTargetField> {
   if (entity === 'notes') {
+    return {};
+  }
+
+  if (entity === 'tag_definitions' || entity === 'tag_links') {
     return {};
   }
 

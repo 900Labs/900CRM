@@ -3,14 +3,20 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    audit::ACTOR_DESKTOP_APP,
     storage::{
-        activities::Activity, contacts::Contact, deals::Deal, notes::Note,
+        self,
+        activities::Activity,
+        contacts::Contact,
+        deals::Deal,
+        notes::Note,
         organizations::Organization,
+        tags::{Tag, TargetTagLink},
     },
     utils::{errors::CrmError, uuid::new_uuid},
 };
 
-use super::{CrmCore, CrmResult};
+use super::{record_audit_json, CrmCore, CrmResult};
 
 const CUSTOM_FIELD_ROLLBACK_PREFIX: &str = "custom_field:";
 
@@ -75,6 +81,22 @@ pub enum ImportRollbackAction {
         changed_fields: Vec<String>,
         before_import: Option<NoteImportRollbackSnapshot>,
         post_import: NoteImportRollbackSnapshot,
+    },
+    TagDefinition {
+        row_number: u32,
+        entity_id: String,
+        operation: ImportRollbackOperation,
+        changed_fields: Vec<String>,
+        before_import: Option<TagDefinitionImportRollbackSnapshot>,
+        post_import: TagDefinitionImportRollbackSnapshot,
+    },
+    TagLink {
+        row_number: u32,
+        entity_id: String,
+        operation: ImportRollbackOperation,
+        changed_fields: Vec<String>,
+        before_import: Option<TagLinkImportRollbackSnapshot>,
+        post_import: TagLinkImportRollbackSnapshot,
     },
 }
 
@@ -213,6 +235,38 @@ impl ImportRollbackAction {
             changed_fields: Vec::new(),
             before_import: None,
             post_import: NoteImportRollbackSnapshot::from(note),
+        }
+    }
+
+    pub(crate) fn created_tag_definition(row_number: usize, tag: &Tag) -> Self {
+        Self::TagDefinition {
+            row_number: row_number as u32,
+            entity_id: tag.id.clone(),
+            operation: ImportRollbackOperation::Created,
+            changed_fields: Vec::new(),
+            before_import: None,
+            post_import: TagDefinitionImportRollbackSnapshot::from(tag),
+        }
+    }
+
+    pub(crate) fn created_tag_link(row_number: usize, link: &TargetTagLink) -> Self {
+        Self::TagLink {
+            row_number: row_number as u32,
+            entity_id: tag_link_rollback_entity_id(
+                &link.entity_type,
+                &link.entity_id,
+                &link.tag_id,
+            ),
+            operation: ImportRollbackOperation::Created,
+            changed_fields: Vec::new(),
+            before_import: None,
+            post_import: TagLinkImportRollbackSnapshot {
+                link_id: link.id.clone(),
+                entity_type: link.entity_type.clone(),
+                entity_id: link.entity_id.clone(),
+                tag_id: link.tag_id.clone(),
+                created_at: link.created_at.clone(),
+            },
         }
     }
 
@@ -447,6 +501,44 @@ impl From<&Note> for NoteImportRollbackSnapshot {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TagDefinitionImportRollbackSnapshot {
+    pub name: String,
+    pub color: String,
+    pub updated_at: String,
+}
+
+impl From<&Tag> for TagDefinitionImportRollbackSnapshot {
+    fn from(tag: &Tag) -> Self {
+        Self {
+            name: tag.name.clone(),
+            color: tag.color.clone(),
+            updated_at: tag.updated_at.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TagLinkImportRollbackSnapshot {
+    pub link_id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub tag_id: String,
+    pub created_at: String,
+}
+
+impl TagLinkImportRollbackSnapshot {
+    fn target_link(&self) -> TargetTagLink {
+        TargetTagLink {
+            id: self.link_id.clone(),
+            entity_type: self.entity_type.clone(),
+            entity_id: self.entity_id.clone(),
+            tag_id: self.tag_id.clone(),
+            created_at: self.created_at.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportRollbackResult {
     pub token: String,
@@ -626,6 +718,48 @@ impl CrmCore {
                         *row_number,
                         "invalid_plan",
                         "note merge rollback is not supported".to_string(),
+                    ),
+                },
+                ImportRollbackAction::TagDefinition {
+                    row_number,
+                    entity_id,
+                    operation,
+                    post_import,
+                    ..
+                } => match operation {
+                    ImportRollbackOperation::Created => self.rollback_created_tag_definition(
+                        *row_number,
+                        entity_id,
+                        post_import,
+                        &mut result,
+                    ),
+                    ImportRollbackOperation::Merged => result.record_error(
+                        "tag",
+                        entity_id,
+                        *row_number,
+                        "invalid_plan",
+                        "tag definition merge rollback is not supported".to_string(),
+                    ),
+                },
+                ImportRollbackAction::TagLink {
+                    row_number,
+                    entity_id,
+                    operation,
+                    post_import,
+                    ..
+                } => match operation {
+                    ImportRollbackOperation::Created => self.rollback_created_tag_link(
+                        *row_number,
+                        entity_id,
+                        post_import,
+                        &mut result,
+                    ),
+                    ImportRollbackOperation::Merged => result.record_error(
+                        "tag_link",
+                        entity_id,
+                        *row_number,
+                        "invalid_plan",
+                        "tag link merge rollback is not supported".to_string(),
                     ),
                 },
             }
@@ -994,6 +1128,126 @@ impl CrmCore {
         }
     }
 
+    fn rollback_created_tag_definition(
+        &mut self,
+        row_number: u32,
+        entity_id: &str,
+        post_import: &TagDefinitionImportRollbackSnapshot,
+        result: &mut ImportRollbackResult,
+    ) {
+        let Some(current) = current_tag_for_rollback(self, row_number, entity_id, result) else {
+            return;
+        };
+
+        let current_snapshot = TagDefinitionImportRollbackSnapshot::from(&current);
+        if current_snapshot != *post_import {
+            record_conflict(result, "tag", entity_id, row_number);
+            return;
+        }
+
+        match storage::tags::tag_has_active_links(&self.db.conn, entity_id) {
+            Ok(true) => {
+                result.record_skipped(
+                    "tag",
+                    entity_id,
+                    row_number,
+                    "conflict",
+                    "created tag now has active links".to_string(),
+                );
+                return;
+            }
+            Ok(false) => {}
+            Err(err) => {
+                result.record_error("tag", entity_id, row_number, "read_failed", err.to_string());
+                return;
+            }
+        }
+
+        match self.delete_tag(entity_id) {
+            Ok(()) => result.record_rolled_back(),
+            Err(CrmError::NotFound(message)) => {
+                result.record_skipped("tag", entity_id, row_number, "not_found", message)
+            }
+            Err(err) => result.record_error(
+                "tag",
+                entity_id,
+                row_number,
+                "rollback_failed",
+                err.to_string(),
+            ),
+        }
+    }
+
+    fn rollback_created_tag_link(
+        &mut self,
+        row_number: u32,
+        rollback_entity_id: &str,
+        post_import: &TagLinkImportRollbackSnapshot,
+        result: &mut ImportRollbackResult,
+    ) {
+        match self.rollback_exact_created_tag_link(post_import) {
+            Ok(false) => {
+                result.record_skipped(
+                    "tag_link",
+                    rollback_entity_id,
+                    row_number,
+                    "not_found",
+                    "created tag link is no longer active".to_string(),
+                );
+            }
+            Ok(true) => result.record_rolled_back(),
+            Err(err) => result.record_error(
+                "tag_link",
+                rollback_entity_id,
+                row_number,
+                "rollback_failed",
+                err.to_string(),
+            ),
+        }
+    }
+
+    fn rollback_exact_created_tag_link(
+        &mut self,
+        post_import: &TagLinkImportRollbackSnapshot,
+    ) -> CrmResult<bool> {
+        let target_link = post_import.target_link();
+        let device_id = self.device_id.clone();
+        let tx = self.db.conn.unchecked_transaction()?;
+        let changed = storage::tags::soft_delete_exact_target_tag_link(&tx, &target_link)?;
+        if !changed {
+            tx.commit()?;
+            return Ok(false);
+        }
+
+        storage::tags::delete_legacy_tag_link(
+            &tx,
+            &post_import.entity_type,
+            &post_import.entity_id,
+            &post_import.tag_id,
+        )?;
+        storage::sync::record_change(
+            &tx,
+            &post_import.entity_type,
+            &post_import.entity_id,
+            "tags",
+            Some(&post_import.tag_id),
+            None,
+            &device_id,
+        )?;
+        record_audit_json(
+            &tx,
+            ACTOR_DESKTOP_APP,
+            "remove_tag",
+            Some(post_import.entity_type.as_str()),
+            Some(post_import.entity_id.as_str()),
+            Some(post_import),
+            Option::<&TagLinkImportRollbackSnapshot>::None,
+            &device_id,
+        )?;
+        tx.commit()?;
+        Ok(true)
+    }
+
     fn rollback_merged_organization(
         &mut self,
         row_number: u32,
@@ -1196,6 +1450,25 @@ fn current_note_for_rollback(
     }
 }
 
+fn current_tag_for_rollback(
+    core: &CrmCore,
+    row_number: u32,
+    entity_id: &str,
+    result: &mut ImportRollbackResult,
+) -> Option<Tag> {
+    match core.get_tag(entity_id) {
+        Ok(tag) => Some(tag),
+        Err(CrmError::NotFound(message)) => {
+            result.record_skipped("tag", entity_id, row_number, "not_found", message);
+            None
+        }
+        Err(err) => {
+            result.record_error("tag", entity_id, row_number, "read_failed", err.to_string());
+            None
+        }
+    }
+}
+
 fn activity_snapshot_for_rollback(
     core: &CrmCore,
     row_number: u32,
@@ -1341,6 +1614,10 @@ fn record_invalid_plan(
         "invalid_plan",
         "rollback plan is missing before-import state for a merge action".to_string(),
     );
+}
+
+fn tag_link_rollback_entity_id(entity_type: &str, entity_id: &str, tag_id: &str) -> String {
+    format!("{}:{}:{}", entity_type, entity_id, tag_id)
 }
 
 fn string_field_update(changed_fields: &[String], field: &str, value: &str) -> Option<String> {

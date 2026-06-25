@@ -555,6 +555,266 @@ pub async fn export_notes_json(
 }
 
 #[tauri::command]
+pub async fn import_tag_definitions_csv(
+    state: State<'_, AppState>,
+    file_path: String,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_tag_definitions_csv_with_options(&file_path, import_options(merge_duplicates))
+            .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn import_tag_definitions_csv_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_tag_definitions_csv_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn import_tag_definitions_json(
+    state: State<'_, AppState>,
+    file_path: String,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_tag_definitions_json_with_options(&file_path, import_options(merge_duplicates))
+            .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn import_tag_definitions_json_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_tag_definitions_json_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn preview_tag_definitions_json_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<JsonImportPreview, String> {
+    let core = super::lock_core(&state)?;
+    core.preview_tag_definitions_json_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_tag_definitions_csv_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_tag_definitions_csv_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_tag_definitions_csv_import_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_tag_definitions_csv_import_with_mapping(&file_path, mapping)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_tag_definitions_json_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_tag_definitions_json_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_tag_definitions_json_import_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_tag_definitions_json_import_with_mapping(&file_path, mapping)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_tag_definitions_csv(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<u32, String> {
+    let core = super::lock_core(&state)?;
+    core.export_tag_definitions_csv(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_tag_definitions_json(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<u32, String> {
+    let core = super::lock_core(&state)?;
+    core.export_tag_definitions_json(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn import_tag_links_csv(
+    state: State<'_, AppState>,
+    file_path: String,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_tag_links_csv_with_options(&file_path, import_options(merge_duplicates))
+            .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn import_tag_links_csv_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_tag_links_csv_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn import_tag_links_json(
+    state: State<'_, AppState>,
+    file_path: String,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_tag_links_json_with_options(&file_path, import_options(merge_duplicates))
+            .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn import_tag_links_json_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_tag_links_json_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn preview_tag_links_json_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<JsonImportPreview, String> {
+    let core = super::lock_core(&state)?;
+    core.preview_tag_links_json_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_tag_links_csv_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_tag_links_csv_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_tag_links_csv_import_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_tag_links_csv_import_with_mapping(&file_path, mapping)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_tag_links_json_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_tag_links_json_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_tag_links_json_import_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_tag_links_json_import_with_mapping(&file_path, mapping)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_tag_links_csv(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<u32, String> {
+    let core = super::lock_core(&state)?;
+    core.export_tag_links_csv(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_tag_links_json(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<u32, String> {
+    let core = super::lock_core(&state)?;
+    core.export_tag_links_json(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn import_organizations_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -948,6 +1208,35 @@ mod tests {
         assert_eq!(active_activities.len(), 1);
         assert_eq!(active_activities[0].title, "Intro call");
         assert!(active_activities[0].completed);
+
+        fs::remove_dir_all(&app_data_dir).ok();
+    }
+
+    #[test]
+    fn backup_is_created_before_tag_definition_import_writes() {
+        let app_data_dir = unique_test_dir("creates-before-tag-write");
+        let csv_path = app_data_dir.join("tag-definitions.csv");
+        fs::create_dir_all(&app_data_dir).expect("app data dir");
+        write_csv(&csv_path, "name,color\nVIP,#ef4444\n");
+
+        let mut core = CrmCore::open(&app_data_dir).expect("core opens");
+        let backup_dir = app_data_dir.join("pre-import-backups").join("before-tag");
+        let result = create_backup_then_import(&mut core, &backup_dir, |core| {
+            core.import_tag_definitions_csv(csv_path.to_str().expect("utf8 path"))
+                .map_err(|e| e.to_string())
+        })
+        .expect("backup and tag definition import should succeed");
+
+        assert_eq!(result.import.created, 1);
+        assert!(backup_dir.join("900crm.db").is_file());
+
+        let backup_core = CrmCore::open(&backup_dir).expect("backup core opens");
+        let backup_tags = backup_core.list_tags().expect("backup tags list");
+        assert_eq!(backup_tags.len(), 0);
+
+        let active_tags = core.list_tags().expect("active tags list");
+        assert_eq!(active_tags.len(), 1);
+        assert_eq!(active_tags[0].name, "VIP");
 
         fs::remove_dir_all(&app_data_dir).ok();
     }
