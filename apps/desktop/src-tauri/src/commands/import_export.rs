@@ -426,6 +426,135 @@ pub async fn export_activities_json(
 }
 
 #[tauri::command]
+pub async fn import_notes_csv(
+    state: State<'_, AppState>,
+    file_path: String,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_notes_csv_with_options(&file_path, import_options(merge_duplicates))
+            .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn import_notes_csv_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_notes_csv_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn import_notes_json(
+    state: State<'_, AppState>,
+    file_path: String,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_notes_json_with_options(&file_path, import_options(merge_duplicates))
+            .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn import_notes_json_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
+) -> Result<ImportWithBackupResult, String> {
+    import_with_pre_import_backup(&state, |core| {
+        core.import_notes_json_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
+    })
+}
+
+#[tauri::command]
+pub async fn preview_notes_json_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<JsonImportPreview, String> {
+    let core = super::lock_core(&state)?;
+    core.preview_notes_json_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_notes_csv_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_notes_csv_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_notes_csv_import_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_notes_csv_import_with_mapping(&file_path, mapping)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_notes_json_import(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_notes_json_import(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preflight_notes_json_import_with_mapping(
+    state: State<'_, AppState>,
+    file_path: String,
+    mapping: ImportColumnMapping,
+) -> Result<ImportPreflightReport, String> {
+    let core = super::lock_core(&state)?;
+    core.preflight_notes_json_import_with_mapping(&file_path, mapping)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_notes_csv(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<u32, String> {
+    let core = super::lock_core(&state)?;
+    core.export_notes_csv(&file_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_notes_json(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<u32, String> {
+    let core = super::lock_core(&state)?;
+    core.export_notes_json(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn import_organizations_csv(
     state: State<'_, AppState>,
     file_path: String,

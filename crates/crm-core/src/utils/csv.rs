@@ -1,4 +1,4 @@
-//! Flat import/export row helpers for contacts, deals, organizations, and activities.
+//! Flat import/export row helpers for contacts, deals, organizations, activities, and notes.
 //!
 //! This module provides utilities for reading and writing CSV files and parsing
 //! JSON arrays used in the 900CRM import/export feature. It wraps the [`csv`]
@@ -40,6 +40,14 @@
 //! | `completed`     | no       | `true`/`false` |
 //! | `contact_id`    | no       | Existing local contact UUID |
 //! | `deal_id`       | no       | Existing local deal UUID |
+//!
+//! # Note CSV Format
+//!
+//! | Column        | Required | Notes |
+//! |---------------|----------|-------|
+//! | `entity_type` | yes      | `contact`, `organization`, `deal`, or `activity` |
+//! | `entity_id`   | yes      | Existing active local entity UUID |
+//! | `content`     | yes      | Note body |
 //!
 //! # Organization CSV Format
 //!
@@ -131,6 +139,8 @@ const ACTIVITY_IMPORT_TARGET_FIELDS: &[&str] = &[
     "contact_id",
     "deal_id",
 ];
+
+const NOTE_IMPORT_TARGET_FIELDS: &[&str] = &["entity_type", "entity_id", "content"];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Contact CSV record
@@ -313,6 +323,23 @@ pub struct OrganizationCsvRow {
     /// User-defined custom field values keyed by `custom:<field_name>`.
     #[serde(default, flatten)]
     pub custom_fields: BTreeMap<String, String>,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Note CSV record
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A flat CSV record representing one generic note row.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NoteCsvRow {
+    /// Parent entity type: `"contact"`, `"organization"`, `"deal"`, or `"activity"`.
+    pub entity_type: String,
+
+    /// Existing active local parent entity UUID.
+    pub entity_id: String,
+
+    /// Note content/body.
+    pub content: String,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -683,6 +710,58 @@ pub fn parse_organizations_csv_with_mapping_targets<R: Read>(
     Ok(rows)
 }
 
+/// Parses generic note CSV data and preserves source row numbers.
+pub fn parse_notes_csv_with_row_numbers<R: Read>(reader: R) -> CrmResult<Vec<(usize, NoteCsvRow)>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .trim(csv::Trim::All)
+        .flexible(true)
+        .from_reader(reader);
+
+    let headers = rdr.headers()?.clone();
+    require_csv_header(&headers, "entity_type")?;
+    require_csv_header(&headers, "entity_id")?;
+    require_csv_header(&headers, "content")?;
+
+    let mut rows = Vec::new();
+    for (index, result) in rdr.records().enumerate() {
+        let row_number = index + 2;
+        let record = result.map_err(|e| CrmError::Csv(e.to_string()))?;
+        rows.push((row_number, note_row_from_record(&headers, &record)));
+    }
+
+    log::info!("Parsed {} note rows from CSV", rows.len());
+    Ok(rows)
+}
+
+/// Parses arbitrary-header generic note CSV data with a frontend-provided mapping.
+pub fn parse_notes_csv_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, NoteCsvRow)>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .trim(csv::Trim::All)
+        .flexible(true)
+        .from_reader(reader);
+
+    let headers = rdr.headers()?.clone();
+    let assignments = validate_import_mapping(&headers, mapping, NOTE_IMPORT_TARGET_FIELDS, &[])?;
+
+    let mut rows = Vec::new();
+    for (index, result) in rdr.records().enumerate() {
+        let row_number = index + 2;
+        let record = result.map_err(|e| CrmError::Csv(e.to_string()))?;
+        rows.push((
+            row_number,
+            note_row_from_mapped_record(&record, &assignments),
+        ));
+    }
+
+    log::info!("Parsed {} mapped note rows from CSV", rows.len());
+    Ok(rows)
+}
+
 /// Parses contact JSON data from a top-level array of flat row objects.
 ///
 /// Row numbers are reported with the same data-row offset as CSV imports:
@@ -969,6 +1048,61 @@ pub fn parse_organizations_json_with_mapping_targets<R: Read>(
     Ok(parsed_rows)
 }
 
+/// Parses generic note JSON data from a top-level array of flat row objects.
+///
+/// Row numbers are reported with the same data-row offset as CSV imports:
+/// the first JSON array item is row 2.
+pub fn parse_notes_json_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, NoteCsvRow)>> {
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        parsed_rows.push((row_number, note_row_from_json_object(object, &headers)));
+    }
+
+    log::info!("Parsed {} note rows from JSON", parsed_rows.len());
+    Ok(parsed_rows)
+}
+
+/// Parses generic note JSON data with frontend-provided source-field mapping.
+pub fn parse_notes_json_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, NoteCsvRow)>> {
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let assignments = validate_import_mapping_sources(
+        &headers,
+        mapping,
+        NOTE_IMPORT_TARGET_FIELDS,
+        &[],
+        "field",
+        "JSON",
+    )?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        parsed_rows.push((
+            row_number,
+            note_row_from_mapped_json_object(object, &headers, &assignments),
+        ));
+    }
+
+    log::info!("Parsed {} mapped note rows from JSON", parsed_rows.len());
+    Ok(parsed_rows)
+}
+
 pub fn preview_contacts_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
     preview_json_import(reader)
 }
@@ -982,6 +1116,10 @@ pub fn preview_activities_json_import<R: Read>(reader: R) -> CrmResult<JsonImpor
 }
 
 pub fn preview_organizations_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
+    preview_json_import(reader)
+}
+
+pub fn preview_notes_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
     preview_json_import(reader)
 }
 
@@ -1494,6 +1632,83 @@ fn assign_activity_value(row: &mut ActivityCsvRow, target: &str, value: &str) {
     }
 }
 
+fn note_row_from_record(headers: &csv::StringRecord, record: &csv::StringRecord) -> NoteCsvRow {
+    let mut row = default_note_row();
+
+    for (index, header) in headers.iter().enumerate() {
+        let value = record.get(index).unwrap_or_default().trim();
+        assign_note_value(&mut row, header.trim(), value);
+    }
+
+    row
+}
+
+fn note_row_from_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+) -> NoteCsvRow {
+    let mut row = default_note_row();
+
+    for header in headers {
+        let value = json_preview_cell(object.get(header.as_str()));
+        assign_note_value(&mut row, header.trim(), value.trim());
+    }
+
+    row
+}
+
+fn note_row_from_mapped_record(
+    record: &csv::StringRecord,
+    assignments: &[Option<String>],
+) -> NoteCsvRow {
+    let mut row = default_note_row();
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = record.get(index).unwrap_or_default().trim();
+        assign_note_value(&mut row, target, value);
+    }
+
+    row
+}
+
+fn note_row_from_mapped_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+    assignments: &[Option<String>],
+) -> NoteCsvRow {
+    let mut row = default_note_row();
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = json_preview_cell(object.get(headers[index].as_str()));
+        assign_note_value(&mut row, target, value.trim());
+    }
+
+    row
+}
+
+fn default_note_row() -> NoteCsvRow {
+    NoteCsvRow {
+        entity_type: String::new(),
+        entity_id: String::new(),
+        content: String::new(),
+    }
+}
+
+fn assign_note_value(row: &mut NoteCsvRow, target: &str, value: &str) {
+    match target {
+        "entity_type" => row.entity_type = value.to_string(),
+        "entity_id" => row.entity_id = value.to_string(),
+        "content" => row.content = value.to_string(),
+        _ => {}
+    }
+}
+
 fn default_deal_row() -> DealCsvRow {
     DealCsvRow {
         title: String::new(),
@@ -1778,5 +1993,31 @@ pub fn write_organizations_csv<W: Write>(writer: W, rows: &[OrganizationCsvRow])
 
     wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
     log::info!("Wrote {} organization rows to CSV", rows.len());
+    Ok(())
+}
+
+/// Serializes a slice of [`NoteCsvRow`] to CSV bytes.
+///
+/// The output always includes a header row with `entity_type`, `entity_id`, and
+/// `content`.
+///
+/// # Errors
+///
+/// Returns [`CrmError::Csv`] if writing fails.
+pub fn write_notes_csv<W: Write>(writer: W, rows: &[NoteCsvRow]) -> CrmResult<()> {
+    let mut wtr = csv::WriterBuilder::new()
+        .has_headers(false)
+        .from_writer(writer);
+
+    wtr.write_record(["entity_type", "entity_id", "content"])
+        .map_err(|e| CrmError::Csv(e.to_string()))?;
+
+    for row in rows {
+        wtr.write_record([&row.entity_type, &row.entity_id, &row.content])
+            .map_err(|e| CrmError::Csv(e.to_string()))?;
+    }
+
+    wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
+    log::info!("Wrote {} note rows to CSV", rows.len());
     Ok(())
 }

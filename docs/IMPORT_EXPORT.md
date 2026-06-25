@@ -14,7 +14,8 @@ for:
 - contacts;
 - deals;
 - activities;
-- organizations.
+- organizations;
+- generic notes stored in the `notes` table.
 
 Import and export use local files selected by the user. There is no cloud import
 service, no remote export destination, and no automatic upload.
@@ -28,7 +29,7 @@ directly or be mapped in the import wizard before duplicate preflight.
 The import/export modal is available from the desktop UI. The import tab asks
 the user to choose an entity type, import format, and local file.
 
-For CSV contacts, deals, activities, and organizations, the current wizard flow is:
+For CSV contacts, deals, activities, organizations, and generic notes, the current wizard flow is:
 
 1. Select entity type and CSV file.
 2. Preview parsed headers and the first rows.
@@ -44,8 +45,8 @@ Mapped imports require a desktop-selected file path so the Rust backend can read
 the same CSV file. The browser file-input fallback can preview text, but mapped
 backend import/preflight requires the desktop file picker path.
 
-For JSON contacts, deals, activities, and organizations, the current flow reuses
-the same mapping and confirmation concepts as CSV:
+For JSON contacts, deals, activities, organizations, and generic notes, the
+current flow reuses the same mapping and confirmation concepts as CSV:
 
 1. Select entity type and JSON format.
 2. Select a local `.json` file.
@@ -70,12 +71,17 @@ Frontend preview parsing handles:
 Backend CSV parsing uses the Rust `csv` crate with headers enabled, trimmed
 fields, and flexible row widths.
 
-Rows with a blank required field are skipped by the parser:
+Rows with a blank required field are skipped by the parser for flat entity
+imports:
 
 - contacts require `first_name`;
 - deals require `title`;
 - activities require `activity_type` and `title`;
 - organizations require `name`.
+
+Generic note imports require `entity_type`, `entity_id`, and `content`.
+Missing or blank note fields are reported as row-level validation errors rather
+than silently imported.
 
 ## JSON Import Parsing
 
@@ -89,13 +95,16 @@ fields as the matching JSON export:
   `completed`, `contact_id`, and `deal_id`;
 - organizations: `name`, `email`, `phone`, `website`, `address_line1`,
   `address_line2`, `city`, `region`, `country`, `postal_code`, and
-  `description`.
+  `description`;
+- generic notes: `entity_type`, `entity_id`, and `content`.
 
 JSON rows are parsed into the same flat row structs used by CSV import and then
 sent through the same `crm-core` create/import paths as CSV rows. When source
 keys are nonstandard, the JSON mapping step maps object keys to those same flat
 target fields before duplicate preflight or import. Rows with a blank mapped
-required field are skipped before create attempts, matching CSV behavior.
+required field are skipped before create attempts for contacts, deals,
+activities, and organizations. Note rows with missing required values are
+reported as row-level validation errors.
 
 JSON row numbers are reported with the same data-row offset as CSV imports: the
 first JSON array item is row 2.
@@ -211,6 +220,34 @@ Activity export writes `activity_type`, `title`, `description`, `due_date`,
 `deal_id` are local database IDs and are useful only when importing into a
 database that already has the same active IDs.
 
+## Generic Note CSV
+
+Generic note import/export covers note records stored in the `notes` table. It
+does not import or export the legacy flat `contacts.notes` or `deals.notes`
+fields except through the existing contact and deal flat row formats above.
+
+Supported generic note import fields:
+
+| Field | Required | Notes |
+|---|---|---|
+| `entity_type` | Yes | Must be `contact`, `organization`, `deal`, or `activity`. |
+| `entity_id` | Yes | Existing active local database ID for the parent row. |
+| `content` | Yes | Note body. Blank content is rejected. |
+
+Mapped note import can accept arbitrary source headers as long as each source
+header is mapped to `entity_type`, `entity_id`, `content`, or skipped. The UI
+suggests aliases such as `parent type`, `parent id`, `body`, `note`, and
+`text`.
+
+Note imports validate that the parent row exists and is active before writing.
+They then create note records through `CrmCore::create_note`, so normal generic
+note validation, audit, and sync changelog behavior applies. No lookup by name,
+portable identifier, timestamp, deleted row, or device ID is attempted.
+
+Generic note export writes `entity_type`, `entity_id`, and `content` with a
+header row. `entity_id` values are local database IDs and are useful only when
+importing into a database that already has the same active parent IDs.
+
 ## Contact, Deal, Activity, And Organization Custom Fields
 
 Contact, deal, activity, and organization import/export supports existing active
@@ -251,9 +288,10 @@ unescaped key by hand.
 
 ## JSON Import And Export
 
-JSON import and export are available for contacts, deals, activities, and
-organizations from the same import/export modal as CSV. Import uses an open
-dialog for `.json` files. Export uses a save dialog for `.json` files.
+JSON import and export are available for contacts, deals, activities,
+organizations, and generic notes from the same import/export modal as CSV.
+Import uses an open dialog for `.json` files. Export uses a save dialog for
+`.json` files.
 
 JSON exports are pretty-printed arrays of objects. They use the same flat fields
 as the matching CSV export:
@@ -265,7 +303,8 @@ as the matching CSV export:
   `completed`, `contact_id`, and `deal_id`;
 - organizations: `name`, `email`, `phone`, `website`, `address_line1`,
   `address_line2`, `city`, `region`, `country`, `postal_code`, and
-  `description`.
+  `description`;
+- generic notes: `entity_type`, `entity_id`, and `content`.
 
 JSON export uses the same active-row listing boundaries as CSV export:
 
@@ -274,22 +313,26 @@ JSON export uses the same active-row listing boundaries as CSV export:
 - deals export active deals through the deal listing path;
 - activities export active activities through the activity listing path;
 - organizations export active organizations through the organization listing
-  path.
+  path;
+- generic notes export active note records for `contact`, `organization`,
+  `deal`, and `activity` parents through the generic notes listing path.
 
 JSON export does not include record IDs, timestamps, deleted rows, device IDs,
 relationship rows beyond the optional local activity `contact_id` and `deal_id`
-mirror columns, separate note records, tags, audit log entries, proposed
-actions, external clients, permissions, settings, or backup metadata. For
+mirror columns, tags, audit log entries, proposed actions, external clients,
+permissions, settings, or backup metadata. Generic note export intentionally
+uses only the parent `entity_type`, parent `entity_id`, and note `content`. For
 contacts, deals, activities, and organizations, JSON export does include active
 custom field values using `custom:` keys as described above.
 
 JSON import has the same entity scope. It does not import record IDs, timestamps,
-deleted rows, device IDs, broad relationship rows, separate note records, tags,
-audit log entries, proposed actions, external clients, permissions, settings, or
-backup metadata. Activity `contact_id` and `deal_id` are accepted only as
-existing active local database IDs. For contacts, deals, activities, and
+deleted rows, device IDs, broad relationship rows, tags, audit log entries,
+proposed actions, external clients, permissions, settings, or backup metadata.
+Activity `contact_id` and `deal_id`, and generic note `entity_id`, are accepted
+only as existing active local database IDs. For contacts, deals, activities, and
 organizations, JSON import can set existing custom field values using `custom:`
-keys or mapped custom field targets as described above.
+keys or mapped custom field targets as described above. Generic note import does
+not accept `custom:` values.
 
 JSON import preview is read-only and browser-visible in the import/export modal.
 It shows source object keys before the mapping step. Matching supported JSON
@@ -301,7 +344,10 @@ supported flat import fields before duplicate preflight and confirmed import.
 Duplicate detection is currently implemented for contacts, deals, and
 organizations. Activity imports run the same parse/mapping/custom-field
 validation preflight shape, but they return zero duplicate warnings because
-there is no safe activity duplicate rule in the current service layer.
+there is no safe activity duplicate rule in the current service layer. Generic
+note imports run parse, mapping, required-field, supported `entity_type`, and
+active parent-row validation, but they also return zero duplicate warnings
+because there is no established safe note duplicate rule.
 
 Contact preflight checks active contacts for:
 
@@ -320,7 +366,8 @@ Deal preflight checks active deals for:
 
 Custom field values do not participate in duplicate detection. Preflight parses
 and validates supported contact/deal/activity/organization custom field targets,
-but duplicate warnings are based only on the flat fields listed above.
+but duplicate warnings are based only on the flat fields listed above. Generic
+notes do not support custom field targets.
 
 Preflight returns warnings with the source row number, match type, source value,
 existing record ID, existing display label, and a human-readable reason. CSV
@@ -328,8 +375,8 @@ imports use CSV data row numbers. JSON imports use the same offset as JSON
 import errors: the first array item is row 2.
 
 Duplicate preflight is read-only. It does not create contacts, deals,
-activities, or organizations, and it does not write audit rows or sync changelog
-rows.
+activities, organizations, or notes, and it does not write audit rows or sync
+changelog rows.
 
 Preflight warnings do not block import automatically. The UI lets the user
 continue despite warnings. The import then attempts to create each row and
@@ -342,8 +389,10 @@ merge duplicate import rows into matching existing records. The option is
 available for CSV, mapped CSV, JSON, and mapped JSON imports. It is off by
 default.
 
-Activity imports do not expose duplicate auto-merge. Confirmed activity rows
-always attempt to create new activities.
+Activity and note imports do not expose duplicate auto-merge. Confirmed
+activity rows always attempt to create new activities. Confirmed generic note
+rows always attempt to create new note records after validating their active
+parent row.
 
 Duplicate preflight still runs before confirmation when auto-merge is enabled.
 The confirmation copy states that duplicate warnings will be merged into
@@ -396,15 +445,15 @@ not included in the import result as row-level errors.
 Successful imported rows are written through normal `crm-core` create paths.
 Those paths record sync changelog entries and audit evidence. The import
 service also records an `import_row` audit entry for each successfully imported
-contact, deal, activity, or organization. Successful duplicate auto-merge rows are
-updated through normal update services and also receive an `import_row_merge`
-audit entry.
+contact, deal, activity, organization, or generic note. Successful duplicate
+auto-merge rows are updated through normal update services and also receive an
+`import_row_merge` audit entry.
 
 Desktop CSV, mapped CSV, JSON, and mapped JSON imports for contacts, deals,
-activities, and organizations first create an automatic local backup through
-`CrmCore::create_local_backup`. The backup is created immediately before import
-rows are written, and backup failure stops the import. The import summary shown
-in the UI includes the created backup path.
+activities, organizations, and generic notes first create an automatic local
+backup through `CrmCore::create_local_backup`. The backup is created
+immediately before import rows are written, and backup failure stops the import.
+The import summary shown in the UI includes the created backup path.
 
 When the import summary includes an automatic pre-import backup path, the UI can
 restore that backup directly from the summary. The restore action validates the
@@ -414,19 +463,22 @@ summary remains visible with the failure message.
 
 ## Row-Level Import Rollback
 
-Completed desktop imports for contacts, deals, activities, and organizations
-return a self-contained row-level rollback plan when the import creates rows or
-changes fields through duplicate auto-merge. The current Import/Export summary
-can use that plan to request rollback of the just-completed import.
+Completed desktop imports for contacts, deals, activities, organizations, and
+generic notes return a self-contained row-level rollback plan when the import
+creates rows or changes fields through duplicate auto-merge. The current
+Import/Export summary can use that plan to request rollback of the
+just-completed import.
 
 Rollback is available for CSV, mapped CSV, JSON, and mapped JSON imports. It is
-limited to the same contact, deal, activity, and organization rows supported by
-import/export:
+limited to the same contact, deal, activity, organization, and generic note
+rows supported by import/export:
 
 - created rows are soft-deleted through the existing `crm-core` delete service
   for the matching entity; contact/deal/activity/organization custom field
   values created by that imported row are deleted after the row passes its
   rollback conflict check;
+- created generic notes are soft-deleted through the existing `delete_note`
+  service after the active note still matches the post-import snapshot;
 - duplicate auto-merge rows restore only the fields that the import merge
   changed, through the existing `crm-core` update service for the matching
   entity; contact/deal/organization custom field values changed by duplicate
@@ -438,12 +490,19 @@ not implement duplicate auto-merge. It uses the existing `delete_activity`
 service behavior after confirming that the active activity and its activity
 custom values still match the post-import snapshot.
 
+Generic note rollback covers created generic note records only because note
+imports do not implement duplicate auto-merge. It does not roll back legacy flat
+`contacts.notes` or `deals.notes` fields beyond the existing contact/deal row
+rollback behavior.
+
 Rollback is conflict-safe. Before applying each row action, `crm-core` compares
 the current active row to the post-import state recorded in the rollback plan.
 If the row was edited, deleted, or otherwise no longer matches the expected
 post-import state, that row is skipped and reported as a row-level error. For
 contacts, deals, activities, and organizations, the post-import comparison
-includes custom field values. Later rollback rows continue to run.
+includes custom field values. For generic notes, the comparison includes the
+parent `entity_type`, parent `entity_id`, note `content`, and `updated_at`.
+Later rollback rows continue to run.
 
 The rollback result reports:
 
@@ -461,9 +520,10 @@ created rows are reported as skipped, and already-restored merge rows no longer
 match the post-import expected state.
 
 Row-level rollback is not full database restore. It does not roll back
-relationships beyond the supported imported row behavior, notes-as-records,
-tags, audit logs, sync changelog rows, proposed actions, external clients,
-permissions, settings, backup metadata, or schema changes.
+relationships beyond the supported imported row behavior, legacy flat note
+fields outside contact/deal row rollback, tags, audit logs, sync changelog rows,
+proposed actions, external clients, permissions, settings, backup metadata, or
+schema changes.
 
 ## Export Behavior
 
@@ -492,7 +552,8 @@ CSV import/export and JSON import/export are not a backup system.
 - Automatic pre-import backups are stored under the platform app data directory
   at `pre-import-backups/<timestamp-and-sequence>/`.
 - Current import summaries can run row-level rollback for created rows and
-  duplicate auto-merge field changes from the just-completed import.
+  duplicate auto-merge field changes from the just-completed import. Generic
+  note rollback covers created note records only.
 - Import summaries can validate and restore their automatic pre-import backup
   after explicit destructive confirmation.
 - Duplicate auto-merge writes use the same automatic pre-import backup guard as
@@ -516,6 +577,7 @@ The following are not implemented in the current import/export surface:
 - MCP/AI-driven import behavior.
 - Sync-server upload or download as part of import/export.
 - Relationship import/export beyond optional activity `contact_id` and `deal_id`
-  local ID columns.
-- Notes, tags, audit log, proposed actions, external clients, or permissions
-  import/export.
+  local ID columns and generic note parent `entity_type`/`entity_id`.
+- Tag definition and tag link import/export.
+- Audit log, proposed actions, external clients, permissions, settings, sync
+  changelog, backup metadata, or custom field definition import/export.

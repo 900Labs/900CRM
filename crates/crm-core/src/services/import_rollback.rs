@@ -3,7 +3,10 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    storage::{activities::Activity, contacts::Contact, deals::Deal, organizations::Organization},
+    storage::{
+        activities::Activity, contacts::Contact, deals::Deal, notes::Note,
+        organizations::Organization,
+    },
     utils::{errors::CrmError, uuid::new_uuid},
 };
 
@@ -64,6 +67,14 @@ pub enum ImportRollbackAction {
         changed_fields: Vec<String>,
         before_import: Option<OrganizationImportRollbackSnapshot>,
         post_import: OrganizationImportRollbackSnapshot,
+    },
+    Note {
+        row_number: u32,
+        entity_id: String,
+        operation: ImportRollbackOperation,
+        changed_fields: Vec<String>,
+        before_import: Option<NoteImportRollbackSnapshot>,
+        post_import: NoteImportRollbackSnapshot,
     },
 }
 
@@ -191,6 +202,17 @@ impl ImportRollbackAction {
                 organization,
                 custom_fields,
             ),
+        }
+    }
+
+    pub(crate) fn created_note(row_number: usize, note: &Note) -> Self {
+        Self::Note {
+            row_number: row_number as u32,
+            entity_id: note.id.clone(),
+            operation: ImportRollbackOperation::Created,
+            changed_fields: Vec::new(),
+            before_import: None,
+            post_import: NoteImportRollbackSnapshot::from(note),
         }
     }
 
@@ -406,6 +428,25 @@ impl OrganizationImportRollbackSnapshot {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NoteImportRollbackSnapshot {
+    pub entity_type: String,
+    pub entity_id: String,
+    pub content: String,
+    pub updated_at: String,
+}
+
+impl From<&Note> for NoteImportRollbackSnapshot {
+    fn from(note: &Note) -> Self {
+        Self {
+            entity_type: note.entity_type.clone(),
+            entity_id: note.entity_id.clone(),
+            content: note.content.clone(),
+            updated_at: note.updated_at.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportRollbackResult {
     pub token: String,
@@ -567,6 +608,24 @@ impl CrmCore {
                         before_import.as_ref(),
                         post_import,
                         &mut result,
+                    ),
+                },
+                ImportRollbackAction::Note {
+                    row_number,
+                    entity_id,
+                    operation,
+                    post_import,
+                    ..
+                } => match operation {
+                    ImportRollbackOperation::Created => {
+                        self.rollback_created_note(*row_number, entity_id, post_import, &mut result)
+                    }
+                    ImportRollbackOperation::Merged => result.record_error(
+                        "note",
+                        entity_id,
+                        *row_number,
+                        "invalid_plan",
+                        "note merge rollback is not supported".to_string(),
                     ),
                 },
             }
@@ -903,6 +962,38 @@ impl CrmCore {
         }
     }
 
+    fn rollback_created_note(
+        &mut self,
+        row_number: u32,
+        entity_id: &str,
+        post_import: &NoteImportRollbackSnapshot,
+        result: &mut ImportRollbackResult,
+    ) {
+        let Some(current) = current_note_for_rollback(self, row_number, entity_id, result) else {
+            return;
+        };
+
+        let current_snapshot = NoteImportRollbackSnapshot::from(&current);
+        if current_snapshot != *post_import {
+            record_conflict(result, "note", entity_id, row_number);
+            return;
+        }
+
+        match self.delete_note(entity_id) {
+            Ok(()) => result.record_rolled_back(),
+            Err(CrmError::NotFound(message)) => {
+                result.record_skipped("note", entity_id, row_number, "not_found", message)
+            }
+            Err(err) => result.record_error(
+                "note",
+                entity_id,
+                row_number,
+                "rollback_failed",
+                err.to_string(),
+            ),
+        }
+    }
+
     fn rollback_merged_organization(
         &mut self,
         row_number: u32,
@@ -1070,6 +1161,31 @@ fn current_organization_for_rollback(
         Err(err) => {
             result.record_error(
                 "organization",
+                entity_id,
+                row_number,
+                "read_failed",
+                err.to_string(),
+            );
+            None
+        }
+    }
+}
+
+fn current_note_for_rollback(
+    core: &CrmCore,
+    row_number: u32,
+    entity_id: &str,
+    result: &mut ImportRollbackResult,
+) -> Option<Note> {
+    match core.get_note(entity_id) {
+        Ok(note) => Some(note),
+        Err(CrmError::NotFound(message)) => {
+            result.record_skipped("note", entity_id, row_number, "not_found", message);
+            None
+        }
+        Err(err) => {
+            result.record_error(
+                "note",
                 entity_id,
                 row_number,
                 "read_failed",

@@ -67,6 +67,10 @@ impl CrmCore {
         storage::notes::get_notes_for_entity(&self.db.conn, entity_type, &entity_id)
     }
 
+    pub fn list_notes(&self) -> CrmResult<Vec<Note>> {
+        storage::notes::list_active_notes(&self.db.conn)
+    }
+
     pub fn update_note(&mut self, id: &str, content: String) -> CrmResult<Note> {
         let before = storage::notes::get_note(&self.db.conn, id)?;
         let content = normalize_required(&content, "Note content")?;

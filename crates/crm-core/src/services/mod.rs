@@ -35,12 +35,15 @@ use crate::utils::{
         parse_contacts_json_with_mapping_targets, parse_contacts_json_with_row_numbers,
         parse_deals_csv_with_mapping_targets, parse_deals_csv_with_row_numbers,
         parse_deals_json_with_mapping_targets, parse_deals_json_with_row_numbers,
+        parse_notes_csv_with_mapping, parse_notes_csv_with_row_numbers,
+        parse_notes_json_with_mapping, parse_notes_json_with_row_numbers,
         parse_organizations_csv_with_mapping_targets, parse_organizations_csv_with_row_numbers,
         parse_organizations_json_with_mapping_targets, parse_organizations_json_with_row_numbers,
         preview_activities_json_import, preview_contacts_json_import, preview_deals_json_import,
-        preview_organizations_json_import, write_activities_csv, write_contacts_csv,
-        write_deals_csv, write_organizations_csv, ActivityCsvRow, ContactCsvRow, DealCsvRow,
-        ImportColumnMapping, JsonImportPreview, OrganizationCsvRow, CUSTOM_FIELD_PREFIX,
+        preview_notes_json_import, preview_organizations_json_import, write_activities_csv,
+        write_contacts_csv, write_deals_csv, write_notes_csv, write_organizations_csv,
+        ActivityCsvRow, ContactCsvRow, DealCsvRow, ImportColumnMapping, JsonImportPreview,
+        NoteCsvRow, OrganizationCsvRow, CUSTOM_FIELD_PREFIX,
     },
     datetime::now_iso8601,
     errors::{CrmError, CrmResult as InternalCrmResult},
@@ -2098,6 +2101,214 @@ impl CrmCore {
             .collect())
     }
 
+    pub fn import_notes_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_notes_csv_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_notes_csv_with_options(
+        &mut self,
+        file_path: &str,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_notes_csv_with_row_numbers(file_content.as_slice())?;
+        self.import_note_rows(rows)
+    }
+
+    pub fn import_notes_csv_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        self.import_notes_csv_with_mapping_and_options(file_path, mapping, ImportOptions::default())
+    }
+
+    pub fn import_notes_csv_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_notes_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_note_rows(rows)
+    }
+
+    pub fn import_notes_json(&mut self, file_path: &str) -> CrmResult<ImportResult> {
+        self.import_notes_json_with_options(file_path, ImportOptions::default())
+    }
+
+    pub fn import_notes_json_with_options(
+        &mut self,
+        file_path: &str,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_notes_json_with_row_numbers(file_content.as_slice())?;
+        self.import_note_rows(rows)
+    }
+
+    pub fn import_notes_json_with_mapping(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportResult> {
+        self.import_notes_json_with_mapping_and_options(
+            file_path,
+            mapping,
+            ImportOptions::default(),
+        )
+    }
+
+    pub fn import_notes_json_with_mapping_and_options(
+        &mut self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+        _options: ImportOptions,
+    ) -> CrmResult<ImportResult> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_notes_json_with_mapping(file_content.as_slice(), &mapping)?;
+        self.import_note_rows(rows)
+    }
+
+    pub fn preview_notes_json_import(&self, file_path: &str) -> CrmResult<JsonImportPreview> {
+        let file_content = fs::read(file_path)?;
+        preview_notes_json_import(file_content.as_slice())
+    }
+
+    fn import_note_rows(&mut self, rows: Vec<(usize, NoteCsvRow)>) -> CrmResult<ImportResult> {
+        let mut created = 0u32;
+        let merged = 0u32;
+        let mut skipped = 0u32;
+        let mut errors = Vec::new();
+        let mut rollback_actions = Vec::new();
+
+        for (row_number, row) in rows {
+            let (entity_type, entity_id, content) =
+                match validate_note_import_row(&self.db.conn, row_number, &row) {
+                    Ok(values) => values,
+                    Err(e) => {
+                        errors.push(format!(
+                            "Row {}: {} ({})",
+                            row_number,
+                            e,
+                            note_row_label(&row)
+                        ));
+                        skipped += 1;
+                        continue;
+                    }
+                };
+
+            match self.create_note(entity_type, entity_id, content) {
+                Ok(note) => {
+                    rollback_actions.push(import_rollback::ImportRollbackAction::created_note(
+                        row_number, &note,
+                    ));
+                    let _ = storage::audit::record_audit(
+                        &self.db.conn,
+                        ACTOR_IMPORT,
+                        None,
+                        "import_row",
+                        Some("note"),
+                        Some(&note.id),
+                        None,
+                        None,
+                        &self.device_id,
+                    );
+                    created += 1;
+                }
+                Err(e) => {
+                    errors.push(format!(
+                        "Row {}: {} ({})",
+                        row_number,
+                        e,
+                        note_row_label(&row)
+                    ));
+                    skipped += 1;
+                }
+            }
+        }
+
+        Ok(ImportResult {
+            created,
+            merged,
+            skipped,
+            errors,
+            rollback_plan: import_rollback::ImportRollbackPlan::from_actions(rollback_actions),
+        })
+    }
+
+    pub fn preflight_notes_csv_import(&self, file_path: &str) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_notes_csv_with_row_numbers(file_content.as_slice())?;
+        self.preflight_note_rows(rows)
+    }
+
+    pub fn preflight_notes_csv_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_notes_csv_with_mapping(file_content.as_slice(), &mapping)?;
+        self.preflight_note_rows(rows)
+    }
+
+    pub fn preflight_notes_json_import(&self, file_path: &str) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_notes_json_with_row_numbers(file_content.as_slice())?;
+        self.preflight_note_rows(rows)
+    }
+
+    pub fn preflight_notes_json_import_with_mapping(
+        &self,
+        file_path: &str,
+        mapping: ImportColumnMapping,
+    ) -> CrmResult<ImportPreflightReport> {
+        let file_content = fs::read(file_path)?;
+        let rows = parse_notes_json_with_mapping(file_content.as_slice(), &mapping)?;
+        self.preflight_note_rows(rows)
+    }
+
+    fn preflight_note_rows(
+        &self,
+        rows: Vec<(usize, NoteCsvRow)>,
+    ) -> CrmResult<ImportPreflightReport> {
+        for (row_number, row) in &rows {
+            validate_note_import_row(&self.db.conn, *row_number, row)
+                .map_err(|e| CrmError::InvalidInput(format!("Row {}: {}", row_number, e)))?;
+        }
+
+        Ok(import_preflight_report("notes", rows.len(), Vec::new()))
+    }
+
+    pub fn export_notes_csv(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_note_rows()?;
+        let count = rows.len() as u32;
+        let file = fs::File::create(file_path)?;
+        write_notes_csv(BufWriter::new(file), &rows)?;
+        Ok(count)
+    }
+
+    pub fn export_notes_json(&self, file_path: &str) -> CrmResult<u32> {
+        let rows = self.export_note_rows()?;
+        let count = rows.len() as u32;
+        write_json_export(file_path, &rows)?;
+        Ok(count)
+    }
+
+    fn export_note_rows(&self) -> CrmResult<Vec<NoteCsvRow>> {
+        Ok(self
+            .list_notes()?
+            .into_iter()
+            .map(|note| NoteCsvRow {
+                entity_type: note.entity_type,
+                entity_id: note.entity_id,
+                content: note.content,
+            })
+            .collect())
+    }
+
     pub fn import_organizations_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {
         self.import_organizations_csv_with_options(file_path, ImportOptions::default())
     }
@@ -2933,6 +3144,69 @@ fn import_preflight_report(
         total_rows: total_rows as u32,
         duplicate_warning_count: warnings.len() as u32,
         warnings,
+    }
+}
+
+fn validate_note_import_row(
+    conn: &Connection,
+    _row_number: usize,
+    row: &NoteCsvRow,
+) -> CrmResult<(String, String, String)> {
+    let entity_type = normalize_note_import_entity_type(&row.entity_type)?;
+    let entity_id = normalize_required_note_import_field(&row.entity_id, "entity_id")?;
+    let content = normalize_required_note_import_field(&row.content, "content")?;
+    ensure_note_import_entity_exists(conn, &entity_type, &entity_id)?;
+    Ok((entity_type, entity_id, content))
+}
+
+fn normalize_note_import_entity_type(value: &str) -> CrmResult<String> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "contact" => Ok("contact".to_string()),
+        "organization" => Ok("organization".to_string()),
+        "deal" => Ok("deal".to_string()),
+        "activity" => Ok("activity".to_string()),
+        "" => Err(CrmError::InvalidInput(
+            "entity_type is required".to_string(),
+        )),
+        other => Err(CrmError::InvalidInput(format!(
+            "Unsupported entity_type '{}'",
+            other
+        ))),
+    }
+}
+
+fn normalize_required_note_import_field(value: &str, field: &str) -> CrmResult<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(CrmError::InvalidInput(format!("{} is required", field)));
+    }
+    Ok(trimmed.to_string())
+}
+
+fn ensure_note_import_entity_exists(
+    conn: &Connection,
+    entity_type: &str,
+    entity_id: &str,
+) -> CrmResult<()> {
+    match entity_type {
+        "contact" => storage::contacts::get_contact(conn, entity_id).map(|_| ()),
+        "organization" => storage::organizations::get_organization(conn, entity_id).map(|_| ()),
+        "deal" => storage::deals::get_deal(conn, entity_id).map(|_| ()),
+        "activity" => storage::activities::get_activity(conn, entity_id).map(|_| ()),
+        _ => Err(CrmError::InvalidInput(format!(
+            "Unsupported entity_type '{}'",
+            entity_type
+        ))),
+    }
+}
+
+fn note_row_label(row: &NoteCsvRow) -> String {
+    let entity_type = row.entity_type.trim();
+    let entity_id = row.entity_id.trim();
+    if entity_type.is_empty() && entity_id.is_empty() {
+        "note".to_string()
+    } else {
+        format!("{}:{}", entity_type, entity_id)
     }
 }
 
