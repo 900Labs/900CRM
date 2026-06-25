@@ -219,6 +219,39 @@ describe('import/export API', () => {
     });
   });
 
+  it('passes duplicate auto-merge only for contact and organization imports when enabled', async () => {
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importContactsCsv('/tmp/contacts.csv', { mergeDuplicates: true });
+    expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_csv', {
+      file_path: '/tmp/contacts.csv',
+      merge_duplicates: true,
+    });
+
+    const contactMapping = { Email: 'email', First: 'first_name' } as const;
+    invokeMock.mockResolvedValueOnce(importWithBackup(0));
+    await importContactsJsonWithMapping('/tmp/contacts.json', contactMapping, {
+      mergeDuplicates: true,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('import_contacts_json_with_mapping', {
+      file_path: '/tmp/contacts.json',
+      mapping: contactMapping,
+      merge_duplicates: true,
+    });
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importOrganizationsJson('/tmp/organizations.json', { mergeDuplicates: true });
+    expect(invokeMock).toHaveBeenLastCalledWith('import_organizations_json', {
+      file_path: '/tmp/organizations.json',
+      merge_duplicates: true,
+    });
+
+    invokeMock.mockResolvedValueOnce(importWithBackup(1));
+    await importData('deals', 'csv', '/tmp/deals.csv', { mergeDuplicates: true });
+    expect(invokeMock).toHaveBeenLastCalledWith('import_deals_csv', {
+      file_path: '/tmp/deals.csv',
+    });
+  });
+
   it('maps CSV preflight duplicate warning commands', async () => {
     invokeMock.mockResolvedValueOnce({
       entity_type: 'contacts',

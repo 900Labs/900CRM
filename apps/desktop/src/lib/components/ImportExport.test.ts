@@ -423,6 +423,123 @@ describe("ImportExport component", () => {
     expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it("shows duplicate auto-merge only for contact and organization imports", async () => {
+    openDialogMock.mockResolvedValue("/tmp/import.json");
+    previewJsonMock.mockResolvedValue({
+      total_rows: 1,
+      headers: ["name", "email", "title"],
+      rows: [
+        {
+          row_number: 2,
+          values: { name: "Acme", email: "hello@acme.test", title: "Renewal" },
+        },
+      ],
+    });
+
+    render(ImportExport, { open: true });
+
+    await fireEvent.change(screen.getByLabelText("Format"), {
+      target: { value: "json" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+    await screen.findByText("hello@acme.test");
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByLabelText("Merge duplicate rows into existing records")).toBeTruthy();
+
+    await fireEvent.change(screen.getByLabelText("Type"), {
+      target: { value: "organizations" },
+    });
+    await fireEvent.change(screen.getByLabelText("Format"), {
+      target: { value: "json" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+    await screen.findByText("hello@acme.test");
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByLabelText("Merge duplicate rows into existing records")).toBeTruthy();
+
+    await fireEvent.change(screen.getByLabelText("Type"), {
+      target: { value: "deals" },
+    });
+    await fireEvent.change(screen.getByLabelText("Format"), {
+      target: { value: "json" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+    await screen.findByText("Renewal");
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.queryByLabelText("Merge duplicate rows into existing records")).toBeNull();
+  });
+
+  it("sends enabled duplicate auto-merge through import and shows merged summary", async () => {
+    openDialogMock.mockResolvedValue("/tmp/contacts.json");
+    previewJsonMock.mockResolvedValue({
+      total_rows: 1,
+      headers: ["first_name", "email"],
+      rows: [
+        {
+          row_number: 2,
+          values: { first_name: "Ada", email: "ada@example.com" },
+        },
+      ],
+    });
+    preflightJsonWithMappingMock.mockResolvedValue({
+      entity_type: "contacts",
+      total_rows: 1,
+      duplicate_warning_count: 1,
+      warnings: [
+        {
+          entity_type: "contacts",
+          row_number: 2,
+          match_type: "email",
+          csv_value: "ada@example.com",
+          existing_entity_type: "contact",
+          existing_entity_id: "contact-1",
+          existing_display_label: "Ada Lovelace",
+          reason: "Email 'ada@example.com' matches existing contact",
+        },
+      ],
+    });
+    importJsonWithMappingMock.mockResolvedValue({
+      import: { created: 0, merged: 1, skipped: 0, errors: [] },
+      backup: backupValidation,
+    });
+
+    render(ImportExport, { open: true });
+
+    await fireEvent.change(screen.getByLabelText("Format"), {
+      target: { value: "json" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Choose File" }));
+    await screen.findByText("Ada");
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await fireEvent.click(screen.getByLabelText("Merge duplicate rows into existing records"));
+    await fireEvent.click(screen.getByRole("button", { name: "Detect duplicates" }));
+    await screen.findByText("Duplicate auto-merge is enabled for this import.");
+    await fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(
+      screen.getByText(
+        "Duplicate auto-merge is enabled. Safe contact or organization matches will merge instead of creating duplicate records.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("1 duplicate warnings will be merged into matching existing records where safe."),
+    ).toBeTruthy();
+    await fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
+
+    await waitFor(() => {
+      expect(importJsonWithMappingMock).toHaveBeenCalledWith(
+        "contacts",
+        "/tmp/contacts.json",
+        {
+          email: "email",
+          first_name: "first_name",
+        },
+        { mergeDuplicates: true },
+      );
+    });
+    const mergedLabel = await screen.findByText("Merged");
+    expect(mergedLabel.nextElementSibling?.textContent).toBe("1");
+  });
+
   it("does not show the restore control when the import summary has no backup path", async () => {
     await renderJsonImportSummary({
       import: { created: 1, skipped: 0, errors: [] },

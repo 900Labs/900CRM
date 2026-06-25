@@ -246,11 +246,39 @@ Preflight warnings do not block import automatically. The UI lets the user
 continue despite warnings. The import then attempts to create each row and
 reports created, skipped, and error counts.
 
+## Contact And Organization Duplicate Auto-Merge
+
+Contact and organization imports include an explicit opt-in checkbox to merge
+duplicate import rows into matching existing records. The option is available
+for contact and organization CSV, mapped CSV, JSON, and mapped JSON imports. It
+is not shown for deal imports, and it is off by default.
+
+Duplicate preflight still runs before confirmation when auto-merge is enabled.
+The confirmation copy states that duplicate warnings will be merged into
+matching existing records where safe.
+
+When enabled, duplicate matching uses the same active-record fields as
+preflight:
+
+- contacts match by case-insensitive email or trimmed phone;
+- organizations match by case-insensitive name, case-insensitive email, or
+  trimmed phone.
+
+If all matching rules identify one existing active record, the import row fills
+blank fields on that record without overwriting existing non-empty values.
+Existing IDs and active rows are preserved, and updates route through the
+existing `crm-core` update services so sync and audit behavior stays aligned
+with normal edits. Non-duplicate rows continue to create normally.
+
+If one import row matches multiple existing records, that row is skipped with a
+row-numbered error rather than merged unsafely.
+
 ## Row-Level Results
 
 Imports return:
 
 - `created`: number of rows successfully created;
+- `merged`: number of duplicate rows folded into existing records;
 - `skipped`: number of rows that failed during creation after parsing;
 - `errors`: row-numbered error strings from failed create attempts.
 
@@ -260,7 +288,9 @@ not included in the import result as row-level errors.
 Successful imported rows are written through normal `crm-core` create paths.
 Those paths record sync changelog entries and audit evidence. The import
 service also records an `import_row` audit entry for each successfully imported
-contact, deal, or organization.
+contact, deal, or organization. Successful duplicate auto-merge rows are
+updated through normal update services and also receive an `import_row_merge`
+audit entry.
 
 Desktop CSV, mapped CSV, JSON, and mapped JSON imports for contacts, deals, and
 organizations first create an automatic local backup through
@@ -314,7 +344,6 @@ validated backup workflow.
 
 The following are not implemented in the current import/export surface:
 
-- Contact or organization duplicate auto-merge during import.
 - Deal duplicate auto-merge during import.
 - Import rollback for a completed multi-row import.
 - Remote import/export endpoints.
