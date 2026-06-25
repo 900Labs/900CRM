@@ -6,7 +6,7 @@ use std::{
 
 use crm_core::utils::csv::ImportColumnMapping;
 use crm_core::{
-    services::{ImportPreflightReport, ImportResult, LocalBackup},
+    services::{ImportOptions, ImportPreflightReport, ImportResult, LocalBackup},
     utils::csv::JsonImportPreview,
     CrmCore,
 };
@@ -27,9 +27,10 @@ pub struct ImportWithBackupResult {
 pub async fn import_contacts_csv(
     state: State<'_, AppState>,
     file_path: String,
+    merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
     import_with_pre_import_backup(&state, |core| {
-        core.import_contacts_csv(&file_path)
+        core.import_contacts_csv_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
     })
 }
@@ -39,10 +40,15 @@ pub async fn import_contacts_csv_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
     mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
     import_with_pre_import_backup(&state, |core| {
-        core.import_contacts_csv_with_mapping(&file_path, mapping)
-            .map_err(|e| e.to_string())
+        core.import_contacts_csv_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
     })
 }
 
@@ -50,9 +56,10 @@ pub async fn import_contacts_csv_with_mapping(
 pub async fn import_contacts_json(
     state: State<'_, AppState>,
     file_path: String,
+    merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
     import_with_pre_import_backup(&state, |core| {
-        core.import_contacts_json(&file_path)
+        core.import_contacts_json_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
     })
 }
@@ -62,10 +69,15 @@ pub async fn import_contacts_json_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
     mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
     import_with_pre_import_backup(&state, |core| {
-        core.import_contacts_json_with_mapping(&file_path, mapping)
-            .map_err(|e| e.to_string())
+        core.import_contacts_json_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
     })
 }
 
@@ -261,9 +273,10 @@ pub async fn export_deals_json(
 pub async fn import_organizations_csv(
     state: State<'_, AppState>,
     file_path: String,
+    merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
     import_with_pre_import_backup(&state, |core| {
-        core.import_organizations_csv(&file_path)
+        core.import_organizations_csv_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
     })
 }
@@ -273,10 +286,15 @@ pub async fn import_organizations_csv_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
     mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
     import_with_pre_import_backup(&state, |core| {
-        core.import_organizations_csv_with_mapping(&file_path, mapping)
-            .map_err(|e| e.to_string())
+        core.import_organizations_csv_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
     })
 }
 
@@ -284,9 +302,10 @@ pub async fn import_organizations_csv_with_mapping(
 pub async fn import_organizations_json(
     state: State<'_, AppState>,
     file_path: String,
+    merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
     import_with_pre_import_backup(&state, |core| {
-        core.import_organizations_json(&file_path)
+        core.import_organizations_json_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
     })
 }
@@ -296,10 +315,15 @@ pub async fn import_organizations_json_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
     mapping: ImportColumnMapping,
+    merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
     import_with_pre_import_backup(&state, |core| {
-        core.import_organizations_json_with_mapping(&file_path, mapping)
-            .map_err(|e| e.to_string())
+        core.import_organizations_json_with_mapping_and_options(
+            &file_path,
+            mapping,
+            import_options(merge_duplicates),
+        )
+        .map_err(|e| e.to_string())
     })
 }
 
@@ -385,6 +409,12 @@ where
     let mut core = super::lock_core(state)?;
     let backup_dir = next_pre_import_backup_dir(&state.data_dir)?;
     create_backup_then_import(&mut core, &backup_dir, import)
+}
+
+fn import_options(merge_duplicates: Option<bool>) -> ImportOptions {
+    ImportOptions {
+        merge_duplicates: merge_duplicates.unwrap_or(false),
+    }
 }
 
 fn create_backup_then_import<F>(
@@ -479,6 +509,63 @@ mod tests {
 
         let active_contacts = core.list_contacts(None).expect("active contacts list");
         assert_eq!(active_contacts.contacts.len(), 1);
+
+        fs::remove_dir_all(&app_data_dir).ok();
+    }
+
+    #[test]
+    fn backup_is_created_before_auto_merge_import_writes() {
+        let app_data_dir = unique_test_dir("creates-before-auto-merge");
+        let csv_path = app_data_dir.join("contacts.csv");
+        fs::create_dir_all(&app_data_dir).expect("app data dir");
+
+        let mut core = CrmCore::open(&app_data_dir).expect("core opens");
+        let existing = core
+            .create_contact(
+                Some("person".to_string()),
+                Some("Ada".to_string()),
+                Some("Lovelace".to_string()),
+                None,
+                Some("ada@example.com".to_string()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("existing contact should be created");
+        write_csv(
+            &csv_path,
+            "first_name,last_name,email,phone\nImported,Duplicate,ADA@example.com,+15550123\n",
+        );
+
+        let backup_dir = app_data_dir.join("pre-import-backups").join("before-merge");
+        let result = create_backup_then_import(&mut core, &backup_dir, |core| {
+            core.import_contacts_csv_with_options(
+                csv_path.to_str().expect("utf8 path"),
+                ImportOptions {
+                    merge_duplicates: true,
+                },
+            )
+            .map_err(|e| e.to_string())
+        })
+        .expect("backup and auto-merge import should succeed");
+
+        assert_eq!(result.import.created, 0);
+        assert_eq!(result.import.merged, 1);
+        assert!(backup_dir.join("900crm.db").is_file());
+
+        let backup_core = CrmCore::open(&backup_dir).expect("backup core opens");
+        let backup_contact = backup_core
+            .get_contact(&existing.id)
+            .expect("backup should contain pre-merge contact");
+        assert_eq!(backup_contact.phone, "");
+
+        let active_contact = core
+            .get_contact(&existing.id)
+            .expect("active contact should remain after merge");
+        assert_eq!(active_contact.phone, "+15550123");
 
         fs::remove_dir_all(&app_data_dir).ok();
     }

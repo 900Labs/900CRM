@@ -38,7 +38,9 @@ pre-import-backups/<timestamp-and-sequence>/
 
 If the automatic backup cannot be created, the import is not run. The
 post-import summary displays the created backup path. Preflight duplicate checks
-remain read-only and do not create backups.
+remain read-only and do not create backups. Contact and organization imports
+with duplicate auto-merge enabled use the same automatic pre-import backup
+guard before any create or merge writes.
 
 When a post-import summary includes an automatic pre-import backup path, the
 summary also offers a destructive restore control. That control validates the
@@ -78,7 +80,7 @@ Before restoring:
 During restore, the active `CrmCore` instance is closed, the validated backup database is copied into the app data directory, stale SQLite sidecars are removed, and `CrmCore` is reopened.
 
 Import summary restore is full database replacement. It is not row-level import
-rollback, partial restore, merge-back, or duplicate auto-merge.
+rollback, partial restore, or merge-back.
 
 ## Developer API surface
 
