@@ -1,4 +1,5 @@
-//! Flat import/export row helpers for contacts, deals, organizations, activities, notes, and tags.
+//! Flat import/export row helpers for contacts, deals, organizations, activities, notes, tags,
+//! and custom field definitions.
 //!
 //! This module provides utilities for reading and writing CSV files and parsing
 //! JSON arrays used in the 900CRM import/export feature. It wraps the [`csv`]
@@ -63,6 +64,16 @@
 //! | `entity_type` | yes      | `contact`, `organization`, `deal`, or `activity` |
 //! | `entity_id`   | yes      | Existing active local entity UUID |
 //! | `tag_id`      | yes      | Existing active local tag UUID |
+//!
+//! # Custom Field Definition CSV Format
+//!
+//! | Column          | Required | Notes |
+//! |-----------------|----------|-------|
+//! | `entity_type`   | yes      | `contact`, `organization`, `deal`, or `activity` |
+//! | `field_name`    | yes      | Local field label |
+//! | `field_type`    | yes      | `text`, `number`, `date`, `boolean`, or `select` |
+//! | `field_options` | no       | JSON string array; required for `select` fields |
+//! | `sort_order`    | no       | Integer display order; blank defaults to `0` |
 //!
 //! # Organization CSV Format
 //!
@@ -160,6 +171,14 @@ const NOTE_IMPORT_TARGET_FIELDS: &[&str] = &["entity_type", "entity_id", "conten
 const TAG_DEFINITION_IMPORT_TARGET_FIELDS: &[&str] = &["name", "color"];
 
 const TAG_LINK_IMPORT_TARGET_FIELDS: &[&str] = &["entity_type", "entity_id", "tag_id"];
+
+const CUSTOM_FIELD_DEFINITION_IMPORT_TARGET_FIELDS: &[&str] = &[
+    "entity_type",
+    "field_name",
+    "field_type",
+    "field_options",
+    "sort_order",
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Contact CSV record
@@ -387,6 +406,31 @@ pub struct TagLinkCsvRow {
 
     /// Existing active local tag UUID.
     pub tag_id: String,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Custom field definition CSV record
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A flat CSV record representing one local custom field definition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomFieldDefinitionCsvRow {
+    /// Definition owner: `"contact"`, `"organization"`, `"deal"`, or `"activity"`.
+    pub entity_type: String,
+
+    /// Local custom field label. Required.
+    pub field_name: String,
+
+    /// Field kind: `"text"`, `"number"`, `"date"`, `"boolean"`, or `"select"`.
+    pub field_type: String,
+
+    /// JSON string array for select fields.
+    #[serde(default)]
+    pub field_options: Option<String>,
+
+    /// Display order. Blank or missing values default to `0`.
+    #[serde(default)]
+    pub sort_order: Option<String>,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -924,6 +968,74 @@ pub fn parse_tag_links_csv_with_mapping<R: Read>(
     Ok(rows)
 }
 
+/// Parses custom field definition CSV data and preserves source row numbers.
+pub fn parse_custom_field_definitions_csv_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, CustomFieldDefinitionCsvRow)>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .trim(csv::Trim::All)
+        .flexible(true)
+        .from_reader(reader);
+
+    let headers = rdr.headers()?.clone();
+    require_csv_header(&headers, "entity_type")?;
+    require_csv_header(&headers, "field_name")?;
+    require_csv_header(&headers, "field_type")?;
+
+    let mut rows = Vec::new();
+    for (index, result) in rdr.records().enumerate() {
+        let row_number = index + 2;
+        let record = result.map_err(|e| CrmError::Csv(e.to_string()))?;
+        rows.push((
+            row_number,
+            custom_field_definition_row_from_record(&headers, &record),
+        ));
+    }
+
+    log::info!(
+        "Parsed {} custom field definition rows from CSV",
+        rows.len()
+    );
+    Ok(rows)
+}
+
+/// Parses arbitrary-header custom field definition CSV data with a frontend-provided mapping.
+pub fn parse_custom_field_definitions_csv_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, CustomFieldDefinitionCsvRow)>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .trim(csv::Trim::All)
+        .flexible(true)
+        .from_reader(reader);
+
+    let headers = rdr.headers()?.clone();
+    let assignments = validate_import_mapping(
+        &headers,
+        mapping,
+        CUSTOM_FIELD_DEFINITION_IMPORT_TARGET_FIELDS,
+        &[],
+    )?;
+
+    let mut rows = Vec::new();
+    for (index, result) in rdr.records().enumerate() {
+        let row_number = index + 2;
+        let record = result.map_err(|e| CrmError::Csv(e.to_string()))?;
+        rows.push((
+            row_number,
+            custom_field_definition_row_from_mapped_record(&record, &assignments),
+        ));
+    }
+
+    log::info!(
+        "Parsed {} mapped custom field definition rows from CSV",
+        rows.len()
+    );
+    Ok(rows)
+}
+
 /// Parses contact JSON data from a top-level array of flat row objects.
 ///
 /// Row numbers are reported with the same data-row offset as CSV imports:
@@ -1382,6 +1494,67 @@ pub fn parse_tag_links_json_with_mapping<R: Read>(
     Ok(parsed_rows)
 }
 
+/// Parses custom field definition JSON data from a top-level array of flat row objects.
+pub fn parse_custom_field_definitions_json_with_row_numbers<R: Read>(
+    reader: R,
+) -> CrmResult<Vec<(usize, CustomFieldDefinitionCsvRow)>> {
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        parsed_rows.push((
+            row_number,
+            custom_field_definition_row_from_json_object(object, &headers),
+        ));
+    }
+
+    log::info!(
+        "Parsed {} custom field definition rows from JSON",
+        parsed_rows.len()
+    );
+    Ok(parsed_rows)
+}
+
+/// Parses custom field definition JSON data with frontend-provided source-field mapping.
+pub fn parse_custom_field_definitions_json_with_mapping<R: Read>(
+    reader: R,
+    mapping: &ImportColumnMapping,
+) -> CrmResult<Vec<(usize, CustomFieldDefinitionCsvRow)>> {
+    let rows = parse_json_array_rows(reader)?;
+    let headers = collect_json_source_fields(&rows)?;
+    let assignments = validate_import_mapping_sources(
+        &headers,
+        mapping,
+        CUSTOM_FIELD_DEFINITION_IMPORT_TARGET_FIELDS,
+        &[],
+        "field",
+        "JSON",
+    )?;
+    let mut parsed_rows = Vec::new();
+
+    for (index, value) in rows.iter().enumerate() {
+        let row_number = index + 2;
+        let object = value.as_object().ok_or_else(|| {
+            CrmError::InvalidInput(format!("JSON row {} must be an object", row_number))
+        })?;
+        parsed_rows.push((
+            row_number,
+            custom_field_definition_row_from_mapped_json_object(object, &headers, &assignments),
+        ));
+    }
+
+    log::info!(
+        "Parsed {} mapped custom field definition rows from JSON",
+        parsed_rows.len()
+    );
+    Ok(parsed_rows)
+}
+
 pub fn preview_contacts_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
     preview_json_import(reader)
 }
@@ -1407,6 +1580,12 @@ pub fn preview_tag_definitions_json_import<R: Read>(reader: R) -> CrmResult<Json
 }
 
 pub fn preview_tag_links_json_import<R: Read>(reader: R) -> CrmResult<JsonImportPreview> {
+    preview_json_import(reader)
+}
+
+pub fn preview_custom_field_definitions_json_import<R: Read>(
+    reader: R,
+) -> CrmResult<JsonImportPreview> {
     preview_json_import(reader)
 }
 
@@ -2154,6 +2333,94 @@ fn assign_tag_link_value(row: &mut TagLinkCsvRow, target: &str, value: &str) {
     }
 }
 
+fn custom_field_definition_row_from_record(
+    headers: &csv::StringRecord,
+    record: &csv::StringRecord,
+) -> CustomFieldDefinitionCsvRow {
+    let mut row = default_custom_field_definition_row();
+
+    for (index, header) in headers.iter().enumerate() {
+        let value = record.get(index).unwrap_or_default().trim();
+        assign_custom_field_definition_value(&mut row, header.trim(), value);
+    }
+
+    row
+}
+
+fn custom_field_definition_row_from_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+) -> CustomFieldDefinitionCsvRow {
+    let mut row = default_custom_field_definition_row();
+
+    for header in headers {
+        let value = json_preview_cell(object.get(header.as_str()));
+        assign_custom_field_definition_value(&mut row, header.trim(), value.trim());
+    }
+
+    row
+}
+
+fn custom_field_definition_row_from_mapped_record(
+    record: &csv::StringRecord,
+    assignments: &[Option<String>],
+) -> CustomFieldDefinitionCsvRow {
+    let mut row = default_custom_field_definition_row();
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = record.get(index).unwrap_or_default().trim();
+        assign_custom_field_definition_value(&mut row, target, value);
+    }
+
+    row
+}
+
+fn custom_field_definition_row_from_mapped_json_object(
+    object: &serde_json::Map<String, Value>,
+    headers: &[String],
+    assignments: &[Option<String>],
+) -> CustomFieldDefinitionCsvRow {
+    let mut row = default_custom_field_definition_row();
+
+    for (index, target) in assignments.iter().enumerate() {
+        let Some(target) = target.as_deref() else {
+            continue;
+        };
+        let value = json_preview_cell(object.get(headers[index].as_str()));
+        assign_custom_field_definition_value(&mut row, target, value.trim());
+    }
+
+    row
+}
+
+fn default_custom_field_definition_row() -> CustomFieldDefinitionCsvRow {
+    CustomFieldDefinitionCsvRow {
+        entity_type: String::new(),
+        field_name: String::new(),
+        field_type: String::new(),
+        field_options: None,
+        sort_order: None,
+    }
+}
+
+fn assign_custom_field_definition_value(
+    row: &mut CustomFieldDefinitionCsvRow,
+    target: &str,
+    value: &str,
+) {
+    match target {
+        "entity_type" => row.entity_type = value.to_string(),
+        "field_name" => row.field_name = value.to_string(),
+        "field_type" => row.field_type = value.to_string(),
+        "field_options" => row.field_options = optional_csv_value(value),
+        "sort_order" => row.sort_order = optional_csv_value(value),
+        _ => {}
+    }
+}
+
 fn default_deal_row() -> DealCsvRow {
     DealCsvRow {
         title: String::new(),
@@ -2510,5 +2777,42 @@ pub fn write_tag_links_csv<W: Write>(writer: W, rows: &[TagLinkCsvRow]) -> CrmRe
 
     wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
     log::info!("Wrote {} tag link rows to CSV", rows.len());
+    Ok(())
+}
+
+/// Serializes a slice of [`CustomFieldDefinitionCsvRow`] to CSV bytes.
+///
+/// The output always includes portable definition columns and intentionally
+/// omits local IDs and timestamps.
+pub fn write_custom_field_definitions_csv<W: Write>(
+    writer: W,
+    rows: &[CustomFieldDefinitionCsvRow],
+) -> CrmResult<()> {
+    let mut wtr = csv::WriterBuilder::new()
+        .has_headers(false)
+        .from_writer(writer);
+
+    wtr.write_record([
+        "entity_type",
+        "field_name",
+        "field_type",
+        "field_options",
+        "sort_order",
+    ])
+    .map_err(|e| CrmError::Csv(e.to_string()))?;
+
+    for row in rows {
+        wtr.write_record([
+            &row.entity_type,
+            &row.field_name,
+            &row.field_type,
+            row.field_options.as_deref().unwrap_or_default(),
+            row.sort_order.as_deref().unwrap_or_default(),
+        ])
+        .map_err(|e| CrmError::Csv(e.to_string()))?;
+    }
+
+    wtr.flush().map_err(|e| CrmError::Csv(e.to_string()))?;
+    log::info!("Wrote {} custom field definition rows to CSV", rows.len());
     Ok(())
 }

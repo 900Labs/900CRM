@@ -3,6 +3,7 @@ import type { CustomFieldDefinition } from '$lib/api/customFields';
 import type {
   ActivityImportTargetField,
   ContactImportTargetField,
+  CustomFieldDefinitionImportTargetField,
   CustomFieldImportTargetField,
   DealImportTargetField,
   ImportColumnMapping,
@@ -81,6 +82,14 @@ export const NOTE_IMPORT_FIELDS: ImportFieldOption<NoteImportTargetField>[] = [
 export const TAG_DEFINITION_IMPORT_FIELDS: ImportFieldOption<TagDefinitionImportTargetField>[] = [
   { value: 'name', label: 'Name', required: true },
   { value: 'color', label: 'Color' },
+];
+
+export const CUSTOM_FIELD_DEFINITION_IMPORT_FIELDS: ImportFieldOption<CustomFieldDefinitionImportTargetField>[] = [
+  { value: 'entity_type', label: 'Entity type', required: true },
+  { value: 'field_name', label: 'Field name', required: true },
+  { value: 'field_type', label: 'Field type', required: true },
+  { value: 'field_options', label: 'Field options' },
+  { value: 'sort_order', label: 'Sort order' },
 ];
 
 export const TAG_LINK_IMPORT_FIELDS: ImportFieldOption<TagLinkImportTargetField>[] = [
@@ -231,6 +240,28 @@ const TAG_DEFINITION_ALIASES: Record<string, TagDefinitionImportTargetField> = {
   hexcolour: 'color',
 };
 
+const CUSTOM_FIELD_DEFINITION_ALIASES: Record<string, CustomFieldDefinitionImportTargetField> = {
+  entitytype: 'entity_type',
+  type: 'entity_type',
+  ownertype: 'entity_type',
+  targettype: 'entity_type',
+  fieldname: 'field_name',
+  name: 'field_name',
+  label: 'field_name',
+  customfield: 'field_name',
+  customfieldname: 'field_name',
+  fieldtype: 'field_type',
+  datatype: 'field_type',
+  kind: 'field_type',
+  options: 'field_options',
+  fieldoptions: 'field_options',
+  choices: 'field_options',
+  selectoptions: 'field_options',
+  sortorder: 'sort_order',
+  order: 'sort_order',
+  displayorder: 'sort_order',
+};
+
 const TAG_LINK_ALIASES: Record<string, TagLinkImportTargetField> = {
   entitytype: 'entity_type',
   type: 'entity_type',
@@ -277,6 +308,10 @@ export function getImportFieldOptions(
 
   if (entity === 'tag_definitions') {
     return TAG_DEFINITION_IMPORT_FIELDS;
+  }
+
+  if (entity === 'custom_field_definitions') {
+    return CUSTOM_FIELD_DEFINITION_IMPORT_FIELDS;
   }
 
   if (entity === 'tag_links') {
@@ -337,6 +372,10 @@ function getImportAliases(entity: MappedImportEntity): Record<string, ImportTarg
 
   if (entity === 'tag_definitions') {
     return TAG_DEFINITION_ALIASES;
+  }
+
+  if (entity === 'custom_field_definitions') {
+    return CUSTOM_FIELD_DEFINITION_ALIASES;
   }
 
   if (entity === 'tag_links') {
@@ -422,7 +461,7 @@ function getCustomImportAliases(
     return {};
   }
 
-  if (entity === 'tag_definitions' || entity === 'tag_links') {
+  if (entity === 'tag_definitions' || entity === 'custom_field_definitions' || entity === 'tag_links') {
     return {};
   }
 
