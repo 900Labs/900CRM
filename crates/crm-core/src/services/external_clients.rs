@@ -1,11 +1,14 @@
 use std::{fs, io::BufWriter};
 
+use crate::audit::ACTOR_DESKTOP_APP;
+use crate::permissions::ExternalClientPermissionMode;
 use crate::result::CrmResult;
 use crate::storage::{self, external_clients::ExternalClient};
 use crate::utils::csv::{write_external_clients_csv, ExternalClientCsvRow};
+use crate::utils::errors::CrmError;
 
-use super::external_client_permissions::required_external_client_field;
 use super::CrmCore;
+use super::{external_client_permissions::required_external_client_field, record_audit_json};
 
 impl CrmCore {
     pub fn list_external_clients(&self) -> CrmResult<Vec<ExternalClient>> {
@@ -26,6 +29,57 @@ impl CrmCore {
             &client_type,
             &self.device_id,
         )
+    }
+
+    pub fn update_external_client_activation(
+        &mut self,
+        client_id: &str,
+        enabled: bool,
+        permission_mode: &str,
+    ) -> CrmResult<ExternalClient> {
+        let client_id = required_external_client_field("client_id", client_id)?;
+        let permission_mode = required_external_client_field("permission_mode", permission_mode)?;
+        let mode = validate_activation_mode(enabled, &permission_mode)?;
+        let before =
+            storage::external_clients::get_active_external_client(&self.db.conn, &client_id)?
+                .ok_or_else(|| external_client_not_found(&client_id))?;
+
+        if before.enabled == enabled && before.permission_mode == mode.as_str() {
+            return Ok(before);
+        }
+
+        let device_id = self.device_id.clone();
+        let tx = self.db.conn.unchecked_transaction()?;
+        let client = storage::external_clients::update_external_client_activation(
+            &tx,
+            &client_id,
+            enabled,
+            mode.as_str(),
+        )?
+        .ok_or_else(|| external_client_not_found(&client_id))?;
+
+        storage::sync::record_change(
+            &tx,
+            "external_client",
+            &client.id,
+            "__update__",
+            Some(&before.id),
+            Some(&client.id),
+            &device_id,
+        )?;
+        record_audit_json(
+            &tx,
+            ACTOR_DESKTOP_APP,
+            "update_external_client_activation",
+            Some("external_client"),
+            Some(&client.id),
+            Some(&before),
+            Some(&client),
+            &device_id,
+        )?;
+
+        tx.commit()?;
+        Ok(client)
     }
 
     pub fn export_external_clients_csv(&self, file_path: &str) -> CrmResult<u32> {
@@ -51,6 +105,51 @@ impl CrmCore {
                 .collect(),
         )
     }
+}
+
+fn validate_activation_mode(
+    enabled: bool,
+    permission_mode: &str,
+) -> CrmResult<ExternalClientPermissionMode> {
+    let mode = ExternalClientPermissionMode::from_storage_value(permission_mode).ok_or_else(|| {
+        CrmError::InvalidInput(format!(
+            "External client permission mode '{}' is not supported by the activation review surface",
+            permission_mode
+        ))
+    })?;
+
+    if !mode.is_supported_initial_mode() {
+        return Err(CrmError::InvalidInput(format!(
+            "External client permission mode '{}' is reserved for future support and cannot be activated in this sprint",
+            permission_mode
+        )));
+    }
+
+    match (enabled, mode) {
+        (false, ExternalClientPermissionMode::Disabled) => Ok(mode),
+        (
+            true,
+            ExternalClientPermissionMode::ReadOnly | ExternalClientPermissionMode::DraftOnly,
+        ) => Ok(mode),
+        (false, _) => Err(CrmError::InvalidInput(
+            "Disabled external clients must use permission mode 'disabled'".to_string(),
+        )),
+        (true, ExternalClientPermissionMode::Disabled) => Err(CrmError::InvalidInput(
+            "Enabled external clients must use permission mode 'read_only' or 'draft_only'"
+                .to_string(),
+        )),
+        (true, _) => Err(CrmError::InvalidInput(
+            "External client permission mode is not supported by the activation review surface"
+                .to_string(),
+        )),
+    }
+}
+
+fn external_client_not_found(client_id: &str) -> CrmError {
+    CrmError::NotFound(format!(
+        "External client '{}' was not found or has been deleted",
+        client_id
+    ))
 }
 
 fn external_client_export_row(client: ExternalClient) -> ExternalClientCsvRow {

@@ -102,6 +102,31 @@ pub fn get_active_external_client(
     }
 }
 
+pub fn update_external_client_activation(
+    conn: &Connection,
+    client_id: &str,
+    enabled: bool,
+    permission_mode: &str,
+) -> CrmResult<Option<ExternalClient>> {
+    let now = now_iso8601();
+    let changed = conn.execute(
+        r#"
+        UPDATE external_clients
+        SET enabled = ?2,
+            permission_mode = ?3,
+            updated_at = ?4
+        WHERE id = ?1 AND deleted_at IS NULL
+        "#,
+        params![client_id, bool_to_sql(enabled), permission_mode, now],
+    )?;
+
+    if changed == 0 {
+        return Ok(None);
+    }
+
+    get_active_external_client(conn, client_id)
+}
+
 fn map_external_client_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExternalClient> {
     let enabled: i64 = row.get(4)?;
     Ok(ExternalClient {
@@ -115,4 +140,12 @@ fn map_external_client_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<External
         deleted_at: row.get(7)?,
         device_id: row.get(8)?,
     })
+}
+
+fn bool_to_sql(value: bool) -> i64 {
+    if value {
+        1
+    } else {
+        0
+    }
 }

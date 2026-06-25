@@ -221,6 +221,17 @@ clients are disabled by default and do not receive tokens or credentials.
 Current fields include name, client type, enabled flag, permission mode,
 timestamps, soft-delete metadata, and `device_id`.
 
+The current activation update path is local readiness state only. It accepts
+only these consistent stored pairs:
+
+- `enabled = false` with `permission_mode = 'disabled'`;
+- `enabled = true` with `permission_mode = 'read_only'`;
+- `enabled = true` with `permission_mode = 'draft_only'`.
+
+Activation updates refresh `updated_at` and record local audit/sync evidence.
+Schema-reserved future modes cannot be written through the activation update
+service until a later sprint explicitly supports them.
+
 `external_client_permissions` stores per-client, per-tool permission rows with
 `can_read`, `can_write`, and `requires_confirmation`. A unique index enforces
 one row per `(client_id, tool_name)`.

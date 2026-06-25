@@ -32,6 +32,8 @@ The following data and API surfaces exist today:
 - External client records with `name`, `client_type`, `enabled`, and `permission_mode`.
 - External client permission rows keyed by `(client_id, tool_name)`.
 - Permission evaluation for the initial modes `disabled`, `read_only`, and `draft_only`.
+- Settings UI local activation review/edit controls for existing external-client
+  records using only `disabled`, `read_only`, and `draft_only`.
 - Proposed action rows with pending, approved, rejected, and other schema-reserved lifecycle states.
 - Audit log entries for accountable changes and proposed-action decisions.
 - Pending Actions UI for reviewing proposed actions.
@@ -84,11 +86,21 @@ The allowed initial modes are:
 
 The schema reserves future values such as `write_with_confirmation` and `write_allowed`, but they are inactive in the current implementation. Current evaluation logic treats those future modes as unsupported.
 
-The Settings UI can list and create disabled external client placeholders and
-review or upsert local per-tool permission rows for those clients. This is a
-readiness surface only: it does not enable clients, issue credentials, start a
-server/listener, or run MCP/client code. Disabled clients still evaluate as
-disabled even when permission rows exist.
+The Settings UI can list and create disabled external client placeholders,
+update local activation state for those clients, and review or upsert local
+per-tool permission rows. This is a readiness surface only: local activation
+does not issue credentials, start a server/listener, enable sync server
+behavior, or run MCP/client code. Disabled clients still evaluate as disabled
+even when permission rows exist.
+
+Activation updates must keep stored state consistent:
+
+- disabled clients store `enabled = false` and `permission_mode = 'disabled'`;
+- enabled clients store `enabled = true` with `permission_mode = 'read_only'`
+  or `permission_mode = 'draft_only'`;
+- future modes such as `write_with_confirmation` and `write_allowed` are
+  rejected by the activation update path until a future sprint explicitly
+  supports them.
 
 ## Current Non-Goals
 
@@ -102,7 +114,7 @@ The current codebase intentionally does not include:
 - Internet or cloud requirements.
 - Raw SQL access for MCP clients.
 - File-system or shell tools.
-- Activation UI, token/secret UI, listener UI, or MCP runtime UI.
+- Token/secret UI, listener UI, or MCP runtime UI.
 - General direct execution of approved proposed actions beyond the supported
   `create_activity_draft` core path.
 
