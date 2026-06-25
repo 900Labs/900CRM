@@ -197,6 +197,13 @@ Current mutating service paths record audit entries for user-visible data
 changes, import row creation, proposed-action decisions, and external-client
 permission changes.
 
+Audit log entries can be exported locally to CSV or JSON for accountability
+review. The export includes every existing `audit_log` row with `id`,
+`actor_type`, `actor_id`, `action`, `entity_type`, `entity_id`, `before_json`,
+`after_json`, `created_at`, and `device_id`, sorted by `created_at` ascending
+and then `id` ascending. Audit log import is intentionally unsupported, and the
+export path does not record a new audit row.
+
 ### Sync Changelog
 
 `sync_changelog` is an append-only mutation log with entity type, entity ID,

@@ -95,3 +95,31 @@ pub fn list_recent_audit_log(conn: &Connection, limit: u32) -> CrmResult<Vec<Aud
 
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
+
+pub fn list_all_audit_log(conn: &Connection) -> CrmResult<Vec<AuditLogEntry>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, actor_type, actor_id, action, entity_type, entity_id,
+               before_json, after_json, created_at, device_id
+        FROM audit_log
+        ORDER BY created_at ASC, id ASC
+        "#,
+    )?;
+
+    let rows = stmt.query_map([], |row| {
+        Ok(AuditLogEntry {
+            id: row.get(0)?,
+            actor_type: row.get(1)?,
+            actor_id: row.get(2)?,
+            action: row.get(3)?,
+            entity_type: row.get(4)?,
+            entity_id: row.get(5)?,
+            before_json: row.get(6)?,
+            after_json: row.get(7)?,
+            created_at: row.get(8)?,
+            device_id: row.get(9)?,
+        })
+    })?;
+
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}

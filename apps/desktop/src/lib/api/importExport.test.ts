@@ -11,6 +11,8 @@ vi.mock('@tauri-apps/api/core', () => ({
 import {
   exportActivitiesCsv,
   exportActivitiesJson,
+  exportAuditLogCsv,
+  exportAuditLogJson,
   exportContactsCsv,
   exportContactsJson,
   exportCsv,
@@ -365,6 +367,20 @@ describe('import/export API', () => {
     });
   });
 
+  it('maps audit log export-only commands', async () => {
+    invokeMock.mockResolvedValueOnce(4);
+    await expect(exportAuditLogCsv('/tmp/audit-log-export.csv')).resolves.toBe(4);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_audit_log_csv', {
+      file_path: '/tmp/audit-log-export.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(4);
+    await expect(exportAuditLogJson('/tmp/audit-log-export.json')).resolves.toBe(4);
+    expect(invokeMock).toHaveBeenLastCalledWith('export_audit_log_json', {
+      file_path: '/tmp/audit-log-export.json',
+    });
+  });
+
   it('routes generic CSV helpers by entity', async () => {
     invokeMock.mockResolvedValueOnce(importWithBackup(1));
     await importCsv('organizations', '/tmp/orgs.csv');
@@ -419,6 +435,12 @@ describe('import/export API', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('export_tag_links_csv', {
       file_path: '/tmp/tag-links-export.csv',
     });
+
+    invokeMock.mockResolvedValueOnce(2);
+    await exportCsv('audit_log', '/tmp/audit-log-export.csv');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_audit_log_csv', {
+      file_path: '/tmp/audit-log-export.csv',
+    });
   });
 
   it('routes generic import/export helpers by entity and format', async () => {
@@ -462,6 +484,18 @@ describe('import/export API', () => {
     await exportData('activities', 'csv', '/tmp/activities-export.csv');
     expect(invokeMock).toHaveBeenLastCalledWith('export_activities_csv', {
       file_path: '/tmp/activities-export.csv',
+    });
+
+    invokeMock.mockResolvedValueOnce(4);
+    await exportJson('audit_log', '/tmp/audit-log-export.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_audit_log_json', {
+      file_path: '/tmp/audit-log-export.json',
+    });
+
+    invokeMock.mockResolvedValueOnce(4);
+    await exportData('audit_log', 'json', '/tmp/audit-log-export.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('export_audit_log_json', {
+      file_path: '/tmp/audit-log-export.json',
     });
   });
 
