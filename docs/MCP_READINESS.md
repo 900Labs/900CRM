@@ -39,6 +39,8 @@ The following data and API surfaces exist today:
 - Proposed action approve/reject APIs and UI controls.
 - Core approval execution for pending proposed actions where `tool_name` or
   `action_type` is `create_activity_draft`.
+- Settings UI permission review/edit controls for existing external-client
+  per-tool permission rows.
 
 Approving a supported `create_activity_draft` proposed action creates an activity
 through the normal `crm-core` service/storage path and marks the proposed action
@@ -82,7 +84,11 @@ The allowed initial modes are:
 
 The schema reserves future values such as `write_with_confirmation` and `write_allowed`, but they are inactive in the current implementation. Current evaluation logic treats those future modes as unsupported.
 
-No UI currently exposes permission grant review or activation controls. Existing Settings surfaces can list and create disabled external client placeholders, but they do not enable clients, issue credentials, or grant tool permissions.
+The Settings UI can list and create disabled external client placeholders and
+review or upsert local per-tool permission rows for those clients. This is a
+readiness surface only: it does not enable clients, issue credentials, start a
+server/listener, or run MCP/client code. Disabled clients still evaluate as
+disabled even when permission rows exist.
 
 ## Current Non-Goals
 
@@ -96,7 +102,7 @@ The current codebase intentionally does not include:
 - Internet or cloud requirements.
 - Raw SQL access for MCP clients.
 - File-system or shell tools.
-- Permission-grant UI.
+- Activation UI, token/secret UI, listener UI, or MCP runtime UI.
 - General direct execution of approved proposed actions beyond the supported
   `create_activity_draft` core path.
 
