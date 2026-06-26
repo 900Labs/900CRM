@@ -6,7 +6,7 @@ license.workspace = true
 repository.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-description = "Placeholder SDK crate for future 900CRM integrations"
+description = "Read-only local SDK facade for reviewed 900CRM integrations"
 
 [dependencies]
 crm-core = { path = "../crm-core" }
