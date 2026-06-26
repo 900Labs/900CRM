@@ -71,6 +71,9 @@ jobs:
       - name: Install Node.js dependencies
         run: npm ci
 
+      - name: Generate sample release manifest
+        run: npm run release:manifest:sample
+
       - name: Check public release guardrails
         run: npm run check:release-guardrails
 
