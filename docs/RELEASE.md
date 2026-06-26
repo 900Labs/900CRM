@@ -10,30 +10,36 @@ checks required before publishing a public release.
 900CRM is not published as a packaged public desktop release yet.
 
 Current CI is verification-only, and release packaging is intentionally
-separate:
+separate. Manual release packaging now has an automated Ubuntu preflight gate
+before any platform packaging starts:
 
 - it runs on `ubuntu-latest`;
-- it verifies frontend linting, type checks, unit tests, production build, and
-  browser smoke tests;
+- it verifies the public-release guardrail scan, frontend linting, type checks,
+  unit tests, production build, and browser smoke tests;
 - it verifies Rust formatting, Clippy, workspace checks, and workspace tests;
-- it does not build or publish release installers.
+- package generation does not start unless that preflight passes;
+- normal CI still does not build or publish release installers.
 
 Manual release packaging now lives in
 [`.github/workflows/release.yml`](../.github/workflows/release.yml). It must be
-started with `workflow_dispatch`, builds Windows, macOS, and Linux Tauri
-bundles, uploads workflow artifacts, and generates per-platform SHA-256
-checksums, release metadata, and an SPDX-shaped dependency inventory. The
-workflow does not publish a GitHub Release unless `publish_github_release` is
-explicitly enabled for a matching `v`-prefixed tag ref.
+started with `workflow_dispatch`, runs the preflight gate, then builds Windows,
+macOS, and Linux Tauri bundles, uploads workflow artifacts, and generates
+per-platform SHA-256 checksums, release metadata, and an SPDX-shaped dependency
+inventory. The workflow does not publish a GitHub Release unless
+`publish_github_release` is explicitly enabled for a matching `v`-prefixed tag
+ref.
 
 The current repository can be built and tested locally by contributors, but the
 presence of source code, CI checks, or Tauri configuration is not a release
 artifact.
 
-## Manual Verification Checklist
+## Verification Checklist
 
 Before a release candidate is tagged or published, maintainers should complete
-the following checks from a clean checkout:
+the following checks from a clean checkout. The command-only gates are enforced
+automatically by the manual release packaging workflow preflight before package
+artifacts are built; the platform, data, signing, and release-note checks remain
+manual.
 
 - [ ] Confirm the repository contains no local machine paths, private hostnames,
   secrets, tokens, or real customer data in source, docs, scripts, samples, or
@@ -106,6 +112,12 @@ The workflow produces two artifact groups for each platform:
   `target/release/bundle`;
 - release metadata from `scripts/generate-release-manifest.mjs`, including
   `*-SHA256SUMS.txt`, `*-release-metadata.json`, and `*-sbom.spdx.json`.
+
+The packaging matrix depends on the `preflight` job. That job installs the same
+Ubuntu system dependencies used by CI, runs `npm ci`, checks public release
+guardrails, runs the documented frontend and browser smoke gates, and runs the
+documented Rust formatting, lint, check, and test gates. A failing preflight
+blocks all package jobs before any release artifacts are generated.
 
 The manifest script is also locally runnable for validation:
 
