@@ -5,9 +5,9 @@
 //! It only publishes deterministic local catalog/status metadata for future
 //! runtime work.
 
-use std::{fmt, net::IpAddr};
+use std::{fmt, fs, io, net::IpAddr, path::Path};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// CLI flag that prints the offline tool catalog as deterministic JSON.
 pub const PRINT_TOOL_CATALOG_FLAG: &str = "--print-tool-catalog";
@@ -15,6 +15,8 @@ pub const PRINT_TOOL_CATALOG_FLAG: &str = "--print-tool-catalog";
 pub const LIST_TOOLS_FLAG: &str = "--list-tools";
 /// CLI flag that prints the disabled runtime guard status as deterministic JSON.
 pub const PRINT_RUNTIME_STATUS_FLAG: &str = "--print-runtime-status";
+/// CLI flag that prints runtime guard status after loading JSON config metadata.
+pub const PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG: &str = "--print-runtime-status-from-config";
 
 /// Honest default status for running the placeholder binary without a catalog flag.
 pub const DEFAULT_STATUS_MESSAGE: &str = "900CRM MCP server/runtime is not implemented. This binary does not start a server, listener, tools, prompts, resources, network binding, token handling, or model integration. Use --print-tool-catalog to print the offline SDK-backed read-only catalog or --print-runtime-status to print the disabled runtime guard status.";
@@ -25,7 +27,7 @@ pub const RUNTIME_DISABLED_REASON: &str = "runtime disabled";
 pub const RUNTIME_SERVER_NOT_IMPLEMENTED_REASON: &str = "server not implemented";
 
 /// Disabled-by-default runtime guard configuration for future MCP work.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct McpRuntimeConfig {
     /// Whether a future runtime would be allowed to start.
     pub enabled: bool,
@@ -95,6 +97,103 @@ impl fmt::Display for McpRuntimeConfigError {
 
 impl std::error::Error for McpRuntimeConfigError {}
 
+/// File loading, JSON parsing, and validation failures for MCP runtime config metadata.
+#[derive(Debug)]
+pub enum McpRuntimeConfigLoadError {
+    /// Config file could not be read.
+    Read { path: String, source: io::Error },
+    /// Config file did not contain valid JSON for `McpRuntimeConfig`.
+    Parse {
+        path: String,
+        source: serde_json::Error,
+    },
+    /// Config file parsed but failed runtime guard validation.
+    Validation {
+        path: String,
+        source: McpRuntimeConfigError,
+    },
+}
+
+impl fmt::Display for McpRuntimeConfigLoadError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Read { path, source } => {
+                write!(
+                    formatter,
+                    "failed to read MCP runtime config '{path}': {source}"
+                )
+            }
+            Self::Parse { path, source } => {
+                write!(
+                    formatter,
+                    "failed to parse MCP runtime config JSON '{path}': {source}"
+                )
+            }
+            Self::Validation { path, source } => {
+                write!(formatter, "invalid MCP runtime config '{path}': {source}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for McpRuntimeConfigLoadError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Read { source, .. } => Some(source),
+            Self::Parse { source, .. } => Some(source),
+            Self::Validation { source, .. } => Some(source),
+        }
+    }
+}
+
+/// Reads, parses, and validates JSON runtime config metadata from a required path.
+///
+/// This is a config/status helper only. It does not start a server, bind
+/// sockets, execute tools, call the SDK, issue tokens, or access the network.
+pub fn load_runtime_config_from_path(
+    path: impl AsRef<Path>,
+) -> Result<McpRuntimeConfig, McpRuntimeConfigLoadError> {
+    let path = path.as_ref();
+    let display_path = path.display().to_string();
+    let raw = fs::read_to_string(path).map_err(|source| McpRuntimeConfigLoadError::Read {
+        path: display_path.clone(),
+        source,
+    })?;
+    let config: McpRuntimeConfig =
+        serde_json::from_str(&raw).map_err(|source| McpRuntimeConfigLoadError::Parse {
+            path: display_path.clone(),
+            source,
+        })?;
+
+    config
+        .validate()
+        .map_err(|source| McpRuntimeConfigLoadError::Validation {
+            path: display_path,
+            source,
+        })?;
+
+    Ok(config)
+}
+
+/// Loads runtime config metadata from JSON, falling back to disabled defaults if absent.
+///
+/// A missing file is treated as an optional config not being present. Other
+/// read errors, invalid JSON, and validation failures are returned explicitly.
+pub fn load_runtime_config_from_optional_path(
+    path: impl AsRef<Path>,
+) -> Result<McpRuntimeConfig, McpRuntimeConfigLoadError> {
+    let path = path.as_ref();
+    match load_runtime_config_from_path(path) {
+        Ok(config) => Ok(config),
+        Err(McpRuntimeConfigLoadError::Read { source, .. })
+            if source.kind() == io::ErrorKind::NotFound =>
+        {
+            Ok(McpRuntimeConfig::default())
+        }
+        Err(error) => Err(error),
+    }
+}
+
 /// Explicit non-serving runtime status for the guard configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct McpRuntimeStatus {
@@ -144,6 +243,11 @@ pub fn default_runtime_status() -> McpRuntimeStatus {
 /// Serializes the default runtime guard status as deterministic pretty JSON.
 pub fn default_runtime_status_json() -> Result<String, serde_json::Error> {
     serde_json::to_string_pretty(&default_runtime_status())
+}
+
+/// Serializes runtime guard status for a config as deterministic pretty JSON.
+pub fn runtime_status_json(config: &McpRuntimeConfig) -> Result<String, serde_json::Error> {
+    serde_json::to_string_pretty(&runtime_status(config))
 }
 
 fn is_loopback_bind_host(bind_host: &str) -> bool {
@@ -197,21 +301,30 @@ pub fn read_only_tool_catalog_json() -> Result<String, serde_json::Error> {
 /// Returns the CLI help text without implying an implemented MCP runtime.
 pub fn help_message(program_name: &str) -> String {
     format!(
-        "Usage: {program_name} [{PRINT_TOOL_CATALOG_FLAG}|{LIST_TOOLS_FLAG}|{PRINT_RUNTIME_STATUS_FLAG}]\n\n\
+        "Usage: {program_name} [{PRINT_TOOL_CATALOG_FLAG}|{LIST_TOOLS_FLAG}|{PRINT_RUNTIME_STATUS_FLAG}|{PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path>]\n\n\
 Default: print the current MCP readiness status. No server, listener, tool execution, prompt/resource serving, token handling, or network binding is implemented.\n\
 {PRINT_TOOL_CATALOG_FLAG}, {LIST_TOOLS_FLAG}: print the offline SDK-backed read-only tool catalog as JSON.\n\
-{PRINT_RUNTIME_STATUS_FLAG}: print the disabled runtime guard status as JSON."
+{PRINT_RUNTIME_STATUS_FLAG}: print the disabled runtime guard status as JSON.\n\
+{PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path>: load JSON config metadata from an optional path and print non-serving runtime guard status as JSON."
     )
 }
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
     use serde_json::Value;
 
     use super::{
-        default_runtime_status, default_runtime_status_json, read_only_tool_catalog,
-        read_only_tool_catalog_json, runtime_status, McpRuntimeConfig, McpRuntimeConfigError,
-        DEFAULT_STATUS_MESSAGE, PRINT_RUNTIME_STATUS_FLAG, PRINT_TOOL_CATALOG_FLAG,
+        default_runtime_status, default_runtime_status_json,
+        load_runtime_config_from_optional_path, read_only_tool_catalog,
+        read_only_tool_catalog_json, runtime_status, runtime_status_json, McpRuntimeConfig,
+        McpRuntimeConfigError, McpRuntimeConfigLoadError, DEFAULT_STATUS_MESSAGE,
+        PRINT_RUNTIME_STATUS_FLAG, PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG, PRINT_TOOL_CATALOG_FLAG,
         RUNTIME_DISABLED_REASON, RUNTIME_SERVER_NOT_IMPLEMENTED_REASON,
     };
 
@@ -253,6 +366,7 @@ mod tests {
         assert!(DEFAULT_STATUS_MESSAGE.contains("does not start a server"));
         assert!(DEFAULT_STATUS_MESSAGE.contains(PRINT_TOOL_CATALOG_FLAG));
         assert!(DEFAULT_STATUS_MESSAGE.contains(PRINT_RUNTIME_STATUS_FLAG));
+        assert!(!DEFAULT_STATUS_MESSAGE.contains(PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG));
         assert!(!DEFAULT_STATUS_MESSAGE.contains("server is running"));
         assert!(!DEFAULT_STATUS_MESSAGE.contains("listening"));
     }
@@ -267,6 +381,110 @@ mod tests {
         config
             .validate()
             .expect("default disabled runtime config should validate");
+    }
+
+    #[test]
+    fn missing_optional_runtime_config_path_uses_disabled_default() {
+        let path = temp_config_path("missing");
+        let config = load_runtime_config_from_optional_path(&path)
+            .expect("missing optional runtime config should use default");
+
+        assert_eq!(config, McpRuntimeConfig::default());
+    }
+
+    #[test]
+    fn valid_disabled_runtime_config_json_parses_and_reports_disabled_status() {
+        let path = write_temp_config(
+            "disabled",
+            r#"{
+  "enabled": false,
+  "bind_host": "127.0.0.1",
+  "bind_port": 0
+}"#,
+        );
+        let config = load_runtime_config_from_optional_path(&path)
+            .expect("disabled runtime config should parse");
+        let status = runtime_status(&config);
+
+        assert_eq!(
+            config,
+            McpRuntimeConfig {
+                enabled: false,
+                bind_host: "127.0.0.1".to_string(),
+                bind_port: 0,
+            }
+        );
+        assert!(!status.serving);
+        assert!(!status.tool_execution_enabled);
+        assert_eq!(status.reason, RUNTIME_DISABLED_REASON);
+        fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn valid_enabled_loopback_runtime_config_reports_server_not_implemented() {
+        let path = write_temp_config(
+            "enabled-loopback",
+            r#"{
+  "enabled": true,
+  "bind_host": "localhost",
+  "bind_port": 3987
+}"#,
+        );
+        let config = load_runtime_config_from_optional_path(&path)
+            .expect("enabled loopback runtime config should parse");
+        let status_json =
+            runtime_status_json(&config).expect("runtime status JSON should serialize");
+
+        assert!(config.enabled);
+        assert_eq!(config.bind_host, "localhost");
+        assert_eq!(config.bind_port, 3987);
+        assert_eq!(
+            status_json,
+            r#"{
+  "enabled": true,
+  "bind_host": "localhost",
+  "bind_port": 3987,
+  "serving": false,
+  "tool_execution_enabled": false,
+  "reason": "server not implemented"
+}"#
+        );
+        fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn enabled_non_loopback_runtime_config_json_is_rejected() {
+        let path = write_temp_config(
+            "non-loopback",
+            r#"{
+  "enabled": true,
+  "bind_host": "0.0.0.0",
+  "bind_port": 3987
+}"#,
+        );
+        let error = load_runtime_config_from_optional_path(&path)
+            .expect_err("enabled non-loopback runtime config should fail validation");
+
+        assert!(matches!(
+            error,
+            McpRuntimeConfigLoadError::Validation {
+                source: McpRuntimeConfigError::NonLoopbackBindHostWhenEnabled { .. },
+                ..
+            }
+        ));
+        assert!(error.to_string().contains("non-loopback"));
+        fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn invalid_runtime_config_json_is_rejected() {
+        let path = write_temp_config("invalid-json", r#"{ "enabled": true, "#);
+        let error = load_runtime_config_from_optional_path(&path)
+            .expect_err("invalid runtime config JSON should fail parsing");
+
+        assert!(matches!(error, McpRuntimeConfigLoadError::Parse { .. }));
+        assert!(error.to_string().contains("failed to parse"));
+        fs::remove_file(path).ok();
     }
 
     #[test]
@@ -391,5 +609,22 @@ mod tests {
   "reason": "{RUNTIME_DISABLED_REASON}"
 }}"#
         )
+    }
+
+    fn write_temp_config(name: &str, contents: &str) -> PathBuf {
+        let path = temp_config_path(name);
+        fs::write(&path, contents).expect("temp runtime config should be writable");
+        path
+    }
+
+    fn temp_config_path(name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "crm-mcp-runtime-config-{name}-{}-{unique}.json",
+            std::process::id()
+        ))
     }
 }
