@@ -39,6 +39,7 @@ the following checks from a clean checkout:
   secrets, tokens, or real customer data in source, docs, scripts, samples, or
   packaged assets.
 - [ ] Run `npm ci`.
+- [ ] Run `npm run check:release-guardrails`.
 - [ ] Run `npm run lint`.
 - [ ] Run `npm run check`.
 - [ ] Run `npm run test`.
@@ -57,6 +58,21 @@ the following checks from a clean checkout:
 - [ ] Confirm the privacy, import/export, backup/restore, MCP readiness, README,
   and changelog docs still describe only implemented behavior.
 - [ ] Confirm the release notes list known gaps and deferred systems clearly.
+
+
+### Public Release Guardrail Scan
+
+`npm run check:release-guardrails` runs a deterministic scan over tracked
+repository text files. It catches high-confidence local-machine path leaks,
+private/internal host URLs, and literal credential patterns before a release or
+PR is accepted. The scan intentionally does not treat ordinary variable names
+such as `token`, placeholder values, empty passwords, or generic `/tmp/...` test
+paths as release blockers.
+
+This automated check is a guardrail, not a substitute for manual review.
+Maintainers must still confirm that samples, screenshots, docs, and packaged
+assets do not contain real customer data or other sensitive material that a
+pattern scan cannot reliably identify.
 
 ## Release Artifacts and Metadata
 

@@ -30,4 +30,5 @@ Use this lightweight checklist for every sprint, PR, and release review.
 
 - [ ] Work was done on a dedicated sprint branch.
 - [ ] Validation commands and known blockers are documented in sprint notes.
+- [ ] `npm run check:release-guardrails` passed or a scoped exception was documented.
 - [ ] PR includes this checklist with explicit confirmations or exceptions.
