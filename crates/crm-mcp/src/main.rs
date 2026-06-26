@@ -1,3 +1,28 @@
+use crm_mcp::{
+    help_message, read_only_tool_catalog_json, DEFAULT_STATUS_MESSAGE, LIST_TOOLS_FLAG,
+    PRINT_TOOL_CATALOG_FLAG,
+};
+
 fn main() {
-    println!("900CRM MCP server placeholder: not implemented in foundation-realignment.");
+    let mut args = std::env::args();
+    let program_name = args.next().unwrap_or_else(|| "crm-mcp".to_string());
+    let args: Vec<String> = args.collect();
+
+    match args.as_slice() {
+        [] => println!("{DEFAULT_STATUS_MESSAGE}"),
+        [flag] if flag == PRINT_TOOL_CATALOG_FLAG || flag == LIST_TOOLS_FLAG => {
+            let catalog_json =
+                read_only_tool_catalog_json().expect("offline MCP catalog should serialize");
+            println!("{catalog_json}");
+        }
+        [flag] if flag == "--help" || flag == "-h" => {
+            println!("{}", help_message(&program_name));
+        }
+        _ => {
+            eprintln!(
+                "Unsupported crm-mcp arguments. Use {PRINT_TOOL_CATALOG_FLAG} or {LIST_TOOLS_FLAG} to print the offline SDK-backed read-only catalog. MCP server/runtime startup is not implemented."
+            );
+            std::process::exit(2);
+        }
+    }
 }
