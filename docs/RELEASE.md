@@ -24,9 +24,10 @@ before any platform packaging starts:
 Manual release packaging now lives in
 [`.github/workflows/release.yml`](../.github/workflows/release.yml). It must be
 started with `workflow_dispatch`, runs the preflight gate, then builds Windows,
-macOS, and Linux Tauri bundles, uploads workflow artifacts, and generates
-per-platform SHA-256 checksums, release metadata, and an SPDX-shaped dependency
-inventory. The workflow does not publish a GitHub Release unless
+macOS, and Linux Tauri bundles, uploads workflow artifacts, generates
+repo-owned release notes, and generates per-platform SHA-256 checksums, release
+metadata, and an SPDX-shaped dependency inventory. The workflow does not
+publish a GitHub Release unless
 `publish_github_release` is explicitly enabled for a matching `v`-prefixed tag
 ref.
 
@@ -46,6 +47,7 @@ manual.
   secrets, tokens, or real customer data in source, docs, scripts, samples, or
   packaged assets.
 - [ ] Run `npm ci`.
+- [ ] Run `npm run release:notes:sample`.
 - [ ] Run `npm run release:manifest:sample`.
 - [ ] Run `npm run check:release-guardrails`.
 - [ ] Run `npm run lint`.
@@ -112,19 +114,23 @@ The workflow produces two artifact groups for each platform:
 
 - desktop packages built by Tauri under
   `target/release/bundle`;
+- release notes from `scripts/generate-release-notes.mjs`, written to
+  `release-notes.md` for guarded GitHub Release creation;
 - release metadata from `scripts/generate-release-manifest.mjs`, including
   `*-SHA256SUMS.txt`, `*-release-metadata.json`, and `*-sbom.spdx.json`.
 
 The packaging matrix depends on the `preflight` job. That job installs the same
 Ubuntu system dependencies used by CI, runs `npm ci`, generates the sample
-release manifest, checks public release guardrails, runs the documented
-frontend and browser smoke gates, and runs the documented Rust formatting,
-lint, check, and test gates. A failing preflight blocks all package jobs before
-any release artifacts are generated.
+release notes and sample release manifest, checks public release guardrails,
+runs the documented frontend and browser smoke gates, and runs the documented
+Rust formatting, lint, check, and test gates. A failing preflight blocks all
+package jobs before any release artifacts are generated.
 
-The manifest script is also locally runnable for validation:
+The release-note and manifest scripts are also locally runnable for validation:
 
 ```bash
+npm run release:notes:sample
+node scripts/generate-release-notes.mjs --help
 npm run release:manifest:sample
 node scripts/generate-release-manifest.mjs --help
 ```
