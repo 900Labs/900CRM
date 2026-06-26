@@ -14,8 +14,9 @@ separate. Manual release packaging now has an automated Ubuntu preflight gate
 before any platform packaging starts:
 
 - it runs on `ubuntu-latest`;
-- it verifies the public-release guardrail scan, frontend linting, type checks,
-  unit tests, production build, and browser smoke tests;
+- it verifies sample release manifest generation, the public-release guardrail
+  scan, frontend linting, type checks, unit tests, production build, and browser
+  smoke tests;
 - it verifies Rust formatting, Clippy, workspace checks, and workspace tests;
 - package generation does not start unless that preflight passes;
 - normal CI still does not build or publish release installers.
@@ -45,6 +46,7 @@ manual.
   secrets, tokens, or real customer data in source, docs, scripts, samples, or
   packaged assets.
 - [ ] Run `npm ci`.
+- [ ] Run `npm run release:manifest:sample`.
 - [ ] Run `npm run check:release-guardrails`.
 - [ ] Run `npm run lint`.
 - [ ] Run `npm run check`.
@@ -114,16 +116,17 @@ The workflow produces two artifact groups for each platform:
   `*-SHA256SUMS.txt`, `*-release-metadata.json`, and `*-sbom.spdx.json`.
 
 The packaging matrix depends on the `preflight` job. That job installs the same
-Ubuntu system dependencies used by CI, runs `npm ci`, checks public release
-guardrails, runs the documented frontend and browser smoke gates, and runs the
-documented Rust formatting, lint, check, and test gates. A failing preflight
-blocks all package jobs before any release artifacts are generated.
+Ubuntu system dependencies used by CI, runs `npm ci`, generates the sample
+release manifest, checks public release guardrails, runs the documented
+frontend and browser smoke gates, and runs the documented Rust formatting,
+lint, check, and test gates. A failing preflight blocks all package jobs before
+any release artifacts are generated.
 
 The manifest script is also locally runnable for validation:
 
 ```bash
+npm run release:manifest:sample
 node scripts/generate-release-manifest.mjs --help
-node scripts/generate-release-manifest.mjs --sample --out-dir /tmp/900crm-release-sample --platform local
 ```
 
 If real release artifacts are not present and `--sample` is not used, the script

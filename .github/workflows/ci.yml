@@ -49,6 +49,9 @@ jobs:
       - name: Install Node.js dependencies
         run: npm ci
 
+      - name: Generate sample release manifest
+        run: npm run release:manifest:sample
+
       - name: Lint frontend tooling
         run: npm run lint
 
