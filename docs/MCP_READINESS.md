@@ -9,7 +9,8 @@ This document records the current Model Context Protocol (MCP) readiness state f
 - 900CRM core has no built-in AI agent.
 - Normal desktop and `crm-core` operation do not require internet access, cloud services, or model providers.
 - MCP is intended to be a separate optional package boundary, not a required desktop/core dependency.
-- `crates/crm-mcp` currently contains only a placeholder binary and is not an implemented MCP server.
+- `crates/crm-mcp` contains an offline SDK-backed read-only tool catalog CLI
+  and is not an implemented MCP server.
 - `crates/crm-sdk` now provides a narrow local read-only facade over
   `crm-core` for reviewed external clients; it is not an MCP runtime.
 - The desktop app and `crm-core` do not start an MCP server, bind a localhost listener, expose prompts/resources/tools, or manage MCP tokens/secrets.
@@ -20,6 +21,10 @@ Future MCP tools must call the read-only `crm-sdk` facade or explicit
 `crm-core` service APIs. They must not read or write the SQLite database
 directly, and they must not bypass the existing storage, validation, audit,
 sync-log, and proposed-action boundaries.
+
+The current `crm-mcp` catalog is metadata only. It is useful for reviewing the
+initial tool boundary, but it does not serve tools, execute SDK methods, accept
+client requests, or enable an MCP runtime.
 
 The intended call path is:
 
@@ -43,6 +48,11 @@ The following data and API surfaces exist today:
 - `crates/crm-sdk` read-only SDK facade with exported initial tool constants
   for `contacts.list`, `organizations.list`, `deals.list`,
   `activities.list`, and `search.global`.
+- `crates/crm-mcp` offline catalog generation for those initial SDK read tool
+  constants. `cargo run -p crm-mcp -- --print-tool-catalog` and the
+  `--list-tools` alias print deterministic JSON entries with `name`,
+  `access_kind: "read"`, `requires_external_client_permission: true`,
+  `sdk_backed: true`, and `runtime_enabled: false`.
 - SDK read methods for contacts, organizations, deals, activities, and global
   search. Each method calls
   `CrmCore::evaluate_external_client_tool_read_permission(client_id,
@@ -138,6 +148,7 @@ The current codebase intentionally does not include:
 - MCP authentication tokens, client secrets, or credential storage.
 - Prompt, resource, or tool implementations.
 - MCP runtime bindings to the SDK facade.
+- Tool-serving behavior behind the offline catalog.
 - Model-provider integrations.
 - Internet or cloud requirements.
 - Raw SQL access for MCP clients.
@@ -167,6 +178,9 @@ Future MCP implementation work must include these gates before acceptance:
 A future MCP implementation should not be accepted until all of the following are true:
 
 - [ ] `crates/crm-mcp` is implemented as an optional package and is not required for normal desktop/core operation.
+- [x] `crates/crm-mcp` has an offline SDK-backed read-only catalog for the
+      initial reviewed tool names, with all entries marked
+      `runtime_enabled: false`.
 - [ ] No MCP server starts unless the user explicitly enables it.
 - [ ] The default listener is localhost-only.
 - [ ] No cloud, internet, or model-provider dependency is required for core CRM use.
