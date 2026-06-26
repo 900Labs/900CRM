@@ -14,6 +14,7 @@ Reference: `docs/OPEN_SOURCE_GUARDRAIL_CHECKLIST.md`
 - [ ] Data/query path impact reviewed (indexes/bounds where needed).
 - [ ] License compatibility of added dependencies reviewed.
 - [ ] Changelog + sprint docs updated chronologically with UTC date.
+- [ ] Public release guardrail scan run or scope exception documented.
 
 ## Risks / Follow-ups
 - 

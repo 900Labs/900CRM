@@ -60,7 +60,7 @@ Scope: Conservative manual release-packaging foundation for release-candidate ar
 
 - [x] `npm run tauri -- build -- --help` verified the extra npm delimiter reaches the Tauri CLI.
 - [x] `CI=true npm run tauri -- build -- --bundles dmg` produced `target/release/bundle/dmg/900CRM_1.0.0_aarch64.dmg`.
-- [x] `node scripts/generate-release-manifest.mjs --artifact-dir target/release/bundle --out-dir /private/tmp/900crm-s053-actual-release-manifest --platform macos --release-version 1.0.0 --release-title "900CRM 1.0.0" --release-ref local-probe --release-sha local-probe --generated-at 2026-06-24T00:00:00.000Z` indexed only `dmg/900CRM_1.0.0_aarch64.dmg`.
+- [x] `node scripts/generate-release-manifest.mjs --artifact-dir target/release/bundle --out-dir release-assets/s053-actual-release-manifest --platform macos --release-version 1.0.0 --release-title "900CRM 1.0.0" --release-ref local-probe --release-sha local-probe --generated-at 2026-06-24T00:00:00.000Z` indexed only `dmg/900CRM_1.0.0_aarch64.dmg`.
 - [x] `npm run lint`
 - [x] `npm run check`
 - [x] `npm run test`
