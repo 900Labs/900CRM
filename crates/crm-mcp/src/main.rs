@@ -1,8 +1,9 @@
 use crm_mcp::{
     default_runtime_status_json, handle_jsonrpc_once, help_message,
-    load_runtime_config_from_optional_path, read_only_tool_catalog_json, runtime_status_json,
-    DEFAULT_STATUS_MESSAGE, HANDLE_JSONRPC_ONCE_FLAG, LIST_TOOLS_FLAG, PRINT_RUNTIME_STATUS_FLAG,
-    PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG, PRINT_TOOL_CATALOG_FLAG,
+    load_runtime_config_from_optional_path, read_only_tool_catalog_json, run_stdio_loop,
+    runtime_status_json, DEFAULT_STATUS_MESSAGE, HANDLE_JSONRPC_ONCE_FLAG, LIST_TOOLS_FLAG,
+    PRINT_RUNTIME_STATUS_FLAG, PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG, PRINT_TOOL_CATALOG_FLAG,
+    SERVE_STDIO_FROM_CONFIG_FLAG,
 };
 
 fn main() {
@@ -41,12 +42,27 @@ fn main() {
                 println!("{response_json}");
             }
         }
+        [flag, path] if flag == SERVE_STDIO_FROM_CONFIG_FLAG => {
+            let config = match load_runtime_config_from_optional_path(path) {
+                Ok(config) => config,
+                Err(error) => {
+                    eprintln!("{error}");
+                    std::process::exit(2);
+                }
+            };
+            let stdin = std::io::stdin();
+            let stdout = std::io::stdout();
+            if let Err(error) = run_stdio_loop(&config, stdin.lock(), stdout.lock()) {
+                eprintln!("{error}");
+                std::process::exit(2);
+            }
+        }
         [flag] if flag == "--help" || flag == "-h" => {
             println!("{}", help_message(&program_name));
         }
         _ => {
             eprintln!(
-                "Unsupported crm-mcp arguments. Use {PRINT_TOOL_CATALOG_FLAG} or {LIST_TOOLS_FLAG} to print the offline SDK-backed read-only catalog, {PRINT_RUNTIME_STATUS_FLAG} to print the disabled runtime guard status, {PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path> to load JSON config metadata and print non-serving runtime guard status, or {HANDLE_JSONRPC_ONCE_FLAG} <json> to handle one metadata-only JSON-RPC request. MCP server/runtime startup is not implemented."
+                "Unsupported crm-mcp arguments. Use {PRINT_TOOL_CATALOG_FLAG} or {LIST_TOOLS_FLAG} to print the offline SDK-backed read-only catalog, {PRINT_RUNTIME_STATUS_FLAG} to print the disabled runtime guard status, {PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path> to load JSON config metadata and print non-serving runtime guard status, {HANDLE_JSONRPC_ONCE_FLAG} <json> to handle one metadata-only JSON-RPC request, or {SERVE_STDIO_FROM_CONFIG_FLAG} <path> to attempt the disabled-by-default local stdio metadata loop. MCP server/runtime startup is not implemented."
             );
             std::process::exit(2);
         }

@@ -1,11 +1,14 @@
 use std::{
     fs,
+    io::Write,
     path::Path,
-    process::Command,
+    process::{Command, Stdio},
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crm_mcp::{HANDLE_JSONRPC_ONCE_FLAG, PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG};
+use crm_mcp::{
+    HANDLE_JSONRPC_ONCE_FLAG, PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG, SERVE_STDIO_FROM_CONFIG_FLAG,
+};
 use crm_sdk::INITIAL_READ_TOOL_NAMES;
 use serde_json::Value;
 
@@ -22,6 +25,20 @@ fn default_cli_output_does_not_imply_running_server() {
     assert!(stdout.contains("--print-runtime-status"));
     assert!(!stdout.contains("server is running"));
     assert!(!stdout.contains("listening"));
+}
+
+#[test]
+fn default_cli_does_not_start_stdio_loop() {
+    let output = Command::new(env!("CARGO_BIN_EXE_crm-mcp"))
+        .stdin(Stdio::piped())
+        .output()
+        .expect("crm-mcp should run");
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    assert!(stdout.contains("not implemented"));
+    assert!(!stdout.trim_end().ends_with(r#""jsonrpc":"2.0"}"#));
 }
 
 #[test]
@@ -135,6 +152,86 @@ fn print_runtime_status_from_config_cli_exits_nonzero_for_non_loopback_enabled_c
     assert!(!output.status.success());
     let stderr = String::from_utf8(output.stderr).expect("stderr should be UTF-8");
     assert!(stderr.contains("non-loopback"));
+    fs::remove_file(path).ok();
+}
+
+#[test]
+fn serve_stdio_from_config_cli_exits_nonzero_for_disabled_config_without_output() {
+    let path = write_temp_config(
+        "cli-stdio-disabled",
+        r#"{
+  "enabled": false,
+  "bind_host": "127.0.0.1",
+  "bind_port": 0
+}"#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_crm-mcp"))
+        .arg(SERVE_STDIO_FROM_CONFIG_FLAG)
+        .arg(&path)
+        .output()
+        .expect("crm-mcp should run");
+
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).expect("stderr should be UTF-8");
+    assert!(stderr.contains("MCP stdio loop is disabled by config"));
+    fs::remove_file(path).ok();
+}
+
+#[test]
+fn serve_stdio_from_config_cli_processes_piped_loopback_metadata() {
+    let path = write_temp_config(
+        "cli-stdio-enabled-loopback",
+        r#"{
+  "enabled": true,
+  "bind_host": "127.0.0.1",
+  "bind_port": 3987
+}"#,
+    );
+    let mut child = Command::new(env!("CARGO_BIN_EXE_crm-mcp"))
+        .arg(SERVE_STDIO_FROM_CONFIG_FLAG)
+        .arg(&path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("crm-mcp should spawn");
+
+    {
+        let stdin = child.stdin.as_mut().expect("child stdin should be piped");
+        stdin
+            .write_all(
+                concat!(
+                    r#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#,
+                    "\n",
+                    r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
+                    "\n",
+                    r#"{"jsonrpc":"2.0","id":"tools","method":"tools/list"}"#,
+                    "\n",
+                )
+                .as_bytes(),
+            )
+            .expect("stdin write should succeed");
+    }
+    drop(child.stdin.take());
+
+    let output = child
+        .wait_with_output()
+        .expect("crm-mcp should finish after stdin closes");
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines.len(), 2);
+    assert_eq!(
+        serde_json::from_str::<Value>(lines[0]).expect("initialize should parse")["id"],
+        1
+    );
+    assert_eq!(
+        serde_json::from_str::<Value>(lines[1]).expect("tools/list should parse")["id"],
+        "tools"
+    );
     fs::remove_file(path).ok();
 }
 
