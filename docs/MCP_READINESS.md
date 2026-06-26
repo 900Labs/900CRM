@@ -65,6 +65,16 @@ The following data and API surfaces exist today:
   `runtime disabled` for the default config. This does not start a server,
   create a listener, execute tools, call the SDK, issue tokens, or bind a
   network socket.
+- `crates/crm-mcp` can load optional JSON runtime config metadata from a file
+  and print deterministic non-serving status with
+  `cargo run -p crm-mcp -- --print-runtime-status-from-config <path>`.
+  Missing optional config paths use the disabled default. Invalid JSON and
+  enabled non-loopback hosts are rejected. If a config sets
+  `enabled: true` on a loopback host, status still reports `serving: false`,
+  `tool_execution_enabled: false`, and reason `server not implemented`.
+  Config files are readiness metadata only; loading them does not start a
+  server, create a listener, execute tools, call the SDK, issue tokens, perform
+  authentication, or access the network.
 - SDK read methods for contacts, organizations, deals, activities, and global
   search. Each method calls
   `CrmCore::evaluate_external_client_tool_read_permission(client_id,
@@ -161,6 +171,7 @@ The current codebase intentionally does not include:
 - Prompt, resource, or tool implementations.
 - MCP runtime bindings to the SDK facade.
 - MCP runtime serving behind the runtime guard/config/status metadata.
+- MCP runtime serving behind the JSON config-file metadata.
 - Tool-serving behavior behind the offline catalog.
 - Model-provider integrations.
 - Internet or cloud requirements.
