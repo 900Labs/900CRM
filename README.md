@@ -337,7 +337,7 @@ Current implementation baselines are documented in [Data Model](docs/DATA_MODEL.
 │   │       ├── search/           # Search support
 │   │       └── import_export/    # CSV import/export support
 │   ├── crm-mcp/                  # MCP integration placeholder; not implemented
-│   └── crm-sdk/                  # SDK placeholder
+│   └── crm-sdk/                  # Read-only local SDK facade
 ├── scripts/                      # Root verification and release metadata helpers
 ├── plugins/                      # Community plugin directory
 │   └── README.md                 # Plugin development guide

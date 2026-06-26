@@ -10,20 +10,28 @@ This document records the current Model Context Protocol (MCP) readiness state f
 - Normal desktop and `crm-core` operation do not require internet access, cloud services, or model providers.
 - MCP is intended to be a separate optional package boundary, not a required desktop/core dependency.
 - `crates/crm-mcp` currently contains only a placeholder binary and is not an implemented MCP server.
+- `crates/crm-sdk` now provides a narrow local read-only facade over
+  `crm-core` for reviewed external clients; it is not an MCP runtime.
 - The desktop app and `crm-core` do not start an MCP server, bind a localhost listener, expose prompts/resources/tools, or manage MCP tokens/secrets.
 
 ## Architecture Boundary
 
-Future MCP tools must call `crm-core` service APIs. They must not read or write the SQLite database directly, and they must not bypass the existing storage, validation, audit, sync-log, and proposed-action boundaries.
+Future MCP tools must call the read-only `crm-sdk` facade or explicit
+`crm-core` service APIs. They must not read or write the SQLite database
+directly, and they must not bypass the existing storage, validation, audit,
+sync-log, and proposed-action boundaries.
 
 The intended call path is:
 
 1. Optional MCP package receives a local client request.
 2. MCP package validates the client, requested tool, and configured mode.
-3. MCP package calls explicit `crm-core` services.
-4. `crm-core` applies normal domain validation and records audit evidence.
-5. Write-like external-client requests create proposed actions for user review unless a narrow reviewed execution path explicitly supports the action.
-6. The current reviewed execution path is limited to core approval of `create_activity_draft` proposed actions; it does not add an MCP runtime.
+3. MCP package calls the `crm-sdk` read-only facade for supported reads, or
+   explicit `crm-core` services for future reviewed flows.
+4. `crm-sdk` requires `crm-core` external-client read permission for each tool
+   before dispatching to existing `crm-core` services.
+5. `crm-core` applies normal domain validation and records audit evidence.
+6. Write-like external-client requests create proposed actions for user review unless a narrow reviewed execution path explicitly supports the action.
+7. The current reviewed execution path is limited to core approval of `create_activity_draft` proposed actions; it does not add an MCP runtime.
 
 ## Active Readiness Surfaces
 
@@ -32,6 +40,13 @@ The following data and API surfaces exist today:
 - External client records with `name`, `client_type`, `enabled`, and `permission_mode`.
 - External client permission rows keyed by `(client_id, tool_name)`.
 - Permission evaluation for the initial modes `disabled`, `read_only`, and `draft_only`.
+- `crates/crm-sdk` read-only SDK facade with exported initial tool constants
+  for `contacts.list`, `organizations.list`, `deals.list`,
+  `activities.list`, and `search.global`.
+- SDK read methods for contacts, organizations, deals, activities, and global
+  search. Each method calls
+  `CrmCore::evaluate_external_client_tool_read_permission(client_id,
+  tool_name)` before returning data from existing `crm-core` services.
 - Settings UI local activation review/edit controls for existing external-client
   records using only `disabled`, `read_only`, and `draft_only`.
 - Proposed action rows with pending, approved, rejected, and other schema-reserved lifecycle states.
@@ -122,11 +137,13 @@ The current codebase intentionally does not include:
 - A localhost MCP listener.
 - MCP authentication tokens, client secrets, or credential storage.
 - Prompt, resource, or tool implementations.
+- MCP runtime bindings to the SDK facade.
 - Model-provider integrations.
 - Internet or cloud requirements.
 - Raw SQL access for MCP clients.
 - File-system or shell tools.
 - Token/secret UI, listener UI, or MCP runtime UI.
+- SDK write methods or SDK proposed-action creation.
 - General direct execution of approved proposed actions beyond the supported
   `create_activity_draft` core path.
 
@@ -154,6 +171,8 @@ A future MCP implementation should not be accepted until all of the following ar
 - [ ] The default listener is localhost-only.
 - [ ] No cloud, internet, or model-provider dependency is required for core CRM use.
 - [ ] Every MCP tool calls `crm-core` services instead of direct SQL.
+- [ ] MCP read tools reuse the reviewed `crm-sdk` tool constants and
+      permission-gated read methods where the SDK supports the requested tool.
 - [ ] No raw SQL, shell, process, or arbitrary file tools are exposed.
 - [ ] External client enablement and per-tool permission grants have explicit review UI.
 - [ ] Only `disabled`, `read_only`, and `draft_only` are active unless a future sprint implements broader modes with tests and docs.
