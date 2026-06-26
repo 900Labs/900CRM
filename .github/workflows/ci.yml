@@ -52,6 +52,9 @@ jobs:
       - name: Lint frontend tooling
         run: npm run lint
 
+      - name: Check public release guardrails
+        run: npm run check:release-guardrails
+
       - name: Check frontend types
         run: npm run check
 
