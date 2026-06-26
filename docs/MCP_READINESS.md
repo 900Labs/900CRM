@@ -1,6 +1,7 @@
 # MCP Readiness Baseline
 
 Date: 2026-06-24
+Last updated: 2026-06-26
 
 This document records the current Model Context Protocol (MCP) readiness state for 900CRM. It is a baseline for future implementation work, not a description of active MCP behavior.
 
@@ -10,7 +11,8 @@ This document records the current Model Context Protocol (MCP) readiness state f
 - Normal desktop and `crm-core` operation do not require internet access, cloud services, or model providers.
 - MCP is intended to be a separate optional package boundary, not a required desktop/core dependency.
 - `crates/crm-mcp` contains an offline SDK-backed read-only tool catalog CLI
-  and is not an implemented MCP server.
+  and a disabled-by-default runtime guard/config/status model. It is not an
+  implemented MCP server.
 - `crates/crm-sdk` now provides a narrow local read-only facade over
   `crm-core` for reviewed external clients; it is not an MCP runtime.
 - The desktop app and `crm-core` do not start an MCP server, bind a localhost listener, expose prompts/resources/tools, or manage MCP tokens/secrets.
@@ -22,9 +24,10 @@ Future MCP tools must call the read-only `crm-sdk` facade or explicit
 directly, and they must not bypass the existing storage, validation, audit,
 sync-log, and proposed-action boundaries.
 
-The current `crm-mcp` catalog is metadata only. It is useful for reviewing the
-initial tool boundary, but it does not serve tools, execute SDK methods, accept
-client requests, or enable an MCP runtime.
+The current `crm-mcp` catalog and runtime status are metadata only. They are
+useful for reviewing the initial tool/runtime boundary, but they do not serve
+tools, execute SDK methods, accept client requests, bind sockets, or enable an
+MCP runtime.
 
 The intended call path is:
 
@@ -53,6 +56,15 @@ The following data and API surfaces exist today:
   `--list-tools` alias print deterministic JSON entries with `name`,
   `access_kind: "read"`, `requires_external_client_permission: true`,
   `sdk_backed: true`, and `runtime_enabled: false`.
+- `crates/crm-mcp` runtime guard configuration and status metadata.
+  `McpRuntimeConfig::default()` is disabled and localhost-only
+  (`enabled: false`, `bind_host: "127.0.0.1"`, `bind_port: 0`). Validation
+  rejects enabled runtime configurations that name a non-loopback bind host.
+  `cargo run -p crm-mcp -- --print-runtime-status` prints deterministic JSON
+  with `serving: false`, `tool_execution_enabled: false`, and reason
+  `runtime disabled` for the default config. This does not start a server,
+  create a listener, execute tools, call the SDK, issue tokens, or bind a
+  network socket.
 - SDK read methods for contacts, organizations, deals, activities, and global
   search. Each method calls
   `CrmCore::evaluate_external_client_tool_read_permission(client_id,
@@ -148,6 +160,7 @@ The current codebase intentionally does not include:
 - MCP authentication tokens, client secrets, or credential storage.
 - Prompt, resource, or tool implementations.
 - MCP runtime bindings to the SDK facade.
+- MCP runtime serving behind the runtime guard/config/status metadata.
 - Tool-serving behavior behind the offline catalog.
 - Model-provider integrations.
 - Internet or cloud requirements.
@@ -163,6 +176,8 @@ The current codebase intentionally does not include:
 Future MCP implementation work must include these gates before acceptance:
 
 - Default to localhost-only binding, with no remote network exposure by default.
+- Re-validate localhost-only binding at the point a future listener is
+  implemented; the current guard validates configuration only and does not bind.
 - Require explicit user enablement before any MCP server process or listener starts.
 - Require explicit user review before granting a client access to any tool.
 - Keep tool access behind external client records and per-tool permission rows.
@@ -182,7 +197,10 @@ A future MCP implementation should not be accepted until all of the following ar
       initial reviewed tool names, with all entries marked
       `runtime_enabled: false`.
 - [ ] No MCP server starts unless the user explicitly enables it.
-- [ ] The default listener is localhost-only.
+- [x] `crates/crm-mcp` has a disabled-by-default runtime guard/config/status
+      model with localhost-only default configuration and loopback validation
+      when enabled.
+- [ ] The future implemented listener is localhost-only.
 - [ ] No cloud, internet, or model-provider dependency is required for core CRM use.
 - [ ] Every MCP tool calls `crm-core` services instead of direct SQL.
 - [ ] MCP read tools reuse the reviewed `crm-sdk` tool constants and

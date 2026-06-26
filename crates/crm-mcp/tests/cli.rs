@@ -13,6 +13,7 @@ fn default_cli_output_does_not_imply_running_server() {
     let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
     assert!(stdout.contains("not implemented"));
     assert!(stdout.contains("does not start a server"));
+    assert!(stdout.contains("--print-runtime-status"));
     assert!(!stdout.contains("server is running"));
     assert!(!stdout.contains("listening"));
 }
@@ -34,9 +35,31 @@ fn list_tools_alias_outputs_same_catalog_json() {
     assert_eq!(alias, canonical);
 }
 
+#[test]
+fn print_runtime_status_cli_outputs_parseable_deterministic_json() {
+    let first = run_runtime_status_flag();
+    let second = run_runtime_status_flag();
+
+    assert_eq!(first, second);
+    assert_runtime_status_json(&first);
+}
+
 fn run_catalog_flag(flag: &str) -> String {
     let output = Command::new(env!("CARGO_BIN_EXE_crm-mcp"))
         .arg(flag)
+        .output()
+        .expect("crm-mcp should run");
+
+    assert!(output.status.success());
+    String::from_utf8(output.stdout)
+        .expect("stdout should be UTF-8")
+        .trim_end()
+        .to_string()
+}
+
+fn run_runtime_status_flag() -> String {
+    let output = Command::new(env!("CARGO_BIN_EXE_crm-mcp"))
+        .arg("--print-runtime-status")
         .output()
         .expect("crm-mcp should run");
 
@@ -77,4 +100,40 @@ fn assert_catalog_json(raw: &str) {
             Some(false)
         );
     }
+}
+
+fn assert_runtime_status_json(raw: &str) {
+    let parsed: Value = serde_json::from_str(raw).expect("runtime status JSON should parse");
+    let status = parsed
+        .as_object()
+        .expect("runtime status should be a JSON object");
+
+    assert_eq!(status.get("enabled").and_then(Value::as_bool), Some(false));
+    assert_eq!(
+        status.get("bind_host").and_then(Value::as_str),
+        Some("127.0.0.1")
+    );
+    assert_eq!(status.get("bind_port").and_then(Value::as_u64), Some(0));
+    assert_eq!(status.get("serving").and_then(Value::as_bool), Some(false));
+    assert_eq!(
+        status
+            .get("tool_execution_enabled")
+            .and_then(Value::as_bool),
+        Some(false)
+    );
+    assert_eq!(
+        status.get("reason").and_then(Value::as_str),
+        Some("runtime disabled")
+    );
+    assert_eq!(
+        raw,
+        r#"{
+  "enabled": false,
+  "bind_host": "127.0.0.1",
+  "bind_port": 0,
+  "serving": false,
+  "tool_execution_enabled": false,
+  "reason": "runtime disabled"
+}"#
+    );
 }
