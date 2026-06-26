@@ -10,8 +10,9 @@ This document records the current Model Context Protocol (MCP) readiness state f
 - 900CRM core has no built-in AI agent.
 - Normal desktop and `crm-core` operation do not require internet access, cloud services, or model providers.
 - MCP is intended to be a separate optional package boundary, not a required desktop/core dependency.
-- `crates/crm-mcp` contains an offline SDK-backed read-only tool catalog CLI
-  and a disabled-by-default runtime guard/config/status model. It is not an
+- `crates/crm-mcp` contains an offline SDK-backed read-only tool catalog CLI,
+  a disabled-by-default runtime guard/config/status model, and a local
+  one-shot JSON-RPC probe for metadata-only MCP requests. It is not an
   implemented MCP server.
 - `crates/crm-sdk` now provides a narrow local read-only facade over
   `crm-core` for reviewed external clients; it is not an MCP runtime.
@@ -28,6 +29,12 @@ The current `crm-mcp` catalog and runtime status are metadata only. They are
 useful for reviewing the initial tool/runtime boundary, but they do not serve
 tools, execute SDK methods, accept client requests, bind sockets, or enable an
 MCP runtime.
+
+The current `crm-mcp` JSON-RPC handler is also metadata only. It handles one
+already-provided JSON string at a time for deterministic local tests and
+returns at most one JSON-RPC response. It does not read a stdio loop, listen on
+TCP/HTTP/SSE, authenticate clients, call the SDK, query the database, execute
+tools, or start a server.
 
 The intended call path is:
 
@@ -75,6 +82,19 @@ The following data and API surfaces exist today:
   Config files are readiness metadata only; loading them does not start a
   server, create a listener, execute tools, call the SDK, issue tokens, perform
   authentication, or access the network.
+- `crates/crm-mcp` can handle a single local JSON-RPC message with
+  `cargo run -p crm-mcp -- --handle-jsonrpc-once '<json>'`. The supported
+  metadata-only subset is `initialize`, `tools/list`, and no-response
+  notifications such as `notifications/initialized`. `initialize` reports
+  deterministic server metadata and tools-list capability only. `tools/list`
+  maps the offline catalog to MCP-style tool metadata with read-only input
+  schemas, read-only annotations, and explicit `runtimeEnabled: false` /
+  `executionEnabled: false` readiness metadata. Malformed JSON returns the
+  standard parse error with `id: null`, invalid request shapes return invalid
+  request errors, and unsupported methods return method-not-found errors.
+  `tools/call` is rejected and does not execute anything. This one-shot probe
+  does not start a serving loop, transport, listener, SDK dispatch, database
+  access, authentication, token/secret handling, or tool execution.
 - SDK read methods for contacts, organizations, deals, activities, and global
   search. Each method calls
   `CrmCore::evaluate_external_client_tool_read_permission(client_id,
@@ -172,7 +192,10 @@ The current codebase intentionally does not include:
 - MCP runtime bindings to the SDK facade.
 - MCP runtime serving behind the runtime guard/config/status metadata.
 - MCP runtime serving behind the JSON config-file metadata.
+- MCP serving behind the one-shot JSON-RPC metadata probe.
+- Stdio, TCP, HTTP, SSE, or other transport loops for JSON-RPC handling.
 - Tool-serving behavior behind the offline catalog.
+- Tool execution through `tools/call`.
 - Model-provider integrations.
 - Internet or cloud requirements.
 - Raw SQL access for MCP clients.
@@ -211,6 +234,9 @@ A future MCP implementation should not be accepted until all of the following ar
 - [x] `crates/crm-mcp` has a disabled-by-default runtime guard/config/status
       model with localhost-only default configuration and loopback validation
       when enabled.
+- [x] `crates/crm-mcp` has a metadata-only one-shot JSON-RPC handler for
+      `initialize`, `tools/list`, and notifications, with `tools/call`
+      explicitly rejected and no serving loop or transport.
 - [ ] The future implemented listener is localhost-only.
 - [ ] No cloud, internet, or model-provider dependency is required for core CRM use.
 - [ ] Every MCP tool calls `crm-core` services instead of direct SQL.
