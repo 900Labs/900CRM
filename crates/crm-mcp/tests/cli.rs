@@ -5,7 +5,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crm_mcp::PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG;
+use crm_mcp::{HANDLE_JSONRPC_ONCE_FLAG, PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG};
 use crm_sdk::INITIAL_READ_TOOL_NAMES;
 use serde_json::Value;
 
@@ -138,6 +138,133 @@ fn print_runtime_status_from_config_cli_exits_nonzero_for_non_loopback_enabled_c
     fs::remove_file(path).ok();
 }
 
+#[test]
+fn jsonrpc_initialize_probe_outputs_deterministic_non_runtime_capabilities() {
+    let request =
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"test"}}}"#;
+    let first = run_jsonrpc_probe(request);
+    let second = run_jsonrpc_probe(request);
+
+    assert_eq!(first, second);
+    let parsed: Value = serde_json::from_str(&first).expect("initialize response should parse");
+
+    assert_eq!(parsed["jsonrpc"], "2.0");
+    assert_eq!(parsed["id"], 1);
+    assert_eq!(parsed["result"]["protocolVersion"], "2024-11-05");
+    assert_eq!(parsed["result"]["serverInfo"]["name"], "900crm-mcp");
+    assert_eq!(parsed["result"]["serverInfo"]["status"], "metadata-only");
+    assert_eq!(
+        parsed["result"]["capabilities"]["tools"]["listChanged"],
+        false
+    );
+    assert!(parsed["result"]["capabilities"]["resources"].is_null());
+    assert!(parsed["result"]["capabilities"]["prompts"].is_null());
+    assert!(parsed["result"]["instructions"]
+        .as_str()
+        .expect("instructions should be a string")
+        .contains("No serving loop"));
+    assert!(parsed["result"]["instructions"]
+        .as_str()
+        .expect("instructions should be a string")
+        .contains("tool execution is enabled"));
+}
+
+#[test]
+fn jsonrpc_tools_list_probe_maps_catalog_in_order_with_read_only_schemas() {
+    let raw = run_jsonrpc_probe(r#"{"jsonrpc":"2.0","id":"tools","method":"tools/list"}"#);
+    let parsed: Value = serde_json::from_str(&raw).expect("tools/list response should parse");
+    let tools = parsed["result"]["tools"]
+        .as_array()
+        .expect("tools/list result should include tools array");
+    let names: Vec<&str> = tools
+        .iter()
+        .map(|tool| tool["name"].as_str().expect("tool name should be a string"))
+        .collect();
+
+    assert_eq!(names, INITIAL_READ_TOOL_NAMES);
+
+    for tool in tools {
+        assert!(tool["description"]
+            .as_str()
+            .expect("tool description should be a string")
+            .contains("runtime execution is not enabled"));
+        assert_eq!(tool["inputSchema"]["type"], "object");
+        assert_eq!(tool["inputSchema"]["additionalProperties"], false);
+        assert_eq!(tool["annotations"]["readOnlyHint"], true);
+        assert_eq!(tool["annotations"]["destructiveHint"], false);
+        assert_eq!(tool["annotations"]["openWorldHint"], false);
+        assert_eq!(tool["metadata"]["accessKind"], "read");
+        assert_eq!(tool["metadata"]["runtimeEnabled"], false);
+        assert_eq!(tool["metadata"]["executionEnabled"], false);
+        assert_eq!(
+            tool["metadata"]["readiness"],
+            "metadata-only; runtime execution is not enabled"
+        );
+    }
+}
+
+#[test]
+fn jsonrpc_notification_probe_outputs_no_response() {
+    let output = Command::new(env!("CARGO_BIN_EXE_crm-mcp"))
+        .arg(HANDLE_JSONRPC_ONCE_FLAG)
+        .arg(r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#)
+        .output()
+        .expect("crm-mcp should run");
+
+    assert!(output.status.success());
+    assert!(output.stdout.is_empty());
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn jsonrpc_malformed_json_probe_returns_parse_error_with_null_id() {
+    let raw = run_jsonrpc_probe(r#"{"jsonrpc":"2.0","id":1,"method":"initialize","#);
+    let parsed: Value = serde_json::from_str(&raw).expect("parse error response should parse");
+
+    assert_eq!(parsed["jsonrpc"], "2.0");
+    assert!(parsed["id"].is_null());
+    assert_eq!(parsed["error"]["code"], -32700);
+    assert_eq!(parsed["error"]["message"], "Parse error");
+}
+
+#[test]
+fn jsonrpc_invalid_request_probe_returns_invalid_request_error() {
+    let raw = run_jsonrpc_probe(r#"{"jsonrpc":"2.0","id":2,"params":{}}"#);
+    let parsed: Value = serde_json::from_str(&raw).expect("invalid request response should parse");
+
+    assert_eq!(parsed["jsonrpc"], "2.0");
+    assert_eq!(parsed["id"], 2);
+    assert_eq!(parsed["error"]["code"], -32600);
+    assert_eq!(parsed["error"]["message"], "Invalid Request");
+}
+
+#[test]
+fn jsonrpc_unknown_method_probe_returns_method_not_found_error() {
+    let raw = run_jsonrpc_probe(r#"{"jsonrpc":"2.0","id":3,"method":"resources/list"}"#);
+    let parsed: Value = serde_json::from_str(&raw).expect("unknown method response should parse");
+
+    assert_eq!(parsed["jsonrpc"], "2.0");
+    assert_eq!(parsed["id"], 3);
+    assert_eq!(parsed["error"]["code"], -32601);
+    assert_eq!(parsed["error"]["message"], "Method not found");
+}
+
+#[test]
+fn jsonrpc_tools_call_probe_is_rejected_without_execution() {
+    let raw = run_jsonrpc_probe(
+        r#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"contacts.list","arguments":{}}}"#,
+    );
+    let parsed: Value = serde_json::from_str(&raw).expect("tools/call response should parse");
+
+    assert_eq!(parsed["jsonrpc"], "2.0");
+    assert_eq!(parsed["id"], 4);
+    assert_eq!(parsed["error"]["code"], -32601);
+    assert!(parsed["error"]["message"]
+        .as_str()
+        .expect("error message should be a string")
+        .contains("tools/call execution is not implemented or enabled"));
+}
+
 fn run_catalog_flag(flag: &str) -> String {
     let output = Command::new(env!("CARGO_BIN_EXE_crm-mcp"))
         .arg(flag)
@@ -172,6 +299,21 @@ fn run_runtime_status_from_config(path: &Path) -> String {
         .expect("crm-mcp should run");
 
     assert!(output.status.success());
+    String::from_utf8(output.stdout)
+        .expect("stdout should be UTF-8")
+        .trim_end()
+        .to_string()
+}
+
+fn run_jsonrpc_probe(raw_json: &str) -> String {
+    let output = Command::new(env!("CARGO_BIN_EXE_crm-mcp"))
+        .arg(HANDLE_JSONRPC_ONCE_FLAG)
+        .arg(raw_json)
+        .output()
+        .expect("crm-mcp should run");
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
     String::from_utf8(output.stdout)
         .expect("stdout should be UTF-8")
         .trim_end()

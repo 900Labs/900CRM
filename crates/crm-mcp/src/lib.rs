@@ -17,6 +17,8 @@ pub const LIST_TOOLS_FLAG: &str = "--list-tools";
 pub const PRINT_RUNTIME_STATUS_FLAG: &str = "--print-runtime-status";
 /// CLI flag that prints runtime guard status after loading JSON config metadata.
 pub const PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG: &str = "--print-runtime-status-from-config";
+/// CLI flag that handles one JSON-RPC message and prints at most one response.
+pub const HANDLE_JSONRPC_ONCE_FLAG: &str = "--handle-jsonrpc-once";
 
 /// Honest default status for running the placeholder binary without a catalog flag.
 pub const DEFAULT_STATUS_MESSAGE: &str = "900CRM MCP server/runtime is not implemented. This binary does not start a server, listener, tools, prompts, resources, network binding, token handling, or model integration. Use --print-tool-catalog to print the offline SDK-backed read-only catalog or --print-runtime-status to print the disabled runtime guard status.";
@@ -298,14 +300,200 @@ pub fn read_only_tool_catalog_json() -> Result<String, serde_json::Error> {
     serde_json::to_string_pretty(&read_only_tool_catalog())
 }
 
+/// Handles one metadata-only JSON-RPC/MCP request without starting a runtime.
+///
+/// This one-shot helper does not read from stdio, start a serving loop, bind
+/// sockets, execute tools, call the SDK, authenticate clients, or access data.
+pub fn handle_jsonrpc_once(raw: &str) -> Result<Option<String>, serde_json::Error> {
+    let response = handle_jsonrpc_value(raw);
+    response
+        .map(|value| serde_json::to_string(&value).map(Some))
+        .unwrap_or(Ok(None))
+}
+
+fn handle_jsonrpc_value(raw: &str) -> Option<serde_json::Value> {
+    let parsed: serde_json::Value = match serde_json::from_str(raw) {
+        Ok(value) => value,
+        Err(_) => return Some(jsonrpc_error(None, -32700, "Parse error")),
+    };
+
+    let Some(request) = parsed.as_object() else {
+        return Some(jsonrpc_error(None, -32600, "Invalid Request"));
+    };
+
+    let id = request.get("id").cloned();
+    let is_notification = id.is_none();
+
+    if request.get("jsonrpc").and_then(serde_json::Value::as_str) != Some("2.0") {
+        return Some(jsonrpc_error(id, -32600, "Invalid Request"));
+    }
+
+    let Some(method) = request.get("method").and_then(serde_json::Value::as_str) else {
+        return Some(jsonrpc_error(id, -32600, "Invalid Request"));
+    };
+
+    if is_notification {
+        return None;
+    }
+
+    match method {
+        "initialize" => Some(jsonrpc_success(id, initialize_result())),
+        "tools/list" => Some(jsonrpc_success(id, tools_list_result())),
+        "tools/call" => Some(jsonrpc_error(
+            id,
+            -32601,
+            "Method not found: tools/call execution is not implemented or enabled",
+        )),
+        _ => Some(jsonrpc_error(id, -32601, "Method not found")),
+    }
+}
+
+fn initialize_result() -> serde_json::Value {
+    serde_json::json!({
+        "protocolVersion": "2024-11-05",
+        "serverInfo": {
+            "name": "900crm-mcp",
+            "version": env!("CARGO_PKG_VERSION"),
+            "status": "metadata-only"
+        },
+        "capabilities": {
+            "tools": {
+                "listChanged": false
+            }
+        },
+        "instructions": "Metadata-only one-shot probe. No serving loop, transport, listener, authentication, SDK dispatch, database access, or tool execution is enabled."
+    })
+}
+
+fn tools_list_result() -> serde_json::Value {
+    let tools: Vec<serde_json::Value> = read_only_tool_catalog()
+        .iter()
+        .map(mcp_tool_metadata)
+        .collect();
+
+    serde_json::json!({
+        "tools": tools
+    })
+}
+
+fn mcp_tool_metadata(entry: &ToolCatalogEntry) -> serde_json::Value {
+    serde_json::json!({
+        "name": entry.name,
+        "description": tool_description(entry.name),
+        "inputSchema": tool_input_schema(entry.name),
+        "annotations": {
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": false
+        },
+        "metadata": {
+            "accessKind": entry.access_kind,
+            "requiresExternalClientPermission": entry.requires_external_client_permission,
+            "sdkBacked": entry.sdk_backed,
+            "runtimeEnabled": entry.runtime_enabled,
+            "executionEnabled": false,
+            "readiness": "metadata-only; runtime execution is not enabled"
+        }
+    })
+}
+
+fn tool_description(name: &str) -> &'static str {
+    match name {
+        crm_sdk::CONTACTS_LIST_TOOL => {
+            "List contacts metadata contract. Read-only catalog entry; runtime execution is not enabled."
+        }
+        crm_sdk::ORGANIZATIONS_LIST_TOOL => {
+            "List organizations metadata contract. Read-only catalog entry; runtime execution is not enabled."
+        }
+        crm_sdk::DEALS_LIST_TOOL => {
+            "List deals metadata contract. Read-only catalog entry; runtime execution is not enabled."
+        }
+        crm_sdk::ACTIVITIES_LIST_TOOL => {
+            "List activities metadata contract. Read-only catalog entry; runtime execution is not enabled."
+        }
+        crm_sdk::SEARCH_GLOBAL_TOOL => {
+            "Search CRM records metadata contract. Read-only catalog entry; runtime execution is not enabled."
+        }
+        _ => "Read-only metadata contract. Runtime execution is not enabled.",
+    }
+}
+
+fn tool_input_schema(name: &str) -> serde_json::Value {
+    match name {
+        crm_sdk::CONTACTS_LIST_TOOL => serde_json::json!({
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Optional read-only result limit for future execution."
+                },
+                "offset": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Optional read-only result offset for future execution."
+                }
+            }
+        }),
+        crm_sdk::SEARCH_GLOBAL_TOOL => serde_json::json!({
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["query"],
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Read-only search query for future execution."
+                },
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Optional read-only result limit for future execution."
+                }
+            }
+        }),
+        _ => serde_json::json!({
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {}
+        }),
+    }
+}
+
+fn jsonrpc_success(id: Option<serde_json::Value>, result: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": id.unwrap_or(serde_json::Value::Null),
+        "result": result
+    })
+}
+
+fn jsonrpc_error(
+    id: Option<serde_json::Value>,
+    code: i64,
+    message: &'static str,
+) -> serde_json::Value {
+    serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": id.unwrap_or(serde_json::Value::Null),
+        "error": {
+            "code": code,
+            "message": message
+        }
+    })
+}
+
 /// Returns the CLI help text without implying an implemented MCP runtime.
 pub fn help_message(program_name: &str) -> String {
     format!(
-        "Usage: {program_name} [{PRINT_TOOL_CATALOG_FLAG}|{LIST_TOOLS_FLAG}|{PRINT_RUNTIME_STATUS_FLAG}|{PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path>]\n\n\
+        "Usage: {program_name} [{PRINT_TOOL_CATALOG_FLAG}|{LIST_TOOLS_FLAG}|{PRINT_RUNTIME_STATUS_FLAG}|{PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path>|{HANDLE_JSONRPC_ONCE_FLAG} <json>]\n\n\
 Default: print the current MCP readiness status. No server, listener, tool execution, prompt/resource serving, token handling, or network binding is implemented.\n\
 {PRINT_TOOL_CATALOG_FLAG}, {LIST_TOOLS_FLAG}: print the offline SDK-backed read-only tool catalog as JSON.\n\
 {PRINT_RUNTIME_STATUS_FLAG}: print the disabled runtime guard status as JSON.\n\
-{PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path>: load JSON config metadata from an optional path and print non-serving runtime guard status as JSON."
+{PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path>: load JSON config metadata from an optional path and print non-serving runtime guard status as JSON.\n\
+{HANDLE_JSONRPC_ONCE_FLAG} <json>: handle one metadata-only JSON-RPC request and print one response, or nothing for notifications."
     )
 }
 

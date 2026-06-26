@@ -1,7 +1,8 @@
 use crm_mcp::{
-    default_runtime_status_json, help_message, load_runtime_config_from_optional_path,
-    read_only_tool_catalog_json, runtime_status_json, DEFAULT_STATUS_MESSAGE, LIST_TOOLS_FLAG,
-    PRINT_RUNTIME_STATUS_FLAG, PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG, PRINT_TOOL_CATALOG_FLAG,
+    default_runtime_status_json, handle_jsonrpc_once, help_message,
+    load_runtime_config_from_optional_path, read_only_tool_catalog_json, runtime_status_json,
+    DEFAULT_STATUS_MESSAGE, HANDLE_JSONRPC_ONCE_FLAG, LIST_TOOLS_FLAG, PRINT_RUNTIME_STATUS_FLAG,
+    PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG, PRINT_TOOL_CATALOG_FLAG,
 };
 
 fn main() {
@@ -33,12 +34,19 @@ fn main() {
                 runtime_status_json(&config).expect("offline MCP runtime status should serialize");
             println!("{status_json}");
         }
+        [flag, raw_json] if flag == HANDLE_JSONRPC_ONCE_FLAG => {
+            let response_json = handle_jsonrpc_once(raw_json)
+                .expect("metadata-only JSON-RPC response should serialize");
+            if let Some(response_json) = response_json {
+                println!("{response_json}");
+            }
+        }
         [flag] if flag == "--help" || flag == "-h" => {
             println!("{}", help_message(&program_name));
         }
         _ => {
             eprintln!(
-                "Unsupported crm-mcp arguments. Use {PRINT_TOOL_CATALOG_FLAG} or {LIST_TOOLS_FLAG} to print the offline SDK-backed read-only catalog, {PRINT_RUNTIME_STATUS_FLAG} to print the disabled runtime guard status, or {PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path> to load JSON config metadata and print non-serving runtime guard status. MCP server/runtime startup is not implemented."
+                "Unsupported crm-mcp arguments. Use {PRINT_TOOL_CATALOG_FLAG} or {LIST_TOOLS_FLAG} to print the offline SDK-backed read-only catalog, {PRINT_RUNTIME_STATUS_FLAG} to print the disabled runtime guard status, {PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path> to load JSON config metadata and print non-serving runtime guard status, or {HANDLE_JSONRPC_ONCE_FLAG} <json> to handle one metadata-only JSON-RPC request. MCP server/runtime startup is not implemented."
             );
             std::process::exit(2);
         }
