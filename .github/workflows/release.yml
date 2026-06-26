@@ -71,6 +71,9 @@ jobs:
       - name: Install Node.js dependencies
         run: npm ci
 
+      - name: Generate sample release notes
+        run: npm run release:notes:sample
+
       - name: Generate sample release manifest
         run: npm run release:manifest:sample
 
@@ -222,6 +225,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
       - name: Download workflow artifacts
         uses: actions/download-artifact@v8
         with:
@@ -262,21 +270,10 @@ jobs:
           set -euo pipefail
           release_title="${RELEASE_TITLE:-900CRM ${RELEASE_VERSION}}"
 
-          cat > release-notes.md <<EOF
-          ${release_title}
-
-          This release was packaged by the manual release workflow.
-
-          Scope:
-          - Windows, macOS, and Linux Tauri bundles from the workflow matrix.
-          - SHA-256 checksum files and release metadata generated per platform.
-          - SPDX-shaped dependency inventory generated from package-lock.json and Cargo.lock.
-
-          Boundaries:
-          - Artifacts are not signed.
-          - macOS artifacts are not notarized.
-          - No update channel, telemetry, crash reporting, or credential handling is configured.
-          EOF
+          node scripts/generate-release-notes.mjs \
+            --release-version "$RELEASE_VERSION" \
+            --release-title "$release_title" \
+            --out release-notes.md
 
           mapfile -d '' release_files < <(
             find release-download -type f \( \
