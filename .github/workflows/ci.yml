@@ -49,6 +49,9 @@ jobs:
       - name: Install Node.js dependencies
         run: npm ci
 
+      - name: Generate sample release notes
+        run: npm run release:notes:sample
+
       - name: Generate sample release manifest
         run: npm run release:manifest:sample
 

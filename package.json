@@ -25,6 +25,8 @@
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "release:notes": "node scripts/generate-release-notes.mjs",
+    "release:notes:sample": "node scripts/generate-release-notes.mjs --out dist/release-sample/release-notes.md --release-version 0.0.0-sample --release-title \"900CRM sample release\"",
     "release:manifest": "node scripts/generate-release-manifest.mjs",
     "release:manifest:sample": "node scripts/generate-release-manifest.mjs --sample --out-dir dist/release-sample --platform local --release-version 0.0.0-sample --release-title \"900CRM sample release\" --release-ref local --release-sha local --generated-at 2026-06-24T00:00:00.000Z",
     "tauri": "npm --workspace apps/desktop run tauri"
