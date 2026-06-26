@@ -1,6 +1,6 @@
 use crm_mcp::{
-    help_message, read_only_tool_catalog_json, DEFAULT_STATUS_MESSAGE, LIST_TOOLS_FLAG,
-    PRINT_TOOL_CATALOG_FLAG,
+    default_runtime_status_json, help_message, read_only_tool_catalog_json, DEFAULT_STATUS_MESSAGE,
+    LIST_TOOLS_FLAG, PRINT_RUNTIME_STATUS_FLAG, PRINT_TOOL_CATALOG_FLAG,
 };
 
 fn main() {
@@ -15,12 +15,17 @@ fn main() {
                 read_only_tool_catalog_json().expect("offline MCP catalog should serialize");
             println!("{catalog_json}");
         }
+        [flag] if flag == PRINT_RUNTIME_STATUS_FLAG => {
+            let status_json =
+                default_runtime_status_json().expect("offline MCP runtime status should serialize");
+            println!("{status_json}");
+        }
         [flag] if flag == "--help" || flag == "-h" => {
             println!("{}", help_message(&program_name));
         }
         _ => {
             eprintln!(
-                "Unsupported crm-mcp arguments. Use {PRINT_TOOL_CATALOG_FLAG} or {LIST_TOOLS_FLAG} to print the offline SDK-backed read-only catalog. MCP server/runtime startup is not implemented."
+                "Unsupported crm-mcp arguments. Use {PRINT_TOOL_CATALOG_FLAG} or {LIST_TOOLS_FLAG} to print the offline SDK-backed read-only catalog, or {PRINT_RUNTIME_STATUS_FLAG} to print the disabled runtime guard status. MCP server/runtime startup is not implemented."
             );
             std::process::exit(2);
         }
