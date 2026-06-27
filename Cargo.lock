@@ -633,6 +633,8 @@ name = "crm-sdk"
 version = "1.0.0"
 dependencies = [
  "crm-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

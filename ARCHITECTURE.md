@@ -193,11 +193,11 @@ crates/crm-core/src/
 ### Rust Placeholders (`crates/crm-mcp/`, `crates/crm-sdk/`)
 
 ```
-crates/crm-mcp/src/main.rs     Placeholder for future optional MCP integration.
+crates/crm-mcp/src/main.rs     Optional local MCP stdio boundary.
 crates/crm-sdk/src/lib.rs      Placeholder for future SDK exports.
 ```
 
-The current MCP package is not implemented and is not started by the desktop app or `crm-core`.
+The current MCP package is optional and is not started by the desktop app or `crm-core`.
 
 ### Frontend (`apps/desktop/src/`)
 
@@ -515,9 +515,9 @@ See [plugins/README.md](plugins/README.md) for the current specification.
 
 ## MCP Readiness
 
-MCP is a future optional package boundary, not a current runtime dependency. The desktop app and `crm-core` do not include a built-in AI agent, do not start an MCP server, do not bind a localhost listener, and do not require internet access, cloud services, or model providers.
+MCP is an optional package boundary, not a desktop or core runtime dependency. The desktop app and `crm-core` do not include a built-in AI agent, do not start an MCP server, do not bind a localhost listener, and do not require internet access, cloud services, or model providers.
 
-The current codebase has external-client records, per-tool permission rows, proposed actions, audit logging, Pending Actions/Audit Log UI surfaces, and one narrow core execution path for approved `create_activity_draft` proposed actions. The active permission modes are limited to `disabled`, `read_only`, and `draft_only`; broader schema-reserved modes are inactive. Approval does not run MCP/client code, and unsupported proposed-action tool/action types remain pending with explicit errors.
+The current codebase has external-client records, per-tool permission rows, proposed actions, audit logging, Pending Actions/Audit Log UI surfaces, a disabled-by-default local MCP stdio boundary for reviewed read tools plus `create_activity_draft` pending-action creation, and one narrow core execution path for approved `create_activity_draft` proposed actions. The active permission modes are limited to `disabled`, `read_only`, and `draft_only`; broader schema-reserved modes are inactive. Approval does not run MCP/client code, and unsupported proposed-action tool/action types remain pending with explicit errors.
 
 See [MCP Readiness Baseline](docs/MCP_READINESS.md) for the current status, non-goals, security gates, and future implementation acceptance checklist.
 
