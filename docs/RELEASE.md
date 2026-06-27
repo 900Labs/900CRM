@@ -67,6 +67,16 @@ metadata for a final DMG, and does not prove Windows, Linux, downloaded
 workflow artifacts, GitHub Release, signing, notarization, or end-user
 installability.
 
+Maintainers can now produce a local headless macOS DMG with
+`npm run release:macos:dmg:headless`. The helper builds the Tauri `.app`
+bundle with app-only bundling, stages `900CRM.app` plus an `Applications`
+symlink, creates a compressed DMG with `hdiutil create -srcfolder`, and verifies
+the image with `hdiutil verify`. It intentionally avoids the generated
+Finder/AppleScript DMG customization path that blocked Sprint 096. This helper
+is local package evidence only: the output is unsigned, unnotarized, not a
+manual workflow artifact, not Windows or Linux proof, not GitHub Release proof,
+not end-user installability proof, and not alpha release completion.
+
 ## Verification Checklist
 
 Before a release candidate is tagged or published, maintainers should complete
@@ -87,11 +97,13 @@ manual.
   the manual release packaging workflow. This is source/preflight evidence only;
   it does not prove installer generation, signing, notarization, GitHub Release
   publication, or end-user installability.
-- [ ] Produce a completed local macOS DMG or successful workflow macOS package
-  artifact before treating Sprint 096 macOS evidence as package proof. Sprint
-  096 created the release binary and `.app` bundle, but local DMG attempts hit
-  the sprint cap, failed in `bundle_dmg.sh`, or stalled in the `osascript`
-  Finder-customization step before final DMG output.
+- [ ] For local macOS package evidence, run
+  `npm run release:macos:dmg:headless` and preserve the printed output path,
+  size, SHA-256, and `hdiutil verify` result. This proves only that a local
+  unsigned, unnotarized headless DMG can be created from the app bundle; it does
+  not replace workflow macOS artifacts, signing, notarization, release metadata,
+  downloaded-artifact verification, Windows/Linux package proof, GitHub Release
+  proof, or end-user release completion.
 - [ ] Run `npm run release:notes:sample`.
 - [ ] Run `npm run release:manifest:sample`.
 - [ ] Run `npm run release:artifacts:verify:sample` to exercise the downloaded
@@ -180,6 +192,7 @@ The release-note and manifest scripts are also locally runnable for validation:
 
 ```bash
 npm run release:preflight:local
+npm run release:macos:dmg:headless
 npm run release:notes:sample
 node scripts/generate-release-notes.mjs --help
 npm run release:manifest:sample
@@ -201,6 +214,15 @@ jobs, generate installers, sign, notarize, tag, upload artifacts, or publish a
 GitHub Release. If Playwright browsers or platform prerequisites are missing
 locally, the browser smoke step fails and maintainers should record that failure
 honestly rather than treating the local preflight as release proof.
+
+`npm run release:macos:dmg:headless` is a macOS-only maintainer helper for the
+Sprint 096 DMG blocker. It builds or reuses
+`target/release/bundle/macos/900CRM.app`, creates an ignored output such as
+`target/release/bundle/dmg/900CRM_1.0.0_aarch64.headless.dmg`, verifies that
+DMG with `hdiutil verify`, and prints its size and SHA-256. It does not invoke
+the normal Tauri DMG Finder/AppleScript customization flow, generate release
+metadata, sign, notarize, tag, upload artifacts, publish a GitHub Release, or
+prove Windows/Linux installability.
 
 ### Downloaded Artifact Verification
 

@@ -222,6 +222,13 @@ Current evidence:
   failed in the generated `bundle_dmg.sh`, and a control-tower rerun stalled in
   `osascript` while customizing the temporary mounted image. No final
   `target/release/bundle/dmg/900CRM_1.0.0_aarch64.dmg` was produced.
+- `npm run release:macos:dmg:headless` now provides a macOS-only maintainer
+  helper that bypasses Finder/AppleScript DMG customization, creates a basic
+  compressed DMG from `900CRM.app` plus an `Applications` symlink, verifies it
+  with `hdiutil verify`, and prints its size and SHA-256. This is local
+  unsigned, unnotarized package evidence only; it is not workflow artifact
+  proof, not Windows/Linux proof, not GitHub Release proof, and not release
+  completion.
 - `docs/RELEASE.md` lists manual release verification and intentionally not
   implemented release systems such as signing, notarization, default automatic
   publishing, upgrade/update channel, telemetry, and crash reporting.
@@ -232,10 +239,10 @@ Remaining before Phase 6 can be called complete:
 - Run the manual release packaging workflow from the intended ref and preserve
   evidence that preflight and all package jobs completed.
 - Produce and inspect Windows, macOS, and Linux package artifacts.
-- Complete macOS DMG finalization; Sprint 096 reached the release binary and
-  `.app` bundle, but local DMG attempts hit the sprint cap, failed in
-  `bundle_dmg.sh`, or stalled in the `osascript` Finder-customization step
-  before producing a final `.dmg`.
+- Produce workflow-backed macOS package evidence. A local headless DMG helper
+  can create a basic unsigned and unnotarized DMG for maintainer evidence, but
+  it does not replace manual workflow artifacts, release metadata, signing,
+  notarization, downloaded-artifact verification, or end-user install smoke.
 - Produce and preserve checksums, release metadata, SBOM-shaped dependency
   inventory, and release notes.
 - Run the downloaded-artifact verifier against the real workflow artifacts and
