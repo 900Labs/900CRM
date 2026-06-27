@@ -5,7 +5,12 @@
 //! It only publishes deterministic local catalog/status metadata for future
 //! runtime work.
 
-use std::{fmt, fs, io, net::IpAddr, path::Path};
+use std::{
+    fmt, fs,
+    io::{self, BufRead, Write},
+    net::IpAddr,
+    path::Path,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +24,8 @@ pub const PRINT_RUNTIME_STATUS_FLAG: &str = "--print-runtime-status";
 pub const PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG: &str = "--print-runtime-status-from-config";
 /// CLI flag that handles one JSON-RPC message and prints at most one response.
 pub const HANDLE_JSONRPC_ONCE_FLAG: &str = "--handle-jsonrpc-once";
+/// CLI flag that attempts a gated local stdio JSON-RPC loop from config.
+pub const SERVE_STDIO_FROM_CONFIG_FLAG: &str = "--serve-stdio-from-config";
 
 /// Honest default status for running the placeholder binary without a catalog flag.
 pub const DEFAULT_STATUS_MESSAGE: &str = "900CRM MCP server/runtime is not implemented. This binary does not start a server, listener, tools, prompts, resources, network binding, token handling, or model integration. Use --print-tool-catalog to print the offline SDK-backed read-only catalog or --print-runtime-status to print the disabled runtime guard status.";
@@ -144,6 +151,48 @@ impl std::error::Error for McpRuntimeConfigLoadError {
             Self::Read { source, .. } => Some(source),
             Self::Parse { source, .. } => Some(source),
             Self::Validation { source, .. } => Some(source),
+        }
+    }
+}
+
+/// Validation, IO, and serialization failures for the gated stdio loop.
+#[derive(Debug)]
+pub enum McpStdioLoopError {
+    /// Stdio serving was requested while the runtime guard is disabled.
+    RuntimeDisabled,
+    /// Enabled stdio serving requires a valid loopback-only runtime config.
+    ConfigValidation(McpRuntimeConfigError),
+    /// Reading stdin or writing stdout failed after the gate was opened.
+    Io(io::Error),
+    /// Metadata-only JSON-RPC response serialization failed.
+    Serialize(serde_json::Error),
+}
+
+impl fmt::Display for McpStdioLoopError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RuntimeDisabled => write!(
+                formatter,
+                "MCP stdio loop is disabled by config; set enabled true with a loopback bind_host to allow local metadata-only stdio"
+            ),
+            Self::ConfigValidation(source) => {
+                write!(formatter, "invalid MCP stdio loop config: {source}")
+            }
+            Self::Io(source) => write!(formatter, "MCP stdio loop IO failed: {source}"),
+            Self::Serialize(source) => {
+                write!(formatter, "MCP stdio loop response serialization failed: {source}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for McpStdioLoopError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::RuntimeDisabled => None,
+            Self::ConfigValidation(source) => Some(source),
+            Self::Io(source) => Some(source),
+            Self::Serialize(source) => Some(source),
         }
     }
 }
@@ -309,6 +358,61 @@ pub fn handle_jsonrpc_once(raw: &str) -> Result<Option<String>, serde_json::Erro
     response
         .map(|value| serde_json::to_string(&value).map(Some))
         .unwrap_or(Ok(None))
+}
+
+/// Handles newline-delimited metadata-only JSON-RPC input as newline-delimited responses.
+///
+/// Each input line is processed with the same one-shot handler used by
+/// `handle_jsonrpc_once`. Notifications produce no output line.
+pub fn handle_jsonrpc_lines(input: &str) -> Result<String, serde_json::Error> {
+    let mut output = String::new();
+
+    for line in input.lines() {
+        if let Some(response_json) = handle_jsonrpc_once(line)? {
+            output.push_str(&response_json);
+            output.push('\n');
+        }
+    }
+
+    Ok(output)
+}
+
+/// Runs a local stdio JSON-RPC loop only when explicitly enabled by valid config.
+///
+/// This function validates before reading input or writing output. The loop is
+/// metadata-only and delegates each newline-delimited request to
+/// `handle_jsonrpc_once`; `tools/call` remains rejected there.
+pub fn run_stdio_loop(
+    config: &McpRuntimeConfig,
+    reader: impl BufRead,
+    mut writer: impl Write,
+) -> Result<(), McpStdioLoopError> {
+    validate_stdio_loop_config(config)?;
+
+    for line in reader.lines() {
+        let line = line.map_err(McpStdioLoopError::Io)?;
+        if let Some(response_json) =
+            handle_jsonrpc_once(&line).map_err(McpStdioLoopError::Serialize)?
+        {
+            writer
+                .write_all(response_json.as_bytes())
+                .map_err(McpStdioLoopError::Io)?;
+            writer.write_all(b"\n").map_err(McpStdioLoopError::Io)?;
+            writer.flush().map_err(McpStdioLoopError::Io)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_stdio_loop_config(config: &McpRuntimeConfig) -> Result<(), McpStdioLoopError> {
+    if !config.enabled {
+        return Err(McpStdioLoopError::RuntimeDisabled);
+    }
+
+    config
+        .validate()
+        .map_err(McpStdioLoopError::ConfigValidation)
 }
 
 fn handle_jsonrpc_value(raw: &str) -> Option<serde_json::Value> {
@@ -488,12 +592,13 @@ fn jsonrpc_error(
 /// Returns the CLI help text without implying an implemented MCP runtime.
 pub fn help_message(program_name: &str) -> String {
     format!(
-        "Usage: {program_name} [{PRINT_TOOL_CATALOG_FLAG}|{LIST_TOOLS_FLAG}|{PRINT_RUNTIME_STATUS_FLAG}|{PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path>|{HANDLE_JSONRPC_ONCE_FLAG} <json>]\n\n\
+        "Usage: {program_name} [{PRINT_TOOL_CATALOG_FLAG}|{LIST_TOOLS_FLAG}|{PRINT_RUNTIME_STATUS_FLAG}|{PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path>|{HANDLE_JSONRPC_ONCE_FLAG} <json>|{SERVE_STDIO_FROM_CONFIG_FLAG} <path>]\n\n\
 Default: print the current MCP readiness status. No server, listener, tool execution, prompt/resource serving, token handling, or network binding is implemented.\n\
 {PRINT_TOOL_CATALOG_FLAG}, {LIST_TOOLS_FLAG}: print the offline SDK-backed read-only tool catalog as JSON.\n\
 {PRINT_RUNTIME_STATUS_FLAG}: print the disabled runtime guard status as JSON.\n\
 {PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path>: load JSON config metadata from an optional path and print non-serving runtime guard status as JSON.\n\
-{HANDLE_JSONRPC_ONCE_FLAG} <json>: handle one metadata-only JSON-RPC request and print one response, or nothing for notifications."
+{HANDLE_JSONRPC_ONCE_FLAG} <json>: handle one metadata-only JSON-RPC request and print one response, or nothing for notifications.\n\
+{SERVE_STDIO_FROM_CONFIG_FLAG} <path>: load JSON config metadata and attempt a disabled-by-default local stdio metadata loop."
     )
 }
 
@@ -501,6 +606,7 @@ Default: print the current MCP readiness status. No server, listener, tool execu
 mod tests {
     use std::{
         fs,
+        io::Cursor,
         path::PathBuf,
         time::{SystemTime, UNIX_EPOCH},
     };
@@ -508,12 +614,12 @@ mod tests {
     use serde_json::Value;
 
     use super::{
-        default_runtime_status, default_runtime_status_json,
+        default_runtime_status, default_runtime_status_json, handle_jsonrpc_lines,
         load_runtime_config_from_optional_path, read_only_tool_catalog,
-        read_only_tool_catalog_json, runtime_status, runtime_status_json, McpRuntimeConfig,
-        McpRuntimeConfigError, McpRuntimeConfigLoadError, DEFAULT_STATUS_MESSAGE,
-        PRINT_RUNTIME_STATUS_FLAG, PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG, PRINT_TOOL_CATALOG_FLAG,
-        RUNTIME_DISABLED_REASON, RUNTIME_SERVER_NOT_IMPLEMENTED_REASON,
+        read_only_tool_catalog_json, run_stdio_loop, runtime_status, runtime_status_json,
+        McpRuntimeConfig, McpRuntimeConfigError, McpRuntimeConfigLoadError, McpStdioLoopError,
+        DEFAULT_STATUS_MESSAGE, PRINT_RUNTIME_STATUS_FLAG, PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG,
+        PRINT_TOOL_CATALOG_FLAG, RUNTIME_DISABLED_REASON, RUNTIME_SERVER_NOT_IMPLEMENTED_REASON,
     };
 
     #[test]
@@ -546,6 +652,128 @@ mod tests {
         let parsed: Value = serde_json::from_str(&first).expect("catalog JSON should parse");
         assert!(parsed.is_array());
         assert_eq!(first, expected_catalog_json());
+    }
+
+    #[test]
+    fn jsonrpc_lines_outputs_only_responses_for_request_lines() {
+        let output = handle_jsonrpc_lines(concat!(
+            r#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","id":"tools","method":"tools/list"}"#,
+            "\n",
+        ))
+        .expect("line handler should serialize responses");
+        let lines: Vec<&str> = output.lines().collect();
+
+        assert_eq!(lines.len(), 2);
+        let initialize: Value =
+            serde_json::from_str(lines[0]).expect("initialize line should parse");
+        let tools: Value = serde_json::from_str(lines[1]).expect("tools/list line should parse");
+        assert_eq!(initialize["id"], 1);
+        assert_eq!(
+            initialize["result"]["serverInfo"]["status"],
+            "metadata-only"
+        );
+        assert_eq!(tools["id"], "tools");
+        assert!(tools["result"]["tools"].is_array());
+    }
+
+    #[test]
+    fn disabled_config_rejects_stdio_loop_before_reading_or_writing() {
+        struct FailingReader;
+
+        impl std::io::Read for FailingReader {
+            fn read(&mut self, _buffer: &mut [u8]) -> std::io::Result<usize> {
+                panic!("disabled stdio loop must not read input");
+            }
+        }
+
+        let config = McpRuntimeConfig::default();
+        let mut output = Vec::new();
+        let error = run_stdio_loop(&config, std::io::BufReader::new(FailingReader), &mut output)
+            .expect_err("disabled config should reject stdio loop");
+
+        assert!(matches!(error, McpStdioLoopError::RuntimeDisabled));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn enabled_loopback_stdio_loop_processes_metadata_lines() {
+        let config = McpRuntimeConfig {
+            enabled: true,
+            bind_host: "127.0.0.1".to_string(),
+            bind_port: 3987,
+        };
+        let input = Cursor::new(concat!(
+            r#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","id":"tools","method":"tools/list"}"#,
+            "\n",
+        ));
+        let mut output = Vec::new();
+
+        run_stdio_loop(&config, input, &mut output).expect("loopback config should run stdio loop");
+        let output = String::from_utf8(output).expect("stdio output should be UTF-8");
+        let lines: Vec<&str> = output.lines().collect();
+
+        assert_eq!(lines.len(), 2);
+        assert_eq!(
+            serde_json::from_str::<Value>(lines[0]).expect("initialize should parse")["id"],
+            1
+        );
+        assert_eq!(
+            serde_json::from_str::<Value>(lines[1]).expect("tools/list should parse")["id"],
+            "tools"
+        );
+    }
+
+    #[test]
+    fn enabled_loopback_stdio_loop_rejects_tools_call_without_execution() {
+        let config = McpRuntimeConfig {
+            enabled: true,
+            bind_host: "localhost".to_string(),
+            bind_port: 3987,
+        };
+        let input = Cursor::new(
+            r#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"contacts.list","arguments":{}}}"#,
+        );
+        let mut output = Vec::new();
+
+        run_stdio_loop(&config, input, &mut output).expect("loopback config should run stdio loop");
+        let output = String::from_utf8(output).expect("stdio output should be UTF-8");
+        let parsed: Value =
+            serde_json::from_str(output.trim_end()).expect("tools/call rejection should parse");
+
+        assert_eq!(parsed["id"], 4);
+        assert_eq!(parsed["error"]["code"], -32601);
+        assert!(parsed["error"]["message"]
+            .as_str()
+            .expect("error message should be a string")
+            .contains("tools/call execution is not implemented or enabled"));
+    }
+
+    #[test]
+    fn enabled_non_loopback_config_rejects_stdio_loop() {
+        let config = McpRuntimeConfig {
+            enabled: true,
+            bind_host: "0.0.0.0".to_string(),
+            bind_port: 3987,
+        };
+        let mut output = Vec::new();
+        let error = run_stdio_loop(&config, Cursor::new(""), &mut output)
+            .expect_err("non-loopback config should reject stdio loop");
+
+        assert!(matches!(
+            error,
+            McpStdioLoopError::ConfigValidation(
+                McpRuntimeConfigError::NonLoopbackBindHostWhenEnabled { .. }
+            )
+        ));
+        assert!(output.is_empty());
     }
 
     #[test]
