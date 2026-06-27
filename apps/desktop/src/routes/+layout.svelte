@@ -91,10 +91,20 @@
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
+  function routeHash(href: string): string {
+    return href === '/' ? '#/' : `#${href}`;
+  }
+
   function navigate(href: string) {
     currentRoute = href;
-    // Use hash-based routing for Tauri
-    window.location.hash = href === '/' ? '' : href;
+    // Use hash-based routing for Tauri. Dispatch explicitly when the target is
+    // already active so route renderers can resync after interrupted clicks.
+    const nextHash = routeHash(href);
+    if (window.location.hash === nextHash) {
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    } else {
+      window.location.hash = nextHash;
+    }
   }
 
   function isActive(href: string): boolean {
@@ -158,7 +168,7 @@
         <a
           class="nav-link"
           class:active={isActive(item.href)}
-          href={item.href}
+          href={routeHash(item.href)}
           onclick={(e) => { e.preventDefault(); navigate(item.href); }}
           title={uiStore.sidebarCollapsed ? item.label() : undefined}
           aria-current={isActive(item.href) ? 'page' : undefined}

@@ -30,9 +30,12 @@
   let stats = $state<DashboardStats | null>(null);
   let pipelineReport = $state<PipelineConversionReport | null>(null);
   let activityReport = $state<ActivityFunnelReport | null>(null);
-  let isLoading = $state(true);
+  let statsLoading = $state(true);
+  let reportsLoading = $state(true);
   let error = $state<string | null>(null);
   let reportError = $state<string | null>(null);
+
+  const DASHBOARD_LOAD_TIMEOUT_MS = 8_000;
 
   const stageLabelKeyMap: Record<string, string> = {
     Lead: 'lead',
@@ -100,40 +103,83 @@
     return map[normalized] ?? type;
   }
 
+  function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        reject(new Error(`${label} timed out after ${DASHBOARD_LOAD_TIMEOUT_MS}ms`));
+      }, DASHBOARD_LOAD_TIMEOUT_MS);
+
+      promise.then(
+        (value) => {
+          window.clearTimeout(timeout);
+          resolve(value);
+        },
+        (err) => {
+          window.clearTimeout(timeout);
+          reject(err);
+        },
+      );
+    });
+  }
+
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
-  onMount(async () => {
-    isLoading = true;
+  onMount(() => {
+    let mounted = true;
+
+    statsLoading = true;
+    reportsLoading = true;
     error = null;
     reportError = null;
 
-    try {
-      const [dashStats] = await Promise.all([
-        getDashboardStats(),
-        activityStore.loadUpcoming(),
-      ]);
-      stats = dashStats;
+    void (async () => {
+      try {
+        const dashStats = await withTimeout(getDashboardStats(), 'Dashboard stats');
+        if (!mounted) return;
+        stats = dashStats;
+      } catch (err) {
+        if (!mounted) return;
+        error = t('errors.loadFailed');
+        console.error('[Dashboard] Stats load error:', err);
+      } finally {
+        if (mounted) statsLoading = false;
+      }
+    })();
 
-      const [pipelineResult, activityResult] = await Promise.allSettled([
-        getPipelineConversionReport(),
-        getActivityFunnelReport(),
-      ]);
+    void (async () => {
+      try {
+        await withTimeout(activityStore.loadUpcoming(), 'Upcoming activities');
+      } catch (err) {
+        console.error('[Dashboard] Upcoming activity load error:', err);
+      }
+    })();
 
-      if (pipelineResult.status === 'fulfilled') {
-        pipelineReport = pipelineResult.value;
+    void (async () => {
+      try {
+        const [pipelineResult, activityResult] = await Promise.allSettled([
+          withTimeout(getPipelineConversionReport(), 'Pipeline report'),
+          withTimeout(getActivityFunnelReport(), 'Activity report'),
+        ]);
+
+        if (!mounted) return;
+
+        if (pipelineResult.status === 'fulfilled') {
+          pipelineReport = pipelineResult.value;
+        }
+        if (activityResult.status === 'fulfilled') {
+          activityReport = activityResult.value;
+        }
+        if (pipelineResult.status === 'rejected' || activityResult.status === 'rejected') {
+          reportError = t('dashboard.reports.loadFailed');
+        }
+      } finally {
+        if (mounted) reportsLoading = false;
       }
-      if (activityResult.status === 'fulfilled') {
-        activityReport = activityResult.value;
-      }
-      if (pipelineResult.status === 'rejected' || activityResult.status === 'rejected') {
-        reportError = t('dashboard.reports.loadFailed');
-      }
-    } catch (err) {
-      error = t('errors.loadFailed');
-      console.error('[Dashboard] Load error:', err);
-    } finally {
-      isLoading = false;
-    }
+    })();
+
+    return () => {
+      mounted = false;
+    };
   });
 </script>
 
@@ -177,28 +223,28 @@
     <section class="stat-grid" aria-label={t('dashboard.title')}>
       <StatCard
         label={t('dashboard.totalContacts')}
-        value={isLoading ? '…' : String(stats?.totalContacts ?? 0)}
+        value={statsLoading ? '…' : String(stats?.totalContacts ?? 0)}
         icon="users"
-        loading={isLoading}
+        loading={statsLoading}
       />
       <StatCard
         label={t('dashboard.activeDeals')}
-        value={isLoading ? '…' : String(stats?.activeDeals ?? 0)}
+        value={statsLoading ? '…' : String(stats?.activeDeals ?? 0)}
         icon="bar-chart"
-        loading={isLoading}
+        loading={statsLoading}
       />
       <StatCard
         label={t('dashboard.pipelineValue')}
-        value={isLoading ? '…' : pipelineFormatted}
+        value={statsLoading ? '…' : pipelineFormatted}
         icon="dollar-sign"
-        loading={isLoading}
+        loading={statsLoading}
         accent={true}
       />
       <StatCard
         label={t('dashboard.upcomingTasks')}
-        value={isLoading ? '…' : String(stats?.upcomingTasks ?? 0)}
+        value={statsLoading ? '…' : String(stats?.upcomingTasks ?? 0)}
         icon="check-square"
-        loading={isLoading}
+        loading={statsLoading}
       />
     </section>
 
@@ -207,7 +253,7 @@
         <div class="card-header report-header">
           <h2 class="section-title" id="pipeline-report-heading">{t('dashboard.reports.pipelineTitle')}</h2>
           <span class="report-kpi-value">
-            {isLoading || !pipelineReport ? '…' : asPercentRatio(pipelineReport.overall_win_rate)}
+            {reportsLoading || !pipelineReport ? '…' : asPercentRatio(pipelineReport.overall_win_rate)}
           </span>
         </div>
         <div class="report-subtitle">{t('dashboard.reports.winRate')}</div>
@@ -216,18 +262,18 @@
           <div class="summary-stat">
             <span class="summary-stat-label">{t('dashboard.reports.closedWon')}</span>
             <span class="summary-stat-value">
-              {isLoading || !pipelineReport ? '…' : formatCompactNumber(pipelineReport.closed_won)}
+              {reportsLoading || !pipelineReport ? '…' : formatCompactNumber(pipelineReport.closed_won)}
             </span>
           </div>
           <div class="summary-stat">
             <span class="summary-stat-label">{t('dashboard.reports.openDeals')}</span>
             <span class="summary-stat-value">
-              {isLoading || !pipelineReport ? '…' : formatCompactNumber(pipelineReport.open_deals)}
+              {reportsLoading || !pipelineReport ? '…' : formatCompactNumber(pipelineReport.open_deals)}
             </span>
           </div>
         </div>
 
-        {#if !isLoading && pipelineReport}
+        {#if !reportsLoading && pipelineReport}
           {#if visibleStageMetrics.length === 0}
             <p class="report-empty">{t('dashboard.reports.noPipelineData')}</p>
           {:else}
@@ -252,7 +298,7 @@
         <div class="card-header report-header">
           <h2 class="section-title" id="activity-report-heading">{t('dashboard.reports.activityTitle')}</h2>
           <span class="report-kpi-value">
-            {isLoading || !activityReport ? '…' : asPercentRatio(activityReport.completion_rate)}
+            {reportsLoading || !activityReport ? '…' : asPercentRatio(activityReport.completion_rate)}
           </span>
         </div>
         <div class="report-subtitle">{t('dashboard.reports.completionRate')}</div>
@@ -261,18 +307,18 @@
           <div class="summary-stat">
             <span class="summary-stat-label">{t('dashboard.reports.pending')}</span>
             <span class="summary-stat-value">
-              {isLoading || !activityReport ? '…' : formatCompactNumber(activityReport.pending_activities)}
+              {reportsLoading || !activityReport ? '…' : formatCompactNumber(activityReport.pending_activities)}
             </span>
           </div>
           <div class="summary-stat">
             <span class="summary-stat-label">{t('dashboard.reports.overdueRate')}</span>
             <span class="summary-stat-value">
-              {isLoading || !activityReport ? '…' : asPercentRatio(activityReport.overdue_rate)}
+              {reportsLoading || !activityReport ? '…' : asPercentRatio(activityReport.overdue_rate)}
             </span>
           </div>
         </div>
 
-        {#if !isLoading && activityReport}
+        {#if !reportsLoading && activityReport}
           {#if visibleActivityTypes.length === 0}
             <p class="report-empty">{t('dashboard.reports.noActivityData')}</p>
           {:else}
