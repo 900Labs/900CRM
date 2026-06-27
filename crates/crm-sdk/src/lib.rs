@@ -1,9 +1,9 @@
-//! Narrow local read-only SDK facade for future 900CRM integrations.
+//! Narrow local SDK facade for future 900CRM integrations.
 //!
 //! This crate intentionally exposes no listener, credentials, network behavior,
-//! write methods, or proposed-action creation. It is a local facade over
-//! [`crm_core::CrmCore`] so future runtime packages can call reviewed core
-//! services without raw SQL.
+//! direct write methods, or proposed-action decisions. It is a local facade over
+//! [`crm_core::CrmCore`] so future runtime packages can call reviewed read and
+//! draft core services without raw SQL.
 
 use std::path::Path;
 
@@ -12,10 +12,12 @@ use crm_core::{
     result::CrmResult,
     search::SearchResult,
     storage::{
-        activities::Activity, contacts::ContactListResult, deals::Deal, organizations::Organization,
+        activities::Activity, contacts::ContactListResult, deals::Deal,
+        organizations::Organization, proposed_actions::ProposedAction,
     },
     CrmCore,
 };
+use serde::Serialize;
 
 pub use crm_core::{errors::CrmError as SdkError, storage::contacts::ContactListParams};
 
@@ -29,6 +31,8 @@ pub const DEALS_LIST_TOOL: &str = "deals.list";
 pub const ACTIVITIES_LIST_TOOL: &str = "activities.list";
 /// Tool name for global search through the read-only SDK.
 pub const SEARCH_GLOBAL_TOOL: &str = "search.global";
+/// Tool name for creating a pending activity proposed action through the SDK.
+pub const CREATE_ACTIVITY_DRAFT_TOOL: &str = "create_activity_draft";
 
 /// Initial read-only tool names exported for future MCP/runtime reuse.
 pub const INITIAL_READ_TOOL_NAMES: &[&str] = &[
@@ -39,13 +43,16 @@ pub const INITIAL_READ_TOOL_NAMES: &[&str] = &[
     SEARCH_GLOBAL_TOOL,
 ];
 
-/// Local read-only SDK facade over [`CrmCore`].
+/// Initial draft tool names exported for future MCP/runtime reuse.
+pub const INITIAL_DRAFT_TOOL_NAMES: &[&str] = &[CREATE_ACTIVITY_DRAFT_TOOL];
+
+/// Local SDK facade over [`CrmCore`].
 pub struct ReadOnlyCrmSdk {
     core: CrmCore,
     external_client_id: String,
 }
 
-/// Product-facing alias for the read-only SDK surface.
+/// Product-facing alias for the reviewed SDK surface.
 pub type CrmSdk = ReadOnlyCrmSdk;
 
 impl ReadOnlyCrmSdk {
@@ -96,6 +103,28 @@ impl ReadOnlyCrmSdk {
         self.core.global_search(query, limit)
     }
 
+    /// Creates a pending activity proposed action after draft permission checks.
+    ///
+    /// This does not create an activity, approve a proposed action, or execute a
+    /// proposed action. It preserves the documented core draft input JSON shape
+    /// and delegates permission/audit behavior to `crm-core`.
+    pub fn create_activity_draft(
+        &mut self,
+        params: CreateActivityDraftParams,
+    ) -> CrmResult<ProposedAction> {
+        let params = params.normalized()?;
+        let input_json = serde_json::to_string(&params)?;
+        self.core.create_external_proposed_action_stub(
+            Some(self.external_client_id.clone()),
+            CREATE_ACTIVITY_DRAFT_TOOL.to_string(),
+            CREATE_ACTIVITY_DRAFT_TOOL.to_string(),
+            Some("activity".to_string()),
+            None,
+            input_json,
+            None,
+        )
+    }
+
     fn require_read_permission(&self, tool_name: &str) -> CrmResult<()> {
         let evaluation = self
             .core
@@ -110,6 +139,61 @@ impl ReadOnlyCrmSdk {
             tool_name,
             evaluation.reason.as_str()
         )))
+    }
+}
+
+/// Documented input shape for the `create_activity_draft` pending-action tool.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CreateActivityDraftParams {
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub activity_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_at: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub linked_entities: Vec<CreateActivityDraftLinkedEntityParam>,
+}
+
+impl CreateActivityDraftParams {
+    fn normalized(self) -> CrmResult<Self> {
+        Ok(Self {
+            title: required_draft_string("title", &self.title)?,
+            activity_type: optional_draft_string(self.activity_type),
+            description: optional_draft_string(self.description),
+            due_at: optional_draft_string(self.due_at),
+            linked_entities: self
+                .linked_entities
+                .into_iter()
+                .map(CreateActivityDraftLinkedEntityParam::normalized)
+                .collect::<CrmResult<Vec<_>>>()?,
+        })
+    }
+}
+
+/// Linked entity reference inside a `create_activity_draft` input payload.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CreateActivityDraftLinkedEntityParam {
+    pub entity_type: String,
+    pub entity_id: String,
+}
+
+impl CreateActivityDraftLinkedEntityParam {
+    fn normalized(self) -> CrmResult<Self> {
+        let entity_type =
+            required_draft_string("linked_entities[].entity_type", &self.entity_type)?;
+        if !matches!(entity_type.as_str(), "contact" | "organization" | "deal") {
+            return Err(CrmError::InvalidInput(format!(
+                "create_activity_draft linked_entities[].entity_type '{}' is unsupported",
+                entity_type
+            )));
+        }
+
+        Ok(Self {
+            entity_type,
+            entity_id: required_draft_string("linked_entities[].entity_id", &self.entity_id)?,
+        })
     }
 }
 
@@ -129,6 +213,17 @@ fn normalize_external_client_id(external_client_id: String) -> CrmResult<String>
     Ok(external_client_id.to_string())
 }
 
+fn required_draft_string(field: &str, value: &str) -> CrmResult<String> {
+    optional_draft_string(Some(value.to_string()))
+        .ok_or_else(|| CrmError::InvalidInput(format!("create_activity_draft {field} is required")))
+}
+
+fn optional_draft_string(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|trimmed| !trimmed.is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -143,7 +238,10 @@ mod tests {
         CrmCore,
     };
 
-    use super::{is_implemented, ReadOnlyCrmSdk, CONTACTS_LIST_TOOL, SEARCH_GLOBAL_TOOL};
+    use super::{
+        is_implemented, CreateActivityDraftLinkedEntityParam, CreateActivityDraftParams,
+        ReadOnlyCrmSdk, CONTACTS_LIST_TOOL, CREATE_ACTIVITY_DRAFT_TOOL, SEARCH_GLOBAL_TOOL,
+    };
 
     static TEST_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -188,6 +286,8 @@ mod tests {
             CONTACTS_LIST_TOOL,
             false,
             "denied",
+            "evaluate_external_client_read_permission",
+            "read",
         );
         cleanup(app_data_dir);
     }
@@ -212,6 +312,8 @@ mod tests {
             CONTACTS_LIST_TOOL,
             false,
             "denied",
+            "evaluate_external_client_read_permission",
+            "read",
         );
         cleanup(app_data_dir);
     }
@@ -261,6 +363,8 @@ mod tests {
             CONTACTS_LIST_TOOL,
             true,
             "allowed",
+            "evaluate_external_client_read_permission",
+            "read",
         );
         cleanup(app_data_dir);
     }
@@ -306,6 +410,8 @@ mod tests {
             SEARCH_GLOBAL_TOOL,
             false,
             "denied",
+            "evaluate_external_client_read_permission",
+            "read",
         );
 
         let mut core = open_core(&app_data_dir);
@@ -334,6 +440,127 @@ mod tests {
             SEARCH_GLOBAL_TOOL,
             true,
             "allowed",
+            "evaluate_external_client_read_permission",
+            "read",
+        );
+        cleanup(app_data_dir);
+    }
+
+    #[test]
+    fn draft_only_client_with_confirmed_permission_creates_pending_activity_draft() {
+        let app_data_dir = test_app_data_dir();
+        let mut core = open_core(&app_data_dir);
+        let client = create_draft_only_client(&mut core, "Allowed Draft SDK Client");
+        core.upsert_external_client_tool_permission(
+            &client.id,
+            CREATE_ACTIVITY_DRAFT_TOOL,
+            false,
+            true,
+            true,
+        )
+        .expect("create activity draft permission should upsert");
+        drop(core);
+
+        let mut sdk = ReadOnlyCrmSdk::open(&app_data_dir, &client.id).expect("SDK should open");
+        let proposed_action = sdk
+            .create_activity_draft(CreateActivityDraftParams {
+                title: "  Call Amina  ".to_string(),
+                activity_type: Some(" call ".to_string()),
+                description: Some("Confirm next steps".to_string()),
+                due_at: Some("2026-06-25T09:00:00Z".to_string()),
+                linked_entities: vec![CreateActivityDraftLinkedEntityParam {
+                    entity_type: "organization".to_string(),
+                    entity_id: "org-1".to_string(),
+                }],
+            })
+            .expect("permitted draft client should create pending proposed action");
+        drop(sdk);
+
+        assert_eq!(
+            proposed_action.client_id.as_deref(),
+            Some(client.id.as_str())
+        );
+        assert_eq!(proposed_action.tool_name, CREATE_ACTIVITY_DRAFT_TOOL);
+        assert_eq!(proposed_action.action_type, CREATE_ACTIVITY_DRAFT_TOOL);
+        assert_eq!(proposed_action.status, "pending");
+        assert_eq!(proposed_action.approved_at, None);
+        assert_eq!(proposed_action.rejected_at, None);
+        assert_eq!(proposed_action.executed_at, None);
+        let input: serde_json::Value =
+            serde_json::from_str(&proposed_action.input_json).expect("input JSON should parse");
+        assert_eq!(input["title"], "Call Amina");
+        assert_eq!(input["activity_type"], "call");
+        assert_eq!(input["linked_entities"][0]["entity_type"], "organization");
+
+        let core = open_core(&app_data_dir);
+        assert_eq!(
+            core.list_pending_proposed_actions()
+                .expect("pending actions should list")
+                .len(),
+            1
+        );
+        assert!(
+            core.list_activities()
+                .expect("activities should list")
+                .is_empty(),
+            "draft creation must not create an activity"
+        );
+        drop(core);
+
+        assert_permission_audit(
+            &app_data_dir,
+            &client.id,
+            CREATE_ACTIVITY_DRAFT_TOOL,
+            true,
+            "allowed",
+            "evaluate_external_client_draft_permission",
+            "draft",
+        );
+        cleanup(app_data_dir);
+    }
+
+    #[test]
+    fn read_only_client_cannot_create_activity_draft_and_records_draft_audit() {
+        let app_data_dir = test_app_data_dir();
+        let mut core = open_core(&app_data_dir);
+        let client = create_read_only_client(&mut core, "Read Only Draft SDK Client");
+        core.upsert_external_client_tool_permission(
+            &client.id,
+            CREATE_ACTIVITY_DRAFT_TOOL,
+            true,
+            true,
+            true,
+        )
+        .expect("read-only client permission row should upsert");
+        drop(core);
+
+        let mut sdk = ReadOnlyCrmSdk::open(&app_data_dir, &client.id).expect("SDK should open");
+        let err = sdk
+            .create_activity_draft(CreateActivityDraftParams {
+                title: "Blocked draft".to_string(),
+                activity_type: None,
+                description: None,
+                due_at: None,
+                linked_entities: Vec::new(),
+            })
+            .expect_err("read-only client should not create drafts");
+        assert_invalid_input_contains(err, "write_not_allowed");
+        drop(sdk);
+
+        let core = open_core(&app_data_dir);
+        assert!(core
+            .list_pending_proposed_actions()
+            .expect("pending actions should list")
+            .is_empty());
+        drop(core);
+        assert_permission_audit(
+            &app_data_dir,
+            &client.id,
+            CREATE_ACTIVITY_DRAFT_TOOL,
+            false,
+            "denied",
+            "evaluate_external_client_draft_permission",
+            "draft",
         );
         cleanup(app_data_dir);
     }
@@ -363,6 +590,15 @@ mod tests {
         client
     }
 
+    fn create_draft_only_client(core: &mut CrmCore, name: &str) -> ExternalClient {
+        let client = core
+            .create_external_client_placeholder(name, "mcp")
+            .expect("external client placeholder should be created");
+        core.update_external_client_activation(&client.id, true, "draft_only")
+            .expect("external client should enable draft-only");
+        client
+    }
+
     fn assert_invalid_input_contains(error: CrmError, expected: &str) {
         match error {
             CrmError::InvalidInput(message) => {
@@ -378,9 +614,11 @@ mod tests {
         tool_name: &str,
         allowed: bool,
         status: &str,
+        action: &str,
+        access_kind: &str,
     ) {
-        let entry = latest_permission_audit(app_data_dir, client_id, tool_name);
-        assert_eq!(entry.action, "evaluate_external_client_read_permission");
+        let entry = latest_permission_audit(app_data_dir, client_id, tool_name, action);
+        assert_eq!(entry.action, action);
         assert_eq!(entry.entity_type.as_deref(), Some("external_client"));
         assert_eq!(entry.entity_id.as_deref(), Some(client_id));
 
@@ -397,7 +635,7 @@ mod tests {
             "{after_json}"
         );
         assert!(
-            after_json.contains(r#""access_kind":"read""#),
+            after_json.contains(&format!(r#""access_kind":"{access_kind}""#)),
             "{after_json}"
         );
         assert!(
@@ -414,13 +652,14 @@ mod tests {
         app_data_dir: &Path,
         client_id: &str,
         tool_name: &str,
+        action: &str,
     ) -> AuditLogEntry {
         let core = open_core(app_data_dir);
         core.list_recent_audit_log(50)
             .expect("audit log should list")
             .into_iter()
             .find(|entry| {
-                entry.action == "evaluate_external_client_read_permission"
+                entry.action == action
                     && entry.entity_id.as_deref() == Some(client_id)
                     && entry
                         .after_json
