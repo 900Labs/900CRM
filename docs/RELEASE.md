@@ -34,6 +34,13 @@ publish a GitHub Release unless
 `publish_github_release` is explicitly enabled for a matching `v`-prefixed tag
 ref.
 
+Downloaded workflow artifacts can now be checked locally with
+`npm run release:artifacts:verify -- --artifact-root release-download
+--release-version <version>`. This verifier is integrity evidence for already
+downloaded workflow outputs only. It does not generate installers, sign,
+notarize, create tags, upload assets, publish a release, or prove end-user
+installability.
+
 The current repository can be built and tested locally by contributors, but the
 presence of source code, CI checks, or Tauri configuration is not a release
 artifact.
@@ -69,6 +76,11 @@ manual.
   publication, or end-user installability.
 - [ ] Run `npm run release:notes:sample`.
 - [ ] Run `npm run release:manifest:sample`.
+- [ ] Run `npm run release:artifacts:verify:sample` to exercise the downloaded
+  artifact verifier with deterministic synthetic artifacts.
+- [ ] After the manual workflow produces real artifacts, download the workflow
+  artifacts and run `npm run release:artifacts:verify -- --artifact-root
+  release-download --release-version <version>`.
 - [ ] Run `npm run check:release-guardrails`.
 - [ ] Run `npm run lint`.
 - [ ] Run `npm run check`.
@@ -154,19 +166,48 @@ npm run release:notes:sample
 node scripts/generate-release-notes.mjs --help
 npm run release:manifest:sample
 node scripts/generate-release-manifest.mjs --help
+npm run release:artifacts:verify:sample
+npm run release:artifacts:verify -- --artifact-root release-download --release-version 1.0.0
+node scripts/verify-release-artifacts.mjs --help
 ```
 
 `npm run release:preflight:local` is the maintainer-run local equivalent of the
 manual release workflow's source preflight. It runs the sample release notes,
-sample release manifest, public release guardrail scan, frontend lint, frontend
-type check, frontend tests, frontend build, browser smoke test, Rust formatting,
-Rust Clippy, Rust workspace check, and Rust workspace test commands in sequence,
-failing on the first failed command with the step label. It intentionally does
-not install Ubuntu system dependencies, install Playwright browsers, run package
-matrix jobs, generate installers, sign, notarize, tag, upload artifacts, or
-publish a GitHub Release. If Playwright browsers or platform prerequisites are
-missing locally, the browser smoke step fails and maintainers should record that
-failure honestly rather than treating the local preflight as release proof.
+sample release manifest, deterministic sample downloaded-artifact verification,
+public release guardrail scan, frontend lint, frontend type check, frontend
+tests, frontend build, browser smoke test, Rust formatting, Rust Clippy, Rust
+workspace check, and Rust workspace test commands in sequence, failing on the
+first failed command with the step label. It intentionally does not install
+Ubuntu system dependencies, install Playwright browsers, run package matrix
+jobs, generate installers, sign, notarize, tag, upload artifacts, or publish a
+GitHub Release. If Playwright browsers or platform prerequisites are missing
+locally, the browser smoke step fails and maintainers should record that failure
+honestly rather than treating the local preflight as release proof.
+
+### Downloaded Artifact Verification
+
+After a successful manual release packaging workflow run, maintainers should
+download all workflow artifacts into a single `release-download/` directory and
+run:
+
+```bash
+npm run release:artifacts:verify -- --artifact-root release-download --release-version <version>
+```
+
+The verifier expects metadata for `windows`, `macos`, and `linux` by default.
+It checks that each platform has release metadata, SHA-256 checksums, and an
+SPDX 2.3 SBOM; that metadata uses schema version 1 and the requested release
+version; that metadata artifacts have `fileName`, `relativePath`, `kind`,
+`sizeBytes`, and 64-character SHA-256 values; that package files under the
+download root match the metadata size and SHA-256; that checksum entries match
+metadata exactly; that SBOM JSON has non-empty packages; and that workflow
+package kinds are present for Windows (`.msi` and NSIS/`.exe`), macOS (`.dmg`),
+and Linux (`.deb` and `.AppImage`).
+
+`npm run release:artifacts:verify:sample` creates a deterministic synthetic
+downloaded-artifact tree under ignored `dist/release-artifact-verifier-sample/`
+and verifies it. This sample command is a local script test, not release
+artifact evidence.
 
 If real release artifacts are not present and `--sample` is not used, the script
 fails with a message naming the missing artifact directory or expected package
