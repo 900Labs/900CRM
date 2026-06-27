@@ -12,13 +12,12 @@ use crm_core::{
     result::CrmResult,
     search::SearchResult,
     storage::{
-        activities::Activity,
-        contacts::{ContactListParams, ContactListResult},
-        deals::Deal,
-        organizations::Organization,
+        activities::Activity, contacts::ContactListResult, deals::Deal, organizations::Organization,
     },
     CrmCore,
 };
+
+pub use crm_core::{errors::CrmError as SdkError, storage::contacts::ContactListParams};
 
 /// Tool name for listing contacts through the read-only SDK.
 pub const CONTACTS_LIST_TOOL: &str = "contacts.list";
