@@ -33,7 +33,7 @@ Learn more at [900labs.com/impact](https://www.900labs.com/impact).
 
 ## What is 900CRM?
 
-900CRM is the second tool from [900 Labs](https://www.900labs.com) — a free, open-source desktop CRM (Customer Relationship Management) application designed to work entirely offline. No internet connection required, ever. Built with [Tauri v2](https://tauri.app/) (Rust) and [Svelte 5](https://svelte.dev/), it targets Windows, macOS, and Linux with low hardware requirements. Pre-built release installers are not published yet; see [Release Readiness](docs/RELEASE.md) for the current status.
+900CRM is the second tool from [900 Labs](https://www.900labs.com) — a free, open-source desktop CRM (Customer Relationship Management) application designed to work entirely offline. No internet connection required, ever. Built with [Tauri v2](https://tauri.app/) (Rust) and [Svelte 5](https://svelte.dev/), it targets Windows, macOS, and Linux with low hardware requirements. Pre-built release installers are not published yet; see [Release Readiness](docs/RELEASE.md) and the [Alpha Readiness Audit](docs/ALPHA_READINESS.md) for the current status.
 
 900CRM is built especially for:
 - **Small businesses and entrepreneurs** in regions with unreliable connectivity
@@ -237,7 +237,8 @@ The intended public release artifacts are:
 See [Release Readiness](docs/RELEASE.md) for the manual verification checklist,
 the guarded release-packaging workflow, generated checksums/SBOM metadata, and
 the explicit not-yet-implemented signing, notarization, and publishing
-boundaries.
+boundaries. See the [Alpha Readiness Audit](docs/ALPHA_READINESS.md) for the
+current-vs-remaining phase map.
 
 ---
 
@@ -389,7 +390,7 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for full details on how to get st
 - [x] Full-text search across all entities
 - [x] CSV import and export
 - [x] 10 languages (EN, FR, ES, AR, SW, HI, PT, VI, HA, BN)
-- [ ] Windows, macOS, Linux release installers
+- [ ] Windows, macOS, Linux release installers (major remaining alpha gap; see [Alpha Readiness Audit](docs/ALPHA_READINESS.md))
 
 ### Completed App Foundations
 - [x] Custom fields on any entity type
