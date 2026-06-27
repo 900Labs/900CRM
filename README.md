@@ -86,7 +86,7 @@ The entire interface is localized. Switch languages in settings instantly. Full 
 Every core CRM feature works without an internet connection. There is no "offline mode" to enable because offline is the default. Sync configuration and changelog foundations exist for future team workflows, but real multi-device sync transport is not implemented today.
 
 ### MCP Readiness
-MCP support is not implemented or started by the desktop app today. `crates/crm-mcp` is a placeholder for a future optional package, while current external-client, permission, audit-log, and pending-action surfaces only provide readiness primitives. See [MCP Readiness Baseline](docs/MCP_READINESS.md) for the current boundaries and future acceptance checklist.
+MCP support is optional and is not started by the desktop app today. `crates/crm-mcp` now has a disabled-by-default local stdio boundary for reviewed read tools plus `create_activity_draft` pending-action creation; it is not a network server, token surface, AI agent, or direct write runtime. See [MCP Readiness Baseline](docs/MCP_READINESS.md) for the current boundaries and future acceptance checklist.
 
 ---
 
@@ -336,7 +336,7 @@ Current implementation baselines are documented in [Data Model](docs/DATA_MODEL.
 │   │       ├── services/         # Application services
 │   │       ├── search/           # Search support
 │   │       └── import_export/    # CSV import/export support
-│   ├── crm-mcp/                  # MCP integration placeholder; not implemented
+│   ├── crm-mcp/                  # Optional local MCP stdio boundary
 │   └── crm-sdk/                  # Read-only local SDK facade
 ├── scripts/                      # Root verification and release metadata helpers
 ├── plugins/                      # Community plugin directory

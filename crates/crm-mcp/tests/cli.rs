@@ -10,7 +10,9 @@ use crm_core::{storage::audit::AuditLogEntry, CrmCore};
 use crm_mcp::{
     HANDLE_JSONRPC_ONCE_FLAG, PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG, SERVE_STDIO_FROM_CONFIG_FLAG,
 };
-use crm_sdk::{CONTACTS_LIST_TOOL, INITIAL_READ_TOOL_NAMES, SEARCH_GLOBAL_TOOL};
+use crm_sdk::{
+    CONTACTS_LIST_TOOL, CREATE_ACTIVITY_DRAFT_TOOL, INITIAL_READ_TOOL_NAMES, SEARCH_GLOBAL_TOOL,
+};
 use serde_json::Value;
 
 #[test]
@@ -146,7 +148,7 @@ fn print_runtime_status_from_config_cli_reports_execution_ready_with_context() {
     assert_eq!(parsed["tool_execution_enabled"], true);
     assert_eq!(
         parsed["reason"],
-        "read-only stdio execution context available"
+        "reviewed stdio execution context available"
     );
 
     cleanup_file(path);
@@ -286,6 +288,36 @@ fn serve_stdio_from_config_cli_rejects_tools_call_without_execution_context() {
 }
 
 #[test]
+fn serve_stdio_from_config_cli_rejects_activity_draft_without_execution_context() {
+    let path = write_temp_config(
+        "cli-stdio-enabled-no-context-draft-call",
+        r#"{
+  "enabled": true,
+  "bind_host": "127.0.0.1",
+  "bind_port": 3987
+}"#,
+    );
+    let output = run_stdio_with_input(
+        &path,
+        r#"{"jsonrpc":"2.0","id":"draft","method":"tools/call","params":{"name":"create_activity_draft","arguments":{"title":"Call Amina"}}}"#,
+    );
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let parsed: Value =
+        serde_json::from_str(stdout.trim_end()).expect("tools/call rejection should parse");
+
+    assert_eq!(parsed["id"], "draft");
+    assert_eq!(parsed["error"]["code"], -32002);
+    assert!(parsed["error"]["message"]
+        .as_str()
+        .expect("error message should be a string")
+        .contains("missing local execution context"));
+    fs::remove_file(path).ok();
+}
+
+#[test]
 fn serve_stdio_from_config_cli_executes_allowed_contacts_and_search_tools() {
     let store = seed_allowed_mcp_store(&[CONTACTS_LIST_TOOL, SEARCH_GLOBAL_TOOL]);
     let path = write_enabled_context_config("cli-stdio-allowed-read-tools", &store);
@@ -312,10 +344,7 @@ fn serve_stdio_from_config_cli_executes_allowed_contacts_and_search_tools() {
         .collect();
 
     assert_eq!(lines.len(), 4);
-    assert_eq!(
-        lines[0]["result"]["serverInfo"]["status"],
-        "read-only-stdio"
-    );
+    assert_eq!(lines[0]["result"]["serverInfo"]["status"], "reviewed-stdio");
 
     let tools = lines[1]["result"]["tools"]
         .as_array()
@@ -323,6 +352,28 @@ fn serve_stdio_from_config_cli_executes_allowed_contacts_and_search_tools() {
     assert!(tools
         .iter()
         .all(|tool| tool["metadata"]["executionEnabled"] == true));
+    let tool_names: Vec<&str> = tools
+        .iter()
+        .map(|tool| tool["name"].as_str().expect("tool name should be a string"))
+        .collect();
+    assert!(INITIAL_READ_TOOL_NAMES
+        .iter()
+        .all(|name| tool_names.contains(name)));
+    assert!(tool_names.contains(&CREATE_ACTIVITY_DRAFT_TOOL));
+    let draft_tool = tools
+        .iter()
+        .find(|tool| tool["name"] == CREATE_ACTIVITY_DRAFT_TOOL)
+        .expect(
+            "tools/list should include activity draft tool when execution context is configured",
+        );
+    assert_eq!(draft_tool["annotations"]["readOnlyHint"], false);
+    assert_eq!(draft_tool["annotations"]["destructiveHint"], false);
+    assert_eq!(draft_tool["annotations"]["idempotentHint"], false);
+    assert_eq!(draft_tool["metadata"]["accessKind"], "draft");
+    assert_eq!(draft_tool["metadata"]["requiresConfirmation"], true);
+    assert_eq!(draft_tool["metadata"]["createsPendingAction"], true);
+    assert_eq!(draft_tool["metadata"]["directExecution"], false);
+    assert_eq!(draft_tool["inputSchema"]["required"][0], "title");
 
     let contacts = lines[2]["result"]["structuredContent"]["contacts"]
         .as_array()
@@ -378,6 +429,140 @@ fn serve_stdio_from_config_cli_rejects_permission_denied_client_and_records_audi
         "{after_json}"
     );
     assert!(after_json.contains(r#""status":"denied""#), "{after_json}");
+
+    cleanup_file(path);
+    cleanup_dir(store.app_data_dir);
+}
+
+#[test]
+fn serve_stdio_from_config_cli_rejects_activity_draft_for_read_only_client_and_records_audit() {
+    let store = seed_read_only_mcp_store_with_activity_draft_permission();
+    let path = write_enabled_context_config("cli-stdio-read-only-draft-denied", &store);
+    let output = run_stdio_with_input(
+        &path,
+        r#"{"jsonrpc":"2.0","id":"draft-read-only","method":"tools/call","params":{"name":"create_activity_draft","arguments":{"title":"Call Amina"}}}"#,
+    );
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let parsed: Value =
+        serde_json::from_str(stdout.trim_end()).expect("permission denial should parse");
+
+    assert_eq!(parsed["id"], "draft-read-only");
+    assert_eq!(parsed["error"]["code"], -32003);
+    assert_eq!(parsed["error"]["message"], "Permission denied");
+    assert!(parsed["error"]["data"]["message"]
+        .as_str()
+        .expect("SDK error message should be a string")
+        .contains("write_not_allowed"));
+    assert_draft_permission_audit(&store, "write_not_allowed", false);
+
+    let core = CrmCore::open(&store.app_data_dir).expect("test core should reopen");
+    assert!(core
+        .list_pending_proposed_actions()
+        .expect("pending actions should list")
+        .is_empty());
+    drop(core);
+
+    cleanup_file(path);
+    cleanup_dir(store.app_data_dir);
+}
+
+#[test]
+fn serve_stdio_from_config_cli_rejects_activity_draft_for_draft_only_client_missing_permission() {
+    let store = seed_draft_only_mcp_store_without_activity_draft_permission();
+    let path = write_enabled_context_config("cli-stdio-draft-missing-permission", &store);
+    let output = run_stdio_with_input(
+        &path,
+        r#"{"jsonrpc":"2.0","id":"draft-missing","method":"tools/call","params":{"name":"create_activity_draft","arguments":{"title":"Call Amina"}}}"#,
+    );
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let parsed: Value =
+        serde_json::from_str(stdout.trim_end()).expect("permission denial should parse");
+
+    assert_eq!(parsed["id"], "draft-missing");
+    assert_eq!(parsed["error"]["code"], -32003);
+    assert_eq!(parsed["error"]["message"], "Permission denied");
+    assert!(parsed["error"]["data"]["message"]
+        .as_str()
+        .expect("SDK error message should be a string")
+        .contains("missing_tool_permission"));
+    assert_draft_permission_audit(&store, "missing_tool_permission", false);
+
+    let core = CrmCore::open(&store.app_data_dir).expect("test core should reopen");
+    assert!(core
+        .list_pending_proposed_actions()
+        .expect("pending actions should list")
+        .is_empty());
+    drop(core);
+
+    cleanup_file(path);
+    cleanup_dir(store.app_data_dir);
+}
+
+#[test]
+fn serve_stdio_from_config_cli_creates_pending_activity_draft_for_confirmed_draft_client() {
+    let store = seed_draft_only_mcp_store_with_activity_draft_permission();
+    let path = write_enabled_context_config("cli-stdio-draft-created", &store);
+    let output = run_stdio_with_input(
+        &path,
+        r#"{"jsonrpc":"2.0","id":"draft-created","method":"tools/call","params":{"name":"create_activity_draft","arguments":{"title":"Call Amina","activity_type":"call","description":"Confirm next steps","due_at":"2026-06-25T09:00:00Z","linked_entities":[]}}}"#,
+    );
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let parsed: Value =
+        serde_json::from_str(stdout.trim_end()).expect("draft creation response should parse");
+
+    assert_eq!(parsed["id"], "draft-created");
+    assert_eq!(parsed["result"]["isError"], false);
+    let proposed_action = &parsed["result"]["structuredContent"];
+    assert_eq!(
+        proposed_action["client_id"]
+            .as_str()
+            .expect("client_id should be a string"),
+        store.client_id
+    );
+    assert_eq!(proposed_action["tool_name"], CREATE_ACTIVITY_DRAFT_TOOL);
+    assert_eq!(proposed_action["action_type"], CREATE_ACTIVITY_DRAFT_TOOL);
+    assert_eq!(proposed_action["status"], "pending");
+    assert!(proposed_action["approved_at"].is_null());
+    assert!(proposed_action["rejected_at"].is_null());
+    assert!(proposed_action["executed_at"].is_null());
+
+    let input_json = proposed_action["input_json"]
+        .as_str()
+        .expect("input_json should be a string");
+    let input: Value = serde_json::from_str(input_json).expect("input_json should parse");
+    assert_eq!(input["title"], "Call Amina");
+    assert_eq!(input["activity_type"], "call");
+    assert_eq!(input["description"], "Confirm next steps");
+    assert_eq!(input["due_at"], "2026-06-25T09:00:00Z");
+
+    let core = CrmCore::open(&store.app_data_dir).expect("test core should reopen");
+    let pending = core
+        .list_pending_proposed_actions()
+        .expect("pending actions should list");
+    assert_eq!(pending.len(), 1);
+    assert_eq!(
+        pending[0].id,
+        proposed_action["id"]
+            .as_str()
+            .expect("proposed action id should be a string")
+    );
+    assert!(
+        core.list_activities()
+            .expect("activities should list")
+            .is_empty(),
+        "create_activity_draft must not create activities"
+    );
+    drop(core);
+    assert_draft_permission_audit(&store, "allowed", true);
 
     cleanup_file(path);
     cleanup_dir(store.app_data_dir);
@@ -450,6 +635,10 @@ fn rejected_tools_call_validation_does_not_create_app_data() {
             "\n",
             r#"{"jsonrpc":"2.0","id":"missing-query","method":"tools/call","params":{"name":"search.global","arguments":{}}}"#,
             "\n",
+            r#"{"jsonrpc":"2.0","id":"draft-missing-title","method":"tools/call","params":{"name":"create_activity_draft","arguments":{"description":"Missing title"}}}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","id":"draft-unknown-field","method":"tools/call","params":{"name":"create_activity_draft","arguments":{"title":"Call Amina","execute":true}}}"#,
+            "\n",
         ),
     );
 
@@ -461,9 +650,21 @@ fn rejected_tools_call_validation_does_not_create_app_data() {
         .map(|line| serde_json::from_str(line).expect("stdio error response should parse"))
         .collect();
 
-    assert_eq!(lines.len(), 2);
+    assert_eq!(lines.len(), 4);
     assert_eq!(lines[0]["error"]["code"], -32601);
     assert_eq!(lines[1]["error"]["code"], -32602);
+    assert_eq!(lines[2]["id"], "draft-missing-title");
+    assert_eq!(lines[2]["error"]["code"], -32602);
+    assert_eq!(
+        lines[2]["error"]["data"]["reason"],
+        "create_activity_draft requires a non-empty title string"
+    );
+    assert_eq!(lines[3]["id"], "draft-unknown-field");
+    assert_eq!(lines[3]["error"]["code"], -32602);
+    assert_eq!(
+        lines[3]["error"]["data"]["reason"],
+        "request contains unsupported argument fields"
+    );
     assert!(
         !store.app_data_dir.exists(),
         "rejected calls must not open SDK/core or create app data at {}",
@@ -723,6 +924,73 @@ fn seed_disabled_mcp_store() -> McpTestStore {
     }
 }
 
+fn seed_read_only_mcp_store_with_activity_draft_permission() -> McpTestStore {
+    let app_data_dir = test_app_data_dir("read-only-draft");
+    let mut core = CrmCore::open(&app_data_dir).expect("test core should open");
+    let contact = seed_contact(&mut core);
+    let client = core
+        .create_external_client_placeholder("Read Only Draft MCP Client", "mcp")
+        .expect("external client placeholder should be created");
+    core.update_external_client_activation(&client.id, true, "read_only")
+        .expect("external client should enable read-only");
+    core.upsert_external_client_tool_permission(
+        &client.id,
+        CREATE_ACTIVITY_DRAFT_TOOL,
+        true,
+        true,
+        true,
+    )
+    .expect("draft permission row should upsert");
+
+    McpTestStore {
+        app_data_dir,
+        client_id: client.id,
+        contact_id: contact.id,
+    }
+}
+
+fn seed_draft_only_mcp_store_without_activity_draft_permission() -> McpTestStore {
+    let app_data_dir = test_app_data_dir("draft-missing");
+    let mut core = CrmCore::open(&app_data_dir).expect("test core should open");
+    let contact = seed_contact(&mut core);
+    let client = core
+        .create_external_client_placeholder("Draft Only Missing MCP Client", "mcp")
+        .expect("external client placeholder should be created");
+    core.update_external_client_activation(&client.id, true, "draft_only")
+        .expect("external client should enable draft-only");
+
+    McpTestStore {
+        app_data_dir,
+        client_id: client.id,
+        contact_id: contact.id,
+    }
+}
+
+fn seed_draft_only_mcp_store_with_activity_draft_permission() -> McpTestStore {
+    let app_data_dir = test_app_data_dir("draft-allowed");
+    let mut core = CrmCore::open(&app_data_dir).expect("test core should open");
+    let contact = seed_contact(&mut core);
+    let client = core
+        .create_external_client_placeholder("Draft Only Allowed MCP Client", "mcp")
+        .expect("external client placeholder should be created");
+    core.update_external_client_activation(&client.id, true, "draft_only")
+        .expect("external client should enable draft-only");
+    core.upsert_external_client_tool_permission(
+        &client.id,
+        CREATE_ACTIVITY_DRAFT_TOOL,
+        false,
+        true,
+        true,
+    )
+    .expect("draft permission row should upsert");
+
+    McpTestStore {
+        app_data_dir,
+        client_id: client.id,
+        contact_id: contact.id,
+    }
+}
+
 fn seed_contact(core: &mut CrmCore) -> crm_core::storage::contacts::Contact {
     core.create_contact(
         Some("person".to_string()),
@@ -771,6 +1039,56 @@ fn latest_permission_audit(app_data_dir: &Path, client_id: &str, tool_name: &str
                     .is_some_and(|json| json.contains(&format!(r#""tool_name":"{tool_name}""#)))
         })
         .expect("permission audit entry should exist")
+}
+
+fn latest_draft_permission_audit(
+    app_data_dir: &Path,
+    client_id: &str,
+    tool_name: &str,
+) -> AuditLogEntry {
+    let core = CrmCore::open(app_data_dir).expect("test core should reopen");
+    core.list_recent_audit_log(50)
+        .expect("audit log should list")
+        .into_iter()
+        .find(|entry| {
+            entry.action == "evaluate_external_client_draft_permission"
+                && entry.entity_id.as_deref() == Some(client_id)
+                && entry
+                    .after_json
+                    .as_deref()
+                    .is_some_and(|json| json.contains(&format!(r#""tool_name":"{tool_name}""#)))
+        })
+        .expect("draft permission audit entry should exist")
+}
+
+fn assert_draft_permission_audit(store: &McpTestStore, reason: &str, allowed: bool) {
+    let audit = latest_draft_permission_audit(
+        &store.app_data_dir,
+        &store.client_id,
+        CREATE_ACTIVITY_DRAFT_TOOL,
+    );
+    let after_json = audit
+        .after_json
+        .as_deref()
+        .expect("permission audit should include context");
+
+    assert_eq!(audit.action, "evaluate_external_client_draft_permission");
+    assert!(
+        after_json.contains(&format!(r#""allowed":{allowed}"#)),
+        "{after_json}"
+    );
+    assert!(
+        after_json.contains(&format!(r#""reason":"{reason}""#)),
+        "{after_json}"
+    );
+    assert!(
+        after_json.contains(r#""access_kind":"draft""#),
+        "{after_json}"
+    );
+    assert!(
+        after_json.contains(&format!(r#""tool_name":"{CREATE_ACTIVITY_DRAFT_TOOL}""#)),
+        "{after_json}"
+    );
 }
 
 fn test_app_data_dir(name: &str) -> PathBuf {

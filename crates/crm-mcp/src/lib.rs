@@ -4,7 +4,8 @@
 //! expose prompts/resources, or integrate with model providers. By default it
 //! only publishes deterministic local catalog/status metadata. When explicitly
 //! enabled with loopback-valid config and local SDK context, its stdio path can
-//! execute the reviewed read-only SDK tools.
+//! execute reviewed read-only SDK tools and the reviewed activity draft
+//! pending-action tool.
 
 use std::{
     fmt, fs,
@@ -35,9 +36,9 @@ pub const DEFAULT_STATUS_MESSAGE: &str = "900CRM MCP server is not implemented a
 pub const RUNTIME_DISABLED_REASON: &str = "runtime disabled";
 /// Reason reported when configuration is enabled without SDK execution context.
 pub const RUNTIME_EXECUTION_CONTEXT_MISSING_REASON: &str = "execution context missing";
-/// Reason reported when configuration can execute reviewed read-only stdio calls.
-pub const RUNTIME_READ_ONLY_EXECUTION_READY_REASON: &str =
-    "read-only stdio execution context available";
+/// Reason reported when configuration can execute reviewed stdio calls.
+pub const RUNTIME_REVIEWED_EXECUTION_READY_REASON: &str =
+    "reviewed stdio execution context available";
 
 /// Disabled-by-default runtime guard configuration for future MCP work.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -48,7 +49,7 @@ pub struct McpRuntimeConfig {
     pub bind_host: String,
     /// Local bind port reserved for a future runtime listener.
     pub bind_port: u16,
-    /// Optional local app data directory used by reviewed read-only SDK calls.
+    /// Optional local app data directory used by reviewed SDK calls.
     pub app_data_dir: Option<String>,
     /// Optional reviewed external-client id used by SDK permission checks.
     pub external_client_id: Option<String>,
@@ -162,7 +163,7 @@ impl fmt::Display for McpRuntimeConfigError {
 
 impl std::error::Error for McpRuntimeConfigError {}
 
-/// Normalized local SDK execution context for reviewed read-only stdio calls.
+/// Normalized local SDK execution context for reviewed stdio calls.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct McpExecutionContext {
     app_data_dir: PathBuf,
@@ -347,7 +348,7 @@ impl McpRuntimeStatus {
         let reason = if !config.enabled {
             RUNTIME_DISABLED_REASON
         } else if execution_enabled {
-            RUNTIME_READ_ONLY_EXECUTION_READY_REASON
+            RUNTIME_REVIEWED_EXECUTION_READY_REASON
         } else {
             RUNTIME_EXECUTION_CONTEXT_MISSING_REASON
         };
@@ -415,6 +416,16 @@ impl ToolCatalogEntry {
             runtime_enabled: false,
         }
     }
+
+    fn sdk_draft_tool(name: &'static str) -> Self {
+        Self {
+            name,
+            access_kind: "draft",
+            requires_external_client_permission: true,
+            sdk_backed: true,
+            runtime_enabled: false,
+        }
+    }
 }
 
 /// Returns the initial offline read-only tool catalog in SDK-defined order.
@@ -424,6 +435,19 @@ pub fn read_only_tool_catalog() -> Vec<ToolCatalogEntry> {
         .copied()
         .map(ToolCatalogEntry::sdk_read_tool)
         .collect()
+}
+
+fn reviewed_stdio_tool_catalog(execution_enabled: bool) -> Vec<ToolCatalogEntry> {
+    let mut catalog = read_only_tool_catalog();
+    if execution_enabled {
+        catalog.extend(
+            crm_sdk::INITIAL_DRAFT_TOOL_NAMES
+                .iter()
+                .copied()
+                .map(ToolCatalogEntry::sdk_draft_tool),
+        );
+    }
+    catalog
 }
 
 /// Serializes the offline read-only tool catalog as deterministic pretty JSON.
@@ -463,7 +487,8 @@ pub fn handle_jsonrpc_lines(input: &str) -> Result<String, serde_json::Error> {
 ///
 /// This function validates before reading input or writing output. Without a
 /// local SDK execution context it remains metadata-only and rejects
-/// `tools/call`. With context, it dispatches only reviewed read-only SDK tools.
+/// `tools/call`. With context, it dispatches reviewed SDK read tools and the
+/// reviewed activity draft pending-action tool.
 pub fn run_stdio_loop(
     config: &McpRuntimeConfig,
     reader: impl BufRead,
@@ -585,12 +610,12 @@ impl JsonRpcHandler {
 
 fn initialize_result(execution_enabled: bool) -> serde_json::Value {
     let status = if execution_enabled {
-        "read-only-stdio"
+        "reviewed-stdio"
     } else {
         "metadata-only"
     };
     let instructions = if execution_enabled {
-        "Local stdio runtime for reviewed read-only SDK tools. No network listener, authentication, prompts/resources, token handling, write tools, or model-provider integration is enabled."
+        "Local stdio runtime for reviewed SDK read tools and create_activity_draft pending-action creation. No network listener, authentication, prompts/resources, token handling, direct activity creation, proposed-action decision tool, or model-provider integration is enabled."
     } else {
         "Metadata-only one-shot probe. No serving loop, transport, listener, authentication, SDK dispatch, database access, or tool execution is enabled."
     };
@@ -612,7 +637,7 @@ fn initialize_result(execution_enabled: bool) -> serde_json::Value {
 }
 
 fn tools_list_result(execution_enabled: bool) -> serde_json::Value {
-    let tools: Vec<serde_json::Value> = read_only_tool_catalog()
+    let tools: Vec<serde_json::Value> = reviewed_stdio_tool_catalog(execution_enabled)
         .iter()
         .map(|entry| mcp_tool_metadata(entry, execution_enabled))
         .collect();
@@ -623,7 +648,10 @@ fn tools_list_result(execution_enabled: bool) -> serde_json::Value {
 }
 
 fn mcp_tool_metadata(entry: &ToolCatalogEntry, execution_enabled: bool) -> serde_json::Value {
-    let readiness = if execution_enabled {
+    let is_draft_tool = entry.access_kind == "draft";
+    let readiness = if execution_enabled && is_draft_tool {
+        "draft pending-action creation enabled for current local config"
+    } else if execution_enabled {
         "read-only stdio execution enabled for current local config"
     } else {
         "metadata-only; runtime execution is not enabled"
@@ -634,14 +662,17 @@ fn mcp_tool_metadata(entry: &ToolCatalogEntry, execution_enabled: bool) -> serde
         "description": tool_description(entry.name, execution_enabled),
         "inputSchema": tool_input_schema(entry.name),
         "annotations": {
-            "readOnlyHint": true,
+            "readOnlyHint": !is_draft_tool,
             "destructiveHint": false,
-            "idempotentHint": true,
+            "idempotentHint": !is_draft_tool,
             "openWorldHint": false
         },
         "metadata": {
             "accessKind": entry.access_kind,
             "requiresExternalClientPermission": entry.requires_external_client_permission,
+            "requiresConfirmation": is_draft_tool,
+            "createsPendingAction": is_draft_tool,
+            "directExecution": false,
             "sdkBacked": entry.sdk_backed,
             "runtimeEnabled": execution_enabled,
             "executionEnabled": execution_enabled,
@@ -668,6 +699,9 @@ fn tool_description(name: &str, execution_enabled: bool) -> &'static str {
             crm_sdk::SEARCH_GLOBAL_TOOL => {
                 "Search CRM records through the local read-only SDK when permission checks allow it."
             }
+            crm_sdk::CREATE_ACTIVITY_DRAFT_TOOL => {
+                "Create a pending activity proposed action through the local SDK when draft permission checks allow it; this does not create or execute an activity."
+            }
             _ => "Read-only SDK tool execution is enabled for the current local config.",
         }
     } else {
@@ -686,6 +720,9 @@ fn tool_description(name: &str, execution_enabled: bool) -> &'static str {
             }
             crm_sdk::SEARCH_GLOBAL_TOOL => {
                 "Search CRM records metadata contract. Read-only catalog entry; runtime execution is not enabled."
+            }
+            crm_sdk::CREATE_ACTIVITY_DRAFT_TOOL => {
+                "Create activity draft metadata contract. Pending-action creation only; runtime execution is not enabled."
             }
             _ => "Read-only metadata contract. Runtime execution is not enabled.",
         }
@@ -724,6 +761,51 @@ fn tool_input_schema(name: &str) -> serde_json::Value {
                     "type": "integer",
                     "minimum": 1,
                     "description": "Optional read-only result limit."
+                }
+            }
+        }),
+        crm_sdk::CREATE_ACTIVITY_DRAFT_TOOL => serde_json::json!({
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["title"],
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Required activity draft title."
+                },
+                "activity_type": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Optional activity type; core defaults to task when omitted."
+                },
+                "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Optional activity description."
+                },
+                "due_at": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Optional activity due timestamp or date."
+                },
+                "linked_entities": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["entity_type", "entity_id"],
+                        "properties": {
+                            "entity_type": {
+                                "type": "string",
+                                "enum": ["contact", "organization", "deal"]
+                            },
+                            "entity_id": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        }
+                    }
                 }
             }
         }),
@@ -771,6 +853,14 @@ fn execute_tool_call(
             let sdk = execution_context.open_sdk().map_err(ToolCallError::Sdk)?;
             let result = sdk
                 .search_global(&args.query, args.limit)
+                .map_err(ToolCallError::Sdk)?;
+            serde_json::to_value(result).map_err(ToolCallError::Serialize)
+        }
+        crm_sdk::CREATE_ACTIVITY_DRAFT_TOOL => {
+            let args = parse_create_activity_draft_args(&request.arguments)?;
+            let mut sdk = execution_context.open_sdk().map_err(ToolCallError::Sdk)?;
+            let result = sdk
+                .create_activity_draft(args)
                 .map_err(ToolCallError::Sdk)?;
             serde_json::to_value(result).map_err(ToolCallError::Serialize)
         }
@@ -873,6 +963,80 @@ fn parse_search_global_args(
     Ok(SearchGlobalArgs { query, limit })
 }
 
+fn parse_create_activity_draft_args(
+    arguments: &serde_json::Value,
+) -> Result<crm_sdk::CreateActivityDraftParams, ToolCallError> {
+    let object = arguments
+        .as_object()
+        .ok_or(ToolCallError::MalformedArguments(
+            "create_activity_draft arguments must be an object",
+        ))?;
+    reject_unknown_keys(
+        object,
+        &[
+            "title",
+            "activity_type",
+            "description",
+            "due_at",
+            "linked_entities",
+        ],
+    )?;
+
+    Ok(crm_sdk::CreateActivityDraftParams {
+        title: required_string_field(
+            object,
+            "title",
+            "create_activity_draft requires a non-empty title string",
+        )?,
+        activity_type: optional_string_field(object, "activity_type")?,
+        description: optional_string_field(object, "description")?,
+        due_at: optional_string_field(object, "due_at")?,
+        linked_entities: parse_create_activity_draft_linked_entities(
+            object.get("linked_entities"),
+        )?,
+    })
+}
+
+fn parse_create_activity_draft_linked_entities(
+    value: Option<&serde_json::Value>,
+) -> Result<Vec<crm_sdk::CreateActivityDraftLinkedEntityParam>, ToolCallError> {
+    let Some(value) = value else {
+        return Ok(Vec::new());
+    };
+    let entities = value.as_array().ok_or(ToolCallError::MalformedArguments(
+        "create_activity_draft linked_entities must be an array",
+    ))?;
+
+    entities
+        .iter()
+        .map(|entity| {
+            let object = entity.as_object().ok_or(ToolCallError::MalformedArguments(
+                "create_activity_draft linked_entities items must be objects",
+            ))?;
+            reject_unknown_keys(object, &["entity_type", "entity_id"])?;
+            let entity_type = required_string_field(
+                object,
+                "entity_type",
+                "create_activity_draft linked_entities require non-empty entity_type",
+            )?;
+            if !matches!(entity_type.as_str(), "contact" | "organization" | "deal") {
+                return Err(ToolCallError::MalformedArguments(
+                    "create_activity_draft linked_entities entity_type is unsupported",
+                ));
+            }
+
+            Ok(crm_sdk::CreateActivityDraftLinkedEntityParam {
+                entity_type,
+                entity_id: required_string_field(
+                    object,
+                    "entity_id",
+                    "create_activity_draft linked_entities require non-empty entity_id",
+                )?,
+            })
+        })
+        .collect()
+}
+
 fn require_no_arguments(arguments: &serde_json::Value) -> Result<(), ToolCallError> {
     let object = arguments
         .as_object()
@@ -886,6 +1050,38 @@ fn require_no_arguments(arguments: &serde_json::Value) -> Result<(), ToolCallErr
             "tool does not accept arguments",
         ))
     }
+}
+
+fn required_string_field(
+    object: &serde_json::Map<String, serde_json::Value>,
+    field: &'static str,
+    message: &'static str,
+) -> Result<String, ToolCallError> {
+    object
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .ok_or(ToolCallError::MalformedArguments(message))
+}
+
+fn optional_string_field(
+    object: &serde_json::Map<String, serde_json::Value>,
+    field: &'static str,
+) -> Result<Option<String>, ToolCallError> {
+    let Some(value) = object.get(field) else {
+        return Ok(None);
+    };
+    value
+        .as_str()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .map(Some)
+        .ok_or(ToolCallError::MalformedArguments(
+            "create_activity_draft optional string arguments must be non-empty strings",
+        ))
 }
 
 fn reject_unknown_keys(
@@ -989,7 +1185,8 @@ fn jsonrpc_tool_error(id: Option<serde_json::Value>, error: ToolCallError) -> se
         ToolCallError::Sdk(error) => {
             let code = match &error {
                 crm_sdk::SdkError::InvalidInput(message)
-                    if message.contains("may not read tool") =>
+                    if message.contains("may not read tool")
+                        || message.contains("may not create draft proposed actions") =>
                 {
                     -32003
                 }
@@ -1047,7 +1244,7 @@ Default: print the current MCP readiness status. No network server, listener, pr
 {PRINT_RUNTIME_STATUS_FLAG}: print the disabled runtime guard status as JSON.\n\
 {PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path>: load JSON config metadata from an optional path and print non-serving runtime guard status as JSON.\n\
 {HANDLE_JSONRPC_ONCE_FLAG} <json>: handle one metadata-only JSON-RPC request and print one response, or nothing for notifications.\n\
-{SERVE_STDIO_FROM_CONFIG_FLAG} <path>: load JSON config metadata and attempt a disabled-by-default local stdio loop. With app_data_dir and external_client_id, only reviewed read-only SDK tools can execute."
+{SERVE_STDIO_FROM_CONFIG_FLAG} <path>: load JSON config metadata and attempt a disabled-by-default local stdio loop. With app_data_dir and external_client_id, reviewed SDK read tools and create_activity_draft pending-action creation can execute."
     )
 }
 
@@ -1069,7 +1266,7 @@ mod tests {
         McpRuntimeConfig, McpRuntimeConfigError, McpRuntimeConfigLoadError, McpStdioLoopError,
         DEFAULT_STATUS_MESSAGE, PRINT_RUNTIME_STATUS_FLAG, PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG,
         PRINT_TOOL_CATALOG_FLAG, RUNTIME_DISABLED_REASON, RUNTIME_EXECUTION_CONTEXT_MISSING_REASON,
-        RUNTIME_READ_ONLY_EXECUTION_READY_REASON,
+        RUNTIME_REVIEWED_EXECUTION_READY_REASON,
     };
 
     #[test]
@@ -1343,7 +1540,7 @@ mod tests {
         let status = runtime_status(&config);
 
         assert!(status.tool_execution_enabled);
-        assert_eq!(status.reason, RUNTIME_READ_ONLY_EXECUTION_READY_REASON);
+        assert_eq!(status.reason, RUNTIME_REVIEWED_EXECUTION_READY_REASON);
         fs::remove_file(path).ok();
     }
 

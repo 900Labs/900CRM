@@ -3,7 +3,10 @@
 Date: 2026-06-24
 Last updated: 2026-06-26
 
-This document records the current Model Context Protocol (MCP) readiness state for 900CRM. It is a baseline for future implementation work, not a description of active MCP behavior.
+This document records the current Model Context Protocol (MCP) readiness state
+for 900CRM. It describes the optional local MCP package boundary that exists
+today and the gates still required before any network MCP server, auth surface,
+AI behavior, or broader write behavior is accepted.
 
 ## Current Status
 
@@ -13,12 +16,15 @@ This document records the current Model Context Protocol (MCP) readiness state f
 - `crates/crm-mcp` contains an offline SDK-backed read-only tool catalog CLI,
   a disabled-by-default runtime guard/config/status model, a local one-shot
   JSON-RPC probe, and a disabled-by-default config-gated stdio loop for
-  MCP requests. The stdio path can execute only the reviewed read-only SDK
-  tools when config includes both a local app-data directory and reviewed
-  external-client id. It is not a network MCP server.
-- `crates/crm-sdk` now provides a narrow local read-only facade over
-  `crm-core` for reviewed external clients; it is not an MCP runtime.
-- The desktop app and `crm-core` do not start an MCP server, bind a localhost listener, expose prompts/resources/tools, or manage MCP tokens/secrets.
+  MCP requests. The stdio path can execute only the reviewed SDK read tools and
+  `create_activity_draft` pending-action creation when config includes both a
+  local app-data directory and reviewed external-client id. It is not a
+  network MCP server.
+- `crates/crm-sdk` now provides a narrow local facade over `crm-core` for
+  reviewed reads and the reviewed activity-draft proposed-action flow; it is
+  not an MCP runtime.
+- The desktop app and `crm-core` do not start an MCP server, bind a localhost
+  listener, expose prompt/resource surfaces, or manage MCP tokens/secrets.
 
 ## Architecture Boundary
 
@@ -38,22 +44,27 @@ returns at most one JSON-RPC response. A separate stdio line loop can be
 attempted only through an explicit config-backed CLI flag and only when the
 config is enabled and loopback-valid. The stdio path is local process IO only;
 it does not listen on TCP/HTTP/SSE, authenticate clients, query the database
-directly, execute write tools, or start a network server. If config also
+directly, execute direct write tools, or start a network server. If config also
 includes both `app_data_dir` and `external_client_id`, the stdio path can call
-the reviewed `crm-sdk` read-only facade for the initial read tools after
-`crm-core` permission evaluation succeeds.
+the reviewed `crm-sdk` facade for the initial read tools after `crm-core` read
+permission evaluation succeeds, and can create a pending
+`create_activity_draft` proposed action after `crm-core` draft permission
+evaluation succeeds.
 
 The intended call path is:
 
 1. Optional MCP package receives a local client request.
 2. MCP package validates the client, requested tool, and configured mode.
-3. MCP package calls the `crm-sdk` read-only facade for supported reads, or
-   explicit `crm-core` services for future reviewed flows.
-4. `crm-sdk` requires `crm-core` external-client read permission for each tool
-   before dispatching to existing `crm-core` services.
+3. MCP package calls the `crm-sdk` facade for supported reads and the reviewed
+   activity-draft proposed-action flow.
+4. `crm-sdk` requires `crm-core` external-client read permission for read tools
+   and draft permission for `create_activity_draft` before dispatching to
+   existing `crm-core` services.
 5. `crm-core` applies normal domain validation and records audit evidence.
-6. Write-like external-client requests create proposed actions for user review unless a narrow reviewed execution path explicitly supports the action.
-7. The current reviewed execution path is limited to core approval of `create_activity_draft` proposed actions; it does not add an MCP runtime.
+6. Write-like external-client requests create proposed actions for user review
+   unless a narrow reviewed execution path explicitly supports the action.
+7. The current reviewed execution path is limited to core approval of
+   `create_activity_draft` proposed actions.
 
 ## Active Readiness Surfaces
 
@@ -65,6 +76,11 @@ The following data and API surfaces exist today:
 - `crates/crm-sdk` read-only SDK facade with exported initial tool constants
   for `contacts.list`, `organizations.list`, `deals.list`,
   `activities.list`, and `search.global`.
+- `crates/crm-sdk` exported draft tool constant and method for
+  `create_activity_draft`. This creates only a pending proposed action after
+  draft permission succeeds; it does not create an activity, approve a proposed
+  action, reject a proposed action, execute a proposed action, or bypass
+  Pending Actions review.
 - `crates/crm-mcp` offline catalog generation for those initial SDK read tool
   constants. `cargo run -p crm-mcp -- --print-tool-catalog` and the
   `--list-tools` alias print deterministic JSON entries with `name`,
@@ -91,7 +107,7 @@ The following data and API surfaces exist today:
   `serving: false`, `tool_execution_enabled: false`, and reason
   `execution context missing`. If the config also includes both `app_data_dir`
   and `external_client_id`, status reports `tool_execution_enabled: true` and
-  reason `read-only stdio execution context available`. Loading config still
+  reason `reviewed stdio execution context available`. Loading config still
   does not start a network server, create a listener, issue tokens, perform
   authentication, or access the network.
 - `crates/crm-mcp` can handle a single local JSON-RPC message with
@@ -116,13 +132,18 @@ The following data and API surfaces exist today:
   responses are emitted as newline-delimited JSON and notifications emit no
   line. Without execution context, `tools/call` is rejected. With execution
   context, `tools/call` can execute only `contacts.list`,
-  `organizations.list`, `deals.list`, `activities.list`, and `search.global`
-  through `crm-sdk::CrmSdk`. Unknown tools, write-like tool names, malformed
-  arguments, missing search query, missing permissions, disabled clients, and
-  unsupported methods return JSON-RPC errors. This path is disabled by default,
-  local-only stdio, read-only, SDK-routed, and does not add direct database
-  access, token/secret handling, authentication, TCP/HTTP/SSE/socket listeners,
-  sync-server behavior, schema changes, UI behavior, or write execution.
+  `organizations.list`, `deals.list`, `activities.list`, `search.global`, and
+  `create_activity_draft` through `crm-sdk::CrmSdk`. `create_activity_draft`
+  creates a pending proposed action only when the external client has
+  `draft_only` mode plus a matching `can_write = true` /
+  `requires_confirmation = true` permission row. Unknown tools, write-like tool
+  names outside this reviewed draft flow, malformed arguments, missing search
+  query, missing permissions, disabled clients, and unsupported methods return
+  JSON-RPC errors. This path is disabled by default, local-only stdio,
+  SDK-routed, and does not add direct database access, token/secret handling,
+  authentication, TCP/HTTP/SSE/socket listeners, sync-server behavior, schema
+  changes, UI behavior, direct activity creation, or proposed-action
+  approval/rejection/execution tools.
 - SDK read methods for contacts, organizations, deals, activities, and global
   search. Each method calls
   `CrmCore::evaluate_external_client_tool_read_permission(client_id,
@@ -217,18 +238,19 @@ The current codebase intentionally does not include:
 - A localhost MCP listener.
 - MCP authentication tokens, client secrets, or credential storage.
 - Prompt or resource implementations.
-- MCP runtime bindings beyond the reviewed read-only SDK tools.
+- MCP runtime bindings beyond the reviewed SDK read tools and the reviewed
+  `create_activity_draft` pending-action tool.
 - MCP network-server serving behind the runtime guard/config/status metadata.
 - MCP network-server serving behind the JSON config-file metadata.
 - MCP serving behind the one-shot JSON-RPC metadata probe.
 - TCP, HTTP, SSE, socket, or other network transport loops for JSON-RPC handling.
-- Write-like, draft, unreviewed, or non-SDK tool execution through `tools/call`.
+- Direct write-like, unreviewed, or non-SDK tool execution through `tools/call`.
 - Model-provider integrations.
 - Internet or cloud requirements.
 - Raw SQL access for MCP clients.
 - File-system or shell tools.
 - Token/secret UI, listener UI, or MCP runtime UI.
-- SDK write methods or SDK proposed-action creation.
+- SDK direct write methods or SDK proposed-action decision/execution methods.
 - General direct execution of approved proposed actions beyond the supported
   `create_activity_draft` core path.
 
@@ -265,8 +287,9 @@ A future MCP implementation should not be accepted until all of the following ar
       `initialize`, `tools/list`, and notifications, with `tools/call`
       explicitly rejected and no serving loop or transport.
 - [x] `crates/crm-mcp` has a disabled-by-default config-gated local stdio loop
-      that can execute only reviewed read-only SDK tools when local execution
-      context is present.
+      that can execute only reviewed SDK read tools and the reviewed
+      `create_activity_draft` pending-action tool when local execution context
+      is present.
 - [ ] The future implemented listener is localhost-only.
 - [ ] No cloud, internet, or model-provider dependency is required for core CRM use.
 - [x] Current MCP read tools call `crm-core` services through `crm-sdk` instead
@@ -281,7 +304,8 @@ A future MCP implementation should not be accepted until all of the following ar
       dispatch records `crm-core` external-client permission evaluation audit
       evidence for attempted client, tool, allowed flag, reason, and status, but
       result-scope audit detail remains future work.
-- [ ] Draft proposed actions are audited and visible in Pending Actions.
+- [x] Draft proposed actions are audited and visible in Pending Actions for the
+      reviewed `create_activity_draft` MCP/SDK path.
 - [ ] Approved proposed actions execute only when a reviewed, supported core execution path exists; unsupported actions remain pending with explicit errors.
 - [ ] Prompt-injection boundaries are documented and tested with CRM content treated as untrusted.
 - [ ] Security documentation covers credential handling if tokens or secrets are introduced.
