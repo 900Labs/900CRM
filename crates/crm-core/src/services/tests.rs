@@ -263,6 +263,31 @@ fn external_client_evaluation_audit_context(
     .expect("evaluation audit context should parse")
 }
 
+fn external_client_tool_result_audit_context(
+    core: &CrmCore,
+    client_id: &str,
+    tool_name: &str,
+) -> serde_json::Value {
+    let (entity_type, entity_id, after_json): (Option<String>, Option<String>, Option<String>) =
+        core.db
+            .conn
+            .query_row(
+                "SELECT entity_type, entity_id, after_json FROM audit_log WHERE action = 'record_external_client_tool_result' AND actor_type = 'mcp_client' AND entity_id = ?1 AND after_json LIKE ?2 ORDER BY created_at DESC, id DESC LIMIT 1",
+                params![client_id, format!("%\"tool_name\":\"{tool_name}\"%")],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("external client tool result audit row should query");
+
+    assert_eq!(entity_type.as_deref(), Some("external_client"));
+    assert_eq!(entity_id.as_deref(), Some(client_id));
+    serde_json::from_str(
+        after_json
+            .as_deref()
+            .expect("tool result audit after_json should exist"),
+    )
+    .expect("tool result audit context should parse")
+}
+
 fn assert_permission_denial(error: CrmError, reason: &str) {
     match error {
         CrmError::InvalidInput(message) => {
@@ -1648,6 +1673,50 @@ fn draft_permission_evaluation_records_audit_context_without_sync_changelog() {
         count(&core, "SELECT COUNT(*) FROM sync_changelog"),
         sync_count_before
     );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn external_client_tool_result_records_audit_context_without_sync_changelog() {
+    let (mut core, path) = open_test_core();
+    let client = create_test_external_client_with_mode(&mut core, "read_only");
+    let sync_count_before = count(&core, "SELECT COUNT(*) FROM sync_changelog");
+
+    core.record_external_client_tool_result(
+        &client.id,
+        "contacts.list",
+        "read",
+        2,
+        Some("contact"),
+        Some("contact-1"),
+    )
+    .expect("tool result audit should record");
+
+    let context = external_client_tool_result_audit_context(&core, &client.id, "contacts.list");
+    assert_eq!(context["client_id"].as_str(), Some(client.id.as_str()));
+    assert_eq!(context["tool_name"].as_str(), Some("contacts.list"));
+    assert_eq!(context["access_kind"].as_str(), Some("read"));
+    assert_eq!(context["status"].as_str(), Some("succeeded"));
+    assert_eq!(context["result_count"].as_u64(), Some(2));
+    assert_eq!(
+        context["entity_scope"]["entity_type"].as_str(),
+        Some("contact")
+    );
+    assert_eq!(
+        context["entity_scope"]["entity_id"].as_str(),
+        Some("contact-1")
+    );
+    assert_eq!(
+        count(&core, "SELECT COUNT(*) FROM sync_changelog"),
+        sync_count_before
+    );
+
+    let err = core
+        .record_external_client_tool_result(&client.id, "contacts.list", "write", 1, None, None)
+        .expect_err("unsupported result access kind should reject");
+    assert_permission_denial(err, "unsupported");
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);

@@ -3,12 +3,13 @@ use std::{fs, io::BufWriter};
 use rusqlite::Connection;
 use serde::Serialize;
 
-use crate::audit::ACTOR_DESKTOP_APP;
+use crate::audit::{ACTOR_DESKTOP_APP, ACTOR_MCP_CLIENT};
 use crate::permissions::{
     evaluate_tool_draft_permission, evaluate_tool_read_permission, ExternalClientPermissionMode,
     ToolPermissionEvaluation,
 };
 use crate::result::CrmResult;
+use crate::storage::audit::AuditLogEntry;
 use crate::storage::{
     self, external_client_permissions::ExternalClientPermission, external_clients::ExternalClient,
 };
@@ -23,6 +24,7 @@ const EVALUATE_EXTERNAL_CLIENT_READ_PERMISSION_ACTION: &str =
     "evaluate_external_client_read_permission";
 const EVALUATE_EXTERNAL_CLIENT_DRAFT_PERMISSION_ACTION: &str =
     "evaluate_external_client_draft_permission";
+const RECORD_EXTERNAL_CLIENT_TOOL_RESULT_ACTION: &str = "record_external_client_tool_result";
 const EXTERNAL_CLIENT_ENTITY_TYPE: &str = "external_client";
 
 impl CrmCore {
@@ -155,6 +157,41 @@ impl CrmCore {
             &client_id,
             &tool_name,
             None,
+        )
+    }
+
+    pub fn record_external_client_tool_result(
+        &self,
+        client_id: &str,
+        tool_name: &str,
+        access_kind: &str,
+        result_count: u32,
+        entity_type: Option<&str>,
+        entity_id: Option<&str>,
+    ) -> CrmResult<AuditLogEntry> {
+        let client_id = required_external_client_field("client_id", client_id)?;
+        let tool_name = required_external_client_field("tool_name", tool_name)?;
+        let access_kind = ExternalClientResultAccessKind::parse(access_kind)?;
+        require_existing_external_client(&self.db.conn, &client_id)?;
+        let entity_scope = external_client_entity_scope(entity_type, entity_id);
+        let context = ExternalClientToolResultAudit {
+            client_id: &client_id,
+            tool_name: &tool_name,
+            access_kind: access_kind.as_str(),
+            status: "succeeded",
+            result_count,
+            entity_scope,
+        };
+
+        record_audit_json(
+            &self.db.conn,
+            ACTOR_MCP_CLIENT,
+            RECORD_EXTERNAL_CLIENT_TOOL_RESULT_ACTION,
+            Some(EXTERNAL_CLIENT_ENTITY_TYPE),
+            Some(&client_id),
+            None::<&()>,
+            Some(&context),
+            &self.device_id,
         )
     }
 }
@@ -408,6 +445,43 @@ impl<'a> ExternalClientPermissionEvaluationAudit<'a> {
             },
         }
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ExternalClientResultAccessKind {
+    Read,
+    Draft,
+}
+
+impl ExternalClientResultAccessKind {
+    fn parse(value: &str) -> CrmResult<Self> {
+        match value.trim() {
+            "read" => Ok(Self::Read),
+            "draft" => Ok(Self::Draft),
+            other => Err(CrmError::InvalidInput(format!(
+                "External client tool result access kind '{}' is unsupported",
+                other
+            ))),
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Read => "read",
+            Self::Draft => "draft",
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct ExternalClientToolResultAudit<'a> {
+    client_id: &'a str,
+    tool_name: &'a str,
+    access_kind: &'static str,
+    status: &'static str,
+    result_count: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    entity_scope: Option<ExternalClientEntityScope<'a>>,
 }
 
 fn require_initial_external_client_mode(

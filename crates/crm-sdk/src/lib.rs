@@ -76,31 +76,41 @@ impl ReadOnlyCrmSdk {
     /// Lists contacts after verifying `contacts.list` read permission.
     pub fn contacts_list(&self, params: Option<ContactListParams>) -> CrmResult<ContactListResult> {
         self.require_read_permission(CONTACTS_LIST_TOOL)?;
-        self.core.list_contacts(params)
+        let result = self.core.list_contacts(params)?;
+        self.record_read_result(CONTACTS_LIST_TOOL, count_as_u32(result.contacts.len()))?;
+        Ok(result)
     }
 
     /// Lists organizations after verifying `organizations.list` read permission.
     pub fn organizations_list(&self) -> CrmResult<Vec<Organization>> {
         self.require_read_permission(ORGANIZATIONS_LIST_TOOL)?;
-        self.core.list_organizations()
+        let result = self.core.list_organizations()?;
+        self.record_read_result(ORGANIZATIONS_LIST_TOOL, count_as_u32(result.len()))?;
+        Ok(result)
     }
 
     /// Lists deals after verifying `deals.list` read permission.
     pub fn deals_list(&self) -> CrmResult<Vec<Deal>> {
         self.require_read_permission(DEALS_LIST_TOOL)?;
-        self.core.list_deals()
+        let result = self.core.list_deals()?;
+        self.record_read_result(DEALS_LIST_TOOL, count_as_u32(result.len()))?;
+        Ok(result)
     }
 
     /// Lists activities after verifying `activities.list` read permission.
     pub fn activities_list(&self) -> CrmResult<Vec<Activity>> {
         self.require_read_permission(ACTIVITIES_LIST_TOOL)?;
-        self.core.list_activities()
+        let result = self.core.list_activities()?;
+        self.record_read_result(ACTIVITIES_LIST_TOOL, count_as_u32(result.len()))?;
+        Ok(result)
     }
 
     /// Runs global search after verifying `search.global` read permission.
     pub fn search_global(&self, query: &str, limit: Option<u32>) -> CrmResult<Vec<SearchResult>> {
         self.require_read_permission(SEARCH_GLOBAL_TOOL)?;
-        self.core.global_search(query, limit)
+        let result = self.core.global_search(query, limit)?;
+        self.record_read_result(SEARCH_GLOBAL_TOOL, count_as_u32(result.len()))?;
+        Ok(result)
     }
 
     /// Creates a pending activity proposed action after draft permission checks.
@@ -139,6 +149,18 @@ impl ReadOnlyCrmSdk {
             tool_name,
             evaluation.reason.as_str()
         )))
+    }
+
+    fn record_read_result(&self, tool_name: &str, result_count: u32) -> CrmResult<()> {
+        self.core.record_external_client_tool_result(
+            &self.external_client_id,
+            tool_name,
+            "read",
+            result_count,
+            None,
+            None,
+        )?;
+        Ok(())
     }
 }
 
@@ -224,6 +246,10 @@ fn optional_draft_string(value: Option<String>) -> Option<String> {
         .filter(|trimmed| !trimmed.is_empty())
 }
 
+fn count_as_u32(count: usize) -> u32 {
+    count.min(u32::MAX as usize) as u32
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -289,6 +315,7 @@ mod tests {
             "evaluate_external_client_read_permission",
             "read",
         );
+        assert_no_tool_result_audit(&app_data_dir, &client.id, CONTACTS_LIST_TOOL);
         cleanup(app_data_dir);
     }
 
@@ -315,6 +342,7 @@ mod tests {
             "evaluate_external_client_read_permission",
             "read",
         );
+        assert_no_tool_result_audit(&app_data_dir, &client.id, CONTACTS_LIST_TOOL);
         cleanup(app_data_dir);
     }
 
@@ -366,6 +394,7 @@ mod tests {
             "evaluate_external_client_read_permission",
             "read",
         );
+        assert_tool_result_audit(&app_data_dir, &client.id, CONTACTS_LIST_TOOL, 1);
         cleanup(app_data_dir);
     }
 
@@ -413,6 +442,7 @@ mod tests {
             "evaluate_external_client_read_permission",
             "read",
         );
+        assert_no_tool_result_audit(&app_data_dir, &client.id, SEARCH_GLOBAL_TOOL);
 
         let mut core = open_core(&app_data_dir);
         core.upsert_external_client_tool_permission(
@@ -443,6 +473,7 @@ mod tests {
             "evaluate_external_client_read_permission",
             "read",
         );
+        assert_tool_result_audit(&app_data_dir, &client.id, SEARCH_GLOBAL_TOOL, 1);
         cleanup(app_data_dir);
     }
 
@@ -667,6 +698,71 @@ mod tests {
                         .is_some_and(|json| json.contains(&format!(r#""tool_name":"{tool_name}""#)))
             })
             .expect("permission audit entry should exist")
+    }
+
+    fn assert_tool_result_audit(
+        app_data_dir: &Path,
+        client_id: &str,
+        tool_name: &str,
+        result_count: u32,
+    ) {
+        let entry = latest_tool_result_audit(app_data_dir, client_id, tool_name)
+            .expect("tool result audit entry should exist");
+        assert_eq!(entry.action, "record_external_client_tool_result");
+        assert_eq!(entry.actor_type, "mcp_client");
+        assert_eq!(entry.entity_type.as_deref(), Some("external_client"));
+        assert_eq!(entry.entity_id.as_deref(), Some(client_id));
+
+        let after_json = entry
+            .after_json
+            .as_deref()
+            .expect("tool result audit should include after_json context");
+        assert!(
+            after_json.contains(&format!(r#""client_id":"{client_id}""#)),
+            "{after_json}"
+        );
+        assert!(
+            after_json.contains(&format!(r#""tool_name":"{tool_name}""#)),
+            "{after_json}"
+        );
+        assert!(
+            after_json.contains(r#""access_kind":"read""#),
+            "{after_json}"
+        );
+        assert!(
+            after_json.contains(r#""status":"succeeded""#),
+            "{after_json}"
+        );
+        assert!(
+            after_json.contains(&format!(r#""result_count":{result_count}"#)),
+            "{after_json}"
+        );
+    }
+
+    fn assert_no_tool_result_audit(app_data_dir: &Path, client_id: &str, tool_name: &str) {
+        assert!(
+            latest_tool_result_audit(app_data_dir, client_id, tool_name).is_none(),
+            "denied SDK reads must not record successful tool result audits"
+        );
+    }
+
+    fn latest_tool_result_audit(
+        app_data_dir: &Path,
+        client_id: &str,
+        tool_name: &str,
+    ) -> Option<AuditLogEntry> {
+        let core = open_core(app_data_dir);
+        core.list_recent_audit_log(50)
+            .expect("audit log should list")
+            .into_iter()
+            .find(|entry| {
+                entry.action == "record_external_client_tool_result"
+                    && entry.entity_id.as_deref() == Some(client_id)
+                    && entry
+                        .after_json
+                        .as_deref()
+                        .is_some_and(|json| json.contains(&format!(r#""tool_name":"{tool_name}""#)))
+            })
     }
 
     fn cleanup(app_data_dir: PathBuf) {

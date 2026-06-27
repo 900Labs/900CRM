@@ -148,6 +148,10 @@ The following data and API surfaces exist today:
   search. Each method calls
   `CrmCore::evaluate_external_client_tool_read_permission(client_id,
   tool_name)` before returning data from existing `crm-core` services.
+  Successful SDK reads also record a `record_external_client_tool_result`
+  audit entry with actor `mcp_client`, the external client id, tool name,
+  access kind, succeeded status, returned result count, and optional entity
+  scope. Denied reads do not record successful result audits.
 - Settings UI local activation review/edit controls for existing external-client
   records using only `disabled`, `read_only`, and `draft_only`.
 - Proposed action rows with pending, approved, rejected, and other schema-reserved lifecycle states.
@@ -299,11 +303,11 @@ A future MCP implementation should not be accepted until all of the following ar
 - [ ] No raw SQL, shell, process, or arbitrary file tools are exposed.
 - [ ] External client enablement and per-tool permission grants have explicit review UI.
 - [ ] Only `disabled`, `read_only`, and `draft_only` are active unless a future sprint implements broader modes with tests and docs.
-- [ ] MCP runtime read access is audited with enough context to identify client,
-      tool, entity scope, and result status. Current read-only `tools/call`
-      dispatch records `crm-core` external-client permission evaluation audit
-      evidence for attempted client, tool, allowed flag, reason, and status, but
-      result-scope audit detail remains future work.
+- [x] MCP runtime read access is audited with enough context to identify client,
+      tool, entity scope, and result status. Read `tools/call` dispatch records
+      `crm-core` external-client permission evaluation audit evidence for the
+      attempted client/tool plus successful result audit evidence with result
+      count and optional entity scope.
 - [x] Draft proposed actions are audited and visible in Pending Actions for the
       reviewed `create_activity_draft` MCP/SDK path.
 - [ ] Approved proposed actions execute only when a reviewed, supported core execution path exists; unsupported actions remain pending with explicit errors.
