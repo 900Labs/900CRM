@@ -1,6 +1,6 @@
 use std::{fs, io::BufWriter};
 
-use crate::audit::ACTOR_DESKTOP_APP;
+use crate::audit::{ACTOR_DESKTOP_APP, ACTOR_MCP_CLIENT};
 use crate::result::CrmResult;
 use crate::storage::{
     self,
@@ -22,7 +22,6 @@ use super::{create_activity_in_transaction, record_audit_json, CrmCore};
 
 const CREATE_ACTIVITY_DRAFT_TOOL: &str = "create_activity_draft";
 const CREATE_ACTIVITY_COMPATIBLE_ACTION_TYPE: &str = "create_activity";
-const ACTOR_MCP_CLIENT: &str = "mcp_client";
 
 impl CrmCore {
     pub fn list_pending_proposed_actions(&self) -> CrmResult<Vec<ProposedAction>> {

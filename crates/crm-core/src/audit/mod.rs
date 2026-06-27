@@ -6,4 +6,5 @@
 
 pub const ACTOR_DESKTOP_APP: &str = "desktop_app";
 pub const ACTOR_IMPORT: &str = "import";
+pub const ACTOR_MCP_CLIENT: &str = "mcp_client";
 pub const ACTOR_SYSTEM: &str = "system";
