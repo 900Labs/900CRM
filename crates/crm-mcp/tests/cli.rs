@@ -1,15 +1,16 @@
 use std::{
     fs,
     io::Write,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use crm_core::{storage::audit::AuditLogEntry, CrmCore};
 use crm_mcp::{
     HANDLE_JSONRPC_ONCE_FLAG, PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG, SERVE_STDIO_FROM_CONFIG_FLAG,
 };
-use crm_sdk::INITIAL_READ_TOOL_NAMES;
+use crm_sdk::{CONTACTS_LIST_TOOL, INITIAL_READ_TOOL_NAMES, SEARCH_GLOBAL_TOOL};
 use serde_json::Value;
 
 #[test]
@@ -21,7 +22,7 @@ fn default_cli_output_does_not_imply_running_server() {
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
     assert!(stdout.contains("not implemented"));
-    assert!(stdout.contains("does not start a server"));
+    assert!(stdout.contains("does not start a network server"));
     assert!(stdout.contains("--print-runtime-status"));
     assert!(!stdout.contains("server is running"));
     assert!(!stdout.contains("listening"));
@@ -103,7 +104,7 @@ fn print_runtime_status_from_config_cli_outputs_not_serving_for_enabled_loopback
     assert_eq!(parsed["bind_port"], 3987);
     assert_eq!(parsed["serving"], false);
     assert_eq!(parsed["tool_execution_enabled"], false);
-    assert_eq!(parsed["reason"], "server not implemented");
+    assert_eq!(parsed["reason"], "execution context missing");
     assert_eq!(
         raw,
         r#"{
@@ -112,7 +113,7 @@ fn print_runtime_status_from_config_cli_outputs_not_serving_for_enabled_loopback
   "bind_port": 3987,
   "serving": false,
   "tool_execution_enabled": false,
-  "reason": "server not implemented"
+  "reason": "execution context missing"
 }"#
     );
     fs::remove_file(path).ok();
@@ -131,6 +132,25 @@ fn print_runtime_status_from_config_cli_exits_nonzero_for_invalid_json() {
     let stderr = String::from_utf8(output.stderr).expect("stderr should be UTF-8");
     assert!(stderr.contains("failed to parse MCP runtime config JSON"));
     fs::remove_file(path).ok();
+}
+
+#[test]
+fn print_runtime_status_from_config_cli_reports_execution_ready_with_context() {
+    let store = seed_allowed_mcp_store(&[CONTACTS_LIST_TOOL]);
+    let path = write_enabled_context_config("cli-enabled-context-status", &store);
+    let raw = run_runtime_status_from_config(&path);
+    let parsed: Value = serde_json::from_str(&raw).expect("runtime status JSON should parse");
+
+    assert_eq!(parsed["enabled"], true);
+    assert_eq!(parsed["serving"], false);
+    assert_eq!(parsed["tool_execution_enabled"], true);
+    assert_eq!(
+        parsed["reason"],
+        "read-only stdio execution context available"
+    );
+
+    cleanup_file(path);
+    cleanup_dir(store.app_data_dir);
 }
 
 #[test]
@@ -233,6 +253,225 @@ fn serve_stdio_from_config_cli_processes_piped_loopback_metadata() {
         "tools"
     );
     fs::remove_file(path).ok();
+}
+
+#[test]
+fn serve_stdio_from_config_cli_rejects_tools_call_without_execution_context() {
+    let path = write_temp_config(
+        "cli-stdio-enabled-no-context-call",
+        r#"{
+  "enabled": true,
+  "bind_host": "127.0.0.1",
+  "bind_port": 3987
+}"#,
+    );
+    let output = run_stdio_with_input(
+        &path,
+        r#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"contacts.list","arguments":{}}}"#,
+    );
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let parsed: Value =
+        serde_json::from_str(stdout.trim_end()).expect("tools/call rejection should parse");
+
+    assert_eq!(parsed["id"], 4);
+    assert_eq!(parsed["error"]["code"], -32002);
+    assert!(parsed["error"]["message"]
+        .as_str()
+        .expect("error message should be a string")
+        .contains("missing local execution context"));
+    fs::remove_file(path).ok();
+}
+
+#[test]
+fn serve_stdio_from_config_cli_executes_allowed_contacts_and_search_tools() {
+    let store = seed_allowed_mcp_store(&[CONTACTS_LIST_TOOL, SEARCH_GLOBAL_TOOL]);
+    let path = write_enabled_context_config("cli-stdio-allowed-read-tools", &store);
+    let output = run_stdio_with_input(
+        &path,
+        concat!(
+            r#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","id":"tools","method":"tools/list"}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","id":"contacts","method":"tools/call","params":{"name":"contacts.list","arguments":{"limit":5}}}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","id":"search","method":"tools/call","params":{"name":"search.global","arguments":{"query":"Amina","limit":10}}}"#,
+            "\n",
+        ),
+    );
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let lines: Vec<Value> = stdout
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("stdio response should parse"))
+        .collect();
+
+    assert_eq!(lines.len(), 4);
+    assert_eq!(
+        lines[0]["result"]["serverInfo"]["status"],
+        "read-only-stdio"
+    );
+
+    let tools = lines[1]["result"]["tools"]
+        .as_array()
+        .expect("tools/list should include tools array");
+    assert!(tools
+        .iter()
+        .all(|tool| tool["metadata"]["executionEnabled"] == true));
+
+    let contacts = lines[2]["result"]["structuredContent"]["contacts"]
+        .as_array()
+        .expect("contacts.list should return contacts array");
+    assert_eq!(contacts.len(), 1);
+    assert_eq!(contacts[0]["id"], store.contact_id);
+    assert_eq!(contacts[0]["first_name"], "Amina");
+
+    let search_results = lines[3]["result"]["structuredContent"]
+        .as_array()
+        .expect("search.global should return search results array");
+    assert!(search_results.iter().any(|result| result["title"]
+        .as_str()
+        .is_some_and(|title| title.contains("Amina"))));
+
+    cleanup_file(path);
+    cleanup_dir(store.app_data_dir);
+}
+
+#[test]
+fn serve_stdio_from_config_cli_rejects_permission_denied_client_and_records_audit() {
+    let store = seed_disabled_mcp_store();
+    let path = write_enabled_context_config("cli-stdio-denied-read-tool", &store);
+    let output = run_stdio_with_input(
+        &path,
+        r#"{"jsonrpc":"2.0","id":"denied","method":"tools/call","params":{"name":"contacts.list","arguments":{}}}"#,
+    );
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let parsed: Value =
+        serde_json::from_str(stdout.trim_end()).expect("permission denial should parse");
+
+    assert_eq!(parsed["id"], "denied");
+    assert_eq!(parsed["error"]["code"], -32003);
+    assert_eq!(parsed["error"]["message"], "Permission denied");
+    assert_eq!(parsed["error"]["data"]["kind"], "InvalidInput");
+    assert!(parsed["error"]["data"]["message"]
+        .as_str()
+        .expect("SDK error message should be a string")
+        .contains("client_disabled"));
+
+    let audit = latest_permission_audit(&store.app_data_dir, &store.client_id, CONTACTS_LIST_TOOL);
+    let after_json = audit
+        .after_json
+        .as_deref()
+        .expect("permission audit should include context");
+    assert_eq!(audit.action, "evaluate_external_client_read_permission");
+    assert!(after_json.contains(r#""allowed":false"#), "{after_json}");
+    assert!(
+        after_json.contains(r#""reason":"client_disabled""#),
+        "{after_json}"
+    );
+    assert!(after_json.contains(r#""status":"denied""#), "{after_json}");
+
+    cleanup_file(path);
+    cleanup_dir(store.app_data_dir);
+}
+
+#[test]
+fn serve_stdio_from_config_cli_rejects_unknown_write_like_and_malformed_calls() {
+    let store = seed_allowed_mcp_store(&[CONTACTS_LIST_TOOL, SEARCH_GLOBAL_TOOL]);
+    let path = write_enabled_context_config("cli-stdio-rejected-tools", &store);
+    let output = run_stdio_with_input(
+        &path,
+        concat!(
+            r#"{"jsonrpc":"2.0","id":"write","method":"tools/call","params":{"name":"contacts.create","arguments":{"first_name":"Amina"}}}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","id":"missing-query","method":"tools/call","params":{"name":"search.global","arguments":{}}}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","id":"bad-args","method":"tools/call","params":{"name":"contacts.list","arguments":{"limit":0}}}"#,
+            "\n",
+        ),
+    );
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let lines: Vec<Value> = stdout
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("stdio error response should parse"))
+        .collect();
+
+    assert_eq!(lines.len(), 3);
+    assert_eq!(lines[0]["id"], "write");
+    assert_eq!(lines[0]["error"]["code"], -32601);
+    assert_eq!(
+        lines[0]["error"]["message"],
+        "Tool not found or not executable"
+    );
+
+    assert_eq!(lines[1]["id"], "missing-query");
+    assert_eq!(lines[1]["error"]["code"], -32602);
+    assert_eq!(
+        lines[1]["error"]["data"]["reason"],
+        "search.global requires a non-empty query string"
+    );
+
+    assert_eq!(lines[2]["id"], "bad-args");
+    assert_eq!(lines[2]["error"]["code"], -32602);
+    assert_eq!(
+        lines[2]["error"]["data"]["reason"],
+        "numeric argument is outside the supported range"
+    );
+
+    cleanup_file(path);
+    cleanup_dir(store.app_data_dir);
+}
+
+#[test]
+fn rejected_tools_call_validation_does_not_create_app_data() {
+    let app_data_dir = test_app_data_dir("rejected-no-open");
+    let client_id = "unopened-client".to_string();
+    let store = McpTestStore {
+        app_data_dir,
+        client_id,
+        contact_id: String::new(),
+    };
+    let path = write_enabled_context_config("cli-stdio-rejected-no-open", &store);
+    let output = run_stdio_with_input(
+        &path,
+        concat!(
+            r#"{"jsonrpc":"2.0","id":"write","method":"tools/call","params":{"name":"contacts.create","arguments":{"first_name":"Amina"}}}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","id":"missing-query","method":"tools/call","params":{"name":"search.global","arguments":{}}}"#,
+            "\n",
+        ),
+    );
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let lines: Vec<Value> = stdout
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("stdio error response should parse"))
+        .collect();
+
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0]["error"]["code"], -32601);
+    assert_eq!(lines[1]["error"]["code"], -32602);
+    assert!(
+        !store.app_data_dir.exists(),
+        "rejected calls must not open SDK/core or create app data at {}",
+        store.app_data_dir.display()
+    );
+
+    cleanup_file(path);
+    cleanup_dir(store.app_data_dir);
 }
 
 #[test]
@@ -355,11 +594,11 @@ fn jsonrpc_tools_call_probe_is_rejected_without_execution() {
 
     assert_eq!(parsed["jsonrpc"], "2.0");
     assert_eq!(parsed["id"], 4);
-    assert_eq!(parsed["error"]["code"], -32601);
+    assert_eq!(parsed["error"]["code"], -32002);
     assert!(parsed["error"]["message"]
         .as_str()
         .expect("error message should be a string")
-        .contains("tools/call execution is not implemented or enabled"));
+        .contains("missing local execution context"));
 }
 
 fn run_catalog_flag(flag: &str) -> String {
@@ -415,6 +654,142 @@ fn run_jsonrpc_probe(raw_json: &str) -> String {
         .expect("stdout should be UTF-8")
         .trim_end()
         .to_string()
+}
+
+fn run_stdio_with_input(path: &Path, input: &str) -> std::process::Output {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_crm-mcp"))
+        .arg(SERVE_STDIO_FROM_CONFIG_FLAG)
+        .arg(path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("crm-mcp should spawn");
+
+    {
+        let stdin = child.stdin.as_mut().expect("child stdin should be piped");
+        stdin
+            .write_all(input.as_bytes())
+            .expect("stdin write should succeed");
+    }
+    drop(child.stdin.take());
+
+    child
+        .wait_with_output()
+        .expect("crm-mcp should finish after stdin closes")
+}
+
+struct McpTestStore {
+    app_data_dir: PathBuf,
+    client_id: String,
+    contact_id: String,
+}
+
+fn seed_allowed_mcp_store(granted_tools: &[&str]) -> McpTestStore {
+    let app_data_dir = test_app_data_dir("allowed");
+    let mut core = CrmCore::open(&app_data_dir).expect("test core should open");
+    let contact = seed_contact(&mut core);
+    let client = core
+        .create_external_client_placeholder("Allowed MCP Client", "mcp")
+        .expect("external client placeholder should be created");
+    core.update_external_client_activation(&client.id, true, "read_only")
+        .expect("external client should enable read-only");
+    for tool_name in granted_tools {
+        core.upsert_external_client_tool_permission(&client.id, tool_name, true, false, false)
+            .expect("tool permission should upsert");
+    }
+
+    McpTestStore {
+        app_data_dir,
+        client_id: client.id,
+        contact_id: contact.id,
+    }
+}
+
+fn seed_disabled_mcp_store() -> McpTestStore {
+    let app_data_dir = test_app_data_dir("disabled");
+    let mut core = CrmCore::open(&app_data_dir).expect("test core should open");
+    let contact = seed_contact(&mut core);
+    let client = core
+        .create_external_client_placeholder("Disabled MCP Client", "mcp")
+        .expect("external client placeholder should be created");
+    core.upsert_external_client_tool_permission(&client.id, CONTACTS_LIST_TOOL, true, false, false)
+        .expect("permission row should upsert even while client is disabled");
+
+    McpTestStore {
+        app_data_dir,
+        client_id: client.id,
+        contact_id: contact.id,
+    }
+}
+
+fn seed_contact(core: &mut CrmCore) -> crm_core::storage::contacts::Contact {
+    core.create_contact(
+        Some("person".to_string()),
+        Some("Amina".to_string()),
+        Some("Hassan".to_string()),
+        None,
+        Some("amina@example.com".to_string()),
+        None,
+        None,
+        None,
+        None,
+        None,
+        Some("Seeded for MCP read-only dispatch".to_string()),
+    )
+    .expect("contact should be created")
+}
+
+fn write_enabled_context_config(name: &str, store: &McpTestStore) -> PathBuf {
+    let path = temp_config_path(name);
+    let contents = serde_json::json!({
+        "enabled": true,
+        "bind_host": "127.0.0.1",
+        "bind_port": 3987,
+        "app_data_dir": store.app_data_dir.display().to_string(),
+        "external_client_id": store.client_id,
+    });
+    fs::write(
+        &path,
+        serde_json::to_string_pretty(&contents).expect("config should serialize"),
+    )
+    .expect("temp runtime config should be writable");
+    path
+}
+
+fn latest_permission_audit(app_data_dir: &Path, client_id: &str, tool_name: &str) -> AuditLogEntry {
+    let core = CrmCore::open(app_data_dir).expect("test core should reopen");
+    core.list_recent_audit_log(50)
+        .expect("audit log should list")
+        .into_iter()
+        .find(|entry| {
+            entry.action == "evaluate_external_client_read_permission"
+                && entry.entity_id.as_deref() == Some(client_id)
+                && entry
+                    .after_json
+                    .as_deref()
+                    .is_some_and(|json| json.contains(&format!(r#""tool_name":"{tool_name}""#)))
+        })
+        .expect("permission audit entry should exist")
+}
+
+fn test_app_data_dir(name: &str) -> PathBuf {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "crm-mcp-cli-{name}-{}-{unique}",
+        std::process::id()
+    ))
+}
+
+fn cleanup_file(path: PathBuf) {
+    let _ = fs::remove_file(path);
+}
+
+fn cleanup_dir(path: PathBuf) {
+    let _ = fs::remove_dir_all(path);
 }
 
 fn assert_catalog_json(raw: &str) {
@@ -486,14 +861,18 @@ fn assert_runtime_status_json(raw: &str) {
 }
 
 fn write_temp_config(name: &str, contents: &str) -> std::path::PathBuf {
+    let path = temp_config_path(name);
+    fs::write(&path, contents).expect("temp runtime config should be writable");
+    path
+}
+
+fn temp_config_path(name: &str) -> PathBuf {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time should be after epoch")
         .as_nanos();
-    let path = std::env::temp_dir().join(format!(
+    std::env::temp_dir().join(format!(
         "crm-mcp-runtime-config-{name}-{}-{unique}.json",
         std::process::id()
-    ));
-    fs::write(&path, contents).expect("temp runtime config should be writable");
-    path
+    ))
 }

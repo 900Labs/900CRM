@@ -1,15 +1,16 @@
-//! Offline MCP readiness catalog and runtime guard foundation.
+//! Offline MCP readiness catalog and local stdio runtime guard foundation.
 //!
-//! This crate does not start an MCP server, bind a listener, execute tools,
-//! manage tokens, expose prompts/resources, or integrate with model providers.
-//! It only publishes deterministic local catalog/status metadata for future
-//! runtime work.
+//! This crate does not start an MCP server, bind a listener, manage tokens,
+//! expose prompts/resources, or integrate with model providers. By default it
+//! only publishes deterministic local catalog/status metadata. When explicitly
+//! enabled with loopback-valid config and local SDK context, its stdio path can
+//! execute the reviewed read-only SDK tools.
 
 use std::{
     fmt, fs,
     io::{self, BufRead, Write},
     net::IpAddr,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Serialize};
@@ -27,13 +28,16 @@ pub const HANDLE_JSONRPC_ONCE_FLAG: &str = "--handle-jsonrpc-once";
 /// CLI flag that attempts a gated local stdio JSON-RPC loop from config.
 pub const SERVE_STDIO_FROM_CONFIG_FLAG: &str = "--serve-stdio-from-config";
 
-/// Honest default status for running the placeholder binary without a catalog flag.
-pub const DEFAULT_STATUS_MESSAGE: &str = "900CRM MCP server/runtime is not implemented. This binary does not start a server, listener, tools, prompts, resources, network binding, token handling, or model integration. Use --print-tool-catalog to print the offline SDK-backed read-only catalog or --print-runtime-status to print the disabled runtime guard status.";
+/// Honest default status for running the binary without a catalog flag.
+pub const DEFAULT_STATUS_MESSAGE: &str = "900CRM MCP server is not implemented and the local stdio runtime is disabled by default. This binary does not start a network server, listener, prompts, resources, network binding, token handling, or model integration. Use --print-tool-catalog to print the offline SDK-backed read-only catalog or --print-runtime-status to print the disabled runtime guard status.";
 
 /// Reason reported when the default runtime guard is disabled.
 pub const RUNTIME_DISABLED_REASON: &str = "runtime disabled";
-/// Reason reported when configuration is enabled but runtime serving is absent.
-pub const RUNTIME_SERVER_NOT_IMPLEMENTED_REASON: &str = "server not implemented";
+/// Reason reported when configuration is enabled without SDK execution context.
+pub const RUNTIME_EXECUTION_CONTEXT_MISSING_REASON: &str = "execution context missing";
+/// Reason reported when configuration can execute reviewed read-only stdio calls.
+pub const RUNTIME_READ_ONLY_EXECUTION_READY_REASON: &str =
+    "read-only stdio execution context available";
 
 /// Disabled-by-default runtime guard configuration for future MCP work.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -44,6 +48,10 @@ pub struct McpRuntimeConfig {
     pub bind_host: String,
     /// Local bind port reserved for a future runtime listener.
     pub bind_port: u16,
+    /// Optional local app data directory used by reviewed read-only SDK calls.
+    pub app_data_dir: Option<String>,
+    /// Optional reviewed external-client id used by SDK permission checks.
+    pub external_client_id: Option<String>,
 }
 
 impl Default for McpRuntimeConfig {
@@ -52,6 +60,8 @@ impl Default for McpRuntimeConfig {
             enabled: false,
             bind_host: "127.0.0.1".to_string(),
             bind_port: 0,
+            app_data_dir: None,
+            external_client_id: None,
         }
     }
 }
@@ -69,11 +79,39 @@ impl McpRuntimeConfig {
         }
 
         if is_loopback_bind_host(bind_host) {
-            Ok(())
+            self.execution_context().map(|_| ())
         } else {
             Err(McpRuntimeConfigError::NonLoopbackBindHostWhenEnabled {
                 bind_host: self.bind_host.clone(),
             })
+        }
+    }
+
+    /// Returns normalized local SDK execution context when fully configured.
+    pub fn execution_context(&self) -> Result<Option<McpExecutionContext>, McpRuntimeConfigError> {
+        if !self.enabled {
+            return Ok(None);
+        }
+
+        match (&self.app_data_dir, &self.external_client_id) {
+            (None, None) => Ok(None),
+            (Some(app_data_dir), Some(external_client_id)) => {
+                let app_data_dir = app_data_dir.trim();
+                if app_data_dir.is_empty() {
+                    return Err(McpRuntimeConfigError::EmptyAppDataDirWhenConfigured);
+                }
+
+                let external_client_id = external_client_id.trim();
+                if external_client_id.is_empty() {
+                    return Err(McpRuntimeConfigError::EmptyExternalClientIdWhenConfigured);
+                }
+
+                Ok(Some(McpExecutionContext {
+                    app_data_dir: PathBuf::from(app_data_dir),
+                    external_client_id: external_client_id.to_string(),
+                }))
+            }
+            _ => Err(McpRuntimeConfigError::IncompleteExecutionContextWhenEnabled),
         }
     }
 }
@@ -85,6 +123,12 @@ pub enum McpRuntimeConfigError {
     EmptyBindHostWhenEnabled,
     /// Enabled runtime configuration must not expose a non-loopback host.
     NonLoopbackBindHostWhenEnabled { bind_host: String },
+    /// Enabled execution context must include both local SDK fields or neither.
+    IncompleteExecutionContextWhenEnabled,
+    /// Configured local app data directory must not be blank.
+    EmptyAppDataDirWhenConfigured,
+    /// Configured external-client id must not be blank.
+    EmptyExternalClientIdWhenConfigured,
 }
 
 impl fmt::Display for McpRuntimeConfigError {
@@ -100,11 +144,46 @@ impl fmt::Display for McpRuntimeConfigError {
                 formatter,
                 "enabled MCP runtime config rejects non-loopback bind_host '{bind_host}'"
             ),
+            Self::IncompleteExecutionContextWhenEnabled => write!(
+                formatter,
+                "enabled MCP runtime config requires both app_data_dir and external_client_id for tool execution context, or neither for metadata-only stdio"
+            ),
+            Self::EmptyAppDataDirWhenConfigured => write!(
+                formatter,
+                "enabled MCP runtime config requires non-empty app_data_dir when execution context is configured"
+            ),
+            Self::EmptyExternalClientIdWhenConfigured => write!(
+                formatter,
+                "enabled MCP runtime config requires non-empty external_client_id when execution context is configured"
+            ),
         }
     }
 }
 
 impl std::error::Error for McpRuntimeConfigError {}
+
+/// Normalized local SDK execution context for reviewed read-only stdio calls.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpExecutionContext {
+    app_data_dir: PathBuf,
+    external_client_id: String,
+}
+
+impl McpExecutionContext {
+    /// Local application data directory used by `crm-sdk`.
+    pub fn app_data_dir(&self) -> &Path {
+        &self.app_data_dir
+    }
+
+    /// Reviewed external-client id used by `crm-sdk` permission checks.
+    pub fn external_client_id(&self) -> &str {
+        &self.external_client_id
+    }
+
+    fn open_sdk(&self) -> Result<crm_sdk::CrmSdk, crm_sdk::SdkError> {
+        crm_sdk::CrmSdk::open(&self.app_data_dir, self.external_client_id.clone())
+    }
+}
 
 /// File loading, JSON parsing, and validation failures for MCP runtime config metadata.
 #[derive(Debug)]
@@ -264,10 +343,13 @@ pub struct McpRuntimeStatus {
 
 impl McpRuntimeStatus {
     fn from_config(config: &McpRuntimeConfig) -> Self {
-        let reason = if config.enabled {
-            RUNTIME_SERVER_NOT_IMPLEMENTED_REASON
-        } else {
+        let execution_enabled = config.execution_context().ok().flatten().is_some();
+        let reason = if !config.enabled {
             RUNTIME_DISABLED_REASON
+        } else if execution_enabled {
+            RUNTIME_READ_ONLY_EXECUTION_READY_REASON
+        } else {
+            RUNTIME_EXECUTION_CONTEXT_MISSING_REASON
         };
 
         Self {
@@ -275,7 +357,7 @@ impl McpRuntimeStatus {
             bind_host: config.bind_host.clone(),
             bind_port: config.bind_port,
             serving: false,
-            tool_execution_enabled: false,
+            tool_execution_enabled: execution_enabled,
             reason,
         }
     }
@@ -354,7 +436,7 @@ pub fn read_only_tool_catalog_json() -> Result<String, serde_json::Error> {
 /// This one-shot helper does not read from stdio, start a serving loop, bind
 /// sockets, execute tools, call the SDK, authenticate clients, or access data.
 pub fn handle_jsonrpc_once(raw: &str) -> Result<Option<String>, serde_json::Error> {
-    let response = handle_jsonrpc_value(raw);
+    let response = JsonRpcHandler::metadata_only().handle_raw(raw);
     response
         .map(|value| serde_json::to_string(&value).map(Some))
         .unwrap_or(Ok(None))
@@ -379,20 +461,25 @@ pub fn handle_jsonrpc_lines(input: &str) -> Result<String, serde_json::Error> {
 
 /// Runs a local stdio JSON-RPC loop only when explicitly enabled by valid config.
 ///
-/// This function validates before reading input or writing output. The loop is
-/// metadata-only and delegates each newline-delimited request to
-/// `handle_jsonrpc_once`; `tools/call` remains rejected there.
+/// This function validates before reading input or writing output. Without a
+/// local SDK execution context it remains metadata-only and rejects
+/// `tools/call`. With context, it dispatches only reviewed read-only SDK tools.
 pub fn run_stdio_loop(
     config: &McpRuntimeConfig,
     reader: impl BufRead,
     mut writer: impl Write,
 ) -> Result<(), McpStdioLoopError> {
     validate_stdio_loop_config(config)?;
+    let handler =
+        JsonRpcHandler::from_config(config).map_err(McpStdioLoopError::ConfigValidation)?;
 
     for line in reader.lines() {
         let line = line.map_err(McpStdioLoopError::Io)?;
-        if let Some(response_json) =
-            handle_jsonrpc_once(&line).map_err(McpStdioLoopError::Serialize)?
+        if let Some(response_json) = handler
+            .handle_raw(&line)
+            .map(|value| serde_json::to_string(&value).map(Some))
+            .unwrap_or(Ok(None))
+            .map_err(McpStdioLoopError::Serialize)?
         {
             writer
                 .write_all(response_json.as_bytes())
@@ -415,64 +502,119 @@ fn validate_stdio_loop_config(config: &McpRuntimeConfig) -> Result<(), McpStdioL
         .map_err(McpStdioLoopError::ConfigValidation)
 }
 
-fn handle_jsonrpc_value(raw: &str) -> Option<serde_json::Value> {
-    let parsed: serde_json::Value = match serde_json::from_str(raw) {
-        Ok(value) => value,
-        Err(_) => return Some(jsonrpc_error(None, -32700, "Parse error")),
-    };
+#[derive(Debug, Clone)]
+struct JsonRpcHandler {
+    execution_context: Option<McpExecutionContext>,
+}
 
-    let Some(request) = parsed.as_object() else {
-        return Some(jsonrpc_error(None, -32600, "Invalid Request"));
-    };
-
-    let id = request.get("id").cloned();
-    let is_notification = id.is_none();
-
-    if request.get("jsonrpc").and_then(serde_json::Value::as_str) != Some("2.0") {
-        return Some(jsonrpc_error(id, -32600, "Invalid Request"));
+impl JsonRpcHandler {
+    fn metadata_only() -> Self {
+        Self {
+            execution_context: None,
+        }
     }
 
-    let Some(method) = request.get("method").and_then(serde_json::Value::as_str) else {
-        return Some(jsonrpc_error(id, -32600, "Invalid Request"));
-    };
-
-    if is_notification {
-        return None;
+    fn from_config(config: &McpRuntimeConfig) -> Result<Self, McpRuntimeConfigError> {
+        Ok(Self {
+            execution_context: config.execution_context()?,
+        })
     }
 
-    match method {
-        "initialize" => Some(jsonrpc_success(id, initialize_result())),
-        "tools/list" => Some(jsonrpc_success(id, tools_list_result())),
-        "tools/call" => Some(jsonrpc_error(
-            id,
-            -32601,
-            "Method not found: tools/call execution is not implemented or enabled",
-        )),
-        _ => Some(jsonrpc_error(id, -32601, "Method not found")),
+    fn execution_enabled(&self) -> bool {
+        self.execution_context.is_some()
+    }
+
+    fn handle_raw(&self, raw: &str) -> Option<serde_json::Value> {
+        let parsed: serde_json::Value = match serde_json::from_str(raw) {
+            Ok(value) => value,
+            Err(_) => return Some(jsonrpc_error(None, -32700, "Parse error")),
+        };
+
+        let Some(request) = parsed.as_object() else {
+            return Some(jsonrpc_error(None, -32600, "Invalid Request"));
+        };
+
+        let id = request.get("id").cloned();
+        let is_notification = id.is_none();
+
+        if request.get("jsonrpc").and_then(serde_json::Value::as_str) != Some("2.0") {
+            return Some(jsonrpc_error(id, -32600, "Invalid Request"));
+        }
+
+        let Some(method) = request.get("method").and_then(serde_json::Value::as_str) else {
+            return Some(jsonrpc_error(id, -32600, "Invalid Request"));
+        };
+
+        if is_notification {
+            return None;
+        }
+
+        match method {
+            "initialize" => Some(jsonrpc_success(
+                id,
+                initialize_result(self.execution_enabled()),
+            )),
+            "tools/list" => Some(jsonrpc_success(
+                id,
+                tools_list_result(self.execution_enabled()),
+            )),
+            "tools/call" => Some(self.handle_tools_call(id, request.get("params"))),
+            _ => Some(jsonrpc_error(id, -32601, "Method not found")),
+        }
+    }
+
+    fn handle_tools_call(
+        &self,
+        id: Option<serde_json::Value>,
+        params: Option<&serde_json::Value>,
+    ) -> serde_json::Value {
+        let Some(execution_context) = &self.execution_context else {
+            return jsonrpc_error(
+                id,
+                -32002,
+                "Tool execution is disabled or missing local execution context",
+            );
+        };
+
+        match execute_tool_call(execution_context, params) {
+            Ok(result) => jsonrpc_success(id, tool_call_success_result(result)),
+            Err(error) => jsonrpc_tool_error(id, error),
+        }
     }
 }
 
-fn initialize_result() -> serde_json::Value {
+fn initialize_result(execution_enabled: bool) -> serde_json::Value {
+    let status = if execution_enabled {
+        "read-only-stdio"
+    } else {
+        "metadata-only"
+    };
+    let instructions = if execution_enabled {
+        "Local stdio runtime for reviewed read-only SDK tools. No network listener, authentication, prompts/resources, token handling, write tools, or model-provider integration is enabled."
+    } else {
+        "Metadata-only one-shot probe. No serving loop, transport, listener, authentication, SDK dispatch, database access, or tool execution is enabled."
+    };
+
     serde_json::json!({
         "protocolVersion": "2024-11-05",
         "serverInfo": {
             "name": "900crm-mcp",
             "version": env!("CARGO_PKG_VERSION"),
-            "status": "metadata-only"
+            "status": status
         },
         "capabilities": {
             "tools": {
                 "listChanged": false
             }
         },
-        "instructions": "Metadata-only one-shot probe. No serving loop, transport, listener, authentication, SDK dispatch, database access, or tool execution is enabled."
+        "instructions": instructions
     })
 }
 
-fn tools_list_result() -> serde_json::Value {
+fn tools_list_result(execution_enabled: bool) -> serde_json::Value {
     let tools: Vec<serde_json::Value> = read_only_tool_catalog()
         .iter()
-        .map(mcp_tool_metadata)
+        .map(|entry| mcp_tool_metadata(entry, execution_enabled))
         .collect();
 
     serde_json::json!({
@@ -480,10 +622,16 @@ fn tools_list_result() -> serde_json::Value {
     })
 }
 
-fn mcp_tool_metadata(entry: &ToolCatalogEntry) -> serde_json::Value {
+fn mcp_tool_metadata(entry: &ToolCatalogEntry, execution_enabled: bool) -> serde_json::Value {
+    let readiness = if execution_enabled {
+        "read-only stdio execution enabled for current local config"
+    } else {
+        "metadata-only; runtime execution is not enabled"
+    };
+
     serde_json::json!({
         "name": entry.name,
-        "description": tool_description(entry.name),
+        "description": tool_description(entry.name, execution_enabled),
         "inputSchema": tool_input_schema(entry.name),
         "annotations": {
             "readOnlyHint": true,
@@ -495,31 +643,52 @@ fn mcp_tool_metadata(entry: &ToolCatalogEntry) -> serde_json::Value {
             "accessKind": entry.access_kind,
             "requiresExternalClientPermission": entry.requires_external_client_permission,
             "sdkBacked": entry.sdk_backed,
-            "runtimeEnabled": entry.runtime_enabled,
-            "executionEnabled": false,
-            "readiness": "metadata-only; runtime execution is not enabled"
+            "runtimeEnabled": execution_enabled,
+            "executionEnabled": execution_enabled,
+            "readiness": readiness
         }
     })
 }
 
-fn tool_description(name: &str) -> &'static str {
-    match name {
-        crm_sdk::CONTACTS_LIST_TOOL => {
-            "List contacts metadata contract. Read-only catalog entry; runtime execution is not enabled."
+fn tool_description(name: &str, execution_enabled: bool) -> &'static str {
+    if execution_enabled {
+        match name {
+            crm_sdk::CONTACTS_LIST_TOOL => {
+                "List contacts through the local read-only SDK when permission checks allow it."
+            }
+            crm_sdk::ORGANIZATIONS_LIST_TOOL => {
+                "List organizations through the local read-only SDK when permission checks allow it."
+            }
+            crm_sdk::DEALS_LIST_TOOL => {
+                "List deals through the local read-only SDK when permission checks allow it."
+            }
+            crm_sdk::ACTIVITIES_LIST_TOOL => {
+                "List activities through the local read-only SDK when permission checks allow it."
+            }
+            crm_sdk::SEARCH_GLOBAL_TOOL => {
+                "Search CRM records through the local read-only SDK when permission checks allow it."
+            }
+            _ => "Read-only SDK tool execution is enabled for the current local config.",
         }
-        crm_sdk::ORGANIZATIONS_LIST_TOOL => {
-            "List organizations metadata contract. Read-only catalog entry; runtime execution is not enabled."
+    } else {
+        match name {
+            crm_sdk::CONTACTS_LIST_TOOL => {
+                "List contacts metadata contract. Read-only catalog entry; runtime execution is not enabled."
+            }
+            crm_sdk::ORGANIZATIONS_LIST_TOOL => {
+                "List organizations metadata contract. Read-only catalog entry; runtime execution is not enabled."
+            }
+            crm_sdk::DEALS_LIST_TOOL => {
+                "List deals metadata contract. Read-only catalog entry; runtime execution is not enabled."
+            }
+            crm_sdk::ACTIVITIES_LIST_TOOL => {
+                "List activities metadata contract. Read-only catalog entry; runtime execution is not enabled."
+            }
+            crm_sdk::SEARCH_GLOBAL_TOOL => {
+                "Search CRM records metadata contract. Read-only catalog entry; runtime execution is not enabled."
+            }
+            _ => "Read-only metadata contract. Runtime execution is not enabled.",
         }
-        crm_sdk::DEALS_LIST_TOOL => {
-            "List deals metadata contract. Read-only catalog entry; runtime execution is not enabled."
-        }
-        crm_sdk::ACTIVITIES_LIST_TOOL => {
-            "List activities metadata contract. Read-only catalog entry; runtime execution is not enabled."
-        }
-        crm_sdk::SEARCH_GLOBAL_TOOL => {
-            "Search CRM records metadata contract. Read-only catalog entry; runtime execution is not enabled."
-        }
-        _ => "Read-only metadata contract. Runtime execution is not enabled.",
     }
 }
 
@@ -532,12 +701,12 @@ fn tool_input_schema(name: &str) -> serde_json::Value {
                 "limit": {
                     "type": "integer",
                     "minimum": 1,
-                    "description": "Optional read-only result limit for future execution."
+                    "description": "Optional read-only result limit."
                 },
                 "offset": {
                     "type": "integer",
                     "minimum": 0,
-                    "description": "Optional read-only result offset for future execution."
+                    "description": "Optional read-only result offset."
                 }
             }
         }),
@@ -549,12 +718,12 @@ fn tool_input_schema(name: &str) -> serde_json::Value {
                 "query": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "Read-only search query for future execution."
+                    "description": "Read-only search query."
                 },
                 "limit": {
                     "type": "integer",
                     "minimum": 1,
-                    "description": "Optional read-only result limit for future execution."
+                    "description": "Optional read-only result limit."
                 }
             }
         }),
@@ -564,6 +733,220 @@ fn tool_input_schema(name: &str) -> serde_json::Value {
             "properties": {}
         }),
     }
+}
+
+fn execute_tool_call(
+    execution_context: &McpExecutionContext,
+    params: Option<&serde_json::Value>,
+) -> Result<serde_json::Value, ToolCallError> {
+    let request = parse_tool_call_request(params)?;
+
+    match request.name.as_str() {
+        crm_sdk::CONTACTS_LIST_TOOL => {
+            let args = parse_contacts_list_args(&request.arguments)?;
+            let sdk = execution_context.open_sdk().map_err(ToolCallError::Sdk)?;
+            let result = sdk.contacts_list(args).map_err(ToolCallError::Sdk)?;
+            serde_json::to_value(result).map_err(ToolCallError::Serialize)
+        }
+        crm_sdk::ORGANIZATIONS_LIST_TOOL => {
+            require_no_arguments(&request.arguments)?;
+            let sdk = execution_context.open_sdk().map_err(ToolCallError::Sdk)?;
+            let result = sdk.organizations_list().map_err(ToolCallError::Sdk)?;
+            serde_json::to_value(result).map_err(ToolCallError::Serialize)
+        }
+        crm_sdk::DEALS_LIST_TOOL => {
+            require_no_arguments(&request.arguments)?;
+            let sdk = execution_context.open_sdk().map_err(ToolCallError::Sdk)?;
+            let result = sdk.deals_list().map_err(ToolCallError::Sdk)?;
+            serde_json::to_value(result).map_err(ToolCallError::Serialize)
+        }
+        crm_sdk::ACTIVITIES_LIST_TOOL => {
+            require_no_arguments(&request.arguments)?;
+            let sdk = execution_context.open_sdk().map_err(ToolCallError::Sdk)?;
+            let result = sdk.activities_list().map_err(ToolCallError::Sdk)?;
+            serde_json::to_value(result).map_err(ToolCallError::Serialize)
+        }
+        crm_sdk::SEARCH_GLOBAL_TOOL => {
+            let args = parse_search_global_args(&request.arguments)?;
+            let sdk = execution_context.open_sdk().map_err(ToolCallError::Sdk)?;
+            let result = sdk
+                .search_global(&args.query, args.limit)
+                .map_err(ToolCallError::Sdk)?;
+            serde_json::to_value(result).map_err(ToolCallError::Serialize)
+        }
+        _ => Err(ToolCallError::UnknownTool(request.name)),
+    }
+}
+
+#[derive(Debug)]
+struct ToolCallRequest {
+    name: String,
+    arguments: serde_json::Value,
+}
+
+fn parse_tool_call_request(
+    params: Option<&serde_json::Value>,
+) -> Result<ToolCallRequest, ToolCallError> {
+    let params =
+        params
+            .and_then(serde_json::Value::as_object)
+            .ok_or(ToolCallError::MalformedArguments(
+                "tools/call params must be an object",
+            ))?;
+    reject_unknown_keys(params, &["name", "arguments"])?;
+
+    let name = params
+        .get("name")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .ok_or(ToolCallError::MalformedArguments(
+            "tools/call params.name must be a non-empty string",
+        ))?
+        .to_string();
+
+    let arguments = params
+        .get("arguments")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({}));
+    if !arguments.is_object() {
+        return Err(ToolCallError::MalformedArguments(
+            "tools/call params.arguments must be an object when provided",
+        ));
+    }
+
+    Ok(ToolCallRequest { name, arguments })
+}
+
+fn parse_contacts_list_args(
+    arguments: &serde_json::Value,
+) -> Result<Option<crm_sdk::ContactListParams>, ToolCallError> {
+    let object = arguments
+        .as_object()
+        .ok_or(ToolCallError::MalformedArguments(
+            "contacts.list arguments must be an object",
+        ))?;
+    reject_unknown_keys(object, &["limit", "offset"])?;
+
+    let limit = optional_u32_field(object, "limit", 1)?;
+    let offset = optional_u32_field(object, "offset", 0)?;
+    if limit.is_none() && offset.is_none() {
+        return Ok(None);
+    }
+
+    let per_page = limit.unwrap_or(25);
+    let page = offset.unwrap_or(0) / per_page + 1;
+    Ok(Some(crm_sdk::ContactListParams {
+        page,
+        per_page,
+        ..Default::default()
+    }))
+}
+
+#[derive(Debug)]
+struct SearchGlobalArgs {
+    query: String,
+    limit: Option<u32>,
+}
+
+fn parse_search_global_args(
+    arguments: &serde_json::Value,
+) -> Result<SearchGlobalArgs, ToolCallError> {
+    let object = arguments
+        .as_object()
+        .ok_or(ToolCallError::MalformedArguments(
+            "search.global arguments must be an object",
+        ))?;
+    reject_unknown_keys(object, &["query", "limit"])?;
+
+    let query = object
+        .get("query")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|query| !query.is_empty())
+        .ok_or(ToolCallError::MalformedArguments(
+            "search.global requires a non-empty query string",
+        ))?
+        .to_string();
+    let limit = optional_u32_field(object, "limit", 1)?;
+
+    Ok(SearchGlobalArgs { query, limit })
+}
+
+fn require_no_arguments(arguments: &serde_json::Value) -> Result<(), ToolCallError> {
+    let object = arguments
+        .as_object()
+        .ok_or(ToolCallError::MalformedArguments(
+            "tool arguments must be an object",
+        ))?;
+    if object.is_empty() {
+        Ok(())
+    } else {
+        Err(ToolCallError::MalformedArguments(
+            "tool does not accept arguments",
+        ))
+    }
+}
+
+fn reject_unknown_keys(
+    object: &serde_json::Map<String, serde_json::Value>,
+    allowed: &[&str],
+) -> Result<(), ToolCallError> {
+    if object
+        .keys()
+        .all(|key| allowed.iter().any(|allowed_key| allowed_key == key))
+    {
+        Ok(())
+    } else {
+        Err(ToolCallError::MalformedArguments(
+            "request contains unsupported argument fields",
+        ))
+    }
+}
+
+fn optional_u32_field(
+    object: &serde_json::Map<String, serde_json::Value>,
+    field: &'static str,
+    minimum: u32,
+) -> Result<Option<u32>, ToolCallError> {
+    let Some(value) = object.get(field) else {
+        return Ok(None);
+    };
+    let Some(value) = value.as_u64() else {
+        return Err(ToolCallError::MalformedArguments(
+            "numeric argument must be an unsigned integer",
+        ));
+    };
+    if value > u32::MAX as u64 || value < minimum as u64 {
+        return Err(ToolCallError::MalformedArguments(
+            "numeric argument is outside the supported range",
+        ));
+    }
+
+    Ok(Some(value as u32))
+}
+
+#[derive(Debug)]
+enum ToolCallError {
+    UnknownTool(String),
+    MalformedArguments(&'static str),
+    Sdk(crm_sdk::SdkError),
+    Serialize(serde_json::Error),
+}
+
+fn tool_call_success_result(structured_content: serde_json::Value) -> serde_json::Value {
+    let text = serde_json::to_string(&structured_content)
+        .expect("structured content should serialize after serde_json::to_value");
+    serde_json::json!({
+        "content": [
+            {
+                "type": "text",
+                "text": text
+            }
+        ],
+        "structuredContent": structured_content,
+        "isError": false
+    })
 }
 
 fn jsonrpc_success(id: Option<serde_json::Value>, result: serde_json::Value) -> serde_json::Value {
@@ -589,16 +972,82 @@ fn jsonrpc_error(
     })
 }
 
+fn jsonrpc_tool_error(id: Option<serde_json::Value>, error: ToolCallError) -> serde_json::Value {
+    match error {
+        ToolCallError::UnknownTool(name) => jsonrpc_error_with_data(
+            id,
+            -32601,
+            "Tool not found or not executable",
+            serde_json::json!({ "tool": name }),
+        ),
+        ToolCallError::MalformedArguments(message) => jsonrpc_error_with_data(
+            id,
+            -32602,
+            "Invalid params",
+            serde_json::json!({ "reason": message }),
+        ),
+        ToolCallError::Sdk(error) => {
+            let code = match &error {
+                crm_sdk::SdkError::InvalidInput(message)
+                    if message.contains("may not read tool") =>
+                {
+                    -32003
+                }
+                crm_sdk::SdkError::NotFound(_) => -32004,
+                crm_sdk::SdkError::InvalidInput(_) => -32602,
+                _ => -32000,
+            };
+            let message = match code {
+                -32003 => "Permission denied",
+                -32004 => "External client or CRM record not found",
+                -32602 => "Invalid params",
+                _ => "SDK dispatch failed",
+            };
+            jsonrpc_error_with_data(
+                id,
+                code,
+                message,
+                serde_json::to_value(&error).unwrap_or_else(
+                    |_| serde_json::json!({ "kind": "Unknown", "message": error.to_string() }),
+                ),
+            )
+        }
+        ToolCallError::Serialize(error) => jsonrpc_error_with_data(
+            id,
+            -32603,
+            "Internal error",
+            serde_json::json!({ "message": error.to_string() }),
+        ),
+    }
+}
+
+fn jsonrpc_error_with_data(
+    id: Option<serde_json::Value>,
+    code: i64,
+    message: &'static str,
+    data: serde_json::Value,
+) -> serde_json::Value {
+    serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": id.unwrap_or(serde_json::Value::Null),
+        "error": {
+            "code": code,
+            "message": message,
+            "data": data
+        }
+    })
+}
+
 /// Returns the CLI help text without implying an implemented MCP runtime.
 pub fn help_message(program_name: &str) -> String {
     format!(
         "Usage: {program_name} [{PRINT_TOOL_CATALOG_FLAG}|{LIST_TOOLS_FLAG}|{PRINT_RUNTIME_STATUS_FLAG}|{PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path>|{HANDLE_JSONRPC_ONCE_FLAG} <json>|{SERVE_STDIO_FROM_CONFIG_FLAG} <path>]\n\n\
-Default: print the current MCP readiness status. No server, listener, tool execution, prompt/resource serving, token handling, or network binding is implemented.\n\
+Default: print the current MCP readiness status. No network server, listener, prompt/resource serving, token handling, or network binding is implemented, and local stdio tool execution remains disabled unless explicit config includes a local SDK context.\n\
 {PRINT_TOOL_CATALOG_FLAG}, {LIST_TOOLS_FLAG}: print the offline SDK-backed read-only tool catalog as JSON.\n\
 {PRINT_RUNTIME_STATUS_FLAG}: print the disabled runtime guard status as JSON.\n\
 {PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG} <path>: load JSON config metadata from an optional path and print non-serving runtime guard status as JSON.\n\
 {HANDLE_JSONRPC_ONCE_FLAG} <json>: handle one metadata-only JSON-RPC request and print one response, or nothing for notifications.\n\
-{SERVE_STDIO_FROM_CONFIG_FLAG} <path>: load JSON config metadata and attempt a disabled-by-default local stdio metadata loop."
+{SERVE_STDIO_FROM_CONFIG_FLAG} <path>: load JSON config metadata and attempt a disabled-by-default local stdio loop. With app_data_dir and external_client_id, only reviewed read-only SDK tools can execute."
     )
 }
 
@@ -619,7 +1068,8 @@ mod tests {
         read_only_tool_catalog_json, run_stdio_loop, runtime_status, runtime_status_json,
         McpRuntimeConfig, McpRuntimeConfigError, McpRuntimeConfigLoadError, McpStdioLoopError,
         DEFAULT_STATUS_MESSAGE, PRINT_RUNTIME_STATUS_FLAG, PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG,
-        PRINT_TOOL_CATALOG_FLAG, RUNTIME_DISABLED_REASON, RUNTIME_SERVER_NOT_IMPLEMENTED_REASON,
+        PRINT_TOOL_CATALOG_FLAG, RUNTIME_DISABLED_REASON, RUNTIME_EXECUTION_CONTEXT_MISSING_REASON,
+        RUNTIME_READ_ONLY_EXECUTION_READY_REASON,
     };
 
     #[test]
@@ -705,6 +1155,8 @@ mod tests {
             enabled: true,
             bind_host: "127.0.0.1".to_string(),
             bind_port: 3987,
+            app_data_dir: None,
+            external_client_id: None,
         };
         let input = Cursor::new(concat!(
             r#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#,
@@ -737,6 +1189,8 @@ mod tests {
             enabled: true,
             bind_host: "localhost".to_string(),
             bind_port: 3987,
+            app_data_dir: None,
+            external_client_id: None,
         };
         let input = Cursor::new(
             r#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"contacts.list","arguments":{}}}"#,
@@ -749,11 +1203,11 @@ mod tests {
             serde_json::from_str(output.trim_end()).expect("tools/call rejection should parse");
 
         assert_eq!(parsed["id"], 4);
-        assert_eq!(parsed["error"]["code"], -32601);
+        assert_eq!(parsed["error"]["code"], -32002);
         assert!(parsed["error"]["message"]
             .as_str()
             .expect("error message should be a string")
-            .contains("tools/call execution is not implemented or enabled"));
+            .contains("missing local execution context"));
     }
 
     #[test]
@@ -762,6 +1216,8 @@ mod tests {
             enabled: true,
             bind_host: "0.0.0.0".to_string(),
             bind_port: 3987,
+            app_data_dir: None,
+            external_client_id: None,
         };
         let mut output = Vec::new();
         let error = run_stdio_loop(&config, Cursor::new(""), &mut output)
@@ -779,7 +1235,7 @@ mod tests {
     #[test]
     fn default_status_is_explicitly_non_runtime() {
         assert!(DEFAULT_STATUS_MESSAGE.contains("not implemented"));
-        assert!(DEFAULT_STATUS_MESSAGE.contains("does not start a server"));
+        assert!(DEFAULT_STATUS_MESSAGE.contains("does not start a network server"));
         assert!(DEFAULT_STATUS_MESSAGE.contains(PRINT_TOOL_CATALOG_FLAG));
         assert!(DEFAULT_STATUS_MESSAGE.contains(PRINT_RUNTIME_STATUS_FLAG));
         assert!(!DEFAULT_STATUS_MESSAGE.contains(PRINT_RUNTIME_STATUS_FROM_CONFIG_FLAG));
@@ -828,6 +1284,8 @@ mod tests {
                 enabled: false,
                 bind_host: "127.0.0.1".to_string(),
                 bind_port: 0,
+                app_data_dir: None,
+                external_client_id: None,
             }
         );
         assert!(!status.serving);
@@ -837,7 +1295,7 @@ mod tests {
     }
 
     #[test]
-    fn valid_enabled_loopback_runtime_config_reports_server_not_implemented() {
+    fn valid_enabled_loopback_runtime_config_reports_missing_execution_context() {
         let path = write_temp_config(
             "enabled-loopback",
             r#"{
@@ -862,9 +1320,54 @@ mod tests {
   "bind_port": 3987,
   "serving": false,
   "tool_execution_enabled": false,
-  "reason": "server not implemented"
+  "reason": "execution context missing"
 }"#
         );
+        fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn valid_enabled_loopback_runtime_config_with_context_reports_execution_ready() {
+        let path = write_temp_config(
+            "enabled-loopback-with-context",
+            r#"{
+  "enabled": true,
+  "bind_host": "localhost",
+  "bind_port": 3987,
+  "app_data_dir": "/tmp/900crm-mcp-test-data",
+  "external_client_id": "client-1"
+}"#,
+        );
+        let config = load_runtime_config_from_optional_path(&path)
+            .expect("enabled loopback runtime config with context should parse");
+        let status = runtime_status(&config);
+
+        assert!(status.tool_execution_enabled);
+        assert_eq!(status.reason, RUNTIME_READ_ONLY_EXECUTION_READY_REASON);
+        fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn enabled_runtime_config_rejects_partial_execution_context() {
+        let path = write_temp_config(
+            "partial-context",
+            r#"{
+  "enabled": true,
+  "bind_host": "127.0.0.1",
+  "bind_port": 3987,
+  "app_data_dir": "/tmp/900crm-mcp-test-data"
+}"#,
+        );
+        let error = load_runtime_config_from_optional_path(&path)
+            .expect_err("partial execution context should fail validation");
+
+        assert!(matches!(
+            error,
+            McpRuntimeConfigLoadError::Validation {
+                source: McpRuntimeConfigError::IncompleteExecutionContextWhenEnabled,
+                ..
+            }
+        ));
         fs::remove_file(path).ok();
     }
 
@@ -922,6 +1425,8 @@ mod tests {
                 enabled: true,
                 bind_host: bind_host.to_string(),
                 bind_port: 0,
+                app_data_dir: None,
+                external_client_id: None,
             };
 
             config
@@ -931,7 +1436,7 @@ mod tests {
             let status = runtime_status(&config);
             assert!(!status.serving);
             assert!(!status.tool_execution_enabled);
-            assert_eq!(status.reason, RUNTIME_SERVER_NOT_IMPLEMENTED_REASON);
+            assert_eq!(status.reason, RUNTIME_EXECUTION_CONTEXT_MISSING_REASON);
         }
     }
 
@@ -942,6 +1447,8 @@ mod tests {
                 enabled: true,
                 bind_host: bind_host.to_string(),
                 bind_port: 0,
+                app_data_dir: None,
+                external_client_id: None,
             };
 
             assert_eq!(
