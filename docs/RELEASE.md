@@ -1,9 +1,12 @@
 # Release Readiness
 
 Date: 2026-06-24
+Last updated: 2026-06-27
 
 This document records the current release status for 900CRM and the manual
-checks required before publishing a public release.
+checks required before publishing a public release. For a phase-by-phase
+current-vs-remaining assessment, see
+[Alpha Release Readiness Audit](ALPHA_READINESS.md).
 
 ## Current Status
 
@@ -35,6 +38,15 @@ The current repository can be built and tested locally by contributors, but the
 presence of source code, CI checks, or Tauri configuration is not a release
 artifact.
 
+Current external blocker: recent GitHub Actions check runs are not starting
+because of account billing/spending-limit state, not because of product or test
+failures. The check-run annotation says: `The job was not started because recent
+account payments have failed or your spending limit needs to be increased.
+Please check the 'Billing & plans' section in your settings`. While this is
+active, Actions-backed package artifacts, release artifacts, and GitHub Release
+proof cannot be produced from the repository workflows. Local verification may
+still pass, but it does not prove installability for non-technical users.
+
 ## Verification Checklist
 
 Before a release candidate is tagged or published, maintainers should complete
@@ -43,6 +55,9 @@ automatically by the manual release packaging workflow preflight before package
 artifacts are built; the platform, data, signing, and release-note checks remain
 manual.
 
+- [ ] Confirm GitHub Actions jobs can start. Recent check runs were externally
+  blocked with the billing/spending-limit annotation documented above; this must
+  be resolved before package or release proof can be produced in Actions.
 - [ ] Confirm the repository contains no local machine paths, private hostnames,
   secrets, tokens, or real customer data in source, docs, scripts, samples, or
   packaged assets.
@@ -138,6 +153,16 @@ node scripts/generate-release-manifest.mjs --help
 If real release artifacts are not present and `--sample` is not used, the script
 fails with a message naming the missing artifact directory or expected package
 suffixes.
+
+## Alpha Readiness Audit
+
+The current alpha-readiness evidence is tracked in
+[Alpha Release Readiness Audit](ALPHA_READINESS.md). That audit treats source
+feature readiness and release distribution proof separately: Phases 0-5 are
+materially complete for the current accepted source scope, Phase 6 remains
+incomplete until packaged installer and release evidence exists, and Phase 7 is
+complete only for the accepted local stdio MCP scope while future network MCP
+server work remains deferred.
 
 ## Still Not Implemented
 
