@@ -18,6 +18,11 @@ const steps = [
     args: ['run', 'release:manifest:sample']
   },
   {
+    label: 'Verify sample downloaded release artifacts',
+    command: npmCommand,
+    args: ['run', 'release:artifacts:verify:sample']
+  },
+  {
     label: 'Check public release guardrails',
     command: npmCommand,
     args: ['run', 'check:release-guardrails']
