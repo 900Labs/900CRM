@@ -211,6 +211,9 @@ Current evidence:
   preflight that mirrors the workflow preflight commands where feasible without
   installing OS packages, installing Playwright browsers, building installers,
   signing, notarizing, uploading artifacts, or publishing a release.
+- `npm run release:artifacts:verify` now gives maintainers a deterministic
+  local integrity check for already downloaded manual workflow package,
+  checksum, metadata, and SBOM artifacts once Actions can produce them.
 - `docs/RELEASE.md` lists manual release verification and intentionally not
   implemented release systems such as signing, notarization, default automatic
   publishing, upgrade/update channel, telemetry, and crash reporting.
@@ -223,6 +226,8 @@ Remaining before Phase 6 can be called complete:
 - Produce and inspect Windows, macOS, and Linux package artifacts.
 - Produce and preserve checksums, release metadata, SBOM-shaped dependency
   inventory, and release notes.
+- Run the downloaded-artifact verifier against the real workflow artifacts and
+  preserve the command output as release evidence.
 - Smoke test the packaged desktop app on each target platform.
 - Publish or draft a GitHub Release only through the guarded release process.
 - Keep signing, notarization, auto-update, telemetry, and crash reporting marked
