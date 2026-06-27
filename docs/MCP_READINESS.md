@@ -13,7 +13,9 @@ This document records the current Model Context Protocol (MCP) readiness state f
 - `crates/crm-mcp` contains an offline SDK-backed read-only tool catalog CLI,
   a disabled-by-default runtime guard/config/status model, a local one-shot
   JSON-RPC probe, and a disabled-by-default config-gated stdio loop for
-  metadata-only MCP requests. It is not an implemented MCP server.
+  MCP requests. The stdio path can execute only the reviewed read-only SDK
+  tools when config includes both a local app-data directory and reviewed
+  external-client id. It is not a network MCP server.
 - `crates/crm-sdk` now provides a narrow local read-only facade over
   `crm-core` for reviewed external clients; it is not an MCP runtime.
 - The desktop app and `crm-core` do not start an MCP server, bind a localhost listener, expose prompts/resources/tools, or manage MCP tokens/secrets.
@@ -25,18 +27,21 @@ Future MCP tools must call the read-only `crm-sdk` facade or explicit
 directly, and they must not bypass the existing storage, validation, audit,
 sync-log, and proposed-action boundaries.
 
-The current `crm-mcp` catalog and runtime status are metadata only. They are
-useful for reviewing the initial tool/runtime boundary, but they do not serve
-tools, execute SDK methods, accept client requests, bind sockets, or enable an
-MCP runtime.
+The default `crm-mcp` catalog, one-shot probe, and runtime status remain
+metadata only. They are useful for reviewing the initial tool/runtime boundary,
+but default execution does not serve tools, execute SDK methods, accept client
+requests, bind sockets, or enable an MCP runtime.
 
 The current `crm-mcp` JSON-RPC handler is also metadata only. It handles one
 already-provided JSON string at a time for deterministic local tests and
 returns at most one JSON-RPC response. A separate stdio line loop can be
 attempted only through an explicit config-backed CLI flag and only when the
 config is enabled and loopback-valid. The stdio path is local process IO only;
-it does not listen on TCP/HTTP/SSE, authenticate clients, call the SDK, query
-the database, execute tools, or start a network server.
+it does not listen on TCP/HTTP/SSE, authenticate clients, query the database
+directly, execute write tools, or start a network server. If config also
+includes both `app_data_dir` and `external_client_id`, the stdio path can call
+the reviewed `crm-sdk` read-only facade for the initial read tools after
+`crm-core` permission evaluation succeeds.
 
 The intended call path is:
 
@@ -67,8 +72,11 @@ The following data and API surfaces exist today:
   `sdk_backed: true`, and `runtime_enabled: false`.
 - `crates/crm-mcp` runtime guard configuration and status metadata.
   `McpRuntimeConfig::default()` is disabled and localhost-only
-  (`enabled: false`, `bind_host: "127.0.0.1"`, `bind_port: 0`). Validation
-  rejects enabled runtime configurations that name a non-loopback bind host.
+  (`enabled: false`, `bind_host: "127.0.0.1"`, `bind_port: 0`,
+  `app_data_dir: null`, `external_client_id: null`). Validation rejects enabled
+  runtime configurations that name a non-loopback bind host, and rejects partial
+  execution context where only one of `app_data_dir` or `external_client_id` is
+  supplied.
   `cargo run -p crm-mcp -- --print-runtime-status` prints deterministic JSON
   with `serving: false`, `tool_execution_enabled: false`, and reason
   `runtime disabled` for the default config. This does not start a server,
@@ -79,10 +87,12 @@ The following data and API surfaces exist today:
   `cargo run -p crm-mcp -- --print-runtime-status-from-config <path>`.
   Missing optional config paths use the disabled default. Invalid JSON and
   enabled non-loopback hosts are rejected. If a config sets
-  `enabled: true` on a loopback host, status still reports `serving: false`,
-  `tool_execution_enabled: false`, and reason `server not implemented`.
-  Config files are readiness metadata only; loading them does not start a
-  server, create a listener, execute tools, call the SDK, issue tokens, perform
+  `enabled: true` on a loopback host without execution context, status reports
+  `serving: false`, `tool_execution_enabled: false`, and reason
+  `execution context missing`. If the config also includes both `app_data_dir`
+  and `external_client_id`, status reports `tool_execution_enabled: true` and
+  reason `read-only stdio execution context available`. Loading config still
+  does not start a network server, create a listener, issue tokens, perform
   authentication, or access the network.
 - `crates/crm-mcp` can handle a single local JSON-RPC message with
   `cargo run -p crm-mcp -- --handle-jsonrpc-once '<json>'`. The supported
@@ -102,12 +112,17 @@ The following data and API surfaces exist today:
   the existing runtime config metadata and rejects disabled configs before
   reading stdin or writing stdout. Enabled configs must still pass loopback
   validation. When both gates pass, newline-delimited JSON-RPC input is handled
-  by the same metadata-only handler used by `--handle-jsonrpc-once`; request
-  responses are emitted as newline-delimited JSON, notifications emit no line,
-  and `tools/call` remains rejected without execution. This path is disabled by
-  default, local-only stdio, metadata-only, and does not add SDK dispatch,
-  database access, token/secret handling, authentication, TCP/HTTP/SSE/socket
-  listeners, sync-server behavior, or tool execution.
+  by the same JSON-RPC handler shape used by `--handle-jsonrpc-once`; request
+  responses are emitted as newline-delimited JSON and notifications emit no
+  line. Without execution context, `tools/call` is rejected. With execution
+  context, `tools/call` can execute only `contacts.list`,
+  `organizations.list`, `deals.list`, `activities.list`, and `search.global`
+  through `crm-sdk::CrmSdk`. Unknown tools, write-like tool names, malformed
+  arguments, missing search query, missing permissions, disabled clients, and
+  unsupported methods return JSON-RPC errors. This path is disabled by default,
+  local-only stdio, read-only, SDK-routed, and does not add direct database
+  access, token/secret handling, authentication, TCP/HTTP/SSE/socket listeners,
+  sync-server behavior, schema changes, UI behavior, or write execution.
 - SDK read methods for contacts, organizations, deals, activities, and global
   search. Each method calls
   `CrmCore::evaluate_external_client_tool_read_permission(client_id,
@@ -201,14 +216,13 @@ The current codebase intentionally does not include:
 - MCP server startup.
 - A localhost MCP listener.
 - MCP authentication tokens, client secrets, or credential storage.
-- Prompt, resource, or tool implementations.
-- MCP runtime bindings to the SDK facade.
-- MCP runtime serving behind the runtime guard/config/status metadata.
-- MCP runtime serving behind the JSON config-file metadata.
+- Prompt or resource implementations.
+- MCP runtime bindings beyond the reviewed read-only SDK tools.
+- MCP network-server serving behind the runtime guard/config/status metadata.
+- MCP network-server serving behind the JSON config-file metadata.
 - MCP serving behind the one-shot JSON-RPC metadata probe.
-- Stdio, TCP, HTTP, SSE, or other transport loops for JSON-RPC handling.
-- Tool-serving behavior behind the offline catalog.
-- Tool execution through `tools/call`.
+- TCP, HTTP, SSE, socket, or other network transport loops for JSON-RPC handling.
+- Write-like, draft, unreviewed, or non-SDK tool execution through `tools/call`.
 - Model-provider integrations.
 - Internet or cloud requirements.
 - Raw SQL access for MCP clients.
@@ -250,15 +264,23 @@ A future MCP implementation should not be accepted until all of the following ar
 - [x] `crates/crm-mcp` has a metadata-only one-shot JSON-RPC handler for
       `initialize`, `tools/list`, and notifications, with `tools/call`
       explicitly rejected and no serving loop or transport.
+- [x] `crates/crm-mcp` has a disabled-by-default config-gated local stdio loop
+      that can execute only reviewed read-only SDK tools when local execution
+      context is present.
 - [ ] The future implemented listener is localhost-only.
 - [ ] No cloud, internet, or model-provider dependency is required for core CRM use.
-- [ ] Every MCP tool calls `crm-core` services instead of direct SQL.
-- [ ] MCP read tools reuse the reviewed `crm-sdk` tool constants and
+- [x] Current MCP read tools call `crm-core` services through `crm-sdk` instead
+      of direct SQL.
+- [x] MCP read tools reuse the reviewed `crm-sdk` tool constants and
       permission-gated read methods where the SDK supports the requested tool.
 - [ ] No raw SQL, shell, process, or arbitrary file tools are exposed.
 - [ ] External client enablement and per-tool permission grants have explicit review UI.
 - [ ] Only `disabled`, `read_only`, and `draft_only` are active unless a future sprint implements broader modes with tests and docs.
-- [ ] MCP runtime read access is audited with enough context to identify client, tool, entity scope, and result status. Local `crm-core` external-client permission evaluations already record readiness audit evidence, but MCP runtime/tool access remains unimplemented.
+- [ ] MCP runtime read access is audited with enough context to identify client,
+      tool, entity scope, and result status. Current read-only `tools/call`
+      dispatch records `crm-core` external-client permission evaluation audit
+      evidence for attempted client, tool, allowed flag, reason, and status, but
+      result-scope audit detail remains future work.
 - [ ] Draft proposed actions are audited and visible in Pending Actions.
 - [ ] Approved proposed actions execute only when a reviewed, supported core execution path exists; unsupported actions remain pending with explicit errors.
 - [ ] Prompt-injection boundaries are documented and tested with CRM content treated as untrusted.

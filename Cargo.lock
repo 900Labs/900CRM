@@ -622,6 +622,7 @@ dependencies = [
 name = "crm-mcp"
 version = "1.0.0"
 dependencies = [
+ "crm-core",
  "crm-sdk",
  "serde",
  "serde_json",
