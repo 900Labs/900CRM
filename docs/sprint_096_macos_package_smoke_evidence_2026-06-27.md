@@ -87,12 +87,12 @@ Result: failed before the cap with exit code 1 in the generated
 The retry failed with:
 
 ```text
-failed to bundle project error running bundle_dmg.sh: `failed to run /Volumes/T7/Code/Codex/900CRM-worktrees/macos-package-smoke-evidence/target/release/bundle/dmg/bundle_dmg.sh`
+failed to bundle project error running bundle_dmg.sh: `failed to run target/release/bundle/dmg/bundle_dmg.sh`
 ```
 
 The generated DMG script did not surface a more specific inner `hdiutil` or
 AppleScript error in the captured command output. A previous temporary image
-mount, `/dev/disk4` at `/Volumes/dmg.gA5KDE`, was confirmed to belong to
+mount, `/dev/disk4` with a generated `dmg.*` volume name, was confirmed to belong to
 `target/release/bundle/macos/rw.32336.900CRM_1.0.0_aarch64.dmg` and was
 detached cleanly with `hdiutil detach /dev/disk4`. A follow-up `hdiutil info`
 showed no remaining 900CRM temporary DMG mount.
@@ -117,13 +117,14 @@ bash .../target/release/bundle/dmg/bundle_dmg.sh --volname 900CRM --icon 900CRM.
 /usr/bin/osascript /var/folders/.../createdmg.tmp... dmg.iKPmAs
 ```
 
-`hdiutil info` showed the temporary image mounted at `/Volumes/dmg.iKPmAs`
+`hdiutil info` showed the temporary image mounted with a generated `dmg.*`
+volume name
 from `target/release/bundle/macos/rw.46208.900CRM_1.0.0_aarch64.dmg`. After a
 bounded wait with no progress, the control tower interrupted the packaging
 command with `Ctrl-C`, then detached the generated temporary mount with:
 
 ```bash
-hdiutil detach /Volumes/dmg.iKPmAs
+hdiutil detach <temporary-dmg-mount>
 ```
 
 Result: `"disk4" ejected.` A final `hdiutil info` check showed no remaining
