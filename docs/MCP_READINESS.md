@@ -290,34 +290,50 @@ Future MCP implementation work must include these gates before acceptance:
 - Keep write-like external-client operations in `draft_only` proposed-action flow unless they are handled by a reviewed, narrow core execution path such as `create_activity_draft`.
 - Store no tokens or secrets unless a dedicated security design covers creation, storage, rotation, revocation, and auditability.
 
-## Future MCP Acceptance Checklist
+## Current Accepted Local Stdio Checklist
 
-A future MCP implementation should not be accepted until all of the following are true:
+The following checklist is complete for the current accepted scope: an optional
+local `crm-mcp` package with deterministic metadata probes and a config-gated
+stdio path for reviewed SDK-backed reads plus the reviewed
+`create_activity_draft` pending-action flow. This is not a network MCP server.
 
-- [ ] `crates/crm-mcp` is implemented as an optional package and is not required for normal desktop/core operation.
+- [x] `crates/crm-mcp` is an optional package and is not required for normal
+      desktop or `crm-core` operation.
 - [x] `crates/crm-mcp` has an offline SDK-backed read-only catalog for the
       initial reviewed tool names, with all entries marked
-      `runtime_enabled: false`.
-- [ ] No MCP server starts unless the user explicitly enables it.
+      `runtime_enabled: false` in the offline catalog.
+- [x] Normal desktop/core operation requires no cloud, internet, or
+      model-provider dependency.
+- [x] No TCP, HTTP, SSE, socket, or other network listener is implemented in the
+      accepted current MCP scope.
+- [x] No MCP server or listener starts by default. The only request-processing
+      loop is the explicit config-gated local stdio path.
 - [x] `crates/crm-mcp` has a disabled-by-default runtime guard/config/status
       model with localhost-only default configuration and loopback validation
       when enabled.
 - [x] `crates/crm-mcp` has a metadata-only one-shot JSON-RPC handler for
       `initialize`, `tools/list`, and notifications, with `tools/call`
-      explicitly rejected and no serving loop or transport.
+      rejected when local execution context is missing and with no serving loop
+      or transport.
 - [x] `crates/crm-mcp` has a disabled-by-default config-gated local stdio loop
       that can execute only reviewed SDK read tools and the reviewed
       `create_activity_draft` pending-action tool when local execution context
       is present.
-- [ ] The future implemented listener is localhost-only.
-- [ ] No cloud, internet, or model-provider dependency is required for core CRM use.
 - [x] Current MCP read tools call `crm-core` services through `crm-sdk` instead
       of direct SQL.
-- [x] MCP read tools reuse the reviewed `crm-sdk` tool constants and
+- [x] Current MCP read tools reuse the reviewed `crm-sdk` tool constants and
       permission-gated read methods where the SDK supports the requested tool.
-- [ ] No raw SQL, shell, process, or arbitrary file tools are exposed.
-- [ ] External client enablement and per-tool permission grants have explicit review UI.
-- [ ] Only `disabled`, `read_only`, and `draft_only` are active unless a future sprint implements broader modes with tests and docs.
+- [x] `crm-mcp` exposes no raw SQL, shell, process, arbitrary file,
+      authentication, token, secret, prompt, resource, model-provider, or
+      network-listener surface.
+- [x] MCP `initialize` advertises only tool-list capability. It does not
+      advertise prompt or resource capabilities.
+- [x] `resources/list` and `prompts/list` are explicitly unimplemented through
+      the current JSON-RPC handler shape.
+- [x] External client enablement and per-tool permission grants have explicit
+      local review UI for the existing readiness records.
+- [x] Only `disabled`, `read_only`, and `draft_only` are active permission modes
+      in the current implementation.
 - [x] MCP runtime read access is audited with enough context to identify client,
       tool, entity scope, and result status. Read `tools/call` dispatch records
       `crm-core` external-client permission evaluation audit evidence for the
@@ -325,11 +341,52 @@ A future MCP implementation should not be accepted until all of the following ar
       count and optional entity scope.
 - [x] Draft proposed actions are audited and visible in Pending Actions for the
       reviewed `create_activity_draft` MCP/SDK path.
-- [ ] Approved proposed actions execute only when a reviewed, supported core execution path exists; unsupported actions remain pending with explicit errors.
+- [x] Approved proposed actions execute only when a reviewed, supported core
+      execution path exists. The current supported execution path is limited to
+      `create_activity_draft`; unsupported actions remain pending with explicit
+      errors.
 - [x] Prompt-injection boundaries are documented and tested with CRM content
       treated as untrusted. `crm-mcp` tests verify the warning appears in
       `initialize` instructions and `tools/list` metadata, that only tool
       capabilities are advertised, and that prompt/resource methods remain
       unimplemented.
-- [ ] Security documentation covers credential handling if tokens or secrets are introduced.
-- [ ] Verification includes unit tests, integration tests, no raw SQL boundary regressions, no direct Svelte `invoke()` regressions, and a clean `git fsck`.
+- [x] Current MCP verification includes focused `crm-mcp`, `crm-sdk`, and
+      `crm-core` coverage from Sprints 082-091 plus release-guardrail checks
+      for the accepted local stdio scope.
+
+## Deferred Future MCP Checklist
+
+The following items are intentionally not implemented by the current local stdio
+scope. They remain future obligations only if 900CRM later adds a network MCP
+listener, credentials, prompt/resource surfaces, broader write modes, or broader
+runtime behavior.
+
+- [ ] Re-validate localhost-only binding at the exact point a future listener is
+      implemented. The current guard validates configuration only and does not
+      bind sockets.
+- [ ] Require explicit user enablement before any future MCP server process or
+      network listener starts.
+- [ ] Add a dedicated security design before any MCP authentication token,
+      client secret, credential creation, credential storage, rotation,
+      revocation, or credential audit behavior is introduced.
+- [ ] Keep any future token or secret UI separate from local activation review
+      until the credential security design is implemented and tested.
+- [ ] Design and test future prompt/resource surfaces before exposing them; they
+      must preserve the untrusted CRM content boundary and must not appear as
+      current capabilities until implemented.
+- [ ] Keep future network/listener, prompt/resource, and credential behavior out
+      of normal desktop/core startup and preserve the optional package boundary.
+- [ ] Keep all future tool access behind external client records and per-tool
+      permission rows with explicit user review.
+- [ ] Do not expose raw SQL, arbitrary file, process, or shell execution tools in
+      any future MCP scope.
+- [ ] Keep write-like external-client operations in `draft_only`
+      proposed-action flow unless a future sprint implements a reviewed, narrow
+      core execution path with tests and docs.
+- [ ] Do not activate broader modes such as `write_with_confirmation` or
+      `write_allowed` until a future sprint implements those modes with
+      permission, audit, UI, and documentation coverage.
+- [ ] Future implementation verification must include unit tests, integration
+      tests, raw-SQL boundary scans, listener/auth/token scans, direct Svelte
+      `invoke()` regression checks where UI is touched, release guardrails, and
+      a clean `git fsck`.
