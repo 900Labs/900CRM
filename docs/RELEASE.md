@@ -62,6 +62,11 @@ manual.
   secrets, tokens, or real customer data in source, docs, scripts, samples, or
   packaged assets.
 - [ ] Run `npm ci`.
+- [ ] Run `npm run release:preflight:local` as a maintainer local source gate
+  when GitHub Actions preflight evidence is unavailable or before dispatching
+  the manual release packaging workflow. This is source/preflight evidence only;
+  it does not prove installer generation, signing, notarization, GitHub Release
+  publication, or end-user installability.
 - [ ] Run `npm run release:notes:sample`.
 - [ ] Run `npm run release:manifest:sample`.
 - [ ] Run `npm run check:release-guardrails`.
@@ -144,11 +149,24 @@ package jobs before any release artifacts are generated.
 The release-note and manifest scripts are also locally runnable for validation:
 
 ```bash
+npm run release:preflight:local
 npm run release:notes:sample
 node scripts/generate-release-notes.mjs --help
 npm run release:manifest:sample
 node scripts/generate-release-manifest.mjs --help
 ```
+
+`npm run release:preflight:local` is the maintainer-run local equivalent of the
+manual release workflow's source preflight. It runs the sample release notes,
+sample release manifest, public release guardrail scan, frontend lint, frontend
+type check, frontend tests, frontend build, browser smoke test, Rust formatting,
+Rust Clippy, Rust workspace check, and Rust workspace test commands in sequence,
+failing on the first failed command with the step label. It intentionally does
+not install Ubuntu system dependencies, install Playwright browsers, run package
+matrix jobs, generate installers, sign, notarize, tag, upload artifacts, or
+publish a GitHub Release. If Playwright browsers or platform prerequisites are
+missing locally, the browser smoke step fails and maintainers should record that
+failure honestly rather than treating the local preflight as release proof.
 
 If real release artifacts are not present and `--sample` is not used, the script
 fails with a message naming the missing artifact directory or expected package

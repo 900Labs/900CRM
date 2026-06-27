@@ -207,6 +207,10 @@ Current evidence:
 - `.github/workflows/release.yml` defines a manual release packaging workflow
   with preflight, package matrix, artifact upload, release metadata, checksums,
   SBOM-shaped output, and guarded optional GitHub Release publishing.
+- `npm run release:preflight:local` now gives maintainers a local source
+  preflight that mirrors the workflow preflight commands where feasible without
+  installing OS packages, installing Playwright browsers, building installers,
+  signing, notarizing, uploading artifacts, or publishing a release.
 - `docs/RELEASE.md` lists manual release verification and intentionally not
   implemented release systems such as signing, notarization, default automatic
   publishing, upgrade/update channel, telemetry, and crash reporting.
@@ -224,9 +228,9 @@ Remaining before Phase 6 can be called complete:
 - Keep signing, notarization, auto-update, telemetry, and crash reporting marked
   as not implemented until a future sprint intentionally adds them.
 
-Local `npm`, `cargo`, and browser checks can be green while this phase remains
-incomplete. They do not prove that a non-technical user can install and launch
-900CRM from a release artifact.
+Local `npm`, `cargo`, browser, and `npm run release:preflight:local` checks can
+be green while this phase remains incomplete. They do not prove that a
+non-technical user can install and launch 900CRM from a release artifact.
 
 ### Phase 7 - Separate MCP Server Package
 
