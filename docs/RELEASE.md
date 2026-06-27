@@ -54,6 +54,19 @@ active, Actions-backed package artifacts, release artifacts, and GitHub Release
 proof cannot be produced from the repository workflows. Local verification may
 still pass, but it does not prove installability for non-technical users.
 
+Local macOS package smoke evidence from 2026-06-27 is recorded in
+[Sprint 096](sprint_096_macos_package_smoke_evidence_2026-06-27.md). That run
+passed `npm run release:preflight:local`, built the optimized macOS release
+binary, created `target/release/bundle/macos/900CRM.app`, and launched the
+release binary briefly with disposable app data. DMG finalization did not
+complete: one attempt hit the sprint cap, one retry failed in the generated
+`bundle_dmg.sh`, and a control-tower rerun stalled in `osascript` while
+customizing the temporary mounted image. It did not produce
+`target/release/bundle/dmg/900CRM_1.0.0_aarch64.dmg`, did not generate package
+metadata for a final DMG, and does not prove Windows, Linux, downloaded
+workflow artifacts, GitHub Release, signing, notarization, or end-user
+installability.
+
 ## Verification Checklist
 
 Before a release candidate is tagged or published, maintainers should complete
@@ -74,6 +87,11 @@ manual.
   the manual release packaging workflow. This is source/preflight evidence only;
   it does not prove installer generation, signing, notarization, GitHub Release
   publication, or end-user installability.
+- [ ] Produce a completed local macOS DMG or successful workflow macOS package
+  artifact before treating Sprint 096 macOS evidence as package proof. Sprint
+  096 created the release binary and `.app` bundle, but local DMG attempts hit
+  the sprint cap, failed in `bundle_dmg.sh`, or stalled in the `osascript`
+  Finder-customization step before final DMG output.
 - [ ] Run `npm run release:notes:sample`.
 - [ ] Run `npm run release:manifest:sample`.
 - [ ] Run `npm run release:artifacts:verify:sample` to exercise the downloaded

@@ -214,6 +214,14 @@ Current evidence:
 - `npm run release:artifacts:verify` now gives maintainers a deterministic
   local integrity check for already downloaded manual workflow package,
   checksum, metadata, and SBOM artifacts once Actions can produce them.
+- `docs/sprint_096_macos_package_smoke_evidence_2026-06-27.md` records a local
+  macOS run where `npm run release:preflight:local` passed, the optimized
+  macOS release binary built, `target/release/bundle/macos/900CRM.app` was
+  created, and the release binary launched briefly with disposable app data.
+  DMG finalization did not complete: one attempt hit the sprint cap, one retry
+  failed in the generated `bundle_dmg.sh`, and a control-tower rerun stalled in
+  `osascript` while customizing the temporary mounted image. No final
+  `target/release/bundle/dmg/900CRM_1.0.0_aarch64.dmg` was produced.
 - `docs/RELEASE.md` lists manual release verification and intentionally not
   implemented release systems such as signing, notarization, default automatic
   publishing, upgrade/update channel, telemetry, and crash reporting.
@@ -224,6 +232,10 @@ Remaining before Phase 6 can be called complete:
 - Run the manual release packaging workflow from the intended ref and preserve
   evidence that preflight and all package jobs completed.
 - Produce and inspect Windows, macOS, and Linux package artifacts.
+- Complete macOS DMG finalization; Sprint 096 reached the release binary and
+  `.app` bundle, but local DMG attempts hit the sprint cap, failed in
+  `bundle_dmg.sh`, or stalled in the `osascript` Finder-customization step
+  before producing a final `.dmg`.
 - Produce and preserve checksums, release metadata, SBOM-shaped dependency
   inventory, and release notes.
 - Run the downloaded-artifact verifier against the real workflow artifacts and
