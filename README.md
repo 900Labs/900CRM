@@ -33,7 +33,7 @@ Learn more at [900labs.com/impact](https://www.900labs.com/impact).
 
 ## What is 900CRM?
 
-900CRM is the second tool from [900 Labs](https://www.900labs.com) — a free, open-source desktop CRM (Customer Relationship Management) application designed to work entirely offline. No internet connection required, ever. Built with [Tauri v2](https://tauri.app/) (Rust) and [Svelte 5](https://svelte.dev/), it targets Windows, macOS, and Linux with low hardware requirements. Pre-built release installers are not published yet; see [Release Readiness](docs/RELEASE.md) and the [Alpha Readiness Audit](docs/ALPHA_READINESS.md) for the current status.
+900CRM is the second tool from [900 Labs](https://www.900labs.com) — a free, open-source desktop CRM (Customer Relationship Management) application designed to work entirely offline. No internet connection required, ever. Built with [Tauri v2](https://tauri.app/) (Rust) and [Svelte 5](https://svelte.dev/), it targets Windows, macOS, and Linux with low hardware requirements. Pre-built release installers are not published yet; see [Release Readiness](docs/RELEASE.md), the [Alpha Readiness Audit](docs/ALPHA_READINESS.md), and the [Product Review and Competitive Benchmark](docs/PRODUCT_REVIEW_AND_BENCHMARK.md) for the current status.
 
 900CRM is built especially for:
 - **Small businesses and entrepreneurs** in regions with unreliable connectivity
@@ -45,6 +45,19 @@ Learn more at [900labs.com/impact](https://www.900labs.com/impact).
 Your business data stays on your device. Nothing is ever uploaded anywhere.
 
 ![900CRM dashboard overview screen](docs/assets/readme/900crm-dashboard.png)
+
+---
+
+## Current Status
+
+The source app has a strong local-first CRM foundation, but the visible product
+still needs more depth before it feels competitive with established CRMs. The
+current product-depth review is tracked in
+[Product Review and Competitive Benchmark](docs/PRODUCT_REVIEW_AND_BENCHMARK.md).
+
+Use [Documentation Index](docs/README.md) as the starting point for current
+project docs. Historical `docs/sprint_*.md` files remain as audit records, but
+they are not the best source for current product truth.
 
 ---
 

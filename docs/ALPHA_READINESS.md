@@ -19,6 +19,13 @@ evidence. Phase 7 is complete only for the currently accepted local stdio MCP
 scope. A separate future network MCP server package remains deferred unless it
 is intentionally pulled into scope later.
 
+The product-depth review in
+[Product Review and Competitive Benchmark](PRODUCT_REVIEW_AND_BENCHMARK.md)
+adds an important caveat: source readiness does not mean the app already feels
+competitive in daily CRM use. The next product phase should deepen first-run
+onboarding, customer/account workspaces, pipeline guidance, activities/calendar
+workflows, reports, and navigation structure before broad new platform work.
+
 Recent GitHub Actions failures must not be treated as product or test failures.
 The check-run annotation says: `The job was not started because recent account
 payments have failed or your spending limit needs to be increased. Please check
