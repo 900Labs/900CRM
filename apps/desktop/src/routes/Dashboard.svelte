@@ -10,8 +10,12 @@
 
   import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
+  import { createActivity } from '$lib/api/activities';
+  import { createContact } from '$lib/api/contacts';
   import { getDashboardStats } from '$lib/api/dashboard';
   import type { DashboardStats } from '$lib/api/dashboard';
+  import { createDeal } from '$lib/api/deals';
+  import { createOrganization } from '$lib/api/organizations';
   import {
     getActivityFunnelReport,
     getPipelineConversionReport,
@@ -34,6 +38,11 @@
   let reportsLoading = $state(true);
   let error = $state<string | null>(null);
   let reportError = $state<string | null>(null);
+  let sampleLoading = $state(false);
+  let sampleLoaded = $state(false);
+  let sampleMessage = $state<string | null>(null);
+  let sampleError = $state<string | null>(null);
+  let componentMounted = false;
 
   const DASHBOARD_LOAD_TIMEOUT_MS = 8_000;
 
@@ -76,6 +85,18 @@
 
   const visibleActivityTypes = $derived(
     (activityReport?.by_type ?? []).slice(0, 4)
+  );
+
+  const hasFirstRunContacts = $derived((stats?.totalContacts ?? 0) > 0);
+  const hasFirstRunDeals = $derived((stats?.activeDeals ?? 0) > 0);
+  const hasFirstRunActivities = $derived((stats?.upcomingTasks ?? 0) > 0);
+
+  const showFirstRun = $derived(
+    !sampleLoaded && !error && (!hasFirstRunContacts || !hasFirstRunDeals || !hasFirstRunActivities)
+  );
+
+  const sampleDataAvailable = $derived(
+    !sampleLoaded && !hasFirstRunContacts && !hasFirstRunDeals && !hasFirstRunActivities
   );
 
   function asPercentRatio(ratio: number, decimals = 1): string {
@@ -122,63 +143,151 @@
     });
   }
 
+  async function loadStats(): Promise<void> {
+    statsLoading = true;
+    error = null;
+
+    try {
+      const dashStats = await withTimeout(getDashboardStats(), 'Dashboard stats');
+      if (!componentMounted) return;
+      stats = dashStats;
+    } catch (err) {
+      if (!componentMounted) return;
+      error = t('errors.loadFailed');
+      console.error('[Dashboard] Stats load error:', err);
+    } finally {
+      if (componentMounted) statsLoading = false;
+    }
+  }
+
+  async function loadUpcomingActivities(): Promise<void> {
+    try {
+      await withTimeout(activityStore.loadUpcoming(), 'Upcoming activities');
+    } catch (err) {
+      console.error('[Dashboard] Upcoming activity load error:', err);
+    }
+  }
+
+  async function loadReports(): Promise<void> {
+    reportsLoading = true;
+    reportError = null;
+
+    try {
+      const [pipelineResult, activityResult] = await Promise.allSettled([
+        withTimeout(getPipelineConversionReport(), 'Pipeline report'),
+        withTimeout(getActivityFunnelReport(), 'Activity report'),
+      ]);
+
+      if (!componentMounted) return;
+
+      if (pipelineResult.status === 'fulfilled') {
+        pipelineReport = pipelineResult.value;
+      }
+      if (activityResult.status === 'fulfilled') {
+        activityReport = activityResult.value;
+      }
+      if (pipelineResult.status === 'rejected' || activityResult.status === 'rejected') {
+        reportError = t('dashboard.reports.loadFailed');
+      }
+    } finally {
+      if (componentMounted) reportsLoading = false;
+    }
+  }
+
+  async function refreshDashboard(): Promise<void> {
+    await Promise.allSettled([
+      loadStats(),
+      loadUpcomingActivities(),
+      loadReports(),
+    ]);
+  }
+
+  function futureIsoDate(daysFromNow: number): string {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromNow);
+    date.setHours(9, 0, 0, 0);
+    return date.toISOString();
+  }
+
+  function openDataSettings(): void {
+    window.location.hash = '#/settings';
+  }
+
+  async function loadSampleWorkspace(): Promise<void> {
+    if (sampleLoading) return;
+
+    sampleLoading = true;
+    sampleMessage = null;
+    sampleError = null;
+
+    try {
+      const organization = await createOrganization({
+        name: 'Northstar Cooperative',
+        email: 'hello@northstar.example',
+        phone: '+1 555 0140',
+        website: 'https://northstar.example',
+        city: 'Austin',
+        region: 'TX',
+        country: 'United States',
+        description: 'Sample account for reviewing 900CRM workflows.',
+      });
+
+      const contact = await createContact({
+        firstName: 'Amara',
+        lastName: 'Okafor',
+        email: 'amara@northstar.example',
+        phone: '+1 555 0141',
+        organization: organization.name,
+        type: 'person',
+        tags: [],
+        notes: 'Sample contact created by the dashboard starter.',
+        website: null,
+        address: '120 Market Street',
+      });
+
+      const deal = await createDeal({
+        name: 'Solar inventory rollout',
+        value: 18500,
+        currency: settingsStore.currency,
+        stage: 'proposal',
+        probability: 65,
+        expectedCloseDate: futureIsoDate(21),
+        contactId: contact.id,
+        organizationId: organization.id,
+        description: 'Sample opportunity for a staged inventory rollout.',
+        tags: [],
+      });
+
+      await createActivity({
+        type: 'call',
+        subject: 'Call Amara about rollout timeline',
+        notes: 'Confirm stakeholders, target install dates, and next quote details.',
+        dueDate: futureIsoDate(2),
+        contactId: contact.id,
+        dealId: deal.id,
+      });
+
+      sampleMessage = t('dashboard.firstRun.sampleLoaded');
+      sampleLoaded = true;
+      uiStore.toastSuccess(sampleMessage);
+      await refreshDashboard();
+    } catch (err) {
+      sampleError = t('dashboard.firstRun.sampleFailed');
+      uiStore.toastError(sampleError);
+      console.error('[Dashboard] Sample workspace load error:', err);
+    } finally {
+      sampleLoading = false;
+    }
+  }
+
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
   onMount(() => {
-    let mounted = true;
-
-    statsLoading = true;
-    reportsLoading = true;
-    error = null;
-    reportError = null;
-
-    void (async () => {
-      try {
-        const dashStats = await withTimeout(getDashboardStats(), 'Dashboard stats');
-        if (!mounted) return;
-        stats = dashStats;
-      } catch (err) {
-        if (!mounted) return;
-        error = t('errors.loadFailed');
-        console.error('[Dashboard] Stats load error:', err);
-      } finally {
-        if (mounted) statsLoading = false;
-      }
-    })();
-
-    void (async () => {
-      try {
-        await withTimeout(activityStore.loadUpcoming(), 'Upcoming activities');
-      } catch (err) {
-        console.error('[Dashboard] Upcoming activity load error:', err);
-      }
-    })();
-
-    void (async () => {
-      try {
-        const [pipelineResult, activityResult] = await Promise.allSettled([
-          withTimeout(getPipelineConversionReport(), 'Pipeline report'),
-          withTimeout(getActivityFunnelReport(), 'Activity report'),
-        ]);
-
-        if (!mounted) return;
-
-        if (pipelineResult.status === 'fulfilled') {
-          pipelineReport = pipelineResult.value;
-        }
-        if (activityResult.status === 'fulfilled') {
-          activityReport = activityResult.value;
-        }
-        if (pipelineResult.status === 'rejected' || activityResult.status === 'rejected') {
-          reportError = t('dashboard.reports.loadFailed');
-        }
-      } finally {
-        if (mounted) reportsLoading = false;
-      }
-    })();
+    componentMounted = true;
+    void refreshDashboard();
 
     return () => {
-      mounted = false;
+      componentMounted = false;
     };
   });
 </script>
@@ -247,6 +356,72 @@
         loading={statsLoading}
       />
     </section>
+
+    {#if showFirstRun}
+      <section class="first-run-panel" aria-labelledby="first-run-heading">
+        <div class="first-run-copy">
+          <span class="first-run-eyebrow">{t('dashboard.firstRun.eyebrow')}</span>
+          <h2 class="first-run-title" id="first-run-heading">{t('dashboard.firstRun.title')}</h2>
+          <p>{t('dashboard.firstRun.subtitle')}</p>
+
+          {#if sampleMessage}
+            <div class="first-run-status success" role="status">{sampleMessage}</div>
+          {/if}
+          {#if sampleError}
+            <div class="first-run-status error" role="alert">{sampleError}</div>
+          {/if}
+        </div>
+
+        <div class="first-run-checklist" aria-label={t('dashboard.firstRun.checklistLabel')}>
+          <div class:complete={hasFirstRunContacts} class="first-run-step">
+            <span class="step-dot" aria-hidden="true"></span>
+            <div>
+              <span>{t('dashboard.firstRun.addContact')}</span>
+              <small>{t('dashboard.firstRun.addContactHint')}</small>
+            </div>
+          </div>
+          <div class:complete={hasFirstRunDeals} class="first-run-step">
+            <span class="step-dot" aria-hidden="true"></span>
+            <div>
+              <span>{t('dashboard.firstRun.addDeal')}</span>
+              <small>{t('dashboard.firstRun.addDealHint')}</small>
+            </div>
+          </div>
+          <div class:complete={hasFirstRunActivities} class="first-run-step">
+            <span class="step-dot" aria-hidden="true"></span>
+            <div>
+              <span>{t('dashboard.firstRun.addFollowUp')}</span>
+              <small>{t('dashboard.firstRun.addFollowUpHint')}</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="first-run-actions" aria-label={t('dashboard.firstRun.actionsLabel')}>
+          {#if sampleDataAvailable}
+            <button
+              class="btn btn-primary btn-sm"
+              disabled={sampleLoading}
+              onclick={loadSampleWorkspace}
+              type="button"
+            >
+              {sampleLoading ? t('dashboard.firstRun.loadingSample') : t('dashboard.firstRun.loadSample')}
+            </button>
+          {/if}
+          <button class="btn btn-secondary btn-sm" onclick={() => uiStore.openModal('addContact')} type="button">
+            {t('dashboard.firstRun.contactAction')}
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick={() => uiStore.openModal('addDeal')} type="button">
+            {t('dashboard.firstRun.dealAction')}
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick={() => uiStore.openModal('addActivity')} type="button">
+            {t('dashboard.firstRun.followUpAction')}
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick={openDataSettings} type="button">
+            {t('dashboard.firstRun.dataAction')}
+          </button>
+        </div>
+      </section>
+    {/if}
 
     <section class="report-grid" aria-label={t('dashboard.reports.title')}>
       <section class="card report-card" aria-labelledby="pipeline-report-heading">
@@ -448,6 +623,111 @@
     gap: var(--space-6);
   }
 
+  .first-run-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+    gap: var(--space-6);
+    align-items: start;
+    padding: var(--space-6);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--border-radius-md);
+    background: var(--surface-raised);
+  }
+
+  .first-run-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .first-run-eyebrow {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--text-accent);
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  .first-run-title {
+    margin: 0;
+    font-size: var(--text-xl);
+    color: var(--text-primary);
+  }
+
+  .first-run-copy p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+
+  .first-run-status {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--border-radius-sm);
+    font-size: var(--text-sm);
+  }
+
+  .first-run-status.success {
+    background: var(--color-success-50);
+    color: var(--color-success-600);
+  }
+
+  .first-run-status.error {
+    background: var(--color-danger-50);
+    color: var(--color-danger-600);
+  }
+
+  .first-run-checklist,
+  .first-run-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .first-run-step {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: start;
+    color: var(--text-secondary);
+  }
+
+  .first-run-step span:not(.step-dot) {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--text-primary);
+  }
+
+  .first-run-step small {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    line-height: 1.4;
+  }
+
+  .step-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    border: var(--border-width) solid var(--border-default);
+    background: var(--surface-base);
+    margin-top: 1px;
+  }
+
+  .first-run-step.complete .step-dot {
+    border-color: var(--color-success-500);
+    background: var(--color-success-500);
+    box-shadow: inset 0 0 0 4px var(--surface-raised);
+  }
+
+  .first-run-actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
   .report-card {
     display: flex;
     flex-direction: column;
@@ -554,6 +834,10 @@
 
   @media (max-width: 900px) {
     .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .first-run-panel {
       grid-template-columns: 1fr;
     }
   }
