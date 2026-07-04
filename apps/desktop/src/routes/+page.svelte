@@ -3,7 +3,6 @@
    * +page.svelte — Hash route renderer for Tauri shell mode.
    */
 
-  import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import Dashboard from './Dashboard.svelte';
   import Contacts from './Contacts.svelte';
@@ -14,6 +13,7 @@
   import ContactDetail from './ContactDetail.svelte';
   import AuditLog from './AuditLog.svelte';
   import PendingActions from './PendingActions.svelte';
+  import { currentHashPath, installHashRouteSync } from '$lib/utils/hashRouter';
 
   interface ParsedRoute {
     route: string;
@@ -65,14 +65,14 @@
       return { route: '/', contactId: null };
     }
 
-    const hashPath = window.location.hash.replace(/^#/, '') || '/';
-    return parseRoutePath(hashPath);
+    return parseRoutePath(currentHashPath());
   }
 
   const initialRoute = readHashRoute();
 
   let route = $state(initialRoute.route);
   let contactId = $state<string | null>(initialRoute.contactId);
+  let routeSyncInitialized = false;
 
   function parseRoute(path: string) {
     const parsed = parseRoutePath(path);
@@ -80,16 +80,23 @@
     contactId = parsed.contactId;
   }
 
-  onMount(() => {
+  $effect(() => {
+    if (!browser || routeSyncInitialized) {
+      return;
+    }
+
+    routeSyncInitialized = true;
+
     const syncFromHash = () => {
-      const hashPath = window.location.hash.replace(/^#/, '') || '/';
-      parseRoute(hashPath);
+      parseRoute(currentHashPath());
     };
+    const removeRouteSync = installHashRouteSync(syncFromHash);
 
     syncFromHash();
     window.addEventListener('hashchange', syncFromHash);
 
     return () => {
+      removeRouteSync();
       window.removeEventListener('hashchange', syncFromHash);
     };
   });

@@ -54,6 +54,100 @@ test('creates a contact through the visible UI and shows it in Contacts and glob
   await assertNoConsoleErrors();
 });
 
+test('shows a customer 360 summary for a contact with linked sales work', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/contacts');
+  await expect(page.getByRole('heading', { name: 'Contacts' })).toBeVisible();
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Contact' }).click();
+  const contactDialog = page.getByRole('dialog', { name: 'Add Contact' });
+  await expect(contactDialog).toBeVisible();
+
+  await contactDialog.getByLabel('First Name').fill('Maya');
+  await contactDialog.getByLabel('Last Name').fill('Chen');
+  await contactDialog.getByLabel('Email').fill('maya@example.test');
+  await contactDialog.getByLabel('Phone').fill('+1 555 0303');
+  await contactDialog.getByLabel('Organization').fill('Greenfield Solar');
+  await contactDialog.getByRole('button', { name: 'Save' }).click();
+
+  await expect(contactDialog).toBeHidden();
+  await expect(page.getByText('Maya Chen')).toBeVisible();
+
+  const seed = await page.evaluate(async () => {
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (!invoke) {
+      throw new Error('Tauri smoke shim is not installed.');
+    }
+
+    const contacts = await invoke('list_contacts', {
+      params: {
+        page: 1,
+        per_page: 50,
+        search_query: 'Maya',
+      },
+    }) as { contacts: Array<{ id: string }> };
+    const contact = contacts.contacts[0];
+    if (!contact) {
+      throw new Error('Seed contact was not created.');
+    }
+
+    await invoke('create_deal', {
+      title: 'Solar upgrade expansion',
+      value: 42000,
+      currency: 'USD',
+      stage: 'Proposal',
+      probability: 50,
+      expected_close: '2026-07-31',
+      contact_id: contact.id,
+      organization_id: '',
+      notes: 'Expansion opportunity.',
+    });
+
+    await invoke('create_activity', {
+      activity_type: 'call',
+      title: 'Call Maya about implementation timeline',
+      description: '',
+      due_date: '2026-07-10',
+      contact_id: contact.id,
+      deal_id: '',
+    });
+
+    return { contactId: contact.id };
+  });
+
+  await loadHashRoute(page, `/contacts/${seed.contactId}`);
+  await expect(page).toHaveURL(new RegExp(`#/contacts/${seed.contactId}$`));
+  await expect(page.getByRole('heading', { name: 'Maya Chen' })).toBeVisible();
+
+  const workspace = page.locator('.customer-workspace');
+  await expect(workspace.getByRole('heading', { name: 'Customer 360 Summary' })).toBeVisible();
+  await expect(workspace.getByText('On Track')).toBeVisible();
+  await expect(workspace.locator('.workspace-metric').filter({ hasText: 'Open Deals' }).getByText('1')).toBeVisible();
+  await expect(workspace.getByText('$42,000')).toBeVisible();
+  await expect(
+    workspace.locator('.workspace-metric').filter({ hasText: 'Next Follow-Up' })
+      .getByText('Call Maya about implementation timeline'),
+  ).toBeVisible();
+
+  await workspace.getByRole('button', { name: 'Add Follow-Up' }).click();
+  let dialog = page.getByRole('dialog', { name: 'Add Activity' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('Contact')).toHaveValue(seed.contactId);
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toBeHidden();
+
+  await workspace.getByRole('button', { name: 'Add Deal' }).click();
+  dialog = page.getByRole('dialog', { name: 'Add Deal' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('Contact')).toHaveValue(seed.contactId);
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toBeHidden();
+
+  await assertNoConsoleErrors();
+});
+
 test('creates an organization through the visible UI and shows it in Organizations', async ({
   page,
   assertNoConsoleErrors,
