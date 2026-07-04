@@ -142,7 +142,27 @@ async function installTauriShim(page: Page) {
     };
 
     const timestamp = '2026-06-24T12:00:00.000Z';
-    const state = {
+    const stateStorageKey = '900crm.browser-smoke.state';
+    const storedState = (() => {
+      try {
+        const raw = window.localStorage.getItem(stateStorageKey);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (
+          parsed &&
+          Array.isArray(parsed.contacts) &&
+          Array.isArray(parsed.organizations) &&
+          Array.isArray(parsed.deals) &&
+          Array.isArray(parsed.activities) &&
+          Array.isArray(parsed.activityLinks)
+        ) {
+          return parsed;
+        }
+      } catch {
+        // Fall back to a clean state if prior smoke data is malformed.
+      }
+      return null;
+    })();
+    const state = storedState ?? {
       nextId: 1,
       contacts: [] as BackendContact[],
       organizations: [] as BackendOrganization[],
@@ -150,6 +170,10 @@ async function installTauriShim(page: Page) {
       activities: [] as BackendActivity[],
       activityLinks: [] as BackendActivityLink[],
     };
+
+    function persistState(): void {
+      window.localStorage.setItem(stateStorageKey, JSON.stringify(state));
+    }
 
     function nextId(prefix: string): string {
       const id = `${prefix}-${state.nextId}`;
@@ -238,6 +262,7 @@ async function installTauriShim(page: Page) {
         deleted_at: null,
       };
       state.contacts.push(contact);
+      persistState();
       return contact;
     }
 
@@ -262,6 +287,7 @@ async function installTauriShim(page: Page) {
         device_id: 'browser-smoke-device',
       };
       state.organizations.push(organization);
+      persistState();
       return organization;
     }
 
@@ -281,6 +307,7 @@ async function installTauriShim(page: Page) {
         updated_at: timestamp,
       };
       state.deals.push(deal);
+      persistState();
       return deal;
     }
 
@@ -298,6 +325,7 @@ async function installTauriShim(page: Page) {
         updated_at: timestamp,
       };
       state.activities.unshift(activity);
+      persistState();
       return activity;
     }
 
@@ -312,6 +340,7 @@ async function installTauriShim(page: Page) {
         device_id: 'browser-smoke-device',
       };
       state.activityLinks.push(link);
+      persistState();
       return link;
     }
 
@@ -374,6 +403,120 @@ async function installTauriShim(page: Page) {
       }
 
       return results.slice(0, limit);
+    }
+
+    function listUpcomingActivities(args: InvokeArgs): BackendActivity[] {
+      const limit = numberArg(args, 'limit', 10);
+      return state.activities
+        .filter((activity) => !activity.completed)
+        .sort((left, right) =>
+          (Date.parse(left.due_date ?? '') || Number.MAX_SAFE_INTEGER) -
+          (Date.parse(right.due_date ?? '') || Number.MAX_SAFE_INTEGER)
+        )
+        .slice(0, limit);
+    }
+
+    function getDashboardStats() {
+      const activeContacts = state.contacts.filter(
+        (contact) => !contact.deleted_at && contact.contact_type !== 'organization',
+      );
+      const activeOrganizations = state.organizations.filter((organization) => !organization.deleted_at);
+      const activeDeals = state.deals.filter(
+        (deal) => deal.stage !== 'Closed Won' && deal.stage !== 'Closed Lost',
+      );
+      const pendingActivities = state.activities.filter((activity) => !activity.completed);
+      const now = Date.now();
+
+      const buckets = new Map<string, { currency: string; total_value: number; deal_count: number }>();
+      for (const deal of activeDeals) {
+        const currency = deal.currency || 'USD';
+        const bucket = buckets.get(currency) ?? { currency, total_value: 0, deal_count: 0 };
+        bucket.total_value += deal.value;
+        bucket.deal_count += 1;
+        buckets.set(currency, bucket);
+      }
+
+      return {
+        total_contacts: activeContacts.length,
+        total_organizations: activeOrganizations.length,
+        active_deals: activeDeals.length,
+        pipeline_value: activeDeals.reduce((sum, deal) => sum + deal.value, 0),
+        pipeline_value_by_currency: [...buckets.values()],
+        upcoming_activities: pendingActivities.length,
+        overdue_activities: pendingActivities.filter((activity) => {
+          const dueTs = Date.parse(activity.due_date ?? '');
+          return Number.isFinite(dueTs) && dueTs < now;
+        }).length,
+      };
+    }
+
+    function getPipelineConversionReport() {
+      const totalDeals = state.deals.length;
+      const closedWon = state.deals.filter((deal) => deal.stage === 'Closed Won').length;
+      const closedLost = state.deals.filter((deal) => deal.stage === 'Closed Lost').length;
+      const closedTotal = closedWon + closedLost;
+      const stages = ['Lead', 'Qualified', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'];
+
+      return {
+        generated_at: timestamp,
+        total_deals: totalDeals,
+        open_deals: state.deals.filter((deal) => deal.stage !== 'Closed Won' && deal.stage !== 'Closed Lost').length,
+        closed_won: closedWon,
+        closed_lost: closedLost,
+        overall_win_rate: closedTotal > 0 ? closedWon / closedTotal : 0,
+        stage_metrics: stages.map((stage) => {
+          const deals = state.deals.filter((deal) => deal.stage === stage);
+          const totalValue = deals.reduce((sum, deal) => sum + deal.value, 0);
+          return {
+            stage,
+            count: deals.length,
+            total_value: totalValue,
+            weighted_value: deals.reduce((sum, deal) => sum + deal.value * (deal.probability / 100), 0),
+            stage_share: totalDeals > 0 ? deals.length / totalDeals : 0,
+          };
+        }),
+        transition_metrics: [],
+      };
+    }
+
+    function getActivityFunnelReport() {
+      const totalActivities = state.activities.length;
+      const completedActivities = state.activities.filter((activity) => activity.completed).length;
+      const pendingActivities = state.activities.filter((activity) => !activity.completed).length;
+      const now = Date.now();
+      const overdueActivities = state.activities.filter((activity) => {
+        const dueTs = Date.parse(activity.due_date ?? '');
+        return !activity.completed && Number.isFinite(dueTs) && dueTs < now;
+      }).length;
+      const activityTypes = ['task', 'call', 'meeting', 'email'];
+
+      return {
+        generated_at: timestamp,
+        total_activities: totalActivities,
+        completed_activities: completedActivities,
+        pending_activities: pendingActivities,
+        overdue_activities: overdueActivities,
+        completion_rate: totalActivities > 0 ? completedActivities / totalActivities : 0,
+        overdue_rate: totalActivities > 0 ? overdueActivities / totalActivities : 0,
+        by_type: activityTypes.map((activity_type) => {
+          const activities = state.activities.filter((activity) => activity.activity_type === activity_type);
+          const completed = activities.filter((activity) => activity.completed).length;
+          return {
+            activity_type,
+            total: activities.length,
+            completed,
+            pending: activities.length - completed,
+            completion_rate: activities.length > 0 ? completed / activities.length : 0,
+          };
+        }).filter((metric) => metric.total > 0),
+        due_buckets: {
+          overdue: overdueActivities,
+          due_today: 0,
+          due_next_7_days: pendingActivities,
+          due_later: 0,
+          no_due_date: state.activities.filter((activity) => !activity.due_date).length,
+        },
+      };
     }
 
     const staticResponses: Record<string, unknown> = {
@@ -466,6 +609,14 @@ async function installTauriShim(page: Page) {
             return state.activities;
           case 'create_activity':
             return createActivity(args);
+          case 'list_upcoming_activities':
+            return listUpcomingActivities(args);
+          case 'get_dashboard_stats':
+            return getDashboardStats();
+          case 'get_pipeline_conversion_report':
+            return getPipelineConversionReport();
+          case 'get_activity_funnel_report':
+            return getActivityFunnelReport();
           case 'list_activity_links':
             return listActivityLinks(args);
           case 'add_activity_link':

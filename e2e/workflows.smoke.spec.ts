@@ -1,5 +1,28 @@
 import { expect, loadHashRoute, test } from './tauri-shim';
 
+test('loads the dashboard sample workspace and shows the follow-up on the dashboard', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Start your workspace' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Load sample workspace' }).click();
+  await expect(page.getByText('Sample workspace loaded.').first()).toBeVisible();
+  await expect(page.getByText('Call Amara about rollout timeline')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Load sample workspace' })).toBeHidden();
+
+  const storedSampleState = async () =>
+    page.evaluate(() => window.localStorage.getItem('900crm.browser-smoke.state') ?? '');
+  await expect.poll(storedSampleState).toContain('Amara');
+  await expect.poll(storedSampleState).toContain('Northstar Cooperative');
+  await expect.poll(storedSampleState).toContain('Solar inventory rollout');
+  await expect.poll(storedSampleState).toContain('Call Amara about rollout timeline');
+
+  await assertNoConsoleErrors();
+});
+
 test('creates a contact through the visible UI and shows it in Contacts and global search', async ({
   page,
   assertNoConsoleErrors,

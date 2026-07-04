@@ -15,7 +15,7 @@ or not implemented.
 requirement, local SQLite data ownership, backup/restore, import/export depth,
 audit evidence, and a narrow optional MCP stdio boundary. That is meaningful.
 
-The weakness is the daily CRM experience. As of Sprint 100, the left navigation
+The weakness is the daily CRM experience. As of Sprint 101, the left navigation
 is visually grouped into:
 
 - Workspace: Dashboard, Contacts, Organizations, Pipeline, Activities
@@ -23,10 +23,11 @@ is visually grouped into:
 - Admin: Settings
 
 That grouping is a better information architecture than the original flat menu,
-but it still undersells the product because several core CRM jobs remain shallow
-or absent. Comparable CRMs make sales work feel richer through leads, inbox and
-communication history, calendar views, reports, saved views, automation, guided
-onboarding, and clearer record workspaces.
+and the dashboard now has a first-run starter checklist plus optional synthetic
+sample workspace. The product still undersells its foundation because several
+core CRM jobs remain shallow or absent. Comparable CRMs make sales work feel
+richer through leads, inbox and communication history, calendar views, reports,
+saved views, automation, guided onboarding, and clearer record workspaces.
 
 The next phase should therefore be a product-depth phase, not another foundation
 phase. The priority is to make 900CRM feel useful in the first 10 minutes for a
@@ -36,7 +37,7 @@ real small business owner.
 
 | Area | Current state | Product issue |
 |---|---|---|
-| Dashboard | KPI cards, reports, activity feed, quick actions | Useful start, but not yet a true command center. No saved goals, no forecast view, no setup checklist, no "what needs attention" queue. |
+| Dashboard | KPI cards, reports, activity feed, quick actions, first-run starter checklist, optional synthetic sample workspace | Useful start, but not yet a true command center. No saved goals, no forecast view, and no "what needs attention" queue. |
 | Contacts | Search, type filter, duplicate review, import/export, custom-field filtering | Contacts and lead/account work are blended. There is no lead capture stage, saved segment, list view preset, or interaction timeline at the top level. |
 | Organizations | List, create/edit, notes/tags, contact linking | Important, but weaker than account management in competing CRMs. No account health, open deals summary, recent activity, owner, or next step at list level. |
 | Pipeline | Kanban by stage, custom-field filter, deal cards | Good foundation. Needs drag/drop confidence, stage conversion metrics, stale deal detection, forecast view, and deal detail workspace. |
@@ -79,22 +80,23 @@ Scale: 0 = absent, 1 = foundation only, 2 = usable alpha, 3 = competitive.
 | Email/communication history | 1 | 2 |
 | Automation/workflows | 1 | 2 |
 | Forecasting | 1 | 2 |
-| Onboarding/sample data | 1 | 3 |
+| Onboarding/sample data | 2 | 3 |
 | Release/installability | 1 | 2 |
 | Mobile/team/cloud collaboration | 0 | Deferred |
 
 ## Highest-Impact Gaps
 
-### 1. First-run value is weak
+### 1. First-run value is started, not complete
 
-A new user needs to know what to do immediately. Today the app opens into a
-dashboard, but it does not guide setup, sample data, import, or first CRM
-workflow. Competitors make the user feel oriented through starter pipelines,
-sample records, product tours, or clear empty states.
+A new user needs to know what to do immediately. Sprint 101 added a dashboard
+starter checklist and optional local synthetic sample workspace. That closes the
+blank-dashboard problem, but competitors still go further with starter
+pipelines, product tours, guided imports, and richer empty states across every
+primary module.
 
-Recommended outcome: a first-run setup checklist with sample data, import,
-create first contact, create first deal, add next follow-up, and create first
-backup.
+Recommended outcome: extend first-run guidance into module empty states,
+import/backup prompts, and customer/deal workspace guidance without adding
+marketing-style tours.
 
 ### 2. Contacts are not yet a customer workspace
 
@@ -151,11 +153,13 @@ These are ordered to improve perceived product value fastest.
      release packaging pending."
    - Group admin/safety nav items visually or document the intended grouping.
 
-2. **First-Run Onboarding and Sample Data**
-   - Add a first-run checklist and optional sample CRM dataset.
-   - Guide users through first contact, first organization, first deal, first
-     follow-up, import, and backup.
-   - Add empty states that explain the next useful action without marketing copy.
+2. **First-Run Onboarding and Sample Data** - completed for the dashboard
+   starter layer
+   - Added a first-run checklist and optional synthetic sample CRM dataset.
+   - Guides users through first contact or organization, first deal, and first
+     follow-up from the dashboard.
+   - Remaining work: module-specific empty states, guided import/backup prompts,
+     and richer onboarding inside customer/deal workspaces.
 
 3. **Customer 360 Workspaces**
    - Upgrade contact and organization detail pages.
