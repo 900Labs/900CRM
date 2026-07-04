@@ -20,6 +20,7 @@
   import SearchBar from '$lib/components/SearchBar.svelte';
   import GlobalModalHost from '$lib/components/GlobalModalHost.svelte';
   import { startActivityReminderService } from '$lib/services/activityReminders';
+  import { currentHashPath, navigateHash, routeHash } from '$lib/utils/hashRouter';
 
   // ── Child route ──────────────────────────────────────────────────────────────
 
@@ -121,20 +122,9 @@
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
-  function routeHash(href: string): string {
-    return href === '/' ? '#/' : `#${href}`;
-  }
-
   function navigate(href: string) {
     currentRoute = href;
-    // Use hash-based routing for Tauri. Dispatch explicitly when the target is
-    // already active so route renderers can resync after interrupted clicks.
-    const nextHash = routeHash(href);
-    if (window.location.hash === nextHash) {
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
-    } else {
-      window.location.hash = nextHash;
-    }
+    navigateHash(href);
   }
 
   function isActive(href: string): boolean {
@@ -146,12 +136,11 @@
 
   onMount(() => {
     // Detect current route from hash
-    const hash = window.location.hash.replace('#', '') || '/';
-    currentRoute = hash;
+    currentRoute = currentHashPath();
 
     // Listen for hash changes
     const handleHashChange = () => {
-      currentRoute = window.location.hash.replace('#', '') || '/';
+      currentRoute = currentHashPath();
     };
     window.addEventListener('hashchange', handleHashChange);
 

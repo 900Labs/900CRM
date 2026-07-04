@@ -13,7 +13,6 @@
    *   - Soft-delete with confirmation
    */
 
-  import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
   import { contactStore } from '$lib/stores/contacts';
   import { dealStore } from '$lib/stores/deals';
@@ -23,6 +22,7 @@
   import { composeEmail } from '$lib/api/email';
   import type { Contact, UpdateContactPayload } from '$lib/api/contacts';
   import type { Deal } from '$lib/api/deals';
+  import type { Activity } from '$lib/api/activities';
   import {
     listCustomFieldDefinitions,
     listCustomFieldValues,
@@ -30,6 +30,7 @@
     type CustomFieldDefinition,
   } from '$lib/api/customFields';
   import { formatFullName, formatDate, formatRelativeTime, formatCurrency, formatInitials } from '$lib/utils/formatters';
+  import { navigateHash } from '$lib/utils/hashRouter';
   import { validateEmail, validateUrl } from '$lib/utils/validators';
   import NoteEditor from '$lib/components/NoteEditor.svelte';
   import TagPicker from '$lib/components/TagPicker.svelte';
@@ -71,12 +72,12 @@
   let websiteError = $state<string | null>(null);
 
   // Linked data
-  let linkedDeals = $state<Deal[]>([]);
   let dealsLoading = $state(false);
   let customFieldsLoading = $state(false);
   let customFieldDefinitions = $state<CustomFieldDefinition[]>([]);
   let customFieldValues = $state<Record<string, string>>({});
   let originalCustomFieldValues = $state<Record<string, string>>({});
+  let loadedContactId = '';
 
   // ── Derived ─────────────────────────────────────────────────────────────────
 
@@ -98,10 +99,104 @@
     return Math.abs(hash) % 8;
   });
 
+  const linkedDeals = $derived.by(() =>
+    dealStore.deals.filter((deal) => deal.contactId === contactId)
+  );
+
+  const openDeals = $derived.by(() =>
+    linkedDeals.filter((deal) => isOpenDeal(deal))
+  );
+
+  const openDealCount = $derived(openDeals.length);
+
+  const openPipelineValueByCurrency = $derived.by(() => {
+    const buckets = new Map<string, number>();
+    for (const deal of openDeals) {
+      const currency = deal.currency || settingsStore.currency || 'USD';
+      buckets.set(currency, (buckets.get(currency) ?? 0) + deal.value);
+    }
+    return [...buckets.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([currency, value]) => ({ currency, value }));
+  });
+
+  const openPipelineValue = $derived.by(() => {
+    if (openPipelineValueByCurrency.length === 0) {
+      return t('contacts.workspace.noOpenValue');
+    }
+
+    return openPipelineValueByCurrency
+      .map(({ currency, value }) => formatCurrency(value, currency, settingsStore.language))
+      .join(' + ');
+  });
+
+  const pendingActivities = $derived.by(() =>
+    [...activityStore.activities]
+      .filter((activity) => activity.status !== 'completed')
+      .sort((left, right) => activitySortTime(left) - activitySortTime(right))
+  );
+
+  const overdueActivities = $derived.by(() =>
+    pendingActivities.filter((activity) => activity.status === 'overdue')
+  );
+
+  const nextActivity = $derived<Activity | null>(pendingActivities[0] ?? null);
+
+  const recentActivity = $derived<Activity | null>(
+    [...activityStore.activities]
+      .sort((left, right) => activityUpdatedTime(right) - activityUpdatedTime(left))[0] ?? null
+  );
+
+  const customerHealth = $derived.by(() => {
+    if (dealsLoading || activityStore.isLoading) {
+      return {
+        tone: 'neutral',
+        label: t('common.loading'),
+        detail: t('contacts.workspace.healthLoadingDetail'),
+      };
+    }
+
+    if (overdueActivities.length > 0) {
+      const activity = overdueActivities[0];
+      return {
+        tone: 'danger',
+        label: t('contacts.workspace.healthOverdue'),
+        detail: t('contacts.workspace.healthOverdueDetail', { subject: activity.subject }),
+      };
+    }
+
+    if (openDealCount > 0 && pendingActivities.length === 0) {
+      return {
+        tone: 'warning',
+        label: t('contacts.workspace.healthNeedsFollowUp'),
+        detail: t('contacts.workspace.healthNeedsFollowUpDetail'),
+      };
+    }
+
+    if (nextActivity) {
+      return {
+        tone: 'success',
+        label: t('contacts.workspace.healthOnTrack'),
+        detail: t('contacts.workspace.healthOnTrackDetail', { subject: nextActivity.subject }),
+      };
+    }
+
+    return {
+      tone: 'neutral',
+      label: t('contacts.workspace.healthNurture'),
+      detail: t('contacts.workspace.healthNurtureDetail'),
+    };
+  });
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-  onMount(async () => {
-    await loadContact();
+  $effect(() => {
+    if (!contactId || loadedContactId === contactId) {
+      return;
+    }
+
+    loadedContactId = contactId;
+    void loadContact();
   });
 
   async function loadContact() {
@@ -140,7 +235,6 @@
         activityStore.setFilters({ contactId }),
         loadCustomFields(contactId),
       ]);
-      linkedDeals = dealStore.deals.filter((d) => d.contactId === contactId);
     } catch (err) {
       loadError = t('errors.loadFailed');
       console.error('[ContactDetail] Load error:', err);
@@ -222,6 +316,58 @@
     customFieldValues = { ...originalCustomFieldValues };
   }
 
+  function isOpenDeal(deal: Deal): boolean {
+    return deal.stage !== 'closedWon' && deal.stage !== 'closedLost';
+  }
+
+  function activitySortTime(activity: Activity): number {
+    const dueTime = Date.parse(activity.dueDate ?? '');
+    if (Number.isFinite(dueTime)) {
+      return dueTime;
+    }
+
+    const updatedTime = Date.parse(activity.updatedAt);
+    return Number.isFinite(updatedTime) ? updatedTime : Number.MAX_SAFE_INTEGER;
+  }
+
+  function activityUpdatedTime(activity: Activity): number {
+    const updatedTime = Date.parse(activity.updatedAt);
+    if (Number.isFinite(updatedTime)) {
+      return updatedTime;
+    }
+
+    const createdTime = Date.parse(activity.createdAt);
+    return Number.isFinite(createdTime) ? createdTime : 0;
+  }
+
+  function formatActivityDue(activity: Activity | null): string {
+    if (!activity) {
+      return t('contacts.workspace.noneScheduled');
+    }
+
+    if (!activity.dueDate) {
+      return t('contacts.workspace.noDueDate');
+    }
+
+    return formatDate(
+      activity.dueDate,
+      settingsStore.dateFormat as 'MMM D, YYYY',
+      settingsStore.language,
+    );
+  }
+
+  function openContactDealModal() {
+    if (!contact) return;
+    contactStore.selectContact(contact);
+    uiStore.openModal('addDeal', { contactId: contact.id });
+  }
+
+  function openContactActivityModal() {
+    if (!contact) return;
+    contactStore.selectContact(contact);
+    uiStore.openModal('addActivity', { contactId: contact.id });
+  }
+
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   function markDirty() {
@@ -280,7 +426,7 @@
     try {
       await contactStore.deleteContact(contact.id);
       // Navigate back to contacts list
-      window.location.hash = '/contacts';
+      navigateHash('/contacts');
     } catch (err) {
       console.error('[ContactDetail] Delete error:', err);
     } finally {
@@ -290,7 +436,7 @@
   }
 
   function handleBack() {
-    window.location.hash = '/contacts';
+    navigateHash('/contacts');
   }
 
   function handleNotesSave(newNotes: string) {
@@ -419,6 +565,59 @@
         </button>
       </div>
     </div>
+
+    <!-- ── Customer workspace summary ──────────────────────────────────────── -->
+    <section class="customer-workspace" aria-labelledby="customer-workspace-heading">
+      <div class="customer-workspace-header">
+        <div>
+          <p class="workspace-eyebrow">{t('contacts.workspace.eyebrow')}</p>
+          <h2 class="section-title" id="customer-workspace-heading">
+            {t('contacts.workspace.title')}
+          </h2>
+        </div>
+        <span class="health-badge health-{customerHealth.tone}">
+          {customerHealth.label}
+        </span>
+      </div>
+
+      <p class="workspace-summary">{customerHealth.detail}</p>
+
+      <div class="workspace-metrics" role="list">
+        <div class="workspace-metric" role="listitem">
+          <span class="workspace-metric-label">{t('contacts.workspace.openDeals')}</span>
+          <strong>{openDealCount}</strong>
+        </div>
+        <div class="workspace-metric" role="listitem">
+          <span class="workspace-metric-label">{t('contacts.workspace.openPipeline')}</span>
+          <strong>{openPipelineValue}</strong>
+        </div>
+        <div class="workspace-metric" role="listitem">
+          <span class="workspace-metric-label">{t('contacts.workspace.nextFollowUp')}</span>
+          <strong>{nextActivity?.subject ?? t('contacts.workspace.noneScheduled')}</strong>
+          <small>{formatActivityDue(nextActivity)}</small>
+        </div>
+        <div class="workspace-metric" role="listitem">
+          <span class="workspace-metric-label">{t('contacts.workspace.recentActivity')}</span>
+          <strong>{recentActivity?.subject ?? t('contacts.workspace.noRecentActivity')}</strong>
+          <small>{recentActivity ? t(`activities.${recentActivity.type}`) : t('common.none')}</small>
+        </div>
+      </div>
+
+      <div class="workspace-actions" aria-label={t('contacts.workspace.actionsLabel')}>
+        <button class="btn btn-secondary btn-sm" onclick={openContactDealModal} type="button">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          {t('deals.addDeal')}
+        </button>
+        <button class="btn btn-primary btn-sm" onclick={openContactActivityModal} type="button">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          {t('contacts.workspace.addFollowUp')}
+        </button>
+      </div>
+    </section>
 
     <!-- ── Main content grid ─────────────────────────────────────────────────── -->
     <div class="detail-grid">
@@ -651,7 +850,7 @@
             <h2 class="section-title" id="deals-heading">{t('contacts.linkedDeals')}</h2>
             <button
               class="btn btn-secondary btn-xs"
-              onclick={() => contact && uiStore.openModal('addDeal', { contactId: contact.id })}
+              onclick={openContactDealModal}
               type="button"
             >
               <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -700,7 +899,7 @@
             <h2 class="section-title" id="activity-heading">{t('contacts.activityTimeline')}</h2>
             <button
               class="btn btn-secondary btn-xs"
-              onclick={() => contact && uiStore.openModal('addActivity', { contactId: contact.id })}
+              onclick={openContactActivityModal}
               type="button"
             >
               <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -864,6 +1063,140 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-5);
+  }
+
+  /* ── Customer workspace summary ─────────────────────────────────────────── */
+
+  .customer-workspace {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-5);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-card);
+  }
+
+  .customer-workspace-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+
+  .workspace-eyebrow {
+    margin: 0 0 var(--space-1);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+
+  .workspace-summary {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+
+  .workspace-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .workspace-metric {
+    min-width: 0;
+    padding-block: var(--space-2);
+    border-block-start: var(--border-width) solid var(--border-default);
+  }
+
+  .workspace-metric-label {
+    display: block;
+    margin-block-end: var(--space-1);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+  }
+
+  .workspace-metric strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+    font-size: var(--text-base);
+    line-height: 1.35;
+    white-space: nowrap;
+  }
+
+  .workspace-metric small {
+    display: block;
+    overflow: hidden;
+    margin-block-start: 2px;
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .workspace-actions {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .health-badge {
+    flex-shrink: 0;
+    padding: var(--space-1) var(--space-3);
+    border-radius: 9999px;
+    border: var(--border-width) solid var(--border-default);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+  }
+
+  .health-neutral {
+    color: var(--text-secondary);
+    background-color: var(--surface-raised);
+  }
+
+  .health-success {
+    color: #2D8659;
+    background-color: #E8F5EC;
+    border-color: #BFE4CC;
+  }
+
+  .health-warning {
+    color: #A84B2F;
+    background-color: #FEF3E2;
+    border-color: #F4D1A1;
+  }
+
+  .health-danger {
+    color: #C0392B;
+    background-color: #FFF0F0;
+    border-color: #F0B8B2;
+  }
+
+  @media (max-width: 900px) {
+    .workspace-metrics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
+    .customer-workspace-header {
+      flex-direction: column;
+    }
+
+    .workspace-metrics {
+      grid-template-columns: 1fr;
+    }
+
+    .workspace-actions .btn {
+      width: 100%;
+      justify-content: center;
+    }
   }
 
   /* ── Fields grid ─────────────────────────────────────────────────────────── */

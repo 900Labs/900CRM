@@ -115,7 +115,30 @@
     "duplicatesExplanation": "Target keeps existing non-empty fields. Source fills blank fields, notes are appended, and source is soft-deleted.",
     "duplicatesMergeAction": "Merge selected",
     "duplicatesMerging": "Merging...",
-    "duplicatesConfirmMerge": "Merge {source} into {target}? Target keeps existing non-empty fields, source fills blank fields, notes are appended, and source is soft-deleted."
+    "duplicatesConfirmMerge": "Merge {source} into {target}? Target keeps existing non-empty fields, source fills blank fields, notes are appended, and source is soft-deleted.",
+    "workspace": {
+      "eyebrow": "Customer Workspace",
+      "title": "Customer 360 Summary",
+      "actionsLabel": "Customer workspace actions",
+      "openDeals": "Open Deals",
+      "openPipeline": "Open Pipeline",
+      "nextFollowUp": "Next Follow-Up",
+      "recentActivity": "Recent Activity",
+      "addFollowUp": "Add Follow-Up",
+      "noneScheduled": "None scheduled",
+      "noRecentActivity": "No recent activity",
+      "noOpenValue": "No open value",
+      "noDueDate": "No due date",
+      "healthLoadingDetail": "Loading linked deals and activities.",
+      "healthOverdue": "Overdue",
+      "healthOverdueDetail": "{subject} is overdue.",
+      "healthNeedsFollowUp": "Needs Follow-Up",
+      "healthNeedsFollowUpDetail": "There is an open deal without a scheduled next action.",
+      "healthOnTrack": "On Track",
+      "healthOnTrackDetail": "Next follow-up is scheduled: {subject}.",
+      "healthNurture": "Nurture",
+      "healthNurtureDetail": "No open deal or follow-up is scheduled yet."
+    }
   },
   "entityNotes": {
     "title": "Notes",

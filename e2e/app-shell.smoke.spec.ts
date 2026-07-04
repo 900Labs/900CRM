@@ -34,3 +34,19 @@ test('renders key hash routes without native Tauri dialogs', async ({ page, asse
 
   await assertNoConsoleErrors();
 });
+
+test('switches primary workspace routes from the sidebar', async ({ page, assertNoConsoleErrors }) => {
+  await page.goto('/');
+
+  const navigation = page.getByRole('navigation', { name: 'Main navigation' });
+  await navigation.getByRole('link', { name: 'Contacts' }).click();
+  await expect(page.getByRole('heading', { name: 'Contacts' })).toBeVisible();
+
+  await navigation.getByRole('link', { name: 'Pipeline' }).click();
+  await expect(page.getByRole('heading', { name: 'Pipeline' })).toBeVisible();
+
+  await navigation.getByRole('link', { name: 'Settings' }).click();
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+
+  await assertNoConsoleErrors();
+});
