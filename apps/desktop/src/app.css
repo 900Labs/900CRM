@@ -599,7 +599,38 @@ hr {
   padding: var(--space-4) var(--space-3);
   display: flex;
   flex-direction: column;
+  gap: var(--space-5);
+}
+
+.sidebar-nav-section {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-1);
+}
+
+.app-sidebar.collapsed .sidebar-nav {
+  gap: var(--space-3);
+}
+
+.app-sidebar.collapsed .sidebar-nav-section {
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width) solid var(--border-subtle);
+}
+
+.app-sidebar.collapsed .sidebar-nav-section:first-child {
+  padding-block-start: 0;
+  border-block-start: none;
+}
+
+.nav-section-label {
+  display: block;
+  padding: 0 var(--space-4) var(--space-1);
+  font-size: 0.68rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+  line-height: var(--leading-tight);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
 }
 
 .nav-link {

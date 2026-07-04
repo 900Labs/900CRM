@@ -46,6 +46,12 @@
   type DateFormat  = 'YYYY-MM-DD' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'MMM D, YYYY';
   type ExternalClientActivationMode = EditableExternalClientPermissionMode;
 
+  interface SettingsShortcut {
+    id: string;
+    labelKey: string;
+    targetId: string;
+  }
+
   // ── Constants ────────────────────────────────────────────────────────────────
 
   const CURRENCIES = [
@@ -86,6 +92,16 @@
     { value: 'disabled', labelKey: 'settings.externalClientActivationModeDisabled' },
     { value: 'read_only', labelKey: 'settings.externalClientActivationModeReadOnly' },
     { value: 'draft_only', labelKey: 'settings.externalClientActivationModeDraftOnly' },
+  ];
+
+  const SETTINGS_SHORTCUTS: SettingsShortcut[] = [
+    { id: 'preferences', labelKey: 'settings.sectionPreferences', targetId: 'lang-heading' },
+    { id: 'sync', labelKey: 'settings.sectionSync', targetId: 'sync-heading' },
+    { id: 'email', labelKey: 'settings.sectionEmail', targetId: 'email-heading' },
+    { id: 'notifications', labelKey: 'settings.sectionNotifications', targetId: 'notifications-heading' },
+    { id: 'integrations', labelKey: 'settings.sectionIntegrations', targetId: 'integrations-heading' },
+    { id: 'data', labelKey: 'settings.sectionData', targetId: 'data-heading' },
+    { id: 'about', labelKey: 'settings.sectionAbout', targetId: 'about-heading' },
   ];
 
   // ── State ────────────────────────────────────────────────────────────────────
@@ -166,6 +182,13 @@
     } finally {
       savingKey = null;
     }
+  }
+
+  function scrollToSettingsSection(targetId: string) {
+    document.getElementById(targetId)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
   }
 
   async function handleLanguageChange(code: string) {
@@ -650,6 +673,18 @@
 <div class="page-content settings-page">
   <div class="page-header">
     <h1 class="page-title">{t('settings.title')}</h1>
+  </div>
+
+  <div class="settings-section-nav" aria-label={t('settings.sectionNavLabel')}>
+    {#each SETTINGS_SHORTCUTS as shortcut (shortcut.id)}
+      <button
+        class="settings-section-nav-button"
+        type="button"
+        onclick={() => scrollToSettingsSection(shortcut.targetId)}
+      >
+        {t(shortcut.labelKey)}
+      </button>
+    {/each}
   </div>
 
   <div class="settings-grid">
@@ -1458,6 +1493,43 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
+  }
+
+  .settings-page .page-header {
+    margin-block-end: 0;
+  }
+
+  .settings-section-nav {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-block-start: calc(-1 * var(--space-3));
+  }
+
+  .settings-section-nav-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+    padding: var(--space-2) var(--space-3);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--border-radius-md);
+    background-color: var(--surface-default);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-tight);
+    cursor: pointer;
+    transition: border-color var(--duration-fast) var(--ease-out),
+                background-color var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
+  }
+
+  .settings-section-nav-button:hover {
+    border-color: var(--color-primary-200);
+    background-color: var(--surface-raised);
+    color: var(--text-primary);
   }
 
   /* ── Two-column grid ─────────────────────────────────────────────────────── */
