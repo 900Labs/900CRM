@@ -17,7 +17,12 @@
     "settings": "الإعدادات",
     "organizations": "المؤسسات",
     "auditLog": "Audit Log",
-    "pendingActions": "Pending Actions"
+    "pendingActions": "Pending Actions",
+    "sections": {
+      "workspace": "العمل",
+      "review": "المراجعة",
+      "admin": "الإدارة"
+    }
   },
   "dashboard": {
     "title": "لوحة التحكم",
@@ -156,6 +161,14 @@
   },
   "settings": {
     "title": "الإعدادات",
+    "sectionNavLabel": "أقسام الإعدادات",
+    "sectionPreferences": "التفضيلات",
+    "sectionSync": "المزامنة",
+    "sectionEmail": "البريد",
+    "sectionNotifications": "الإشعارات",
+    "sectionIntegrations": "التكاملات",
+    "sectionData": "البيانات",
+    "sectionAbout": "حول",
     "language": "اللغة",
     "currency": "العملة",
     "theme": "المظهر",

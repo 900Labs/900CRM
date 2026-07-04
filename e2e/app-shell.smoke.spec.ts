@@ -4,7 +4,11 @@ test('renders the browser app shell and dashboard route', async ({ page, assertN
   await page.goto('/');
 
   await expect(page.getByText('900CRM')).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
+  const navigation = page.getByRole('navigation', { name: 'Main navigation' });
+  await expect(navigation).toBeVisible();
+  await expect(navigation.getByText('Workspace')).toBeVisible();
+  await expect(navigation.getByText('Review')).toBeVisible();
+  await expect(navigation.getByText('Admin')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   await expect(page.getByText('Total Contacts')).toBeVisible();
   await expect(page.getByText('Pipeline Conversion')).toBeVisible();
@@ -23,6 +27,9 @@ test('renders key hash routes without native Tauri dialogs', async ({ page, asse
 
   await loadHashRoute(page, '/settings');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Preferences' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Integrations' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Data', exact: true })).toBeVisible();
   await expect(page.getByText('Backup & Restore')).toBeVisible();
 
   await assertNoConsoleErrors();

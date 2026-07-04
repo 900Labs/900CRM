@@ -38,7 +38,13 @@
     icon: string;
   }
 
-  const navItems: NavItem[] = [
+  interface NavSection {
+    id: string;
+    label: () => string;
+    items: NavItem[];
+  }
+
+  const workspaceItems: NavItem[] = [
     {
       id: 'dashboard',
       label: () => t('nav.dashboard'),
@@ -69,12 +75,9 @@
       href: '/activities',
       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7l2 2 4-4',
     },
-    {
-      id: 'audit-log',
-      label: () => t('nav.auditLog'),
-      href: '/audit-log',
-      icon: 'M9 12h6M9 16h6M9 8h6M5 4h14v16H5zM5 8H3m2 4H3m2 4H3',
-    },
+  ];
+
+  const reviewItems: NavItem[] = [
     {
       id: 'pending-actions',
       label: () => t('nav.pendingActions'),
@@ -82,10 +85,37 @@
       icon: 'M12 6v6l4 2M21 12a9 9 0 11-9-9M19 3v5h-5',
     },
     {
+      id: 'audit-log',
+      label: () => t('nav.auditLog'),
+      href: '/audit-log',
+      icon: 'M9 12h6M9 16h6M9 8h6M5 4h14v16H5zM5 8H3m2 4H3m2 4H3',
+    },
+  ];
+
+  const adminItems: NavItem[] = [
+    {
       id: 'settings',
       label: () => t('nav.settings'),
       href: '/settings',
       icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+    },
+  ];
+
+  const navSections: NavSection[] = [
+    {
+      id: 'workspace',
+      label: () => t('nav.sections.workspace'),
+      items: workspaceItems,
+    },
+    {
+      id: 'review',
+      label: () => t('nav.sections.review'),
+      items: reviewItems,
+    },
+    {
+      id: 'admin',
+      label: () => t('nav.sections.admin'),
+      items: adminItems,
     },
   ];
 
@@ -164,34 +194,42 @@
 
     <!-- Navigation -->
     <nav class="sidebar-nav" aria-label="Main navigation">
-      {#each navItems as item (item.id)}
-        <a
-          class="nav-link"
-          class:active={isActive(item.href)}
-          href={routeHash(item.href)}
-          onclick={(e) => { e.preventDefault(); navigate(item.href); }}
-          title={uiStore.sidebarCollapsed ? item.label() : undefined}
-          aria-current={isActive(item.href) ? 'page' : undefined}
-        >
-          <svg
-            class="nav-icon"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.75"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-            style="flex-shrink: 0;"
-          >
-            <path d={item.icon} />
-          </svg>
+      {#each navSections as section (section.id)}
+        <div class="sidebar-nav-section">
           {#if !uiStore.sidebarCollapsed}
-            <span class="nav-label">{item.label()}</span>
+            <span class="nav-section-label">{section.label()}</span>
           {/if}
-        </a>
+
+          {#each section.items as item (item.id)}
+            <a
+              class="nav-link"
+              class:active={isActive(item.href)}
+              href={routeHash(item.href)}
+              onclick={(e) => { e.preventDefault(); navigate(item.href); }}
+              title={uiStore.sidebarCollapsed ? `${section.label()}: ${item.label()}` : undefined}
+              aria-current={isActive(item.href) ? 'page' : undefined}
+            >
+              <svg
+                class="nav-icon"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                style="flex-shrink: 0;"
+              >
+                <path d={item.icon} />
+              </svg>
+              {#if !uiStore.sidebarCollapsed}
+                <span class="nav-label">{item.label()}</span>
+              {/if}
+            </a>
+          {/each}
+        </div>
       {/each}
     </nav>
 

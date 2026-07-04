@@ -17,7 +17,12 @@
     "settings": "Saituna",
     "organizations": "Kungiyoyi",
     "auditLog": "Audit Log",
-    "pendingActions": "Pending Actions"
+    "pendingActions": "Pending Actions",
+    "sections": {
+      "workspace": "Aiki",
+      "review": "Bita",
+      "admin": "Gudanarwa"
+    }
   },
   "dashboard": {
     "title": "Allon Dubawa",
@@ -156,6 +161,14 @@
   },
   "settings": {
     "title": "Saituna",
+    "sectionNavLabel": "Sassan saituna",
+    "sectionPreferences": "Zabi",
+    "sectionSync": "Sync",
+    "sectionEmail": "Imel",
+    "sectionNotifications": "Sanarwa",
+    "sectionIntegrations": "Integrations",
+    "sectionData": "Bayanai",
+    "sectionAbout": "Game da",
     "language": "Harshe",
     "currency": "Kudin Kasar",
     "theme": "Jigo",
