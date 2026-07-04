@@ -17,7 +17,12 @@
     "settings": "Settings",
     "organizations": "Organizations",
     "auditLog": "Audit Log",
-    "pendingActions": "Pending Actions"
+    "pendingActions": "Pending Actions",
+    "sections": {
+      "workspace": "Workspace",
+      "review": "Review",
+      "admin": "Admin"
+    }
   },
   "dashboard": {
     "title": "Dashboard",
@@ -156,6 +161,14 @@
   },
   "settings": {
     "title": "Settings",
+    "sectionNavLabel": "Settings sections",
+    "sectionPreferences": "Preferences",
+    "sectionSync": "Sync",
+    "sectionEmail": "Email",
+    "sectionNotifications": "Notifications",
+    "sectionIntegrations": "Integrations",
+    "sectionData": "Data",
+    "sectionAbout": "About",
     "language": "Language",
     "currency": "Currency",
     "theme": "Theme",

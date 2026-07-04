@@ -15,19 +15,16 @@ or not implemented.
 requirement, local SQLite data ownership, backup/restore, import/export depth,
 audit evidence, and a narrow optional MCP stdio boundary. That is meaningful.
 
-The weakness is the daily CRM experience. The left navigation exposes only:
+The weakness is the daily CRM experience. As of Sprint 100, the left navigation
+is visually grouped into:
 
-- Dashboard
-- Contacts
-- Organizations
-- Pipeline
-- Activities
-- Audit Log
-- Pending Actions
-- Settings
+- Workspace: Dashboard, Contacts, Organizations, Pipeline, Activities
+- Review: Pending Actions, Audit Log
+- Admin: Settings
 
-That menu is honest, but it undersells the product and leaves core CRM jobs
-scattered. Comparable CRMs make sales work feel richer through leads, inbox and
+That grouping is a better information architecture than the original flat menu,
+but it still undersells the product because several core CRM jobs remain shallow
+or absent. Comparable CRMs make sales work feel richer through leads, inbox and
 communication history, calendar views, reports, saved views, automation, guided
 onboarding, and clearer record workspaces.
 
@@ -44,9 +41,9 @@ real small business owner.
 | Organizations | List, create/edit, notes/tags, contact linking | Important, but weaker than account management in competing CRMs. No account health, open deals summary, recent activity, owner, or next step at list level. |
 | Pipeline | Kanban by stage, custom-field filter, deal cards | Good foundation. Needs drag/drop confidence, stage conversion metrics, stale deal detection, forecast view, and deal detail workspace. |
 | Activities | Task/call/meeting/email list with filters and completion | Useful but should become a calendar/task center with due buckets, day/week views, reminders, and relationship context. |
-| Audit Log | Read-only table | Good trust feature, but it should be under Admin/Settings for most users. It currently competes with daily CRM navigation. |
-| Pending Actions | Review queue for proposed actions | Important for MCP/external-client safety, but also admin-grade. It should be grouped under Review/Admin unless there is a high-priority pending count. |
-| Settings | Locale/theme/date/currency, backup/restore, import/export, email, integrations | Too much is buried in one page. Data management, integrations, appearance, and app/admin settings should be separated or sectioned in a clearer settings shell. |
+| Audit Log | Read-only table grouped under Review | Good trust feature, now visually separated from daily work. Later, it may still move deeper into Admin once Review counts are more prominent. |
+| Pending Actions | Review queue for proposed actions grouped under Review | Important for MCP/external-client safety. The next improvement is to show high-priority pending counts without making this a daily-work screen. |
+| Settings | Locale/theme/date/currency, backup/restore, import/export, email, integrations, section jump bar | Still dense, but now easier to scan. Later work should split Data Management, Integrations, Appearance, and Admin/Safety into clearer settings sections or pages. |
 
 ## What Comparable CRMs Emphasize
 
@@ -147,7 +144,7 @@ Integrations, Email, and Admin/Safety sections.
 
 These are ordered to improve perceived product value fastest.
 
-1. **Docs and Navigation Reframe**
+1. **Docs and Navigation Reframe** - completed for the current visible grouping
    - Add a durable docs index.
    - Keep sprint logs as audit evidence, not the main entry point.
    - Reframe current alpha status as "source-ready, product-depth in progress,
