@@ -19,6 +19,7 @@
     listCustomFieldDefinitions,
     type CustomFieldDefinition,
   } from '$lib/api/customFields';
+  import { navigateHash } from '$lib/utils/hashRouter';
   import DataTable from '$lib/components/DataTable.svelte';
   import ImportExport from '$lib/components/ImportExport.svelte';
 
@@ -156,7 +157,7 @@
     contactStore.selectContact(contact);
     selectedContact = contact;
     // Navigate to detail view (hash routing)
-    window.location.hash = `/contacts/${contact.id}`;
+    navigateHash(`/contacts/${contact.id}`);
   }
 
   async function handleSort(key: string, dir: 'asc' | 'desc') {

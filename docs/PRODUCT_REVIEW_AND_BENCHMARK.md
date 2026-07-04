@@ -15,7 +15,7 @@ or not implemented.
 requirement, local SQLite data ownership, backup/restore, import/export depth,
 audit evidence, and a narrow optional MCP stdio boundary. That is meaningful.
 
-The weakness is the daily CRM experience. As of Sprint 101, the left navigation
+The weakness is the daily CRM experience. As of Sprint 102, the left navigation
 is visually grouped into:
 
 - Workspace: Dashboard, Contacts, Organizations, Pipeline, Activities
@@ -23,11 +23,14 @@ is visually grouped into:
 - Admin: Settings
 
 That grouping is a better information architecture than the original flat menu,
-and the dashboard now has a first-run starter checklist plus optional synthetic
-sample workspace. The product still undersells its foundation because several
-core CRM jobs remain shallow or absent. Comparable CRMs make sales work feel
-richer through leads, inbox and communication history, calendar views, reports,
-saved views, automation, guided onboarding, and clearer record workspaces.
+the dashboard now has a first-run starter checklist plus optional synthetic
+sample workspace, and contact detail now starts to behave like a Customer 360
+workspace with open-deal, pipeline, next-follow-up, recent-activity, and
+attention-status summary signals. The product still undersells its foundation
+because several core CRM jobs remain shallow or absent. Comparable CRMs make
+sales work feel richer through leads, inbox and communication history, calendar
+views, reports, saved views, automation, guided onboarding, and clearer account
+and deal workspaces.
 
 The next phase should therefore be a product-depth phase, not another foundation
 phase. The priority is to make 900CRM feel useful in the first 10 minutes for a
@@ -38,7 +41,7 @@ real small business owner.
 | Area | Current state | Product issue |
 |---|---|---|
 | Dashboard | KPI cards, reports, activity feed, quick actions, first-run starter checklist, optional synthetic sample workspace | Useful start, but not yet a true command center. No saved goals, no forecast view, and no "what needs attention" queue. |
-| Contacts | Search, type filter, duplicate review, import/export, custom-field filtering | Contacts and lead/account work are blended. There is no lead capture stage, saved segment, list view preset, or interaction timeline at the top level. |
+| Contacts | Search, type filter, duplicate review, import/export, custom-field filtering, contact detail Customer 360 summary | Contacts and lead/account work are blended. The detail view now has a useful at-a-glance summary, but there is no lead capture stage, saved segment, list view preset, or full interaction timeline. |
 | Organizations | List, create/edit, notes/tags, contact linking | Important, but weaker than account management in competing CRMs. No account health, open deals summary, recent activity, owner, or next step at list level. |
 | Pipeline | Kanban by stage, custom-field filter, deal cards | Good foundation. Needs drag/drop confidence, stage conversion metrics, stale deal detection, forecast view, and deal detail workspace. |
 | Activities | Task/call/meeting/email list with filters and completion | Useful but should become a calendar/task center with due buckets, day/week views, reminders, and relationship context. |
@@ -75,7 +78,7 @@ Scale: 0 = absent, 1 = foundation only, 2 = usable alpha, 3 = competitive.
 | Search/navigation speed | 2 | 3 |
 | Import/export/backup | 3 | 3 |
 | Lead lifecycle | 0 | 2 |
-| Account/customer 360 view | 1 | 2 |
+| Account/customer 360 view | 2 | 2 |
 | Calendar/follow-up workflow | 1 | 2 |
 | Email/communication history | 1 | 2 |
 | Automation/workflows | 1 | 2 |
@@ -98,12 +101,15 @@ Recommended outcome: extend first-run guidance into module empty states,
 import/backup prompts, and customer/deal workspace guidance without adding
 marketing-style tours.
 
-### 2. Contacts are not yet a customer workspace
+### 2. Contacts are becoming a customer workspace, but accounts are still thin
 
-The contact detail page exists, and notes/tags/custom fields exist, but the
-product needs a more obvious "customer 360" pattern: profile, timeline, open
-deals, linked organization, activities, notes, tags, files/links, and next
-action in one place.
+The contact detail page exists, notes/tags/custom fields exist, and Sprint 102
+added a contact-level Customer 360 summary for open deals, open pipeline value,
+next follow-up, recent activity, and attention status. That makes contacts feel
+less like a static address book. The product still needs the fuller "customer
+360" pattern: profile, timeline, linked organization, activities, notes, tags,
+files/links, and next action in one place. Organizations also still lack a real
+account workspace.
 
 Recommended outcome: richer contact and organization detail workspaces before
 adding unrelated modules.
@@ -161,10 +167,11 @@ These are ordered to improve perceived product value fastest.
    - Remaining work: module-specific empty states, guided import/backup prompts,
      and richer onboarding inside customer/deal workspaces.
 
-3. **Customer 360 Workspaces**
-   - Upgrade contact and organization detail pages.
-   - Add timeline, open deals, activities, notes, tags, linked records, and next
-     action summary.
+3. **Customer 360 Workspaces** - started for contact detail summary
+   - Added contact detail open-deal, open-pipeline, next-follow-up,
+     recent-activity, and attention-status summary.
+   - Remaining work: organization/account detail workspace, fuller interaction
+     timeline, linked records, files/links, and richer record routing.
    - Make global search route directly into useful record views.
 
 4. **Pipeline Depth**

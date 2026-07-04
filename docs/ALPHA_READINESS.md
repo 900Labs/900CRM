@@ -22,9 +22,11 @@ is intentionally pulled into scope later.
 The product-depth review in
 [Product Review and Competitive Benchmark](PRODUCT_REVIEW_AND_BENCHMARK.md)
 adds an important caveat: source readiness does not mean the app already feels
-competitive in daily CRM use. The next product phase should deepen first-run
-onboarding, customer/account workspaces, pipeline guidance, activities/calendar
-workflows, reports, and navigation structure before broad new platform work.
+competitive in daily CRM use. Recent post-MVP work has started navigation
+grouping, first-run onboarding, sample data, and contact-level Customer 360
+summary. The next product phase should keep deepening customer/account
+workspaces, pipeline guidance, activities/calendar workflows, reports, and
+navigation structure before broad new platform work.
 
 Recent GitHub Actions failures must not be treated as product or test failures.
 The check-run annotation says: `The job was not started because recent account

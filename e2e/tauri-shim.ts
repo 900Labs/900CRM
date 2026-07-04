@@ -579,6 +579,7 @@ async function installTauriShim(page: Page) {
       list_upcoming_activities: [],
       list_contact_duplicate_candidates: [],
       list_custom_field_defs: [],
+      list_custom_field_values: [],
       list_custom_field_values_for_type: [],
       list_recent_audit_log: [],
       list_pending_proposed_actions: [],
