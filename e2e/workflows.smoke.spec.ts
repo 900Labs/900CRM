@@ -424,6 +424,60 @@ test('creates a deal through the visible UI and shows it in Pipeline', async ({
   await assertNoConsoleErrors();
 });
 
+test('opens a pipeline deal guidance drawer and refreshes follow-up state', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/pipeline');
+  await expect(page.getByRole('heading', { name: 'Pipeline' })).toBeVisible();
+
+  const expectedClose = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const followUpDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Deal' }).click();
+  const dealDialog = page.getByRole('dialog', { name: 'Add Deal' });
+  await expect(dealDialog).toBeVisible();
+  await dealDialog.getByLabel('Deal Name').fill('Guided pipeline rollout');
+  await dealDialog.getByLabel('Value').fill('50000');
+  await dealDialog.getByLabel('Probability').fill('50');
+  await dealDialog.locator('#modal-deal-close-date').fill(expectedClose);
+  await dealDialog.getByLabel('Description').fill('Needs the next sales action.');
+  await dealDialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dealDialog).toBeHidden();
+
+  const needsFollowUpCard = page.getByRole('button', { name: /Guided pipeline rollout/ });
+  await expect(needsFollowUpCard).toContainText('Needs Follow-Up');
+  await needsFollowUpCard.click();
+
+  let drawer = page.getByRole('dialog', { name: 'Guided pipeline rollout' });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByText('Needs Follow-Up')).toBeVisible();
+  await expect(drawer.getByText('$50,000')).toBeVisible();
+  await expect(drawer.getByText('$25,000')).toBeVisible();
+
+  await drawer.getByRole('button', { name: 'Add Follow-Up' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add Activity' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('#modal-activity-deal')).not.toHaveValue('');
+  await dialog.getByLabel('Subject').fill('Schedule guided rollout call');
+  await dialog.locator('#modal-activity-due-date').fill(followUpDate);
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden();
+
+  drawer = page.getByRole('dialog', { name: 'Guided pipeline rollout' });
+  await expect(drawer.getByText('Stale')).toBeVisible();
+  await expect(drawer.getByText('Schedule guided rollout call')).toBeVisible();
+
+  await drawer.getByRole('button', { name: 'Close' }).click();
+  await expect(drawer).toBeHidden();
+
+  await assertNoConsoleErrors();
+});
+
 test('creates an activity through the visible UI and shows it in Activities', async ({
   page,
   assertNoConsoleErrors,

@@ -45,7 +45,7 @@ real small business owner.
 | Dashboard | KPI cards, reports, activity feed, quick actions, first-run starter checklist, optional synthetic sample workspace | Useful start, but not yet a true command center. No saved goals, no forecast view, and no "what needs attention" queue. |
 | Contacts | Search, type filter, duplicate review, import/export, custom-field filtering, contact detail Customer 360 summary, relationship-aware activity timeline | Contacts and lead/account work are blended. The detail view now has useful at-a-glance and timeline context, but there is no lead capture stage, saved segment, list view preset, files/links section, or deal-detail context. |
 | Organizations | List, create/edit, notes/tags, contact linking, account detail workspace with linked people/deals/activity and relationship-aware account timeline | Account detail is now useful, but list-level account management still lacks owner, health, next step, and saved account views. |
-| Pipeline | Kanban by stage, custom-field filter, deal cards | Good foundation. Needs drag/drop confidence, stage conversion metrics, stale deal detection, forecast view, and deal detail workspace. |
+| Pipeline | Kanban by stage, custom-field filter, deal cards, deal guidance drawer with weighted forecast, stale/overdue/follow-up status, and linked activities | Stronger daily sales surface. Still needs stage conversion summaries, broader forecast views, and deeper deal editing/detail routing. |
 | Activities | Task/call/meeting/email list with filters and completion | Useful but should become a calendar/task center with due buckets, day/week views, reminders, and relationship context. |
 | Audit Log | Read-only table grouped under Review | Good trust feature, now visually separated from daily work. Later, it may still move deeper into Admin once Review counts are more prominent. |
 | Pending Actions | Review queue for proposed actions grouped under Review | Important for MCP/external-client safety. The next improvement is to show high-priority pending counts without making this a daily-work screen. |
@@ -120,13 +120,16 @@ next-action guidance across more workflows.
 Recommended outcome: richer contact and organization detail workspaces before
 adding unrelated modules.
 
-### 3. Pipeline lacks sales guidance
+### 3. Pipeline guidance is started, but metrics are still thin
 
-The Kanban board exists, but a salesperson needs to know which deals are stale,
-which stage is leaking, what is forecast to close, and what next action is due.
+The Kanban board exists, and Sprint 105 added a deal guidance drawer with
+weighted forecast, next activity context, stale/overdue/follow-up states, and
+an Add Follow-Up path. A salesperson can now inspect a deal without leaving the
+board. The remaining gap is pipeline-level guidance: which stage is leaking,
+what is forecast to close across the board, and how stale work is distributed.
 
-Recommended outcome: pipeline stage metrics, stale deal badges, missing-next-step
-warnings, expected close date/forecast view, and a deal detail drawer.
+Recommended outcome: pipeline stage metrics, broader forecast views, stage
+conversion summaries, and deeper deal editing/detail routing.
 
 ### 4. Activities need a calendar/task center
 
@@ -185,10 +188,14 @@ These are ordered to improve perceived product value fastest.
    - Remaining work: files/links, deal detail context, and richer record routing
      for records that do not yet have detail pages.
 
-4. **Pipeline Depth**
-   - Add deal detail drawer/page.
-   - Add stale deal detection, missing next activity warning, stage aging, close
-     date, forecast amount, and stage conversion summaries.
+4. **Pipeline Depth** - started with deal guidance drawer
+   - Added deal drawer from Pipeline cards with existing stage, value,
+     probability, weighted forecast, expected close, description, created/updated
+     dates, linked activities, and Add Follow-Up action.
+   - Added guidance badges for Needs Follow-Up, Overdue, Stale, On Track, Closed
+     Won, and Closed Lost.
+   - Remaining work: stage conversion summaries, broader forecast views, deeper
+     deal editing/detail routing, and stronger drag/drop confidence cues.
 
 5. **Activities Calendar and Follow-up Center**
    - Add today/overdue/this-week views.
