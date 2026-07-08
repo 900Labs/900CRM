@@ -116,16 +116,37 @@ function toActivityType(value: string): ActivityType {
   return 'task';
 }
 
+function localDayStart(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+function parseLocalDueDay(value: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (dateOnly) {
+    const [, year, month, day] = dateOnly;
+    return new Date(Number(year), Number(month) - 1, Number(day)).getTime();
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return localDayStart(parsed);
+}
+
 function toActivityStatus(completed: boolean, dueDate: string | null): ActivityStatus {
   if (completed) {
     return 'completed';
   }
 
-  if (dueDate) {
-    const dueTs = Date.parse(dueDate);
-    if (!Number.isNaN(dueTs) && dueTs < Date.now()) {
-      return 'overdue';
-    }
+  const dueDay = parseLocalDueDay(dueDate);
+  if (dueDay !== null && dueDay < localDayStart(new Date())) {
+    return 'overdue';
   }
 
   return 'pending';

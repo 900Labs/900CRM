@@ -356,6 +356,58 @@ async function installTauriShim(page: Page) {
       return activity;
     }
 
+    function updateActivity(args: InvokeArgs): BackendActivity {
+      const id = stringArg(args, 'id');
+      const activity = state.activities.find((candidate) => candidate.id === id);
+      if (!activity) {
+        throw new Error(`Activity not found: ${id}`);
+      }
+
+      if (typeof args?.activity_type === 'string') {
+        activity.activity_type = args.activity_type;
+      }
+      if (typeof args?.title === 'string') {
+        activity.title = args.title;
+      }
+      if (typeof args?.description === 'string') {
+        activity.description = args.description;
+      }
+      if (args?.reset_due_date === true) {
+        activity.due_date = null;
+      } else if (typeof args?.due_date === 'string') {
+        activity.due_date = args.due_date.trim() || null;
+      }
+      if (args?.reset_contact_id === true) {
+        activity.contact_id = null;
+      } else if (typeof args?.contact_id === 'string') {
+        activity.contact_id = args.contact_id.trim() || null;
+      }
+      if (args?.reset_deal_id === true) {
+        activity.deal_id = null;
+      } else if (typeof args?.deal_id === 'string') {
+        activity.deal_id = args.deal_id.trim() || null;
+      }
+      activity.updated_at = new Date().toISOString();
+      persistState();
+      return activity;
+    }
+
+    function markActivityComplete(args: InvokeArgs): BackendActivity {
+      const activity = updateActivity({ id: stringArg(args, 'id') });
+      activity.completed = true;
+      activity.updated_at = new Date().toISOString();
+      persistState();
+      return activity;
+    }
+
+    function markActivityIncomplete(args: InvokeArgs): BackendActivity {
+      const activity = updateActivity({ id: stringArg(args, 'id') });
+      activity.completed = false;
+      activity.updated_at = new Date().toISOString();
+      persistState();
+      return activity;
+    }
+
     function addActivityLink(args: InvokeArgs): BackendActivityLink {
       const link: BackendActivityLink = {
         id: nextId('activity-link'),
@@ -655,6 +707,12 @@ async function installTauriShim(page: Page) {
             return state.activities;
           case 'create_activity':
             return createActivity(args);
+          case 'update_activity':
+            return updateActivity(args);
+          case 'mark_activity_complete':
+            return markActivityComplete(args);
+          case 'mark_activity_incomplete':
+            return markActivityIncomplete(args);
           case 'list_upcoming_activities':
             return listUpcomingActivities(args);
           case 'get_dashboard_stats':
