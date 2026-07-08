@@ -20,6 +20,8 @@
     ondragstart,
     primaryContactName = deal.contactName,
     organizationName = null,
+    guidanceLabel = null,
+    guidanceTone = 'neutral',
   }: {
     deal: Deal;
     draggable?: boolean;
@@ -27,6 +29,8 @@
     ondragstart?: (e: DragEvent, deal: Deal) => void;
     primaryContactName?: string | null;
     organizationName?: string | null;
+    guidanceLabel?: string | null;
+    guidanceTone?: 'neutral' | 'success' | 'danger' | 'warning';
   } = $props();
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -74,7 +78,14 @@
   onkeydown={(e) => { if (e.key === 'Enter') onclick?.(deal); }}
 >
   <!-- Deal name -->
-  <p class="deal-name">{deal.name}</p>
+  <div class="deal-card-header">
+    <p class="deal-name">{deal.name}</p>
+    {#if guidanceLabel}
+      <span class="deal-guidance deal-guidance-{guidanceTone}">
+        {guidanceLabel}
+      </span>
+    {/if}
+  </div>
 
   <!-- Value -->
   <p class="deal-value">{formattedValue}</p>
@@ -155,10 +166,52 @@
   }
 
   .deal-name {
+    min-width: 0;
+    margin: 0;
     font-size: var(--text-sm);
     font-weight: var(--weight-semibold);
     color: var(--text-primary);
     line-height: var(--leading-snug);
+  }
+
+  .deal-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .deal-guidance {
+    flex-shrink: 0;
+    padding: 2px var(--space-2);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    line-height: 1.3;
+  }
+
+  .deal-guidance-neutral {
+    color: var(--text-secondary);
+    background-color: var(--surface-raised);
+  }
+
+  .deal-guidance-success {
+    color: #2D8659;
+    border-color: #BFE4CC;
+    background-color: #E8F5EC;
+  }
+
+  .deal-guidance-warning {
+    color: #A84B2F;
+    border-color: #F4D1A1;
+    background-color: #FEF3E2;
+  }
+
+  .deal-guidance-danger {
+    color: #C0392B;
+    border-color: #F0B8B2;
+    background-color: #FFF0F0;
   }
 
   .deal-value {
