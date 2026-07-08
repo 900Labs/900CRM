@@ -201,7 +201,12 @@
     "markIncomplete": "Mark Incomplete",
     "linkedTo": "Linked To",
     "subject": "Subject",
-    "notes": "Notes"
+    "notes": "Notes",
+    "relationshipsLabel": "Activity relationships",
+    "relationshipContact": "Contact",
+    "relationshipOrganization": "Organization",
+    "relationshipDeal": "Deal",
+    "openRelationship": "Open {type} {label}"
   },
   "settings": {
     "title": "Settings",

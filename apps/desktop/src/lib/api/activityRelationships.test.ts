@@ -16,8 +16,11 @@ import { activityStore } from '$lib/stores/activities';
 import {
   ACTIVITY_RELATIONSHIP_CONTACT_PAGE_SIZE,
   addSelectedActivityLinks,
+  filterActivitiesByRelationship,
   deriveActivityRelationshipLabels,
   loadActivityRelationshipContacts,
+  relationshipLabelsByActivityId,
+  sortActivitiesForDetailTimeline,
 } from '$lib/utils/activityRelationships';
 
 function contact(overrides: Partial<Contact>): Contact {
@@ -213,6 +216,149 @@ describe('activity relationship labels', () => {
       contacts: [{ id: 'legacy-contact', label: 'Legacy Contact' }],
       organizations: [],
       deals: [{ id: 'legacy-deal', label: 'Legacy Deal' }],
+    });
+  });
+
+  it('collapses duplicate active links and excludes deleted relationship links', () => {
+    expect(
+      deriveActivityRelationshipLabels(
+        activity({ contactId: 'contact-1' }),
+        [
+          link({ id: 'link-contact-1', entityType: 'contact', entityId: 'contact-1' }),
+          link({ id: 'link-contact-duplicate', entityType: 'contact', entityId: 'contact-1' }),
+          link({
+            id: 'link-deleted-org',
+            entityType: 'organization',
+            entityId: 'org-1',
+            deletedAt: '2026-06-24T09:00:00Z',
+          }),
+        ],
+        {
+          contacts: [contact({})],
+          organizations: [organization],
+          deals: [],
+        },
+      ),
+    ).toEqual({
+      contacts: [{ id: 'contact-1', label: 'Amina Khan' }],
+      organizations: [],
+      deals: [],
+    });
+  });
+
+  it('filters activities by legacy mirrors and explicit active relationship links', () => {
+    const legacyContact = activity({
+      id: 'legacy-contact',
+      contactId: 'contact-1',
+      subject: 'Legacy contact follow-up',
+    });
+    const linkedContactOnly = activity({
+      id: 'linked-contact',
+      contactId: null,
+      subject: 'Linked contact follow-up',
+    });
+    const deletedLinkedContact = activity({
+      id: 'deleted-linked-contact',
+      contactId: null,
+      subject: 'Deleted linked contact follow-up',
+    });
+    const linkedDeal = activity({
+      id: 'linked-deal',
+      dealId: null,
+      subject: 'Linked deal follow-up',
+    });
+
+    expect(
+      filterActivitiesByRelationship(
+        [legacyContact, linkedContactOnly, deletedLinkedContact, linkedDeal],
+        {
+          [linkedContactOnly.id]: [
+            link({ activityId: linkedContactOnly.id, entityType: 'contact', entityId: 'contact-1' }),
+          ],
+          [deletedLinkedContact.id]: [
+            link({
+              activityId: deletedLinkedContact.id,
+              entityType: 'contact',
+              entityId: 'contact-1',
+              deletedAt: '2026-06-24T09:00:00Z',
+            }),
+          ],
+          [linkedDeal.id]: [
+            link({ activityId: linkedDeal.id, entityType: 'deal', entityId: 'deal-1' }),
+          ],
+        },
+        { contactId: 'contact-1' },
+      ).map((entry) => entry.id),
+    ).toEqual(['legacy-contact', 'linked-contact']);
+
+    expect(
+      filterActivitiesByRelationship(
+        [legacyContact, linkedContactOnly, deletedLinkedContact, linkedDeal],
+        {
+          [linkedDeal.id]: [
+            link({ activityId: linkedDeal.id, entityType: 'deal', entityId: 'deal-1' }),
+          ],
+        },
+        { dealId: 'deal-1' },
+      ).map((entry) => entry.id),
+    ).toEqual(['linked-deal']);
+  });
+
+  it('sorts detail timelines by due date first and undated recent activity after scheduled work', () => {
+    const undatedNewer = activity({
+      id: 'undated-newer',
+      dueDate: null,
+      updatedAt: '2026-06-24T12:00:00Z',
+    });
+    const scheduledLater = activity({
+      id: 'scheduled-later',
+      dueDate: '2026-07-12',
+      updatedAt: '2026-06-24T09:00:00Z',
+    });
+    const scheduledEarlier = activity({
+      id: 'scheduled-earlier',
+      dueDate: '2026-07-10',
+      updatedAt: '2026-06-24T09:00:00Z',
+    });
+    const undatedOlder = activity({
+      id: 'undated-older',
+      dueDate: null,
+      updatedAt: '2026-06-24T08:00:00Z',
+    });
+
+    expect(
+      sortActivitiesForDetailTimeline([
+        undatedOlder,
+        scheduledLater,
+        undatedNewer,
+        scheduledEarlier,
+      ]).map((entry) => entry.id),
+    ).toEqual(['scheduled-earlier', 'scheduled-later', 'undated-newer', 'undated-older']);
+  });
+
+  it('builds relationship labels keyed by activity id for feeds', () => {
+    const linkedActivity = activity({ id: 'activity-linked' });
+
+    expect(
+      relationshipLabelsByActivityId(
+        [linkedActivity],
+        {
+          [linkedActivity.id]: [
+            link({ activityId: linkedActivity.id, entityType: 'organization', entityId: 'org-1' }),
+          ],
+        },
+        {
+          contacts: [],
+          organizations: [organization],
+          deals: [],
+        },
+      ),
+    ).toEqual({
+      'activity-linked': {
+        contacts: [],
+        organizations: [{ id: 'org-1', label: 'Nairobi Health' }],
+        deals: [],
+      },
     });
   });
 

@@ -10,7 +10,15 @@
   import { listContacts } from '$lib/api/contacts';
   import type { Activity } from '$lib/api/activities';
   import { listActivities } from '$lib/api/activities';
-  import { loadActivityLinkIndex } from '$lib/utils/activityRelationships';
+  import {
+    loadActivityLinkIndex,
+    loadActivityRelationshipLookups,
+    relationshipLabelsByActivityId,
+    sortActivitiesForDetailTimeline,
+    type ActivityLinkIndex,
+    type ActivityRelationshipLabels,
+    type ActivityRelationshipLookups,
+  } from '$lib/utils/activityRelationships';
   import {
     deriveOrganizationHealth,
     filterOrganizationActivities,
@@ -38,6 +46,12 @@
   let organization = $state<Organization | null>(null);
   let contacts = $state<Contact[]>([]);
   let organizationActivities = $state<Activity[]>([]);
+  let organizationActivityLinkIndex = $state<ActivityLinkIndex>({});
+  let organizationActivityLookups = $state<ActivityRelationshipLookups>({
+    contacts: [],
+    organizations: [],
+    deals: [],
+  });
   let isLoading = $state(true);
   let contactsLoading = $state(false);
   let activitiesLoading = $state(false);
@@ -89,6 +103,14 @@
 
   const nextActivity = $derived(nextOrganizationActivity(organizationActivities));
   const recentActivity = $derived(recentOrganizationActivity(organizationActivities));
+
+  const organizationActivityRelationships = $derived.by<Record<string, ActivityRelationshipLabels>>(() =>
+    relationshipLabelsByActivityId(
+      organizationActivities,
+      organizationActivityLinkIndex,
+      organizationActivityLookups,
+    )
+  );
 
   const accountHealth = $derived.by(() =>
     deriveOrganizationHealth({
@@ -202,8 +224,20 @@
         sortDir: 'asc',
         pageSize: 500,
       });
-      const linkIndex = await loadActivityLinkIndex(activities.map((activity) => activity.id));
-      organizationActivities = filterOrganizationActivities(activities, linkIndex, id);
+      const [linkIndex, lookups] = await Promise.all([
+        loadActivityLinkIndex(activities.map((activity) => activity.id)),
+        loadActivityRelationshipLookups(),
+      ]);
+      organizationActivityLinkIndex = linkIndex;
+      organizationActivityLookups = lookups;
+      organizationActivities = sortActivitiesForDetailTimeline(
+        filterOrganizationActivities(activities, linkIndex, id),
+      );
+    } catch (err) {
+      console.error('[OrganizationDetail] Failed to load account activity:', err);
+      organizationActivityLinkIndex = {};
+      organizationActivityLookups = { contacts: [], organizations: [], deals: [] };
+      organizationActivities = [];
     } finally {
       activitiesLoading = false;
     }
@@ -271,6 +305,17 @@
 
   function handleBack() {
     navigateHash('/organizations');
+  }
+
+  function handleActivityEntityNavigate(entity: { type: 'contact' | 'organization' | 'deal'; id: string }) {
+    if (entity.type === 'contact') {
+      navigateHash(`/contacts/${entity.id}`);
+      return;
+    }
+
+    if (entity.type === 'organization') {
+      navigateHash(`/organizations/${entity.id}`);
+    }
   }
 </script>
 
@@ -537,6 +582,9 @@
                 activities={organizationActivities}
                 loading={activitiesLoading}
                 maxItems={10}
+                relationshipsByActivityId={organizationActivityRelationships}
+                showRelationshipBreadcrumbs={true}
+                onNavigateEntity={handleActivityEntityNavigate}
               />
             {/if}
           </div>
