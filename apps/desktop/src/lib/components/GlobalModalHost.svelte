@@ -138,6 +138,14 @@
     return typeof value === 'string' ? value : '';
   }
 
+  function modalDataActivityType(key: string): ActivityType {
+    const value = modalDataString(key);
+    if (value === 'call' || value === 'meeting' || value === 'email') {
+      return value;
+    }
+    return 'task';
+  }
+
   function normalizeStage(stage: string): DealStage {
     const map: Record<string, DealStage> = {
       lead: 'lead',
@@ -193,10 +201,10 @@
   }
 
   function resetActivityForm() {
-    activitySubject = '';
-    activityType = 'task';
-    activityDueDate = '';
-    activityNotes = '';
+    activitySubject = modalDataString('subject');
+    activityType = modalDataActivityType('type');
+    activityDueDate = modalDataString('dueDate');
+    activityNotes = modalDataString('notes');
     activityContactId = modalDataString('contactId');
     activityOrganizationId = modalDataString('organizationId');
     activityDealId = modalDataString('dealId');

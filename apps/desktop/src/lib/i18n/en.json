@@ -58,6 +58,15 @@
       "followUpAction": "Add Follow-Up",
       "dataAction": "Import or Backup"
     },
+    "attention": {
+      "title": "Needs Attention",
+      "loading": "Checking overdue and due-today follow-ups.",
+      "summary": "{overdue} overdue · {today} due today",
+      "listLabel": "Follow-ups needing attention",
+      "overdue": "Overdue",
+      "today": "Today",
+      "loadFailed": "Follow-up attention could not be loaded."
+    },
     "reports": {
       "title": "Conversion and Funnel Reports",
       "pipelineTitle": "Pipeline Conversion",
@@ -492,6 +501,7 @@
     "info": "Info",
     "retry": "Retry",
     "refresh": "Refresh",
+    "dismiss": "Dismiss",
     "sort": "Sort",
     "filter": "Filter",
     "customField": "Custom Field",
@@ -531,6 +541,14 @@
   "mission": {
     "title": "900 for 900",
     "description": "Built for the 900 million people without access to enterprise tools. 900CRM is free, open-source, and works offline — because great software should be for everyone."
+  },
+  "localAutomation": {
+    "eyebrow": "Local Suggestion",
+    "pipeline": {
+      "title": "Draft the next follow-up",
+      "description": "{deal} moved to {stage}. 900CRM can draft a follow-up for tomorrow; nothing is saved until you review and save it.",
+      "addDraft": "Draft Follow-Up"
+    }
   },
   "errors": {
     "loadFailed": "Failed to load data",
@@ -608,7 +626,11 @@
     "preImportBackupRestoreConfirm": "Restore the automatic pre-import backup? This replaces the current local 900CRM database.",
     "preImportBackupRestored": "Pre-import backup restored to {path}",
     "preImportBackupRestoreFailed": "Pre-import backup restore failed",
-    "preImportBackupRestoreCancelled": "Pre-import backup restore cancelled"
+    "preImportBackupRestoreCancelled": "Pre-import backup restore cancelled",
+    "mappingGuidance": {
+      "contacts": "Source, owner, and tag columns are not applied automatically to contacts. Map source-like columns to Notes or create a contact custom field first; import tag definitions and tag links with local IDs when you want tags.",
+      "tagLinks": "Tag links require existing local entity IDs and tag IDs. This import does not match tags by name."
+    }
   },
   "export": {
     "title": "Export",

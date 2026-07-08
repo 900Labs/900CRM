@@ -10,7 +10,8 @@
 
   import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
-  import { createActivity } from '$lib/api/activities';
+  import { createActivity, listActivities } from '$lib/api/activities';
+  import type { Activity } from '$lib/api/activities';
   import { createContact } from '$lib/api/contacts';
   import { getDashboardStats } from '$lib/api/dashboard';
   import type { DashboardStats } from '$lib/api/dashboard';
@@ -20,6 +21,7 @@
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
   import { formatCurrency } from '$lib/utils/formatters';
+  import { buildDashboardAttentionSummary } from '$lib/utils/localAutomation';
   import StatCard from '$lib/components/StatCard.svelte';
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
 
@@ -32,6 +34,9 @@
   let sampleLoaded = $state(false);
   let sampleMessage = $state<string | null>(null);
   let sampleError = $state<string | null>(null);
+  let attentionActivities = $state<Activity[]>([]);
+  let attentionLoading = $state(true);
+  let attentionError = $state<string | null>(null);
   let componentMounted = false;
 
   const DASHBOARD_LOAD_TIMEOUT_MS = 8_000;
@@ -71,6 +76,8 @@
   const sampleDataAvailable = $derived(
     !sampleLoaded && !hasFirstRunContacts && !hasFirstRunDeals && !hasFirstRunActivities
   );
+  const attentionSummary = $derived(buildDashboardAttentionSummary(attentionActivities));
+  const showAttentionStrip = $derived(attentionLoading || attentionSummary.totalCount > 0 || Boolean(attentionError));
 
   function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -116,10 +123,31 @@
     }
   }
 
+  async function loadAttentionActivities(): Promise<void> {
+    attentionLoading = true;
+    attentionError = null;
+
+    try {
+      const activities = await withTimeout(
+        listActivities({ sortBy: 'dueDate', sortDir: 'asc', pageSize: 200 }),
+        'Dashboard attention activities',
+      );
+      if (!componentMounted) return;
+      attentionActivities = activities;
+    } catch (err) {
+      if (!componentMounted) return;
+      attentionError = t('dashboard.attention.loadFailed');
+      console.error('[Dashboard] Attention activity load error:', err);
+    } finally {
+      if (componentMounted) attentionLoading = false;
+    }
+  }
+
   async function refreshDashboard(): Promise<void> {
     await Promise.allSettled([
       loadStats(),
       loadUpcomingActivities(),
+      loadAttentionActivities(),
     ]);
   }
 
@@ -345,6 +373,42 @@
     {/if}
 
     <!-- Content grid: activity feed + quick actions -->
+    {#if showAttentionStrip}
+      <section
+        class="attention-strip"
+        aria-labelledby="attention-strip-heading"
+        data-testid="dashboard-attention-strip"
+      >
+        <div class="attention-strip-copy">
+          <p class="attention-eyebrow">{t('localAutomation.eyebrow')}</p>
+          <h2 id="attention-strip-heading">{t('dashboard.attention.title')}</h2>
+          {#if attentionLoading}
+            <p>{t('dashboard.attention.loading')}</p>
+          {:else if attentionError}
+            <p>{attentionError}</p>
+          {:else}
+            <p>
+              {t('dashboard.attention.summary', {
+                overdue: attentionSummary.overdueCount,
+                today: attentionSummary.todayCount,
+              })}
+            </p>
+          {/if}
+        </div>
+
+        {#if !attentionLoading && !attentionError && attentionSummary.items.length > 0}
+          <ul class="attention-list" aria-label={t('dashboard.attention.listLabel')}>
+            {#each attentionSummary.items as item (item.id)}
+              <li class:overdue={item.bucket === 'overdue'}>
+                <span>{item.subject}</span>
+                <small>{t(`dashboard.attention.${item.bucket}`)}</small>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
+    {/if}
+
     <div class="dashboard-grid">
       <!-- Recent Activity -->
       <section class="card dashboard-activity" aria-labelledby="activity-heading">
@@ -545,12 +609,98 @@
     flex-wrap: wrap;
   }
 
+  .attention-strip {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(260px, 1.1fr);
+    gap: var(--space-4);
+    align-items: start;
+    padding: var(--space-4);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--border-radius-md);
+    background: var(--surface-raised);
+  }
+
+  .attention-strip-copy {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .attention-eyebrow {
+    margin: 0;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--text-accent);
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  .attention-strip h2,
+  .attention-strip p {
+    margin: 0;
+  }
+
+  .attention-strip h2 {
+    font-size: var(--text-md);
+    color: var(--text-primary);
+  }
+
+  .attention-strip p {
+    font-size: var(--text-sm);
+    line-height: 1.45;
+    color: var(--text-secondary);
+  }
+
+  .attention-list {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .attention-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-width: 0;
+    padding: var(--space-3);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--border-radius-sm);
+    background: var(--surface-base);
+  }
+
+  .attention-list li.overdue {
+    border-color: var(--color-danger-200);
+    background: var(--color-danger-50);
+  }
+
+  .attention-list span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--text-primary);
+  }
+
+  .attention-list small {
+    flex-shrink: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+  }
+
   @media (max-width: 900px) {
     .dashboard-grid {
       grid-template-columns: 1fr;
     }
 
     .first-run-panel {
+      grid-template-columns: 1fr;
+    }
+
+    .attention-strip {
       grid-template-columns: 1fr;
     }
   }
