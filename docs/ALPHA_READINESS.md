@@ -1,6 +1,7 @@
 # Alpha Release Readiness Audit
 
 Date: 2026-06-27
+Last updated: 2026-07-08
 Branch: `codex/alpha-release-readiness-audit`
 Baseline: canonical `main` before this branch was `c912f669baf7bfdaac9dab163a15e1e0fe08c6ab`.
 
@@ -238,6 +239,13 @@ Current evidence:
   unsigned, unnotarized package evidence only; it is not workflow artifact
   proof, not Windows/Linux proof, not GitHub Release proof, and not release
   completion.
+- `npm run release:macos:smoke:local` now provides a repeatable local macOS
+  package smoke wrapper. It runs the headless DMG helper, verifies the image,
+  generates macOS-only checksums, release metadata, and SBOM output under ignored
+  local artifact directories, runs the artifact verifier with `--platforms
+  macos`, and mounts the DMG to confirm `900CRM.app` plus the `Applications`
+  symlink are present. This remains local unsigned and unnotarized maintainer
+  evidence only.
 - `docs/RELEASE.md` lists manual release verification and intentionally not
   implemented release systems such as signing, notarization, default automatic
   publishing, upgrade/update channel, telemetry, and crash reporting.
@@ -249,9 +257,10 @@ Remaining before Phase 6 can be called complete:
   evidence that preflight and all package jobs completed.
 - Produce and inspect Windows, macOS, and Linux package artifacts.
 - Produce workflow-backed macOS package evidence. A local headless DMG helper
-  can create a basic unsigned and unnotarized DMG for maintainer evidence, but
-  it does not replace manual workflow artifacts, release metadata, signing,
-  notarization, downloaded-artifact verification, or end-user install smoke.
+  and local macOS smoke wrapper can create and inspect a basic unsigned and
+  unnotarized DMG for maintainer evidence, but they do not replace manual
+  workflow artifacts, signing, notarization, downloaded-artifact verification,
+  cross-platform package proof, or end-user install smoke.
 - Produce and preserve checksums, release metadata, SBOM-shaped dependency
   inventory, and release notes.
 - Run the downloaded-artifact verifier against the real workflow artifacts and
