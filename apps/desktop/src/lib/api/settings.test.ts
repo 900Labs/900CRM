@@ -27,6 +27,15 @@ const importDuplicateAutoMergeCopy = {
   merged: 'Merged',
 };
 
+const importMappingGuidanceCopy = {
+  mappingGuidance: {
+    contacts:
+      'Source, owner, and tag columns are not applied automatically to contacts. Map source-like columns to Notes or create a contact custom field first; import tag definitions and tag links with local IDs when you want tags.',
+    tagLinks:
+      'Tag links require existing local entity IDs and tag IDs. This import does not match tags by name.',
+  },
+};
+
 function readLocaleSettings(localeFile: string): Record<string, string> {
   const source = readFileSync(path.join(i18nDir, localeFile), 'utf8');
   return JSON.parse(source).settings;
@@ -64,6 +73,18 @@ describe('Settings unencrypted file warnings', () => {
       for (const [key, value] of Object.entries(importDuplicateAutoMergeCopy)) {
         expect(importCopy[key]).toBe(value);
       }
+    }
+  });
+
+  it('keeps import mapping guidance available in every locale', () => {
+    const localeFiles = readdirSync(i18nDir)
+      .filter((file) => file.endsWith('.json'))
+      .sort();
+
+    for (const localeFile of localeFiles) {
+      const importCopy = readLocaleImport(localeFile);
+
+      expect(importCopy.mappingGuidance).toEqual(importMappingGuidanceCopy.mappingGuidance);
     }
   });
 

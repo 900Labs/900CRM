@@ -28,6 +28,10 @@ export interface ImportMappingValidation {
   errors: string[];
 }
 
+export type ImportMappingGuidanceKey =
+  | 'import.mappingGuidance.contacts'
+  | 'import.mappingGuidance.tagLinks';
+
 export const CONTACT_IMPORT_FIELDS: ImportFieldOption<ContactImportTargetField>[] = [
   { value: 'first_name', label: 'First name', required: true },
   { value: 'last_name', label: 'Last name' },
@@ -97,6 +101,18 @@ export const TAG_LINK_IMPORT_FIELDS: ImportFieldOption<TagLinkImportTargetField>
   { value: 'entity_id', label: 'Entity ID', required: true },
   { value: 'tag_id', label: 'Tag ID', required: true },
 ];
+
+export function importMappingGuidanceKey(entity: MappedImportEntity): ImportMappingGuidanceKey | null {
+  if (entity === 'contacts') {
+    return 'import.mappingGuidance.contacts';
+  }
+
+  if (entity === 'tag_links') {
+    return 'import.mappingGuidance.tagLinks';
+  }
+
+  return null;
+}
 
 type CustomImportEntity = 'contacts' | 'deals' | 'activities' | 'organizations';
 
