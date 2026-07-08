@@ -69,6 +69,7 @@ async function installTauriShim(page: Page) {
       city: string;
       country: string;
       org_id: string | null;
+      organization_id: string | null;
       notes: string;
       created_at: string;
       updated_at: string;
@@ -244,6 +245,7 @@ async function installTauriShim(page: Page) {
     }
 
     function createContact(args: InvokeArgs): BackendContact {
+      const organizationId = nullableStringArg(args, 'organization_id') ?? nullableStringArg(args, 'org_id');
       const contact: BackendContact = {
         id: nextId('contact'),
         contact_type: stringArg(args, 'contact_type') === 'organization' ? 'organization' : 'person',
@@ -255,13 +257,38 @@ async function installTauriShim(page: Page) {
         address: stringArg(args, 'address'),
         city: stringArg(args, 'city'),
         country: stringArg(args, 'country'),
-        org_id: null,
+        org_id: nullableStringArg(args, 'org_id'),
+        organization_id: organizationId,
         notes: stringArg(args, 'notes'),
         created_at: timestamp,
         updated_at: timestamp,
         deleted_at: null,
       };
       state.contacts.push(contact);
+      persistState();
+      return contact;
+    }
+
+    function linkContactToOrganization(args: InvokeArgs): BackendContact {
+      const contactId = stringArg(args, 'contact_id');
+      const organizationId = nullableStringArg(args, 'organization_id');
+      const contact = state.contacts.find((candidate) => candidate.id === contactId);
+      if (!contact) {
+        throw new Error(`Contact not found: ${contactId}`);
+      }
+
+      const organization = organizationId
+        ? state.organizations.find((candidate) => candidate.id === organizationId && !candidate.deleted_at)
+        : null;
+
+      if (organizationId && !organization) {
+        throw new Error(`Organization not found: ${organizationId}`);
+      }
+
+      contact.org_id = null;
+      contact.organization_id = organization?.id ?? null;
+      contact.org_name = organization?.name ?? '';
+      contact.updated_at = timestamp;
       persistState();
       return contact;
     }
@@ -596,10 +623,28 @@ async function installTauriShim(page: Page) {
             return listContacts(args);
           case 'create_contact':
             return createContact(args);
+          case 'get_contact': {
+            const id = stringArg(args, 'id');
+            const contact = state.contacts.find((candidate) => candidate.id === id && !candidate.deleted_at);
+            if (!contact) {
+              throw new Error(`Contact not found: ${id}`);
+            }
+            return contact;
+          }
           case 'list_organizations':
             return state.organizations.filter((organization) => !organization.deleted_at);
+          case 'get_organization': {
+            const id = stringArg(args, 'id');
+            const organization = state.organizations.find((candidate) => candidate.id === id && !candidate.deleted_at);
+            if (!organization) {
+              throw new Error(`Organization not found: ${id}`);
+            }
+            return organization;
+          }
           case 'create_organization':
             return createOrganization(args);
+          case 'link_contact_to_organization':
+            return linkContactToOrganization(args);
           case 'list_deals':
             return state.deals;
           case 'create_deal':

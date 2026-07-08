@@ -13,6 +13,7 @@ import {
   createDeal,
   linkDealToOrganization,
   listDealContacts,
+  listDeals,
   removeDealContact,
   updateDeal,
 } from './deals';
@@ -211,6 +212,18 @@ describe('deal API', () => {
       deal_id: 'deal-1',
       organization_id: 'org-1',
     });
+  });
+
+  it('filters listDeals by organization id on the frontend', async () => {
+    invokeMock.mockResolvedValueOnce([
+      { ...backendDeal, id: 'deal-1', organization_id: 'org-1' },
+      { ...backendDeal, id: 'deal-2', organization_id: 'org-2' },
+      { ...backendDeal, id: 'deal-3', organization_id: null },
+    ]);
+
+    await expect(listDeals({ organizationId: 'org-1' })).resolves.toEqual([
+      expect.objectContaining({ id: 'deal-1', organizationId: 'org-1' }),
+    ]);
   });
 
   it('maps add/list/remove deal contact commands', async () => {

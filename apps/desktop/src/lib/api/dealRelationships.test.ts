@@ -35,6 +35,7 @@ function contact(overrides: Partial<Contact>): Contact {
     updatedAt: '2026-06-24T08:00:00Z',
     deletedAt: null,
     ...overrides,
+    organizationId: overrides.organizationId ?? null,
   };
 }
 

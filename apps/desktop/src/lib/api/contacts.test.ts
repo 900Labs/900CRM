@@ -9,6 +9,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 }));
 
 import {
+  listContacts,
   listContactDuplicateCandidates,
   mergeContacts,
 } from './contacts';
@@ -75,6 +76,30 @@ describe('contacts API', () => {
     expect(invokeMock).toHaveBeenCalledWith('merge_contacts', {
       source_id: 'contact-source',
       target_id: 'contact-target',
+    });
+  });
+
+  it('maps normalized organization id from contact list responses', async () => {
+    invokeMock.mockResolvedValueOnce({
+      contacts: [
+        {
+          ...backendContact,
+          id: 'contact-linked',
+          organization_id: 'organization-1',
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 50,
+    });
+
+    await expect(listContacts()).resolves.toMatchObject({
+      contacts: [
+        {
+          id: 'contact-linked',
+          organizationId: 'organization-1',
+        },
+      ],
     });
   });
 });

@@ -13,6 +13,7 @@ export interface Contact {
   email: string | null;
   phone: string | null;
   organization: string | null;
+  organizationId: string | null;
   type: ContactType;
   tags: string[];
   notes: string | null;
@@ -23,7 +24,12 @@ export interface Contact {
   deletedAt: string | null;
 }
 
-export type CreateContactPayload = Omit<Contact, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>;
+export type CreateContactPayload = Omit<
+  Contact,
+  'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'organizationId'
+> & {
+  organizationId?: string | null;
+};
 export type UpdateContactPayload = Partial<CreateContactPayload>;
 
 export interface ListContactsParams {
@@ -69,6 +75,7 @@ interface BackendContact {
   city: string;
   country: string;
   org_id: string | null;
+  organization_id?: string | null;
   notes: string;
   created_at: string;
   updated_at: string;
@@ -112,6 +119,7 @@ function mapContact(contact: BackendContact): Contact {
     email: toNullable(contact.email),
     phone: toNullable(contact.phone),
     organization: toNullable(contact.org_name),
+    organizationId: toNullable(contact.organization_id),
     type: contact.contact_type === 'organization' ? 'org' : 'person',
     tags: [],
     notes: toNullable(contact.notes),
