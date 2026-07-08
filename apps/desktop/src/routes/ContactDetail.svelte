@@ -20,6 +20,7 @@
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
   import { composeEmail } from '$lib/api/email';
+  import { getContact } from '$lib/api/contacts';
   import type { Contact, UpdateContactPayload } from '$lib/api/contacts';
   import type { Deal } from '$lib/api/deals';
   import type { Activity } from '$lib/api/activities';
@@ -214,15 +215,13 @@
       }
 
       if (!c) {
-        // Last resort: not in cache, but we can't call getContact directly from
-        // the page — trigger a store load and find again.
         await contactStore.loadContacts();
         c = contactStore.contacts.find((x) => x.id === contactId) ?? null;
       }
 
       if (!c) {
-        loadError = t('errors.notFound');
-        return;
+        c = await getContact(contactId);
+        contactStore.selectContact(c);
       }
 
       contact = c;

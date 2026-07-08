@@ -20,6 +20,7 @@
   import CustomFieldInputs from '$lib/components/CustomFieldInputs.svelte';
   import EntityNotesPanel from '$lib/components/EntityNotesPanel.svelte';
   import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
+  import { navigateHash } from '$lib/utils/hashRouter';
 
   interface OrganizationFormState {
     name: string;
@@ -260,6 +261,11 @@
     notesTagsOpen = true;
   }
 
+  function openOrganizationDetail(organization: Organization) {
+    organizationStore.selectOrganization(organization);
+    navigateHash(`/organizations/${organization.id}`);
+  }
+
   function closeNotesTags() {
     notesTagsOpen = false;
     notesTagsOrganization = null;
@@ -353,7 +359,13 @@
               <tr>
                 <td>
                   <div class="organization-name-cell">
-                    <span class="organization-name">{organization.name}</span>
+                    <button
+                      class="organization-name organization-name-button"
+                      type="button"
+                      onclick={() => openOrganizationDetail(organization)}
+                    >
+                      {organization.name}
+                    </button>
                     {#if organization.description}
                       <span class="organization-description">{organization.description}</span>
                     {/if}
@@ -372,6 +384,9 @@
                 <td>{formatDate(organization.createdAt, settingsStore.dateFormat as 'MMM D, YYYY')}</td>
                 <td>
                   <div class="row-actions">
+                    <button class="btn btn-primary btn-sm" type="button" onclick={() => openOrganizationDetail(organization)}>
+                      {t('organizations.viewAccount')}
+                    </button>
                     <button class="btn btn-ghost btn-sm" type="button" onclick={() => openEditForm(organization)}>
                       {t('common.edit')}
                     </button>
@@ -602,6 +617,19 @@
   .organization-name {
     color: var(--text-primary);
     font-weight: var(--weight-semibold);
+  }
+
+  .organization-name-button {
+    width: fit-content;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    text-align: start;
+  }
+
+  .organization-name-button:hover {
+    color: var(--text-accent);
   }
 
   .organization-description {

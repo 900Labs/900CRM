@@ -176,6 +176,191 @@ test('creates an organization through the visible UI and shows it in Organizatio
   await assertNoConsoleErrors();
 });
 
+test('shows an account 360 workspace for an organization with linked work', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/organizations');
+  await expect(page.getByRole('heading', { name: 'Organizations', exact: true })).toBeVisible();
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Organization' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add Organization' });
+  await expect(dialog).toBeVisible();
+
+  await dialog.getByLabel('Name').fill('Helios Account');
+  await dialog.getByLabel('Email').fill('hello@helios.example');
+  await dialog.getByLabel('Website').fill('https://helios.example');
+  await dialog.getByLabel('City').fill('Nairobi');
+  await dialog.getByLabel('Country').fill('Kenya');
+  await dialog.getByLabel('Description').fill('Regional account for off-grid clinics.');
+  await dialog.getByRole('button', { name: 'Create Organization' }).click();
+  await expect(dialog).toBeHidden();
+
+  const seed = await page.evaluate(async () => {
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (!invoke) {
+      throw new Error('Tauri smoke shim is not installed.');
+    }
+    const futureDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    const organizations = await invoke('list_organizations') as Array<{ id: string; name: string }>;
+    const organization = organizations.find((candidate) => candidate.name === 'Helios Account');
+    if (!organization) {
+      throw new Error('Seed organization was not created.');
+    }
+
+    const contact = await invoke('create_contact', {
+      contact_type: 'person',
+      first_name: 'Nia',
+      last_name: 'Mensah',
+      org_name: 'Helios Account',
+      email: 'nia@helios.example',
+      phone: '+254 555 0101',
+      address: '',
+      city: '',
+      country: '',
+      org_id: '',
+      notes: '',
+    }) as { id: string };
+
+    await invoke('link_contact_to_organization', {
+      contact_id: contact.id,
+      organization_id: organization.id,
+    });
+
+    await invoke('create_deal', {
+      title: 'Clinic electrification rollout',
+      value: 73000,
+      currency: 'USD',
+      stage: 'Proposal',
+      probability: 50,
+      expected_close: '2026-08-15',
+      contact_id: '',
+      organization_id: organization.id,
+      notes: 'Account-level expansion opportunity.',
+    });
+
+    const activity = await invoke('create_activity', {
+      activity_type: 'meeting',
+      title: 'Review Helios implementation plan',
+      description: '',
+      due_date: futureDate,
+      contact_id: '',
+      deal_id: '',
+    }) as { id: string };
+
+    await invoke('add_activity_link', {
+      activity_id: activity.id,
+      entity_type: 'organization',
+      entity_id: organization.id,
+    });
+
+    return { organizationId: organization.id, contactId: contact.id };
+  });
+
+  await loadHashRoute(page, `/organizations/${seed.organizationId}`);
+  await expect(page).toHaveURL(new RegExp(`#/organizations/${seed.organizationId}$`));
+  await expect(page.getByRole('heading', { name: 'Helios Account' })).toBeVisible();
+
+  const workspace = page.locator('.account-workspace');
+  await expect(workspace.getByRole('heading', { name: 'Account 360 Summary' })).toBeVisible();
+  await expect(workspace.getByText('On Track')).toBeVisible();
+  await expect(workspace.locator('.workspace-metric').filter({ hasText: 'People' }).getByText('1')).toBeVisible();
+  await expect(workspace.locator('.workspace-metric').filter({ hasText: 'Open Deals' }).getByText('1')).toBeVisible();
+  await expect(workspace.getByText('$73,000')).toBeVisible();
+  await expect(
+    workspace.locator('.workspace-metric').filter({ hasText: 'Next Follow-Up' })
+      .getByText('Review Helios implementation plan'),
+  ).toBeVisible();
+
+  await expect(page.getByRole('button', { name: 'Nia Mensah' })).toBeVisible();
+  await expect(page.getByText('Clinic electrification rollout')).toBeVisible();
+  await expect(
+    page.getByLabel('Account Activity').getByText('Review Helios implementation plan'),
+  ).toBeVisible();
+
+  await workspace.getByRole('button', { name: 'Add Follow-Up' }).click();
+  let accountDialog = page.getByRole('dialog', { name: 'Add Activity' });
+  await expect(accountDialog).toBeVisible();
+  await expect(accountDialog.getByLabel('Organization')).toHaveValue(seed.organizationId);
+  await accountDialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(accountDialog).toBeHidden();
+
+  await workspace.getByRole('button', { name: 'Add Deal' }).click();
+  accountDialog = page.getByRole('dialog', { name: 'Add Deal' });
+  await expect(accountDialog).toBeVisible();
+  await expect(accountDialog.getByLabel('Organization')).toHaveValue(seed.organizationId);
+  await accountDialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(accountDialog).toBeHidden();
+
+  await loadHashRoute(page, '/');
+  await page.getByRole('searchbox', { name: 'Search', exact: true }).fill('Helios');
+  const searchResults = page.getByRole('listbox', { name: 'Search results' });
+  await expect(searchResults).toBeVisible();
+  await searchResults.getByText('Helios Account').click();
+  await expect(page).toHaveURL(new RegExp(`#/organizations/${seed.organizationId}$`));
+
+  await assertNoConsoleErrors();
+});
+
+test('routes global contact search results into direct contact detail outside the loaded list page', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/');
+
+  const seed = await page.evaluate(async () => {
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (!invoke) {
+      throw new Error('Tauri smoke shim is not installed.');
+    }
+
+    for (let index = 0; index < 55; index += 1) {
+      await invoke('create_contact', {
+        contact_type: 'person',
+        first_name: `Contact ${String(index).padStart(2, '0')}`,
+        last_name: 'Paged',
+        org_name: '',
+        email: `contact-${index}@paged.example`,
+        phone: '',
+        address: '',
+        city: '',
+        country: '',
+        org_id: '',
+        notes: '',
+      });
+    }
+
+    const target = await invoke('create_contact', {
+      contact_type: 'person',
+      first_name: 'Zzzara',
+      last_name: 'Searchonly',
+      org_name: '',
+      email: 'zzzara.searchonly@example.test',
+      phone: '',
+      address: '',
+      city: '',
+      country: '',
+      org_id: '',
+      notes: '',
+    }) as { id: string };
+
+    return { contactId: target.id };
+  });
+
+  await page.getByRole('searchbox', { name: 'Search', exact: true }).fill('Zzzara');
+  const searchResults = page.getByRole('listbox', { name: 'Search results' });
+  await expect(searchResults).toBeVisible();
+  await searchResults.getByText('Zzzara Searchonly').click();
+
+  await expect(page).toHaveURL(new RegExp(`#/contacts/${seed.contactId}$`));
+  await expect(page.getByRole('heading', { name: 'Zzzara Searchonly' })).toBeVisible();
+
+  await assertNoConsoleErrors();
+});
+
 test('creates a deal through the visible UI and shows it in Pipeline', async ({
   page,
   assertNoConsoleErrors,

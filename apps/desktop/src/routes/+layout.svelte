@@ -18,6 +18,7 @@
   import { settingsStore } from '$lib/stores/settings';
   import Toast from '$lib/components/Toast.svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
+  import type { SearchResult } from '$lib/stores/ui';
   import GlobalModalHost from '$lib/components/GlobalModalHost.svelte';
   import { startActivityReminderService } from '$lib/services/activityReminders';
   import { currentHashPath, navigateHash, routeHash } from '$lib/utils/hashRouter';
@@ -130,6 +131,27 @@
   function isActive(href: string): boolean {
     if (href === '/') return currentRoute === '/';
     return currentRoute.startsWith(href);
+  }
+
+  function handleSearchResult(result: SearchResult) {
+    if (result.type === 'contact') {
+      navigate(`/contacts/${result.id}`);
+      return;
+    }
+
+    if (result.type === 'organization') {
+      navigate(`/organizations/${result.id}`);
+      return;
+    }
+
+    if (result.type === 'deal') {
+      navigate('/pipeline');
+      return;
+    }
+
+    if (result.type === 'activity') {
+      navigate('/activities');
+    }
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -257,7 +279,7 @@
     <!-- Top bar with search -->
     {#if !uiStore.sidebarCollapsed || true}
       <div class="top-bar">
-        <SearchBar placeholder={t('common.search')} />
+        <SearchBar placeholder={t('common.search')} onselectresult={handleSearchResult} />
       </div>
     {/if}
 
