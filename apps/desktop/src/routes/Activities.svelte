@@ -24,6 +24,12 @@
   } from '$lib/api/customFields';
   import { formatDate, formatRelativeTime } from '$lib/utils/formatters';
   import {
+    ACTIVITY_DUE_BUCKETS,
+    addLocalDays,
+    buildActivityWorkbench,
+    type ActivityDueBucket,
+  } from '$lib/utils/activityWorkbench';
+  import {
     addSelectedActivityLinks,
     deriveActivityRelationshipLabels,
     loadActivityLinkIndex,
@@ -37,6 +43,8 @@
 
   let typeFilter   = $state<ActivityType | ''>('');
   let statusFilter = $state<ActivityStatus | ''>('');
+  let bucketFilter = $state<ActivityDueBucket | ''>('');
+  let reschedulingActivityId = $state<string | null>(null);
   let customFieldDefinitions = $state<CustomFieldDefinition[]>([]);
   let selectedCustomFieldDefId = $state('');
   let customFieldQuery = $state('');
@@ -103,9 +111,21 @@
 
   async function handleStatusFilter(status: ActivityStatus | '') {
     statusFilter = status;
+    bucketFilter = '';
     await activityStore.setFilters({
       type: typeFilter || undefined,
       status: status || undefined,
+    });
+    await refreshActivityLinks();
+  }
+
+  async function handleBucketFilter(bucket: ActivityDueBucket | '') {
+    bucketFilter = bucket;
+    statusFilter = '';
+
+    await activityStore.setFilters({
+      type: typeFilter || undefined,
+      status: undefined,
     });
     await refreshActivityLinks();
   }
@@ -200,6 +220,29 @@
     }
   }
 
+  async function handleSnooze(activityId: string, days = 1) {
+    reschedulingActivityId = activityId;
+    try {
+      await activityStore.updateActivity(activityId, {
+        dueDate: addLocalDays(new Date(), days),
+      });
+    } finally {
+      reschedulingActivityId = null;
+    }
+  }
+
+  async function handleReschedule(activityId: string, event: Event) {
+    const dueDate = (event.target as HTMLInputElement).value;
+    reschedulingActivityId = activityId;
+    try {
+      await activityStore.updateActivity(activityId, {
+        dueDate: dueDate || null,
+      });
+    } finally {
+      reschedulingActivityId = null;
+    }
+  }
+
   async function handleQuickAdd() {
     if (!qaSubject.trim()) return;
     qaSubmitting = true;
@@ -284,6 +327,24 @@
   const filteredActivities = $derived(
     activityStore.activities.filter((activity) => matchesCustomField(activity.id))
   );
+
+  const workbench = $derived(buildActivityWorkbench(filteredActivities));
+
+  const visibleBuckets = $derived(
+    workbench.buckets.filter((bucket) => !bucketFilter || bucket.bucket === bucketFilter)
+  );
+
+  const visibleActivityCount = $derived(
+    visibleBuckets.reduce((sum, bucket) => sum + bucket.activities.length, 0)
+  );
+
+  function bucketLabel(bucket: ActivityDueBucket): string {
+    return t(`activities.buckets.${bucket}`);
+  }
+
+  function bucketDescription(bucket: ActivityDueBucket): string {
+    return t(`activities.bucketDescriptions.${bucket}`);
+  }
 </script>
 
 <div class="page-content activities-page">
@@ -431,8 +492,82 @@
     </form>
   {/if}
 
+  <section class="activity-workbench" aria-labelledby="activity-workbench-heading" data-testid="activity-workbench">
+    <div class="activity-workbench-header">
+      <div>
+        <p class="activity-workbench-eyebrow">{t('activities.workbenchEyebrow')}</p>
+        <h2 id="activity-workbench-heading">{t('activities.workbenchTitle')}</h2>
+      </div>
+      <div class="activity-workbench-open">
+        <span>{t('activities.openWork')}</span>
+        <strong>{workbench.summary.open}</strong>
+      </div>
+    </div>
+
+    <div class="activity-summary-grid" aria-label={t('activities.workbenchSummary')}>
+      <button
+        class="activity-summary-card"
+        class:active={bucketFilter === 'overdue'}
+        type="button"
+        onclick={() => handleBucketFilter(bucketFilter === 'overdue' ? '' : 'overdue')}
+      >
+        <span>{t('activities.buckets.overdue')}</span>
+        <strong>{workbench.summary.overdue}</strong>
+      </button>
+      <button
+        class="activity-summary-card"
+        class:active={bucketFilter === 'today'}
+        type="button"
+        onclick={() => handleBucketFilter(bucketFilter === 'today' ? '' : 'today')}
+      >
+        <span>{t('activities.buckets.today')}</span>
+        <strong>{workbench.summary.today}</strong>
+      </button>
+      <button
+        class="activity-summary-card"
+        class:active={bucketFilter === 'thisWeek'}
+        type="button"
+        onclick={() => handleBucketFilter(bucketFilter === 'thisWeek' ? '' : 'thisWeek')}
+      >
+        <span>{t('activities.buckets.thisWeek')}</span>
+        <strong>{workbench.summary.thisWeek}</strong>
+      </button>
+      <button
+        class="activity-summary-card"
+        class:active={bucketFilter === 'unscheduled'}
+        type="button"
+        onclick={() => handleBucketFilter(bucketFilter === 'unscheduled' ? '' : 'unscheduled')}
+      >
+        <span>{t('activities.buckets.unscheduled')}</span>
+        <strong>{workbench.summary.unscheduled}</strong>
+      </button>
+    </div>
+  </section>
+
   <!-- Filters -->
   <div class="activities-filters">
+    <div class="filter-group" role="group" aria-label={t('activities.dueFocus')}>
+      <span class="filter-group-label">{t('activities.dueFocus')}:</span>
+      <button
+        class="filter-chip"
+        class:active={!bucketFilter}
+        onclick={() => handleBucketFilter('')}
+        type="button"
+      >
+        {t('common.all')}
+      </button>
+      {#each ACTIVITY_DUE_BUCKETS as bucket (bucket)}
+        <button
+          class="filter-chip"
+          class:active={bucketFilter === bucket}
+          onclick={() => handleBucketFilter(bucket)}
+          type="button"
+        >
+          {bucketLabel(bucket)}
+        </button>
+      {/each}
+    </div>
+
     <!-- Type filters -->
     <div class="filter-group" role="group" aria-label={t('activities.type')}>
       <span class="filter-group-label">{t('activities.type')}:</span>
@@ -516,8 +651,8 @@
     {/if}
   </div>
 
-  <!-- Activity list -->
-  <div class="card activities-list-card">
+  <!-- Activity workbench list -->
+  <div class="activities-list-card">
     {#if activityStore.isLoading}
       <!-- Skeleton rows -->
       <ul class="activities-list" aria-label={t('common.loading')}>
@@ -532,7 +667,7 @@
         {/each}
       </ul>
 
-    {:else if filteredActivities.length === 0}
+    {:else if visibleActivityCount === 0}
       <EmptyState
         icon="activities"
         title={t('activities.noActivities')}
@@ -542,92 +677,131 @@
       />
 
     {:else}
-      <ul class="activities-list" role="list">
-        {#each filteredActivities as activity (activity.id)}
-          {@const relationships = deriveActivityRelationshipLabels(
-            activity,
-            activityLinkIndex[activity.id] ?? [],
-            activityRelationshipLookups,
-          )}
-          <li class="activity-row" class:activity-row--completed={activity.status === 'completed'}>
-            <!-- Type icon -->
-            <div class="activity-icon-wrap activity-type-{activity.type}" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <path d={activityIcon(activity.type)}/>
-              </svg>
-            </div>
-
-            <!-- Content -->
-            <div class="activity-content">
-              <div class="activity-header-row">
-                <span class="activity-subject">{activity.subject}</span>
-                <span class="activity-status-badge {statusClass(activity.status)}">
-                  {t(`activities.${activity.status === 'pending' ? 'upcoming' : activity.status}`)}
-                </span>
+      <div class="activity-buckets">
+        {#each visibleBuckets as bucket (bucket.bucket)}
+          {#if bucket.activities.length > 0}
+            <section class="activity-bucket card" aria-labelledby="activity-bucket-{bucket.bucket}">
+              <div class="activity-bucket-header">
+                <div>
+                  <h2 id="activity-bucket-{bucket.bucket}">{bucketLabel(bucket.bucket)}</h2>
+                  <p>{bucketDescription(bucket.bucket)}</p>
+                </div>
+                <span>{bucket.activities.length}</span>
               </div>
-              <div class="activity-meta">
-                {#if activity.dueDate}
-                  <span class="activity-due">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                    </svg>
-                    {formatDate(activity.dueDate, settingsStore.dateFormat as 'MMM D, YYYY')}
-                  </span>
-                {/if}
-                {#each relationships.contacts as contact (contact.id)}
-                  <span class="activity-linked">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8"/>
-                    </svg>
-                    {contact.label}
-                  </span>
-                {/each}
-                {#each relationships.organizations as organization (organization.id)}
-                  <span class="activity-linked">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01"/>
-                    </svg>
-                    {organization.label}
-                  </span>
-                {/each}
-                {#each relationships.deals as deal (deal.id)}
-                  <span class="activity-linked">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                    </svg>
-                    {deal.label}
-                  </span>
-                {/each}
-                <span class="activity-time">{formatRelativeTime(activity.createdAt)}</span>
-              </div>
-            </div>
+              <ul class="activities-list" role="list">
+                {#each bucket.activities as activity (activity.id)}
+                  {@const relationships = deriveActivityRelationshipLabels(
+                    activity,
+                    activityLinkIndex[activity.id] ?? [],
+                    activityRelationshipLookups,
+                  )}
+                  <li class="activity-row" class:activity-row--completed={activity.status === 'completed'}>
+                    <!-- Type icon -->
+                    <div class="activity-icon-wrap activity-type-{activity.type}" aria-hidden="true">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <path d={activityIcon(activity.type)}/>
+                      </svg>
+                    </div>
 
-            <!-- Mark complete toggle -->
-            <button
-              class="btn-complete"
-              class:btn-complete--done={activity.status === 'completed'}
-              onclick={() => handleToggleComplete(activity)}
-              type="button"
-              aria-label={activity.status === 'completed'
-                ? t('activities.markIncomplete')
-                : t('activities.markComplete')}
-              title={activity.status === 'completed'
-                ? t('activities.markIncomplete')
-                : t('activities.markComplete')}
-            >
-              {#if activity.status === 'completed'}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              {:else}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                  <circle cx="12" cy="12" r="9"/>
-                </svg>
-              {/if}
-            </button>
-          </li>
+                    <!-- Content -->
+                    <div class="activity-content">
+                      <div class="activity-header-row">
+                        <span class="activity-subject">{activity.subject}</span>
+                        <span class="activity-status-badge {statusClass(activity.status)}">
+                          {t(`activities.${activity.status === 'pending' ? 'upcoming' : activity.status}`)}
+                        </span>
+                      </div>
+                      <div class="activity-meta">
+                        {#if activity.dueDate}
+                          <span class="activity-due">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                            </svg>
+                            {formatDate(activity.dueDate, settingsStore.dateFormat as 'MMM D, YYYY')}
+                          </span>
+                        {:else}
+                          <span class="activity-due">{t('activities.noDueDate')}</span>
+                        {/if}
+                        {#each relationships.contacts as contact (contact.id)}
+                          <span class="activity-linked">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8"/>
+                            </svg>
+                            {contact.label}
+                          </span>
+                        {/each}
+                        {#each relationships.organizations as organization (organization.id)}
+                          <span class="activity-linked">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                              <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01"/>
+                            </svg>
+                            {organization.label}
+                          </span>
+                        {/each}
+                        {#each relationships.deals as deal (deal.id)}
+                          <span class="activity-linked">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                            </svg>
+                            {deal.label}
+                          </span>
+                        {/each}
+                        <span class="activity-time">{formatRelativeTime(activity.createdAt)}</span>
+                      </div>
+                    </div>
+
+                    <div class="activity-row-actions">
+                      {#if activity.status !== 'completed'}
+                        <button
+                          class="btn btn-ghost btn-sm"
+                          type="button"
+                          onclick={() => handleSnooze(activity.id)}
+                          disabled={reschedulingActivityId === activity.id}
+                        >
+                          {t('activities.snoozeTomorrow')}
+                        </button>
+                      {/if}
+                      <label class="reschedule-control">
+                        <span class="sr-only">{t('activities.reschedule')}</span>
+                        <input
+                          class="input reschedule-input"
+                          type="date"
+                          value={activity.dueDate ?? ''}
+                          disabled={reschedulingActivityId === activity.id}
+                          onchange={(event) => handleReschedule(activity.id, event)}
+                          aria-label={t('activities.reschedule')}
+                        />
+                      </label>
+                      <button
+                        class="btn-complete"
+                        class:btn-complete--done={activity.status === 'completed'}
+                        onclick={() => handleToggleComplete(activity)}
+                        type="button"
+                        aria-label={activity.status === 'completed'
+                          ? t('activities.markIncomplete')
+                          : t('activities.markComplete')}
+                        title={activity.status === 'completed'
+                          ? t('activities.markIncomplete')
+                          : t('activities.markComplete')}
+                      >
+                        {#if activity.status === 'completed'}
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        {:else}
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9"/>
+                          </svg>
+                        {/if}
+                      </button>
+                    </div>
+                  </li>
+                {/each}
+              </ul>
+            </section>
+          {/if}
         {/each}
-      </ul>
+      </div>
     {/if}
   </div>
 </div>
@@ -645,6 +819,96 @@
     display: flex;
     gap: var(--space-3);
     align-items: center;
+  }
+
+  .activity-workbench {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-lg);
+    background: var(--surface-default);
+  }
+
+  .activity-workbench-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+
+  .activity-workbench-eyebrow {
+    margin: 0 0 var(--space-1);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--text-accent);
+    text-transform: uppercase;
+  }
+
+  .activity-workbench h2 {
+    margin: 0;
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .activity-workbench-open {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 120px;
+    padding: var(--space-3);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+    text-align: end;
+  }
+
+  .activity-workbench-open span {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+  }
+
+  .activity-workbench-open strong {
+    font-size: var(--text-xl);
+    color: var(--text-primary);
+  }
+
+  .activity-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .activity-summary-card {
+    display: grid;
+    gap: var(--space-2);
+    min-height: 86px;
+    padding: var(--space-4);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+    color: var(--text-primary);
+    text-align: start;
+    cursor: pointer;
+    transition: background-color var(--duration-fast) var(--ease-out),
+                border-color var(--duration-fast) var(--ease-out);
+  }
+
+  .activity-summary-card:hover,
+  .activity-summary-card.active {
+    border-color: var(--color-primary-200);
+    background: var(--surface-active);
+  }
+
+  .activity-summary-card span {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+  }
+
+  .activity-summary-card strong {
+    font-size: var(--text-2xl);
+    line-height: 1;
   }
 
   /* ── Quick-add form ──────────────────────────────────────────────────────── */
@@ -744,7 +1008,53 @@
 
   .activities-list-card {
     flex: 1;
+    min-width: 0;
+  }
+
+  .activity-buckets {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .activity-bucket {
     overflow: hidden;
+  }
+
+  .activity-bucket-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-6);
+    border-block-end: var(--border-width) solid var(--border-default);
+  }
+
+  .activity-bucket-header h2 {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .activity-bucket-header p {
+    margin: var(--space-1) 0 0;
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+  }
+
+  .activity-bucket-header > span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 24px;
+    padding: 0 var(--space-2);
+    border-radius: 9999px;
+    border: var(--border-width) solid var(--border-default);
+    background: var(--surface-default);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--text-secondary);
   }
 
   .activities-list {
@@ -802,6 +1112,26 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
+  }
+
+  .activity-row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    flex-shrink: 0;
+    margin-block-start: -1px;
+  }
+
+  .reschedule-control {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .reschedule-input {
+    width: 138px;
+    height: 28px;
+    font-size: var(--text-xs);
   }
 
   .activity-header-row {
@@ -934,5 +1264,46 @@
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border-width: 0;
+  }
+
+  @media (max-width: 1040px) {
+    .activity-summary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .activity-row {
+      align-items: stretch;
+    }
+
+    .activity-row-actions {
+      flex-wrap: wrap;
+      max-width: 180px;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .activity-workbench-header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .activity-workbench-open {
+      text-align: start;
+    }
+
+    .activity-summary-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .activity-row {
+      flex-wrap: wrap;
+    }
+
+    .activity-row-actions {
+      width: 100%;
+      justify-content: flex-start;
+      max-width: none;
+      padding-inline-start: 40px;
+    }
   }
 </style>
