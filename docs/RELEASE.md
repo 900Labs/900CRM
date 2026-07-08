@@ -1,7 +1,7 @@
 # Release Readiness
 
 Date: 2026-06-24
-Last updated: 2026-06-27
+Last updated: 2026-07-08
 
 This document records the current release status for 900CRM and the manual
 checks required before publishing a public release. For a phase-by-phase
@@ -77,6 +77,17 @@ is local package evidence only: the output is unsigned, unnotarized, not a
 manual workflow artifact, not Windows or Linux proof, not GitHub Release proof,
 not end-user installability proof, and not alpha release completion.
 
+Maintainers can also run `npm run release:macos:smoke:local` for a fuller local
+macOS package smoke baseline. That command uses the headless DMG helper,
+verifies the DMG with `hdiutil verify`, copies the DMG into an ignored local
+artifact layout under `dist/local-macos-package-smoke/`, generates macOS-only
+checksums, release metadata, and SBOM output, runs the release artifact verifier
+with `--platforms macos`, and mounts the DMG to confirm `900CRM.app` and the
+`Applications` symlink are present. It is still local unsigned and unnotarized
+maintainer evidence only; it does not replace workflow artifacts, platform
+installer smoke, signing, notarization, downloaded artifact verification for
+real workflow output, GitHub Release proof, or alpha release completion.
+
 ## Verification Checklist
 
 Before a release candidate is tagged or published, maintainers should complete
@@ -104,6 +115,11 @@ manual.
   not replace workflow macOS artifacts, signing, notarization, release metadata,
   downloaded-artifact verification, Windows/Linux package proof, GitHub Release
   proof, or end-user release completion.
+- [ ] For a fuller local macOS smoke baseline, run
+  `npm run release:macos:smoke:local` and preserve the printed repo-relative DMG
+  path, size, SHA-256, local artifact verification root, metadata path, and
+  mounted-DMG layout smoke result. This is still macOS-only, local, unsigned,
+  unnotarized maintainer evidence.
 - [ ] Run `npm run release:notes:sample`.
 - [ ] Run `npm run release:manifest:sample`.
 - [ ] Run `npm run release:artifacts:verify:sample` to exercise the downloaded
@@ -193,6 +209,7 @@ The release-note and manifest scripts are also locally runnable for validation:
 ```bash
 npm run release:preflight:local
 npm run release:macos:dmg:headless
+npm run release:macos:smoke:local
 npm run release:notes:sample
 node scripts/generate-release-notes.mjs --help
 npm run release:manifest:sample
@@ -223,6 +240,14 @@ DMG with `hdiutil verify`, and prints its size and SHA-256. It does not invoke
 the normal Tauri DMG Finder/AppleScript customization flow, generate release
 metadata, sign, notarize, tag, upload artifacts, publish a GitHub Release, or
 prove Windows/Linux installability.
+
+`npm run release:macos:smoke:local` is a macOS-only maintainer wrapper around
+the headless DMG helper plus the existing release metadata and artifact
+verification scripts. It writes generated evidence under ignored `dist/` and
+`target/` directories, verifies only `macos` metadata with the artifact
+verifier, and performs a mounted-DMG layout smoke for `900CRM.app` and the
+`Applications` symlink. It should be treated as repeatable local smoke evidence,
+not as release workflow proof or end-user distribution readiness.
 
 ### Downloaded Artifact Verification
 
