@@ -207,6 +207,39 @@
       "addFollowUp": "Add Follow-Up",
       "linkedActivities": "Linked Activities",
       "noDescription": "No description yet"
+    },
+    "metrics": {
+      "eyebrow": "Forecast",
+      "title": "Forecast and Stage Health",
+      "forecastSummary": "Pipeline forecast summary",
+      "focusStage": "Focus Stage",
+      "noOpenDeals": "No open deals",
+      "openPipeline": "Open Pipeline",
+      "openDeals": "{count} open deals",
+      "weightedForecast": "Weighted Forecast",
+      "closingNext30Days": "Closing Next 30 Days",
+      "winRate": "Win Rate",
+      "closedSplit": "{won} won · {lost} lost",
+      "atRisk": "At risk: {count}",
+      "closeDateGaps": "{overdue} overdue · {missing} missing close date · {later} later",
+      "stageHealth": "Stage Health",
+      "currentBoard": "Current board",
+      "deals": "Deals",
+      "value": "Value",
+      "forecast": "Forecast",
+      "averageProbability": "Avg Prob.",
+      "averageUpdateAge": "Avg Since Update",
+      "averageDays": "{count}d",
+      "focusLabel": "Focus",
+      "focus": {
+        "empty": "Empty",
+        "overdue": "Overdue",
+        "needsFollowUp": "Needs Follow-Up",
+        "stale": "Stale",
+        "onTrack": "On Track",
+        "closedWon": "Closed Won",
+        "closedLost": "Closed Lost"
+      }
     }
   },
   "activities": {

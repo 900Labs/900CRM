@@ -36,7 +36,7 @@
     type CustomFieldDefinition,
     type EntityTypeCustomFieldValue,
   } from '$lib/api/customFields';
-  import { formatCurrency } from '$lib/utils/formatters';
+  import { formatCurrency, formatPercent } from '$lib/utils/formatters';
   import { sumByCurrency } from '$lib/utils/currency';
   import {
     deriveDealRelationshipLabels,
@@ -47,6 +47,11 @@
     type PipelineGuidance,
     type PipelineGuidanceTone,
   } from '$lib/utils/pipelineGuidance';
+  import {
+    buildPipelineForecastMetrics,
+    type StageForecastMetric,
+    type StageFocus,
+  } from '$lib/utils/pipelineMetrics';
   import DealCard from '$lib/components/DealCard.svelte';
   import DealDetailDrawer from '$lib/components/DealDetailDrawer.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
@@ -290,6 +295,8 @@
     DEAL_STAGES.flatMap((stage) => dealStore.dealsByStage[stage] ?? [])
   );
 
+  const visibleDeals = $derived.by(() => columns.flatMap((column) => column.deals));
+
   const dealActivitiesById = $derived.by<Record<string, Activity[]>>(() => {
     if (!activityContextReady) {
       return {};
@@ -345,12 +352,103 @@
     );
   });
 
+  const pipelineMetrics = $derived.by(() =>
+    buildPipelineForecastMetrics({
+      deals: visibleDeals,
+      guidanceByDealId,
+    })
+  );
+
+  const pipelineFocusSummary = $derived.by(() => {
+    if (pipelineMetrics.openDealCount === 0) {
+      return t('deals.metrics.noOpenDeals');
+    }
+
+    if (activityContextError) {
+      return t('deals.guidance.unavailable');
+    }
+
+    if (!activityContextReady) {
+      return t('deals.guidance.loading');
+    }
+
+    return pipelineMetrics.focusStage
+      ? `${t(`deals.stages.${pipelineMetrics.focusStage.stage}`)} · ${stageFocusLabel(pipelineMetrics.focusStage)}`
+      : t('deals.metrics.noOpenDeals');
+  });
+
   const selectedDealGuidance = $derived<PipelineGuidance | null>(
     selectedDeal ? guidanceByDealId[selectedDeal.id] ?? null : null
   );
 
   function guidanceLabel(guidance: PipelineGuidance): string {
     return t(`deals.guidance.${guidance.state}`);
+  }
+
+  function formatCurrencyList(
+    totals: { currency: string; total: number }[],
+    fallback = t('common.none'),
+  ): string {
+    if (totals.length === 0) {
+      return fallback;
+    }
+
+    return totals
+      .map((total) => formatCurrency(total.total, total.currency, settingsStore.language))
+      .join(' · ');
+  }
+
+  function formatNullableRatio(value: number | null): string {
+    return value === null ? '—' : formatPercent(value * 100);
+  }
+
+  function formatAverageDays(value: number | null): string {
+    if (value === null) {
+      return '—';
+    }
+
+    return t('deals.metrics.averageDays', { count: Math.round(value) });
+  }
+
+  function formatAverageProbability(value: number | null): string {
+    return value === null ? '—' : formatPercent(value);
+  }
+
+  function ratioWidth(value: number): string {
+    const bounded = Math.min(Math.max(value, 0), 1);
+    return `${Math.round(bounded * 100)}%`;
+  }
+
+  function focusLabel(focus: StageFocus): string {
+    return t(`deals.metrics.focus.${focus}`);
+  }
+
+  function riskCountLabel(count: number): string {
+    if (activityContextError) {
+      return t('deals.guidance.unavailable');
+    }
+
+    if (!activityContextReady) {
+      return t('deals.guidance.loading');
+    }
+
+    return String(count);
+  }
+
+  function stageFocusLabel(metric: StageForecastMetric): string {
+    if (metric.stage === 'closedWon' || metric.stage === 'closedLost' || metric.dealCount === 0) {
+      return focusLabel(metric.focus);
+    }
+
+    if (activityContextError) {
+      return t('deals.guidance.unavailable');
+    }
+
+    if (!activityContextReady) {
+      return t('deals.guidance.loading');
+    }
+
+    return focusLabel(metric.focus);
   }
 
   const guidanceBadgeByDealId = $derived.by<Record<string, { label: string; tone: PipelineGuidanceTone }>>(() =>
@@ -434,6 +532,124 @@
       </button>
     </div>
   </div>
+
+  {#if !dealStore.isLoading}
+    <section
+      class="pipeline-insights"
+      aria-labelledby="pipeline-insights-heading"
+      data-testid="pipeline-forecast-overview"
+    >
+      <div class="pipeline-insights-header">
+        <div>
+          <p class="pipeline-insights-eyebrow">{t('deals.metrics.eyebrow')}</p>
+          <h2 id="pipeline-insights-heading" class="pipeline-insights-title">
+            {t('deals.metrics.title')}
+          </h2>
+        </div>
+        <div class="pipeline-focus-chip">
+          <span class="pipeline-focus-label">{t('deals.metrics.focusStage')}</span>
+          <span class="pipeline-focus-value">{pipelineFocusSummary}</span>
+        </div>
+      </div>
+
+      <div class="forecast-grid" aria-label={t('deals.metrics.forecastSummary')}>
+        <div class="forecast-card">
+          <span class="forecast-card-label">{t('deals.metrics.openPipeline')}</span>
+          <strong class="forecast-card-value">
+            {formatCurrencyList(pipelineMetrics.openPipelineByCurrency)}
+          </strong>
+          <span class="forecast-card-meta">
+            {t('deals.metrics.openDeals', { count: pipelineMetrics.openDealCount })}
+          </span>
+        </div>
+        <div class="forecast-card">
+          <span class="forecast-card-label">{t('deals.metrics.weightedForecast')}</span>
+          <strong class="forecast-card-value">
+            {formatCurrencyList(pipelineMetrics.weightedForecastByCurrency)}
+          </strong>
+          <span class="forecast-card-meta">
+            {t('deals.metrics.atRisk', { count: riskCountLabel(pipelineMetrics.atRiskCount) })}
+          </span>
+        </div>
+        <div class="forecast-card">
+          <span class="forecast-card-label">{t('deals.metrics.closingNext30Days')}</span>
+          <strong class="forecast-card-value">
+            {formatCurrencyList(pipelineMetrics.closingNext30DaysByCurrency)}
+          </strong>
+          <span class="forecast-card-meta">
+            {t('deals.metrics.closeDateGaps', {
+              overdue: pipelineMetrics.overdueCloseDateCount,
+              missing: pipelineMetrics.noCloseDateCount,
+              later: pipelineMetrics.laterCloseDateCount,
+            })}
+          </span>
+        </div>
+        <div class="forecast-card">
+          <span class="forecast-card-label">{t('deals.metrics.winRate')}</span>
+          <strong class="forecast-card-value">
+            {formatNullableRatio(pipelineMetrics.winRate)}
+          </strong>
+          <span class="forecast-card-meta">
+            {t('deals.metrics.closedSplit', {
+              won: pipelineMetrics.closedWonCount,
+              lost: pipelineMetrics.closedLostCount,
+            })}
+          </span>
+        </div>
+      </div>
+
+      <div class="stage-health" aria-label={t('deals.metrics.stageHealth')}>
+        <div class="stage-health-heading">
+          <h3>{t('deals.metrics.stageHealth')}</h3>
+          <span>{t('deals.metrics.currentBoard')}</span>
+        </div>
+        <div class="stage-health-list">
+          {#each pipelineMetrics.stageMetrics as metric (metric.stage)}
+            <div class="stage-health-row" data-focus={metric.focus}>
+              <div class="stage-health-main">
+                <div class="stage-health-title">
+                  <span class="col-stage-dot" style="background-color: {stageColors[metric.stage]}" aria-hidden="true"></span>
+                  <span>{t(`deals.stages.${metric.stage}`)}</span>
+                </div>
+                <div class="stage-health-bar" aria-hidden="true">
+                  <span
+                    class="stage-health-bar-fill"
+                    style={`width: ${ratioWidth(metric.dealShare)}`}
+                  ></span>
+                </div>
+              </div>
+              <dl class="stage-health-metrics">
+                <div>
+                  <dt>{t('deals.metrics.deals')}</dt>
+                  <dd>{metric.dealCount}</dd>
+                </div>
+                <div>
+                  <dt>{t('deals.metrics.value')}</dt>
+                  <dd>{formatCurrencyList(metric.pipelineValueByCurrency)}</dd>
+                </div>
+                <div>
+                  <dt>{t('deals.metrics.forecast')}</dt>
+                  <dd>{formatCurrencyList(metric.weightedForecastByCurrency, '—')}</dd>
+                </div>
+                <div>
+                  <dt>{t('deals.metrics.averageProbability')}</dt>
+                  <dd>{formatAverageProbability(metric.averageProbability)}</dd>
+                </div>
+                <div>
+                  <dt>{t('deals.metrics.averageUpdateAge')}</dt>
+                  <dd>{formatAverageDays(metric.averageStageAgeDays)}</dd>
+                </div>
+                <div>
+                  <dt>{t('deals.metrics.focusLabel')}</dt>
+                  <dd>{stageFocusLabel(metric)}</dd>
+                </div>
+              </dl>
+            </div>
+          {/each}
+        </div>
+      </div>
+    </section>
+  {/if}
 
   <!-- Loading skeleton -->
   <div class="pipeline-filters" role="group" aria-label={t('common.customFieldFilter')}>
@@ -608,6 +824,206 @@
     display: flex;
     gap: var(--space-3);
     align-items: center;
+  }
+
+  .pipeline-insights {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-lg);
+    background: var(--surface-default);
+  }
+
+  .pipeline-insights-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+
+  .pipeline-insights-eyebrow {
+    margin: 0 0 var(--space-1);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--text-accent);
+    text-transform: uppercase;
+  }
+
+  .pipeline-insights-title {
+    margin: 0;
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .pipeline-focus-chip {
+    display: grid;
+    gap: var(--space-1);
+    min-width: min(280px, 100%);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: var(--border-width) solid var(--border-default);
+    background: var(--surface-raised);
+  }
+
+  .pipeline-focus-label {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+  }
+
+  .pipeline-focus-value {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .forecast-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .forecast-card {
+    display: grid;
+    align-content: start;
+    gap: var(--space-2);
+    min-height: 116px;
+    padding: var(--space-4);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+  }
+
+  .forecast-card-label {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+  }
+
+  .forecast-card-value {
+    min-height: 30px;
+    font-size: var(--text-xl);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    line-height: 1.25;
+  }
+
+  .forecast-card-meta {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    line-height: 1.35;
+  }
+
+  .stage-health {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .stage-health-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .stage-health-heading h3 {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .stage-health-heading span {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+  }
+
+  .stage-health-list {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .stage-health-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.7fr) minmax(0, 2fr);
+    gap: var(--space-4);
+    align-items: center;
+    min-height: 82px;
+    padding: var(--space-3);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+  }
+
+  .stage-health-main {
+    display: grid;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .stage-health-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .stage-health-title span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stage-health-bar {
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--surface-active);
+    overflow: hidden;
+  }
+
+  .stage-health-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-primary);
+  }
+
+  .stage-health-metrics {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(72px, 1fr));
+    gap: var(--space-3);
+    margin: 0;
+  }
+
+  .stage-health-metrics div {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .stage-health-metrics dt {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  .stage-health-metrics dd {
+    margin: 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    white-space: nowrap;
   }
 
   .pipeline-filters {
@@ -862,5 +1278,35 @@
   .skeleton-card {
     height: 88px;
     border-radius: var(--radius-md);
+  }
+
+  @media (max-width: 1180px) {
+    .forecast-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .stage-health-row {
+      grid-template-columns: 1fr;
+    }
+
+    .stage-health-metrics {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 760px) {
+    .pipeline-insights-header,
+    .stage-health-heading {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .forecast-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .stage-health-metrics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 </style>
