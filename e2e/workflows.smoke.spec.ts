@@ -2,6 +2,13 @@ import { expect, loadHashRoute, test } from './tauri-shim';
 
 test.describe.configure({ mode: 'serial' });
 
+function localDateInputValue(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 test('loads the dashboard sample workspace and shows the follow-up on the dashboard', async ({
   page,
   assertNoConsoleErrors,
@@ -500,16 +507,43 @@ test('creates an activity through the visible UI and shows it in Activities', as
   await loadHashRoute(page, '/activities');
   await expect(page.getByRole('heading', { name: 'Activities' })).toBeVisible();
 
+  const today = localDateInputValue();
+
   await page.locator('.page-header').getByRole('button', { name: /^Add Activity$/ }).click();
   const quickAddForm = page.getByRole('form', { name: 'Add Activity' });
   await quickAddForm.getByLabel('Subject').fill('Follow up on grant paperwork');
+  await quickAddForm.getByLabel('Due Date').fill(today);
   await quickAddForm.getByRole('button', { name: 'Add', exact: true }).click();
 
-  const activityRow = page.locator('.activity-row').filter({
+  const workbench = page.getByTestId('activity-workbench');
+  await expect(workbench.getByRole('heading', { name: 'Due Workbench' })).toBeVisible();
+  await expect(workbench.getByText('Open work')).toBeVisible();
+
+  const todaySection = page.locator('.activity-bucket').filter({
+    has: page.getByRole('heading', { name: 'Today', exact: true }),
+  });
+  const activityRow = todaySection.locator('.activity-row').filter({
     hasText: 'Follow up on grant paperwork',
   });
   await expect(activityRow).toBeVisible();
   await expect(activityRow.getByText('Upcoming')).toBeVisible();
+
+  await activityRow.getByRole('button', { name: 'Snooze' }).click();
+  const thisWeekSection = page.locator('.activity-bucket').filter({
+    has: page.getByRole('heading', { name: 'This Week', exact: true }),
+  });
+  const snoozedRow = thisWeekSection.locator('.activity-row').filter({
+    hasText: 'Follow up on grant paperwork',
+  });
+  await expect(snoozedRow).toBeVisible();
+
+  await snoozedRow.getByRole('button', { name: 'Mark Complete' }).click();
+  const completedSection = page.locator('.activity-bucket').filter({
+    has: page.getByRole('heading', { name: 'Completed', exact: true }),
+  });
+  await expect(completedSection.locator('.activity-row').filter({
+    hasText: 'Follow up on grant paperwork',
+  })).toBeVisible();
 
   await assertNoConsoleErrors();
 });

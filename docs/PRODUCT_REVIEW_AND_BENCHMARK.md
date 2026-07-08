@@ -46,7 +46,7 @@ real small business owner.
 | Contacts | Search, type filter, duplicate review, import/export, custom-field filtering, contact detail Customer 360 summary, relationship-aware activity timeline | Contacts and lead/account work are blended. The detail view now has useful at-a-glance and timeline context, but there is no lead capture stage, saved segment, list view preset, files/links section, or deal-detail context. |
 | Organizations | List, create/edit, notes/tags, contact linking, account detail workspace with linked people/deals/activity and relationship-aware account timeline | Account detail is now useful, but list-level account management still lacks owner, health, next step, and saved account views. |
 | Pipeline | Kanban by stage, custom-field filter, deal cards, deal guidance drawer with weighted forecast, stale/overdue/follow-up status, linked activities, and a board-level forecast/stage-health overview | Stronger daily sales surface. Still needs true historical stage conversion summaries, deeper deal editing/detail routing, and stronger drag/drop confidence cues. |
-| Activities | Task/call/meeting/email list with filters and completion | Useful but should become a calendar/task center with due buckets, day/week views, reminders, and relationship context. |
+| Activities | Task/call/meeting/email follow-up workbench with due buckets, summary counts, quick snooze/reschedule, completion, filters, and relationship breadcrumbs | Much stronger daily work surface. Still needs a true calendar grid, reminders, recurrence, saved activity views, and optional external calendar sync. |
 | Audit Log | Read-only table grouped under Review | Good trust feature, now visually separated from daily work. Later, it may still move deeper into Admin once Review counts are more prominent. |
 | Pending Actions | Review queue for proposed actions grouped under Review | Important for MCP/external-client safety. The next improvement is to show high-priority pending counts without making this a daily-work screen. |
 | Settings | Locale/theme/date/currency, backup/restore, import/export, email, integrations, section jump bar | Still dense, but now easier to scan. Later work should split Data Management, Integrations, Appearance, and Admin/Safety into clearer settings sections or pages. |
@@ -135,14 +135,18 @@ Recommended outcome: deeper deal editing/detail routing, stronger drag/drop
 confidence cues, and true stage-conversion summaries only after the data model
 stores stage-transition history.
 
-### 4. Activities need a calendar/task center
+### 4. Activities now have a follow-up workbench, but not a full calendar
 
-The current activity list is functional, but daily users expect "today",
-"overdue", "this week", and calendar-like planning. Pipedrive/Odoo-style
-follow-up discipline is central to CRM value.
+Sprint 107 moved Activities from a flat list toward daily follow-up discipline:
+the route now groups work into Overdue, Today, This Week, Later,
+Unscheduled, and Completed buckets, shows priority counts, and allows quick
+snooze/reschedule/complete actions while preserving relationship context.
+This closes the first daily-work gap, but users who plan heavily by time still
+need a true day/week calendar grid, reminders, recurrence, saved views, and
+optional external calendar sync.
 
-Recommended outcome: Activities becomes a day/week workbench with due buckets,
-quick reschedule, complete/snooze, and relationship context.
+Recommended outcome: add a true calendar/planning layer only after the
+follow-up workbench settles.
 
 ### 5. Admin/safety items crowd primary navigation
 
@@ -204,11 +208,13 @@ These are ordered to improve perceived product value fastest.
    - Remaining work: deeper deal editing/detail routing, stronger drag/drop
      confidence cues, and true conversion summaries after stage history exists.
 
-5. **Activities Calendar and Follow-up Center**
-   - Add today/overdue/this-week views.
-   - Add quick reschedule, snooze, complete, and relationship breadcrumbs.
-   - Consider a lightweight calendar view without requiring online calendar
-     sync.
+5. **Activities Calendar and Follow-up Center** - follow-up workbench completed
+   - Added due buckets for Overdue, Today, This Week, Later, Unscheduled, and
+     Completed.
+   - Added quick reschedule, snooze, complete/incomplete, and preserved
+     relationship breadcrumbs.
+   - Remaining work: true day/week calendar grid, reminders, recurrence, saved
+     activity views, and optional external calendar sync.
 
 6. **Reports Hub**
    - Move dashboard reports into a Reports page.

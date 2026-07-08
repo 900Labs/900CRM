@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({
   invokeMock: vi.fn(),
@@ -10,6 +10,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 import {
   addActivityLink,
+  listActivities,
   listActivityLinks,
   removeActivityLink,
   updateActivity,
@@ -41,6 +42,34 @@ const backendActivityLink = {
 describe('activity API', () => {
   beforeEach(() => {
     invokeMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('keeps date-only activities due today pending for the full local day', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-08T18:30:00'));
+    invokeMock.mockResolvedValueOnce([
+      {
+        ...backendActivity,
+        id: 'today',
+        due_date: '2026-07-08',
+        completed: false,
+      },
+      {
+        ...backendActivity,
+        id: 'yesterday',
+        due_date: '2026-07-07',
+        completed: false,
+      },
+    ]);
+
+    await expect(listActivities({ sortBy: 'dueDate', sortDir: 'asc' })).resolves.toMatchObject([
+      { id: 'yesterday', status: 'overdue' },
+      { id: 'today', status: 'pending' },
+    ]);
   });
 
   it('omits absent nullable update fields and sends explicit reset flags intentionally', async () => {
