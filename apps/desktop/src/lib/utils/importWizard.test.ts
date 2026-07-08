@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getImportFieldOptions,
+  importMappingGuidanceKey,
   suggestImportMapping,
   toBackendMapping,
   validateImportMapping,
@@ -386,5 +387,11 @@ describe('import wizard helpers', () => {
       Company: 'name',
       Ignore: null,
     });
+  });
+
+  it('exposes explicit source and tag guidance only where imports need it', () => {
+    expect(importMappingGuidanceKey('contacts')).toBe('import.mappingGuidance.contacts');
+    expect(importMappingGuidanceKey('tag_links')).toBe('import.mappingGuidance.tagLinks');
+    expect(importMappingGuidanceKey('organizations')).toBeNull();
   });
 });

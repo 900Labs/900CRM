@@ -242,10 +242,18 @@ These are ordered to improve perceived product value fastest.
      breakdown where supported, exportable report snapshots, and true
      historical conversion only after stage history exists.
 
-7. **Local Automation Lite**
-   - Add simple local rules: when deal moves stage, create follow-up; when
-     activity is overdue, flag; when contact is created from import, tag/source.
-   - Keep it local and explicit; no cloud automation dependency.
+7. **Local Automation Lite** - explicit local suggestions completed
+   - Added a Pipeline stage-move prompt that drafts a follow-up only after a
+     user moves an open deal with no linked next activity. Nothing is saved
+     until the user reviews and saves the Add Activity modal.
+   - Added a Dashboard attention strip for overdue and due-today follow-ups
+     using the frontend local-day bucketing rules from the Activities
+     workbench.
+   - Added import wizard guidance that clarifies source/tag columns are not
+     applied automatically to contacts and that tag links require local IDs.
+   - Remaining work: saved automation rules, recurring reminders, full
+     workflow automation, owner/source dimensions, and auto-tagging only after
+     import/rollback semantics explicitly support it.
 
 8. **Alpha Packaging and Smoke Evidence**
    - Continue release packaging work once GitHub Actions billing/spending-limit

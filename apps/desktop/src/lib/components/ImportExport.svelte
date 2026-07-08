@@ -10,6 +10,7 @@
   import { listCustomFieldDefinitions, type CustomFieldDefinition } from '$lib/api/customFields';
   import {
     getImportFieldOptions,
+    importMappingGuidanceKey,
     suggestImportMapping,
     toBackendMapping,
     validateImportMapping,
@@ -186,6 +187,7 @@
   const importFieldOptions = $derived(
     mappedEntity ? getImportFieldOptions(mappedEntity, activeImportCustomFields) : [],
   );
+  const mappingGuidanceKey = $derived(mappedEntity ? importMappingGuidanceKey(mappedEntity) : null);
   const sourceHeaders = $derived(isJsonImport ? (jsonPreview?.headers ?? []) : (parseResult?.headers ?? []));
   const sourcePreviewRows = $derived(
     isJsonImport ? jsonPreviewRows.map((row) => row.values) : previewRows,
@@ -988,6 +990,11 @@
 
             {#if showMappingWizard && sourceHeaders.length > 0 && importStep === 'mapping'}
               <div class="mapping-panel">
+                {#if mappingGuidanceKey}
+                  <div class="mapping-guidance" role="note">
+                    {t(mappingGuidanceKey)}
+                  </div>
+                {/if}
                 <div class="mapping-header">
                   <span>{t('import.columnMapping')}</span>
                   <span>{t('import.targetField')}</span>
@@ -1533,6 +1540,16 @@
     font-size: var(--text-xs);
     font-weight: var(--weight-medium);
     text-transform: uppercase;
+  }
+
+  .mapping-guidance {
+    padding: var(--space-3);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--border-radius-sm);
+    background: var(--surface-hover);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: 1.45;
   }
 
   .mapping-row {

@@ -50,6 +50,15 @@
       "noPipelineData": "Babu bayanan pipeline tukuna",
       "noActivityData": "Babu bayanan aiki tukuna",
       "loadFailed": "Wasu bayanan rahoto ba su samuwa a yanzu."
+    },
+    "attention": {
+      "title": "Needs Attention",
+      "loading": "Checking overdue and due-today follow-ups.",
+      "summary": "{overdue} overdue · {today} due today",
+      "listLabel": "Follow-ups needing attention",
+      "overdue": "Overdue",
+      "today": "Today",
+      "loadFailed": "Follow-up attention could not be loaded."
     }
   },
   "contacts": {
@@ -314,7 +323,8 @@
     "invalidEmail": "Adireshin imel ba daidai ba",
     "invalidPhone": "Lambar waya ba daidai ba",
     "invalidUrl": "URL ba daidai ba",
-    "fieldRequired": "{field} wajibi ne"
+    "fieldRequired": "{field} wajibi ne",
+    "dismiss": "Dismiss"
   },
   "mission": {
     "title": "900 don 900",
@@ -393,7 +403,11 @@
     "preImportBackupRestoreConfirm": "Restore the automatic pre-import backup? This replaces the current local 900CRM database.",
     "preImportBackupRestored": "Pre-import backup restored to {path}",
     "preImportBackupRestoreFailed": "Pre-import backup restore failed",
-    "preImportBackupRestoreCancelled": "Pre-import backup restore cancelled"
+    "preImportBackupRestoreCancelled": "Pre-import backup restore cancelled",
+    "mappingGuidance": {
+      "contacts": "Source, owner, and tag columns are not applied automatically to contacts. Map source-like columns to Notes or create a contact custom field first; import tag definitions and tag links with local IDs when you want tags.",
+      "tagLinks": "Tag links require existing local entity IDs and tag IDs. This import does not match tags by name."
+    }
   },
   "export": {
     "title": "Fitar",
@@ -544,6 +558,14 @@
         "dueLater": "Daga baya",
         "noDueDate": "Babu kwanan lokaci"
       }
+    }
+  },
+  "localAutomation": {
+    "eyebrow": "Local Suggestion",
+    "pipeline": {
+      "title": "Draft the next follow-up",
+      "description": "{deal} moved to {stage}. 900CRM can draft a follow-up for tomorrow; nothing is saved until you review and save it.",
+      "addDraft": "Draft Follow-Up"
     }
   }
 }

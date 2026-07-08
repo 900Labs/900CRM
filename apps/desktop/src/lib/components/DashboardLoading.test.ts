@@ -4,11 +4,15 @@ import { render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  createActivityMock,
   getDashboardStatsMock,
+  listActivitiesMock,
   loadUpcomingMock,
   openModalMock,
 } = vi.hoisted(() => ({
+  createActivityMock: vi.fn(),
   getDashboardStatsMock: vi.fn(),
+  listActivitiesMock: vi.fn(),
   loadUpcomingMock: vi.fn(),
   openModalMock: vi.fn(),
 }));
@@ -19,6 +23,11 @@ vi.mock('$lib/i18n', () => ({
 
 vi.mock('$lib/api/dashboard', () => ({
   getDashboardStats: getDashboardStatsMock,
+}));
+
+vi.mock('$lib/api/activities', () => ({
+  createActivity: createActivityMock,
+  listActivities: listActivitiesMock,
 }));
 
 vi.mock('$lib/stores/activities', () => ({
@@ -47,6 +56,8 @@ import Dashboard from '../../routes/Dashboard.svelte';
 describe('Dashboard loading behavior', () => {
   beforeEach(() => {
     getDashboardStatsMock.mockReset();
+    listActivitiesMock.mockReset();
+    listActivitiesMock.mockResolvedValue([]);
     loadUpcomingMock.mockReset();
     openModalMock.mockReset();
   });
@@ -70,5 +81,57 @@ describe('Dashboard loading behavior', () => {
     expect(screen.getByText('4')).toBeTruthy();
     expect(screen.getByText('dashboard.recentActivity')).toBeTruthy();
     expect(screen.getByText('dashboard.quickActions')).toBeTruthy();
+  });
+
+  it('renders overdue and today attention without marking today as overdue', async () => {
+    getDashboardStatsMock.mockResolvedValueOnce({
+      activeDeals: 1,
+      overdueActivities: 0,
+      pipelineValue: 900,
+      pipelineValueByCurrency: [{ currency: 'USD', dealCount: 1, totalValue: 900 }],
+      totalContacts: 4,
+      upcomingTasks: 2,
+    });
+    loadUpcomingMock.mockResolvedValueOnce(undefined);
+    listActivitiesMock.mockResolvedValueOnce([
+      {
+        id: 'overdue',
+        type: 'task',
+        subject: 'Past due follow-up',
+        notes: null,
+        dueDate: '2000-01-01',
+        completedAt: null,
+        status: 'pending',
+        contactId: null,
+        contactName: null,
+        dealId: null,
+        dealName: null,
+        createdAt: '2000-01-01T00:00:00Z',
+        updatedAt: '2000-01-01T00:00:00Z',
+      },
+      {
+        id: 'today',
+        type: 'call',
+        subject: 'Today follow-up',
+        notes: null,
+        dueDate: new Date().toISOString().slice(0, 10),
+        completedAt: null,
+        status: 'pending',
+        contactId: null,
+        contactName: null,
+        dealId: null,
+        dealName: null,
+        createdAt: '2000-01-01T00:00:00Z',
+        updatedAt: '2000-01-01T00:00:00Z',
+      },
+    ]);
+
+    render(Dashboard);
+
+    expect(await screen.findByText('dashboard.attention.title')).toBeTruthy();
+    expect(screen.getByText('Past due follow-up')).toBeTruthy();
+    expect(screen.getByText('Today follow-up')).toBeTruthy();
+    expect(screen.getByText('dashboard.attention.overdue')).toBeTruthy();
+    expect(screen.getByText('dashboard.attention.today')).toBeTruthy();
   });
 });

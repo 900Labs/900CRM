@@ -45,6 +45,15 @@
       "noPipelineData": "Aún no hay datos de pipeline",
       "noActivityData": "Aún no hay datos de actividad",
       "loadFailed": "Algunas métricas de reportes no están disponibles temporalmente."
+    },
+    "attention": {
+      "title": "Needs Attention",
+      "loading": "Checking overdue and due-today follow-ups.",
+      "summary": "{overdue} overdue · {today} due today",
+      "listLabel": "Follow-ups needing attention",
+      "overdue": "Overdue",
+      "today": "Today",
+      "loadFailed": "Follow-up attention could not be loaded."
     }
   },
   "contacts": {
@@ -301,7 +310,8 @@
     "invalidEmail": "Correo electrónico inválido",
     "invalidPhone": "Número de teléfono inválido",
     "invalidUrl": "URL inválida",
-    "fieldRequired": "{field} es requerido"
+    "fieldRequired": "{field} es requerido",
+    "dismiss": "Dismiss"
   },
   "mission": {
     "title": "900 para 900",
@@ -380,7 +390,11 @@
     "preImportBackupRestoreConfirm": "Restore the automatic pre-import backup? This replaces the current local 900CRM database.",
     "preImportBackupRestored": "Pre-import backup restored to {path}",
     "preImportBackupRestoreFailed": "Pre-import backup restore failed",
-    "preImportBackupRestoreCancelled": "Pre-import backup restore cancelled"
+    "preImportBackupRestoreCancelled": "Pre-import backup restore cancelled",
+    "mappingGuidance": {
+      "contacts": "Source, owner, and tag columns are not applied automatically to contacts. Map source-like columns to Notes or create a contact custom field first; import tag definitions and tag links with local IDs when you want tags.",
+      "tagLinks": "Tag links require existing local entity IDs and tag IDs. This import does not match tags by name."
+    }
   },
   "export": {
     "title": "Exportar",
@@ -531,6 +545,14 @@
         "dueLater": "Más tarde",
         "noDueDate": "Sin fecha"
       }
+    }
+  },
+  "localAutomation": {
+    "eyebrow": "Local Suggestion",
+    "pipeline": {
+      "title": "Draft the next follow-up",
+      "description": "{deal} moved to {stage}. 900CRM can draft a follow-up for tomorrow; nothing is saved until you review and save it.",
+      "addDraft": "Draft Follow-Up"
     }
   }
 }

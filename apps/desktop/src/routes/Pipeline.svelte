@@ -48,6 +48,10 @@
     type PipelineGuidanceTone,
   } from '$lib/utils/pipelineGuidance';
   import {
+    buildDealStageFollowUpSuggestion,
+    type DealStageFollowUpSuggestion,
+  } from '$lib/utils/localAutomation';
+  import {
     buildPipelineForecastMetrics,
     type StageForecastMetric,
     type StageFocus,
@@ -84,6 +88,7 @@
   let dealActivitiesLoading = $state(false);
   let selectedDeal = $state<Deal | null>(null);
   let lastActivityRefreshVersion = $state(-1);
+  let stageFollowUpSuggestion = $state<DealStageFollowUpSuggestion | null>(null);
   let pipelineBootstrapped = false;
   let pipelineBootstrapComplete = $state(false);
   let suppressNextCardClick = false;
@@ -155,8 +160,26 @@
     dragOverStage = null;
     if (!draggingId) return;
     const id = draggingId;
+    const movingDeal = allDeals.find((deal) => deal.id === id);
     draggingId = null;
+    if (!movingDeal) return;
+    const fromStage = movingDeal.stage;
     await dealStore.moveDealStage(id, toStage);
+
+    const suggestion = buildDealStageFollowUpSuggestion({
+      deal: { ...movingDeal, stage: toStage },
+      activities: dealActivitiesById[id] ?? [],
+      fromStage,
+      toStage,
+      activityContextReady,
+      activityContextError: Boolean(activityContextError),
+    });
+
+    if (suggestion) {
+      stageFollowUpSuggestion = suggestion;
+    } else if (stageFollowUpSuggestion?.dealId === id) {
+      stageFollowUpSuggestion = null;
+    }
   }
 
   // ── Add deal ─────────────────────────────────────────────────────────────────
@@ -495,6 +518,29 @@
     });
   }
 
+  function dismissStageFollowUpSuggestion() {
+    stageFollowUpSuggestion = null;
+  }
+
+  function openSuggestedFollowUp(suggestion: DealStageFollowUpSuggestion) {
+    const deal = allDeals.find((item) => item.id === suggestion.dealId);
+    if (deal) {
+      selectedDeal = deal;
+      dealStore.selectDeal(deal);
+    }
+
+    uiStore.openModal('addActivity', {
+      dealId: suggestion.draft.dealId,
+      contactId: suggestion.draft.contactId,
+      organizationId: suggestion.draft.organizationId,
+      subject: suggestion.draft.subject,
+      type: suggestion.draft.type,
+      dueDate: suggestion.draft.dueDate,
+      notes: suggestion.draft.notes,
+    });
+    stageFollowUpSuggestion = null;
+  }
+
   function openSelectedDealFollowUp() {
     if (!selectedDeal) {
       return;
@@ -691,6 +737,45 @@
 
   {#if customFieldFilterError}
     <div class="filter-error" role="status">{customFieldFilterError}</div>
+  {/if}
+
+  {#if stageFollowUpSuggestion}
+    <section
+      class="local-automation-prompt"
+      aria-labelledby="local-automation-prompt-heading"
+      data-testid="local-automation-follow-up-prompt"
+    >
+      <div class="local-automation-copy">
+        <p class="local-automation-eyebrow">{t('localAutomation.eyebrow')}</p>
+        <h2 id="local-automation-prompt-heading">{t('localAutomation.pipeline.title')}</h2>
+        <p>
+          {t('localAutomation.pipeline.description', {
+            deal: stageFollowUpSuggestion.dealName,
+            stage: t(`deals.stages.${stageFollowUpSuggestion.toStage}`),
+          })}
+        </p>
+      </div>
+      <div class="local-automation-actions">
+        <button
+          class="btn btn-primary btn-sm"
+          type="button"
+          onclick={() => {
+            if (stageFollowUpSuggestion) {
+              openSuggestedFollowUp(stageFollowUpSuggestion);
+            }
+          }}
+        >
+          {t('localAutomation.pipeline.addDraft')}
+        </button>
+        <button
+          class="btn btn-ghost btn-sm"
+          type="button"
+          onclick={dismissStageFollowUpSuggestion}
+        >
+          {t('common.dismiss')}
+        </button>
+      </div>
+    </section>
   {/if}
 
   {#if dealStore.isLoading}
@@ -1052,6 +1137,57 @@
   .filter-error {
     font-size: var(--text-xs);
     color: var(--text-danger);
+  }
+
+  .local-automation-prompt {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border: var(--border-width) solid var(--color-primary-200);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+  }
+
+  .local-automation-copy {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .local-automation-eyebrow {
+    margin: 0;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--text-accent);
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  .local-automation-copy h2,
+  .local-automation-copy p {
+    margin: 0;
+  }
+
+  .local-automation-copy h2 {
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .local-automation-copy p {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  .local-automation-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    flex-shrink: 0;
   }
 
   /* ── Board ───────────────────────────────────────────────────────────────── */
