@@ -92,6 +92,12 @@ test('shows a customer 360 summary for a contact with linked sales work', async 
     if (!contact) {
       throw new Error('Seed contact was not created.');
     }
+    const futureDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const linkedOnlyDate = new Date(Date.now() + 11 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
 
     await invoke('create_deal', {
       title: 'Solar upgrade expansion',
@@ -109,9 +115,24 @@ test('shows a customer 360 summary for a contact with linked sales work', async 
       activity_type: 'call',
       title: 'Call Maya about implementation timeline',
       description: '',
-      due_date: '2026-07-10',
+      due_date: futureDate,
       contact_id: contact.id,
       deal_id: '',
+    });
+
+    const linkedOnlyActivity = await invoke('create_activity', {
+      activity_type: 'meeting',
+      title: 'Linked-only relationship review',
+      description: '',
+      due_date: linkedOnlyDate,
+      contact_id: '',
+      deal_id: '',
+    }) as { id: string };
+
+    await invoke('add_activity_link', {
+      activity_id: linkedOnlyActivity.id,
+      entity_type: 'contact',
+      entity_id: contact.id,
     });
 
     return { contactId: contact.id };
@@ -129,6 +150,11 @@ test('shows a customer 360 summary for a contact with linked sales work', async 
   await expect(
     workspace.locator('.workspace-metric').filter({ hasText: 'Next Follow-Up' })
       .getByText('Call Maya about implementation timeline'),
+  ).toBeVisible();
+  const contactTimeline = page.locator('.detail-activity');
+  await expect(contactTimeline.getByText('Linked-only relationship review')).toBeVisible();
+  await expect(
+    contactTimeline.getByRole('button', { name: 'Open Contact Maya Chen' }).first(),
   ).toBeVisible();
 
   await workspace.getByRole('button', { name: 'Add Follow-Up' }).click();
@@ -230,7 +256,7 @@ test('shows an account 360 workspace for an organization with linked work', asyn
       organization_id: organization.id,
     });
 
-    await invoke('create_deal', {
+    const deal = await invoke('create_deal', {
       title: 'Clinic electrification rollout',
       value: 73000,
       currency: 'USD',
@@ -240,7 +266,7 @@ test('shows an account 360 workspace for an organization with linked work', asyn
       contact_id: '',
       organization_id: organization.id,
       notes: 'Account-level expansion opportunity.',
-    });
+    }) as { id: string };
 
     const activity = await invoke('create_activity', {
       activity_type: 'meeting',
@@ -257,7 +283,13 @@ test('shows an account 360 workspace for an organization with linked work', asyn
       entity_id: organization.id,
     });
 
-    return { organizationId: organization.id, contactId: contact.id };
+    await invoke('add_activity_link', {
+      activity_id: activity.id,
+      entity_type: 'deal',
+      entity_id: deal.id,
+    });
+
+    return { organizationId: organization.id, contactId: contact.id, dealId: deal.id };
   });
 
   await loadHashRoute(page, `/organizations/${seed.organizationId}`);
@@ -276,10 +308,18 @@ test('shows an account 360 workspace for an organization with linked work', asyn
   ).toBeVisible();
 
   await expect(page.getByRole('button', { name: 'Nia Mensah' })).toBeVisible();
-  await expect(page.getByText('Clinic electrification rollout')).toBeVisible();
+  await expect(
+    page.getByLabel('Linked Deals').getByText('Clinic electrification rollout'),
+  ).toBeVisible();
   await expect(
     page.getByLabel('Account Activity').getByText('Review Helios implementation plan'),
   ).toBeVisible();
+  const accountActivity = page.getByLabel('Account Activity');
+  await expect(
+    accountActivity.getByRole('button', { name: 'Open Organization Helios Account' }).first(),
+  ).toBeVisible();
+  await expect(accountActivity.getByText('Deal')).toBeVisible();
+  await expect(accountActivity.getByText('Clinic electrification rollout')).toBeVisible();
 
   await workspace.getByRole('button', { name: 'Add Follow-Up' }).click();
   let accountDialog = page.getByRole('dialog', { name: 'Add Activity' });

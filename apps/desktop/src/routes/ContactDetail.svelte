@@ -23,7 +23,17 @@
   import { getContact } from '$lib/api/contacts';
   import type { Contact, UpdateContactPayload } from '$lib/api/contacts';
   import type { Deal } from '$lib/api/deals';
-  import type { Activity } from '$lib/api/activities';
+  import { listActivities, type Activity } from '$lib/api/activities';
+  import {
+    filterActivitiesByRelationship,
+    loadActivityLinkIndex,
+    loadActivityRelationshipLookups,
+    relationshipLabelsByActivityId,
+    sortActivitiesForDetailTimeline,
+    type ActivityLinkIndex,
+    type ActivityRelationshipLabels,
+    type ActivityRelationshipLookups,
+  } from '$lib/utils/activityRelationships';
   import {
     listCustomFieldDefinitions,
     listCustomFieldValues,
@@ -74,11 +84,20 @@
 
   // Linked data
   let dealsLoading = $state(false);
+  let activitiesLoading = $state(false);
+  let contactActivities = $state<Activity[]>([]);
+  let contactActivityLinkIndex = $state<ActivityLinkIndex>({});
+  let contactActivityLookups = $state<ActivityRelationshipLookups>({
+    contacts: [],
+    organizations: [],
+    deals: [],
+  });
   let customFieldsLoading = $state(false);
   let customFieldDefinitions = $state<CustomFieldDefinition[]>([]);
   let customFieldValues = $state<Record<string, string>>({});
   let originalCustomFieldValues = $state<Record<string, string>>({});
   let loadedContactId = '';
+  let lastActivityRefreshVersion = -1;
 
   // ── Derived ─────────────────────────────────────────────────────────────────
 
@@ -132,7 +151,7 @@
   });
 
   const pendingActivities = $derived.by(() =>
-    [...activityStore.activities]
+    [...contactActivities]
       .filter((activity) => activity.status !== 'completed')
       .sort((left, right) => activitySortTime(left) - activitySortTime(right))
   );
@@ -144,12 +163,20 @@
   const nextActivity = $derived<Activity | null>(pendingActivities[0] ?? null);
 
   const recentActivity = $derived<Activity | null>(
-    [...activityStore.activities]
+    [...contactActivities]
       .sort((left, right) => activityUpdatedTime(right) - activityUpdatedTime(left))[0] ?? null
   );
 
+  const contactActivityRelationships = $derived.by<Record<string, ActivityRelationshipLabels>>(() =>
+    relationshipLabelsByActivityId(
+      contactActivities,
+      contactActivityLinkIndex,
+      contactActivityLookups,
+    )
+  );
+
   const customerHealth = $derived.by(() => {
-    if (dealsLoading || activityStore.isLoading) {
+    if (dealsLoading || activitiesLoading) {
       return {
         tone: 'neutral',
         label: t('common.loading'),
@@ -200,6 +227,18 @@
     void loadContact();
   });
 
+  $effect(() => {
+    const version = activityStore.relationshipRefreshVersion;
+    if (!contactId || !contact || lastActivityRefreshVersion === version) {
+      return;
+    }
+
+    lastActivityRefreshVersion = version;
+    if (version > 0) {
+      void loadContactTimeline(contactId);
+    }
+  });
+
   async function loadContact() {
     isLoading = true;
     loadError = null;
@@ -231,15 +270,43 @@
       dealsLoading = true;
       await Promise.all([
         dealStore.loadDeals({ contactId }),
-        activityStore.setFilters({ contactId }),
+        loadContactTimeline(contactId),
         loadCustomFields(contactId),
       ]);
+      lastActivityRefreshVersion = activityStore.relationshipRefreshVersion;
     } catch (err) {
       loadError = t('errors.loadFailed');
       console.error('[ContactDetail] Load error:', err);
     } finally {
       isLoading = false;
       dealsLoading = false;
+    }
+  }
+
+  async function loadContactTimeline(id: string) {
+    activitiesLoading = true;
+    try {
+      const activities = await listActivities({
+        sortBy: 'dueDate',
+        sortDir: 'asc',
+        pageSize: 500,
+      });
+      const linkIndex = await loadActivityLinkIndex(activities.map((activity) => activity.id));
+      const lookups = await loadActivityRelationshipLookups();
+      const matchedActivities = filterActivitiesByRelationship(activities, linkIndex, {
+        contactId: id,
+      });
+
+      contactActivityLinkIndex = linkIndex;
+      contactActivityLookups = lookups;
+      contactActivities = sortActivitiesForDetailTimeline(matchedActivities);
+    } catch (err) {
+      console.error('[ContactDetail] Failed to load activity timeline:', err);
+      contactActivityLinkIndex = {};
+      contactActivityLookups = { contacts: [], organizations: [], deals: [] };
+      contactActivities = [];
+    } finally {
+      activitiesLoading = false;
     }
   }
 
@@ -436,6 +503,17 @@
 
   function handleBack() {
     navigateHash('/contacts');
+  }
+
+  function handleActivityEntityNavigate(entity: { type: 'contact' | 'organization' | 'deal'; id: string }) {
+    if (entity.type === 'contact') {
+      navigateHash(`/contacts/${entity.id}`);
+      return;
+    }
+
+    if (entity.type === 'organization') {
+      navigateHash(`/organizations/${entity.id}`);
+    }
   }
 
   function handleNotesSave(newNotes: string) {
@@ -909,9 +987,12 @@
           </div>
           <div class="card-body">
             <ActivityFeed
-              activities={activityStore.activities}
-              loading={activityStore.isLoading}
+              activities={contactActivities}
+              loading={activitiesLoading}
               maxItems={10}
+              relationshipsByActivityId={contactActivityRelationships}
+              showRelationshipBreadcrumbs={true}
+              onNavigateEntity={handleActivityEntityNavigate}
             />
           </div>
         </section>
