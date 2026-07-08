@@ -1,5 +1,7 @@
 import { expect, loadHashRoute, test } from './tauri-shim';
 
+test.describe.configure({ mode: 'serial' });
+
 test('loads the dashboard sample workspace and shows the follow-up on the dashboard', async ({
   page,
   assertNoConsoleErrors,
@@ -421,6 +423,13 @@ test('creates a deal through the visible UI and shows it in Pipeline', async ({
   await expect(page.getByText('Village Solar Rollout')).toBeVisible();
   await expect(page.getByText('$12,500').first()).toBeVisible();
 
+  const overview = page.getByTestId('pipeline-forecast-overview');
+  const forecastSummary = overview.getByLabel('Pipeline forecast summary');
+  await expect(overview.getByRole('heading', { name: 'Forecast and Stage Health' })).toBeVisible();
+  await expect(overview.getByText('Open Pipeline')).toBeVisible();
+  await expect(forecastSummary.getByText('$12,500')).toBeVisible();
+  await expect(overview.getByRole('heading', { name: 'Stage Health', exact: true })).toBeVisible();
+
   await assertNoConsoleErrors();
 });
 
@@ -448,6 +457,12 @@ test('opens a pipeline deal guidance drawer and refreshes follow-up state', asyn
   await dealDialog.getByLabel('Description').fill('Needs the next sales action.');
   await dealDialog.getByRole('button', { name: 'Save' }).click();
   await expect(dealDialog).toBeHidden();
+
+  const overview = page.getByTestId('pipeline-forecast-overview');
+  const forecastSummary = overview.getByLabel('Pipeline forecast summary');
+  await expect(overview.getByText('Weighted Forecast')).toBeVisible();
+  await expect(forecastSummary.getByText('$25,000').first()).toBeVisible();
+  await expect(overview.getByText('Focus Stage')).toBeVisible();
 
   const needsFollowUpCard = page.getByRole('button', { name: /Guided pipeline rollout/ });
   await expect(needsFollowUpCard).toContainText('Needs Follow-Up');
