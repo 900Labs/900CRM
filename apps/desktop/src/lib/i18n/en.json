@@ -14,6 +14,7 @@
     "contacts": "Contacts",
     "pipeline": "Pipeline",
     "activities": "Activities",
+    "reports": "Reports",
     "settings": "Settings",
     "organizations": "Organizations",
     "auditLog": "Audit Log",
@@ -70,6 +71,59 @@
       "noPipelineData": "No pipeline data yet",
       "noActivityData": "No activity data yet",
       "loadFailed": "Some report metrics are temporarily unavailable."
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "subtitle": "Current pipeline and activity health from your local CRM data. These ratios describe the current dataset, not historical stage movement.",
+    "summaryLabel": "Reports summary",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing...",
+    "loading": "Loading report data...",
+    "generatedAt": "Generated {value}",
+    "notAvailable": "not available",
+    "pipeline": {
+      "title": "Pipeline Overview",
+      "description": "Deal counts, win rate, current stage distribution, and current-stage funnel ratios.",
+      "summaryLabel": "Pipeline report summary",
+      "winRate": "Win Rate",
+      "winRateDetail": "Closed won divided by closed deals.",
+      "openDeals": "Open Deals",
+      "openDealsDetail": "Deals not marked won or lost.",
+      "closedWon": "Closed Won",
+      "closedLost": "Closed Lost",
+      "totalDeals": "Total Deals",
+      "stageDistribution": "Current Stage Distribution",
+      "currentFunnel": "Current-Stage Funnel Ratios",
+      "currentFunnelNote": "Ratios compare current counts between neighboring stages; they are not historical conversion rates.",
+      "empty": "No pipeline data yet.",
+      "emptyStages": "No stage distribution is available yet.",
+      "emptyFunnel": "No current-stage funnel ratios are available yet.",
+      "loadFailed": "Pipeline report metrics are temporarily unavailable."
+    },
+    "activity": {
+      "title": "Activity Overview",
+      "description": "Completion, overdue load, due buckets, and activity mix by type.",
+      "summaryLabel": "Activity report summary",
+      "completionRate": "Completion Rate",
+      "completionRateDetail": "Completed activities divided by all activities.",
+      "overdueRate": "Overdue Rate",
+      "overdueRateDetail": "Overdue activities divided by all activities.",
+      "completed": "Completed",
+      "pending": "Pending",
+      "overdue": "Overdue",
+      "byType": "Activity Mix by Type",
+      "empty": "No activity data yet.",
+      "emptyTypes": "No activity type breakdown is available yet.",
+      "loadFailed": "Activity report metrics are temporarily unavailable.",
+      "dueBuckets": {
+        "title": "Due Buckets",
+        "overdue": "Overdue",
+        "dueToday": "Due Today",
+        "dueNext7Days": "Next 7 Days",
+        "dueLater": "Later",
+        "noDueDate": "No Due Date"
+      }
     }
   },
   "contacts": {

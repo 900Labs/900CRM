@@ -14,6 +14,7 @@
     "contacts": "Lambobi",
     "pipeline": "Pipeline",
     "activities": "Ayyuka",
+    "reports": "Rahotanni",
     "settings": "Saituna",
     "organizations": "Kungiyoyi",
     "auditLog": "Audit Log",
@@ -491,5 +492,58 @@
     "decisionFailed": "Failed to decide pending action",
     "approveFailed": "Approval failed",
     "rejectFailed": "Rejection failed"
+  },
+  "reports": {
+    "title": "Rahotanni",
+    "subtitle": "Halin pipeline da ayyuka na yanzu daga bayanan CRM na gida. Wadannan rabo suna nuna bayanan yanzu, ba tarihin sauyin mataki ba.",
+    "summaryLabel": "Takaitaccen rahotanni",
+    "refresh": "Sabunta",
+    "refreshing": "Ana sabuntawa...",
+    "loading": "Ana loda bayanan rahoto...",
+    "generatedAt": "An samar {value}",
+    "notAvailable": "babu",
+    "pipeline": {
+      "title": "Bayanin pipeline",
+      "description": "Yawan deals, rabon nasara, rarraba matakai na yanzu, da rabon funnel na yanzu.",
+      "summaryLabel": "Takaitaccen rahoton pipeline",
+      "winRate": "Rabon nasara",
+      "winRateDetail": "Deals da aka ci an raba da deals da aka rufe.",
+      "openDeals": "Deals masu bude",
+      "openDealsDetail": "Deals da ba a nuna sun ci ko sun fadi ba.",
+      "closedWon": "An ci",
+      "closedLost": "An fadi",
+      "totalDeals": "Jimlar deals",
+      "stageDistribution": "Rarraba matakai na yanzu",
+      "currentFunnel": "Rabon funnel na yanzu",
+      "currentFunnelNote": "Rabon yana kwatanta adadin yanzu tsakanin matakai makwabta; ba rabon canjin tarihi ba ne.",
+      "empty": "Babu bayanan pipeline tukuna.",
+      "emptyStages": "Babu rarraba matakai tukuna.",
+      "emptyFunnel": "Babu rabon funnel na yanzu tukuna.",
+      "loadFailed": "Ma'aunin pipeline ba ya samuwa na dan lokaci."
+    },
+    "activity": {
+      "title": "Bayanin ayyuka",
+      "description": "Kammalawa, nauyin jinkiri, rukunan kwanan lokaci, da hadin nau'ikan ayyuka.",
+      "summaryLabel": "Takaitaccen rahoton ayyuka",
+      "completionRate": "Rabon kammalawa",
+      "completionRateDetail": "Ayyukan da aka kammala an raba da duk ayyuka.",
+      "overdueRate": "Rabon jinkiri",
+      "overdueRateDetail": "Ayyukan da suka wuce lokaci an raba da duk ayyuka.",
+      "completed": "An kammala",
+      "pending": "Na jiran aiki",
+      "overdue": "Sun wuce lokaci",
+      "byType": "Hadi bisa nau'i",
+      "empty": "Babu bayanan ayyuka tukuna.",
+      "emptyTypes": "Babu bayanin nau'in ayyuka tukuna.",
+      "loadFailed": "Ma'aunin ayyuka ba ya samuwa na dan lokaci.",
+      "dueBuckets": {
+        "title": "Rukunan lokaci",
+        "overdue": "Sun wuce lokaci",
+        "dueToday": "Yau",
+        "dueNext7Days": "Kwanaki 7 masu zuwa",
+        "dueLater": "Daga baya",
+        "noDueDate": "Babu kwanan lokaci"
+      }
+    }
   }
 }
