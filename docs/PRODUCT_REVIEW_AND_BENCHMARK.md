@@ -256,9 +256,14 @@ These are ordered to improve perceived product value fastest.
      import/rollback semantics explicitly support it.
 
 8. **Alpha Packaging and Smoke Evidence**
-   - Continue release packaging work once GitHub Actions billing/spending-limit
-     is resolved.
-   - Produce and test Windows, macOS, and Linux artifacts.
+   - Local macOS smoke evidence is now repeatable through
+     `npm run release:macos:smoke:local`, which builds/verifies a local
+     headless DMG, generates macOS-only metadata/checksums/SBOM, verifies the
+     local artifact tree, and performs a mounted-DMG layout smoke.
+   - Remaining work: resolve the GitHub Actions billing/spending-limit blocker,
+     produce Actions-backed Windows, macOS, and Linux artifacts, verify
+     downloaded workflow outputs, and smoke test real installers on each target
+     platform.
 
 ## Product Principles Going Forward
 
