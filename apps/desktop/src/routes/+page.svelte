@@ -9,6 +9,7 @@
   import Organizations from './Organizations.svelte';
   import Pipeline from './Pipeline.svelte';
   import Activities from './Activities.svelte';
+  import Reports from './Reports.svelte';
   import Settings from './Settings.svelte';
   import ContactDetail from './ContactDetail.svelte';
   import OrganizationDetail from './OrganizationDetail.svelte';
@@ -50,6 +51,10 @@
 
     if (normalized === '/activities') {
       return { route: '/activities', contactId: null, organizationId: null };
+    }
+
+    if (normalized === '/reports') {
+      return { route: '/reports', contactId: null, organizationId: null };
     }
 
     if (normalized === '/settings') {
@@ -123,6 +128,8 @@
   <Pipeline />
 {:else if route === '/activities'}
   <Activities />
+{:else if route === '/reports'}
+  <Reports />
 {:else if route === '/settings'}
   <Settings />
 {:else if route === '/audit-log'}

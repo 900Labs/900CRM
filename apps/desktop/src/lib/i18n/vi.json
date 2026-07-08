@@ -14,6 +14,7 @@
     "contacts": "Liên hệ",
     "pipeline": "Pipeline",
     "activities": "Hoạt động",
+    "reports": "Báo cáo",
     "settings": "Cài đặt",
     "organizations": "Tổ chức",
     "auditLog": "Audit Log",
@@ -478,5 +479,58 @@
     "decisionFailed": "Failed to decide pending action",
     "approveFailed": "Approval failed",
     "rejectFailed": "Rejection failed"
+  },
+  "reports": {
+    "title": "Báo cáo",
+    "subtitle": "Tình trạng pipeline và hoạt động hiện tại từ dữ liệu CRM cục bộ. Các tỷ lệ này mô tả dữ liệu hiện tại, không phải lịch sử chuyển giai đoạn.",
+    "summaryLabel": "Tóm tắt báo cáo",
+    "refresh": "Làm mới",
+    "refreshing": "Đang làm mới...",
+    "loading": "Đang tải dữ liệu báo cáo...",
+    "generatedAt": "Tạo lúc {value}",
+    "notAvailable": "không có",
+    "pipeline": {
+      "title": "Tổng quan pipeline",
+      "description": "Số lượng giao dịch, tỷ lệ thắng, phân bổ giai đoạn hiện tại và tỷ lệ phễu hiện tại.",
+      "summaryLabel": "Tóm tắt báo cáo pipeline",
+      "winRate": "Tỷ lệ thắng",
+      "winRateDetail": "Giao dịch thắng chia cho giao dịch đã đóng.",
+      "openDeals": "Giao dịch mở",
+      "openDealsDetail": "Giao dịch chưa được đánh dấu thắng hoặc thua.",
+      "closedWon": "Đã thắng",
+      "closedLost": "Đã thua",
+      "totalDeals": "Tổng giao dịch",
+      "stageDistribution": "Phân bổ giai đoạn hiện tại",
+      "currentFunnel": "Tỷ lệ phễu hiện tại",
+      "currentFunnelNote": "Các tỷ lệ so sánh số lượng hiện tại giữa các giai đoạn liền kề; đây không phải tỷ lệ chuyển đổi lịch sử.",
+      "empty": "Chưa có dữ liệu pipeline.",
+      "emptyStages": "Chưa có phân bổ giai đoạn.",
+      "emptyFunnel": "Chưa có tỷ lệ phễu hiện tại.",
+      "loadFailed": "Tạm thời không tải được chỉ số pipeline."
+    },
+    "activity": {
+      "title": "Tổng quan hoạt động",
+      "description": "Hoàn thành, quá hạn, nhóm ngày đến hạn và cơ cấu theo loại hoạt động.",
+      "summaryLabel": "Tóm tắt báo cáo hoạt động",
+      "completionRate": "Tỷ lệ hoàn thành",
+      "completionRateDetail": "Hoạt động đã hoàn thành chia cho tất cả hoạt động.",
+      "overdueRate": "Tỷ lệ quá hạn",
+      "overdueRateDetail": "Hoạt động quá hạn chia cho tất cả hoạt động.",
+      "completed": "Đã hoàn thành",
+      "pending": "Đang chờ",
+      "overdue": "Quá hạn",
+      "byType": "Cơ cấu theo loại",
+      "empty": "Chưa có dữ liệu hoạt động.",
+      "emptyTypes": "Chưa có phân tích theo loại hoạt động.",
+      "loadFailed": "Tạm thời không tải được chỉ số hoạt động.",
+      "dueBuckets": {
+        "title": "Nhóm ngày đến hạn",
+        "overdue": "Quá hạn",
+        "dueToday": "Hôm nay",
+        "dueNext7Days": "7 ngày tới",
+        "dueLater": "Sau đó",
+        "noDueDate": "Không có ngày đến hạn"
+      }
+    }
   }
 }

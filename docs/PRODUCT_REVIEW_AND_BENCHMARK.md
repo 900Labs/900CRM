@@ -1,7 +1,7 @@
 # Product Review and Competitive Benchmark
 
-Date: 2026-07-02
-Branch: `codex/docs-product-benchmark-review`
+Date: 2026-07-08
+Branch: `codex/reports-hub`
 
 This document is a product-depth review of 900CRM's current menu surface and a
 benchmark against comparable CRM products. It is intentionally direct: 900CRM
@@ -15,10 +15,10 @@ or not implemented.
 requirement, local SQLite data ownership, backup/restore, import/export depth,
 audit evidence, and a narrow optional MCP stdio boundary. That is meaningful.
 
-The weakness is the daily CRM experience. As of Sprint 104, the left navigation
+The weakness is the daily CRM experience. As of Sprint 108, the left navigation
 is visually grouped into:
 
-- Workspace: Dashboard, Contacts, Organizations, Pipeline, Activities
+- Workspace: Dashboard, Contacts, Organizations, Pipeline, Activities, Reports
 - Review: Pending Actions, Audit Log
 - Admin: Settings
 
@@ -28,7 +28,9 @@ sample workspace, and contact detail now starts to behave like a Customer 360
 workspace with open-deal, pipeline, next-follow-up, recent-activity, and
 attention-status summary signals. Organization/account detail now has its own
 workspace, and contact/account timelines now show relationship breadcrumbs for
-linked contacts, accounts, and deals. The product still undersells its
+linked contacts, accounts, and deals. Pipeline and Activities now have richer
+daily-work surfaces, and Reports has a dedicated route for current pipeline and
+activity health. The product still undersells its
 foundation because several core CRM jobs remain shallow or absent. Comparable
 CRMs make sales work feel richer through leads, inbox and communication
 history, calendar views, reports, saved views, automation, guided onboarding,
@@ -42,11 +44,12 @@ real small business owner.
 
 | Area | Current state | Product issue |
 |---|---|---|
-| Dashboard | KPI cards, reports, activity feed, quick actions, first-run starter checklist, optional synthetic sample workspace | Useful start, but not yet a true command center. No saved goals, no forecast view, and no "what needs attention" queue. |
+| Dashboard | KPI cards, activity feed, quick actions, first-run starter checklist, optional synthetic sample workspace | Useful start, but not yet a true command center. No saved goals, no "what needs attention" queue, and no personalized daily priority logic. |
 | Contacts | Search, type filter, duplicate review, import/export, custom-field filtering, contact detail Customer 360 summary, relationship-aware activity timeline | Contacts and lead/account work are blended. The detail view now has useful at-a-glance and timeline context, but there is no lead capture stage, saved segment, list view preset, files/links section, or deal-detail context. |
 | Organizations | List, create/edit, notes/tags, contact linking, account detail workspace with linked people/deals/activity and relationship-aware account timeline | Account detail is now useful, but list-level account management still lacks owner, health, next step, and saved account views. |
 | Pipeline | Kanban by stage, custom-field filter, deal cards, deal guidance drawer with weighted forecast, stale/overdue/follow-up status, linked activities, and a board-level forecast/stage-health overview | Stronger daily sales surface. Still needs true historical stage conversion summaries, deeper deal editing/detail routing, and stronger drag/drop confidence cues. |
 | Activities | Task/call/meeting/email follow-up workbench with due buckets, summary counts, quick snooze/reschedule, completion, filters, and relationship breadcrumbs | Much stronger daily work surface. Still needs a true calendar grid, reminders, recurrence, saved activity views, and optional external calendar sync. |
+| Reports | Dedicated Workspace route for current pipeline and activity health, current-stage funnel ratios, due buckets, and activity type mix | Usable alpha reporting. Still needs saved filters, stale deal reports, source/owner dimensions, exportable snapshots, and true historical conversion after stage history exists. |
 | Audit Log | Read-only table grouped under Review | Good trust feature, now visually separated from daily work. Later, it may still move deeper into Admin once Review counts are more prominent. |
 | Pending Actions | Review queue for proposed actions grouped under Review | Important for MCP/external-client safety. The next improvement is to show high-priority pending counts without making this a daily-work screen. |
 | Settings | Locale/theme/date/currency, backup/restore, import/export, email, integrations, section jump bar | Still dense, but now easier to scan. Later work should split Data Management, Integrations, Appearance, and Admin/Safety into clearer settings sections or pages. |
@@ -76,7 +79,7 @@ Scale: 0 = absent, 1 = foundation only, 2 = usable alpha, 3 = competitive.
 | Contacts and organizations | 2 | 3 |
 | Pipeline/deals | 2 | 3 |
 | Activities/tasks | 2 | 3 |
-| Dashboard/reporting | 1 | 2 |
+| Dashboard/reporting | 2 | 2 |
 | Search/navigation speed | 2 | 3 |
 | Import/export/backup | 3 | 3 |
 | Lead lifecycle | 0 | 2 |
@@ -148,7 +151,21 @@ optional external calendar sync.
 Recommended outcome: add a true calendar/planning layer only after the
 follow-up workbench settles.
 
-### 5. Admin/safety items crowd primary navigation
+### 5. Reports now have a home, but they are still operational snapshots
+
+Sprint 108 moved the embedded Dashboard report cards into a dedicated Reports
+route under Workspace navigation. The page shows current pipeline win rate,
+open/closed counts, current stage distribution, current-stage funnel ratios,
+activity completion, overdue rate, due buckets, and type breakdown. The labels
+make clear that funnel ratios are current-stage comparisons, not historical
+stage-transition analytics.
+
+Recommended outcome: keep Reports focused on current operational health until
+the data model stores stage-transition history and richer report dimensions
+such as owner/source are available. Then add saved filters, exportable snapshots,
+and historical conversion reporting.
+
+### 6. Admin/safety items crowd primary navigation
 
 Audit Log and Pending Actions are important, but they are not daily top-level
 CRM work for most users. They make the app feel technical.
@@ -156,7 +173,7 @@ CRM work for most users. They make the app feel technical.
 Recommended outcome: group these under a Review/Admin section, or show them
 only when counts require attention.
 
-### 6. Settings is overloaded
+### 7. Settings is overloaded
 
 Settings contains appearance, locale, date/currency, backup, import/export,
 email, and external clients. This should be a settings shell with sections, or
@@ -216,10 +233,14 @@ These are ordered to improve perceived product value fastest.
    - Remaining work: true day/week calendar grid, reminders, recurrence, saved
      activity views, and optional external calendar sync.
 
-6. **Reports Hub**
-   - Move dashboard reports into a Reports page.
-   - Add saved filters, pipeline conversion, activity completion, stale deals,
-     source/owner breakdown where supported, and exportable report snapshots.
+6. **Reports Hub** - first dedicated route completed
+   - Moved dashboard reports into a Reports page under Workspace navigation.
+   - Added current pipeline win rate, open/closed counts, current stage
+     distribution, current-stage funnel ratios, activity completion, overdue
+     rate, due buckets, and activity type mix.
+   - Remaining work: saved filters, stale deal reporting, source/owner
+     breakdown where supported, exportable report snapshots, and true
+     historical conversion only after stage history exists.
 
 7. **Local Automation Lite**
    - Add simple local rules: when deal moves stage, create follow-up; when

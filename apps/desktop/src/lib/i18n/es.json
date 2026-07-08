@@ -14,6 +14,7 @@
     "contacts": "Contactos",
     "pipeline": "Pipeline",
     "activities": "Actividades",
+    "reports": "Informes",
     "settings": "Configuración",
     "organizations": "Organizaciones",
     "auditLog": "Audit Log",
@@ -478,5 +479,58 @@
     "decisionFailed": "Failed to decide pending action",
     "approveFailed": "Approval failed",
     "rejectFailed": "Rejection failed"
+  },
+  "reports": {
+    "title": "Informes",
+    "subtitle": "Salud actual del pipeline y de las actividades desde tus datos CRM locales. Estos ratios describen el conjunto de datos actual, no el movimiento histórico entre etapas.",
+    "summaryLabel": "Resumen de informes",
+    "refresh": "Actualizar",
+    "refreshing": "Actualizando...",
+    "loading": "Cargando datos del informe...",
+    "generatedAt": "Generado {value}",
+    "notAvailable": "no disponible",
+    "pipeline": {
+      "title": "Resumen del pipeline",
+      "description": "Conteos de oportunidades, tasa de ganadas, distribución actual por etapa y ratios actuales del embudo.",
+      "summaryLabel": "Resumen del informe de pipeline",
+      "winRate": "Tasa de ganadas",
+      "winRateDetail": "Oportunidades ganadas divididas por oportunidades cerradas.",
+      "openDeals": "Oportunidades abiertas",
+      "openDealsDetail": "Oportunidades no marcadas como ganadas o perdidas.",
+      "closedWon": "Ganadas",
+      "closedLost": "Perdidas",
+      "totalDeals": "Total de oportunidades",
+      "stageDistribution": "Distribución actual por etapa",
+      "currentFunnel": "Ratios actuales entre etapas",
+      "currentFunnelNote": "Los ratios comparan conteos actuales entre etapas vecinas; no son tasas históricas de conversión.",
+      "empty": "Aún no hay datos de pipeline.",
+      "emptyStages": "Aún no hay distribución por etapa disponible.",
+      "emptyFunnel": "Aún no hay ratios actuales entre etapas disponibles.",
+      "loadFailed": "Las métricas del pipeline no están disponibles temporalmente."
+    },
+    "activity": {
+      "title": "Resumen de actividades",
+      "description": "Finalización, carga vencida, vencimientos y mezcla por tipo de actividad.",
+      "summaryLabel": "Resumen del informe de actividades",
+      "completionRate": "Tasa de finalización",
+      "completionRateDetail": "Actividades completadas divididas por todas las actividades.",
+      "overdueRate": "Tasa de vencidas",
+      "overdueRateDetail": "Actividades vencidas divididas por todas las actividades.",
+      "completed": "Completadas",
+      "pending": "Pendientes",
+      "overdue": "Vencidas",
+      "byType": "Mezcla por tipo",
+      "empty": "Aún no hay datos de actividad.",
+      "emptyTypes": "Aún no hay desglose por tipo de actividad.",
+      "loadFailed": "Las métricas de actividad no están disponibles temporalmente.",
+      "dueBuckets": {
+        "title": "Vencimientos",
+        "overdue": "Vencidas",
+        "dueToday": "Hoy",
+        "dueNext7Days": "Próximos 7 días",
+        "dueLater": "Más tarde",
+        "noDueDate": "Sin fecha"
+      }
+    }
   }
 }

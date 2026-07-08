@@ -14,6 +14,7 @@
     "contacts": "جهات الاتصال",
     "pipeline": "خط المبيعات",
     "activities": "الأنشطة",
+    "reports": "التقارير",
     "settings": "الإعدادات",
     "organizations": "المؤسسات",
     "auditLog": "Audit Log",
@@ -491,5 +492,58 @@
     "decisionFailed": "Failed to decide pending action",
     "approveFailed": "Approval failed",
     "rejectFailed": "Rejection failed"
+  },
+  "reports": {
+    "title": "التقارير",
+    "subtitle": "صحة خط المبيعات والأنشطة الحالية من بيانات CRM المحلية. تصف هذه النسب البيانات الحالية، وليست حركة المراحل التاريخية.",
+    "summaryLabel": "ملخص التقارير",
+    "refresh": "تحديث",
+    "refreshing": "جار التحديث...",
+    "loading": "جار تحميل بيانات التقرير...",
+    "generatedAt": "تم الإنشاء {value}",
+    "notAvailable": "غير متاح",
+    "pipeline": {
+      "title": "نظرة عامة على خط المبيعات",
+      "description": "أعداد الصفقات، معدل الفوز، توزيع المراحل الحالي، ونسب القمع الحالية.",
+      "summaryLabel": "ملخص تقرير خط المبيعات",
+      "winRate": "معدل الفوز",
+      "winRateDetail": "الصفقات الرابحة مقسومة على الصفقات المغلقة.",
+      "openDeals": "الصفقات المفتوحة",
+      "openDealsDetail": "الصفقات غير المصنفة كرابحة أو خاسرة.",
+      "closedWon": "مغلقة رابحة",
+      "closedLost": "مغلقة خاسرة",
+      "totalDeals": "إجمالي الصفقات",
+      "stageDistribution": "توزيع المراحل الحالي",
+      "currentFunnel": "نسب القمع الحالية",
+      "currentFunnelNote": "تقارن النسب الأعداد الحالية بين المراحل المتجاورة؛ وليست معدلات تحويل تاريخية.",
+      "empty": "لا توجد بيانات خط مبيعات بعد.",
+      "emptyStages": "لا يتوفر توزيع مراحل بعد.",
+      "emptyFunnel": "لا تتوفر نسب قمع حالية بعد.",
+      "loadFailed": "مقاييس خط المبيعات غير متاحة مؤقتًا."
+    },
+    "activity": {
+      "title": "نظرة عامة على الأنشطة",
+      "description": "الإنجاز، العبء المتأخر، مجموعات المواعيد، ومزيج أنواع الأنشطة.",
+      "summaryLabel": "ملخص تقرير الأنشطة",
+      "completionRate": "معدل الإنجاز",
+      "completionRateDetail": "الأنشطة المكتملة مقسومة على جميع الأنشطة.",
+      "overdueRate": "معدل التأخير",
+      "overdueRateDetail": "الأنشطة المتأخرة مقسومة على جميع الأنشطة.",
+      "completed": "مكتملة",
+      "pending": "معلقة",
+      "overdue": "متأخرة",
+      "byType": "المزيج حسب النوع",
+      "empty": "لا توجد بيانات أنشطة بعد.",
+      "emptyTypes": "لا يتوفر تفصيل حسب نوع النشاط بعد.",
+      "loadFailed": "مقاييس الأنشطة غير متاحة مؤقتًا.",
+      "dueBuckets": {
+        "title": "مجموعات المواعيد",
+        "overdue": "متأخرة",
+        "dueToday": "اليوم",
+        "dueNext7Days": "الأيام السبعة القادمة",
+        "dueLater": "لاحقًا",
+        "noDueDate": "بلا موعد"
+      }
+    }
   }
 }

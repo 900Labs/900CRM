@@ -11,7 +11,7 @@ test('renders the browser app shell and dashboard route', async ({ page, assertN
   await expect(navigation.getByText('Admin')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   await expect(page.getByText('Total Contacts')).toBeVisible();
-  await expect(page.getByText('Pipeline Conversion')).toBeVisible();
+  await expect(navigation.getByRole('link', { name: 'Reports' })).toBeVisible();
 
   await assertNoConsoleErrors();
 });
@@ -24,6 +24,11 @@ test('renders key hash routes without native Tauri dialogs', async ({ page, asse
   await loadHashRoute(page, '/pipeline');
   await expect(page.getByRole('heading', { name: 'Pipeline' })).toBeVisible();
   await expect(page.getByText('Lead').first()).toBeVisible();
+
+  await loadHashRoute(page, '/reports');
+  await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
+  await expect(page.getByText('Pipeline Overview')).toBeVisible();
+  await expect(page.getByText('Activity Overview')).toBeVisible();
 
   await loadHashRoute(page, '/settings');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
@@ -44,6 +49,9 @@ test('switches primary workspace routes from the sidebar', async ({ page, assert
 
   await navigation.getByRole('link', { name: 'Pipeline' }).click();
   await expect(page.getByRole('heading', { name: 'Pipeline' })).toBeVisible();
+
+  await navigation.getByRole('link', { name: 'Reports' }).click();
+  await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
 
   await navigation.getByRole('link', { name: 'Settings' }).click();
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
