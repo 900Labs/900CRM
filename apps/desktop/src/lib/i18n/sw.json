@@ -14,6 +14,7 @@
     "contacts": "Anwani",
     "pipeline": "Mtiririko",
     "activities": "Shughuli",
+    "reports": "Ripoti",
     "settings": "Mipangilio",
     "organizations": "Mashirika",
     "auditLog": "Audit Log",
@@ -478,5 +479,58 @@
     "decisionFailed": "Failed to decide pending action",
     "approveFailed": "Approval failed",
     "rejectFailed": "Rejection failed"
+  },
+  "reports": {
+    "title": "Ripoti",
+    "subtitle": "Hali ya sasa ya pipeline na shughuli kutoka kwenye data yako ya CRM ya ndani. Uwiano huu unaonyesha data ya sasa, si historia ya mabadiliko ya hatua.",
+    "summaryLabel": "Muhtasari wa ripoti",
+    "refresh": "Onyesha upya",
+    "refreshing": "Inaonyesha upya...",
+    "loading": "Inapakia data ya ripoti...",
+    "generatedAt": "Imetengenezwa {value}",
+    "notAvailable": "haipatikani",
+    "pipeline": {
+      "title": "Muhtasari wa pipeline",
+      "description": "Idadi ya dili, kiwango cha ushindi, mgawanyo wa hatua za sasa, na uwiano wa funnel wa sasa.",
+      "summaryLabel": "Muhtasari wa ripoti ya pipeline",
+      "winRate": "Kiwango cha ushindi",
+      "winRateDetail": "Dili zilizoshinda zikigawanywa kwa dili zilizofungwa.",
+      "openDeals": "Dili zilizo wazi",
+      "openDealsDetail": "Dili ambazo hazijawekwa kama kushinda au kupotea.",
+      "closedWon": "Zilizoshinda",
+      "closedLost": "Zilizopotea",
+      "totalDeals": "Jumla ya dili",
+      "stageDistribution": "Mgawanyo wa hatua za sasa",
+      "currentFunnel": "Uwiano wa funnel wa sasa",
+      "currentFunnelNote": "Uwiano unalinganisha hesabu za sasa kati ya hatua jirani; si viwango vya kihistoria vya ubadilishaji.",
+      "empty": "Bado hakuna data ya pipeline.",
+      "emptyStages": "Bado hakuna mgawanyo wa hatua.",
+      "emptyFunnel": "Bado hakuna uwiano wa funnel wa sasa.",
+      "loadFailed": "Vipimo vya pipeline havipatikani kwa muda."
+    },
+    "activity": {
+      "title": "Muhtasari wa shughuli",
+      "description": "Ukamilishaji, mzigo uliochelewa, makundi ya tarehe, na mchanganyiko kwa aina ya shughuli.",
+      "summaryLabel": "Muhtasari wa ripoti ya shughuli",
+      "completionRate": "Kiwango cha ukamilishaji",
+      "completionRateDetail": "Shughuli zilizokamilika zikigawanywa kwa shughuli zote.",
+      "overdueRate": "Kiwango cha kuchelewa",
+      "overdueRateDetail": "Shughuli zilizochelewa zikigawanywa kwa shughuli zote.",
+      "completed": "Zilizokamilika",
+      "pending": "Zinasubiri",
+      "overdue": "Zimechelewa",
+      "byType": "Mchanganyiko kwa aina",
+      "empty": "Bado hakuna data ya shughuli.",
+      "emptyTypes": "Bado hakuna uchanganuzi kwa aina ya shughuli.",
+      "loadFailed": "Vipimo vya shughuli havipatikani kwa muda.",
+      "dueBuckets": {
+        "title": "Makundi ya tarehe",
+        "overdue": "Zimechelewa",
+        "dueToday": "Leo",
+        "dueNext7Days": "Siku 7 zijazo",
+        "dueLater": "Baadaye",
+        "noDueDate": "Hakuna tarehe"
+      }
+    }
   }
 }

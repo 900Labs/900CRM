@@ -4,15 +4,11 @@ import { render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  getActivityFunnelReportMock,
   getDashboardStatsMock,
-  getPipelineConversionReportMock,
   loadUpcomingMock,
   openModalMock,
 } = vi.hoisted(() => ({
-  getActivityFunnelReportMock: vi.fn(),
   getDashboardStatsMock: vi.fn(),
-  getPipelineConversionReportMock: vi.fn(),
   loadUpcomingMock: vi.fn(),
   openModalMock: vi.fn(),
 }));
@@ -23,11 +19,6 @@ vi.mock('$lib/i18n', () => ({
 
 vi.mock('$lib/api/dashboard', () => ({
   getDashboardStats: getDashboardStatsMock,
-}));
-
-vi.mock('$lib/api/reports', () => ({
-  getActivityFunnelReport: getActivityFunnelReportMock,
-  getPipelineConversionReport: getPipelineConversionReportMock,
 }));
 
 vi.mock('$lib/stores/activities', () => ({
@@ -55,14 +46,12 @@ import Dashboard from '../../routes/Dashboard.svelte';
 
 describe('Dashboard loading behavior', () => {
   beforeEach(() => {
-    getActivityFunnelReportMock.mockReset();
     getDashboardStatsMock.mockReset();
-    getPipelineConversionReportMock.mockReset();
     loadUpcomingMock.mockReset();
     openModalMock.mockReset();
   });
 
-  it('renders KPI stats even when report calls are still pending', async () => {
+  it('renders KPI stats even when upcoming activities are still pending', async () => {
     getDashboardStatsMock.mockResolvedValueOnce({
       activeDeals: 3,
       overdueActivities: 0,
@@ -72,8 +61,6 @@ describe('Dashboard loading behavior', () => {
       upcomingTasks: 4,
     });
     loadUpcomingMock.mockReturnValue(new Promise(() => {}));
-    getActivityFunnelReportMock.mockReturnValue(new Promise(() => {}));
-    getPipelineConversionReportMock.mockReturnValue(new Promise(() => {}));
 
     render(Dashboard);
 
@@ -81,7 +68,7 @@ describe('Dashboard loading behavior', () => {
     expect(screen.getByText('3')).toBeTruthy();
     expect(screen.getByText('$1,200')).toBeTruthy();
     expect(screen.getByText('4')).toBeTruthy();
-    expect(screen.getByText('dashboard.reports.pipelineTitle')).toBeTruthy();
-    expect(screen.getByText('dashboard.reports.activityTitle')).toBeTruthy();
+    expect(screen.getByText('dashboard.recentActivity')).toBeTruthy();
+    expect(screen.getByText('dashboard.quickActions')).toBeTruthy();
   });
 });

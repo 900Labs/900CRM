@@ -14,6 +14,7 @@
     "contacts": "Contacts",
     "pipeline": "Pipeline",
     "activities": "Activités",
+    "reports": "Rapports",
     "settings": "Paramètres",
     "organizations": "Organisations",
     "auditLog": "Audit Log",
@@ -478,5 +479,58 @@
     "decisionFailed": "Failed to decide pending action",
     "approveFailed": "Approval failed",
     "rejectFailed": "Rejection failed"
+  },
+  "reports": {
+    "title": "Rapports",
+    "subtitle": "Santé actuelle du pipeline et des activités à partir de vos données CRM locales. Ces ratios décrivent les données actuelles, pas l'historique des changements d'étape.",
+    "summaryLabel": "Résumé des rapports",
+    "refresh": "Actualiser",
+    "refreshing": "Actualisation...",
+    "loading": "Chargement des données du rapport...",
+    "generatedAt": "Généré {value}",
+    "notAvailable": "non disponible",
+    "pipeline": {
+      "title": "Vue du pipeline",
+      "description": "Nombre d'affaires, taux de gain, répartition actuelle par étape et ratios d'entonnoir actuels.",
+      "summaryLabel": "Résumé du rapport pipeline",
+      "winRate": "Taux de gain",
+      "winRateDetail": "Affaires gagnées divisées par les affaires clôturées.",
+      "openDeals": "Affaires ouvertes",
+      "openDealsDetail": "Affaires non marquées gagnées ou perdues.",
+      "closedWon": "Gagnées",
+      "closedLost": "Perdues",
+      "totalDeals": "Total des affaires",
+      "stageDistribution": "Répartition actuelle par étape",
+      "currentFunnel": "Ratios actuels entre étapes",
+      "currentFunnelNote": "Les ratios comparent les volumes actuels entre étapes voisines; ce ne sont pas des taux de conversion historiques.",
+      "empty": "Pas encore de données de pipeline.",
+      "emptyStages": "Aucune répartition par étape n'est encore disponible.",
+      "emptyFunnel": "Aucun ratio actuel entre étapes n'est encore disponible.",
+      "loadFailed": "Les métriques du pipeline sont temporairement indisponibles."
+    },
+    "activity": {
+      "title": "Vue des activités",
+      "description": "Achèvement, charge en retard, échéances et répartition par type d'activité.",
+      "summaryLabel": "Résumé du rapport d'activités",
+      "completionRate": "Taux d'achèvement",
+      "completionRateDetail": "Activités terminées divisées par toutes les activités.",
+      "overdueRate": "Taux de retard",
+      "overdueRateDetail": "Activités en retard divisées par toutes les activités.",
+      "completed": "Terminées",
+      "pending": "En attente",
+      "overdue": "En retard",
+      "byType": "Répartition par type",
+      "empty": "Pas encore de données d'activité.",
+      "emptyTypes": "Aucune répartition par type d'activité n'est encore disponible.",
+      "loadFailed": "Les métriques d'activité sont temporairement indisponibles.",
+      "dueBuckets": {
+        "title": "Échéances",
+        "overdue": "En retard",
+        "dueToday": "Aujourd'hui",
+        "dueNext7Days": "7 prochains jours",
+        "dueLater": "Plus tard",
+        "noDueDate": "Sans échéance"
+      }
+    }
   }
 }

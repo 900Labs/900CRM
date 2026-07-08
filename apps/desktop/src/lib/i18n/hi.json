@@ -14,6 +14,7 @@
     "contacts": "संपर्क",
     "pipeline": "पाइपलाइन",
     "activities": "गतिविधियाँ",
+    "reports": "रिपोर्ट",
     "settings": "सेटिंग्स",
     "organizations": "संगठन",
     "auditLog": "Audit Log",
@@ -478,5 +479,58 @@
     "decisionFailed": "Failed to decide pending action",
     "approveFailed": "Approval failed",
     "rejectFailed": "Rejection failed"
+  },
+  "reports": {
+    "title": "रिपोर्ट",
+    "subtitle": "आपके स्थानीय CRM डेटा से वर्तमान पाइपलाइन और गतिविधि स्वास्थ्य। ये अनुपात वर्तमान डेटा बताते हैं, ऐतिहासिक चरण परिवर्तन नहीं।",
+    "summaryLabel": "रिपोर्ट सारांश",
+    "refresh": "ताज़ा करें",
+    "refreshing": "ताज़ा हो रहा है...",
+    "loading": "रिपोर्ट डेटा लोड हो रहा है...",
+    "generatedAt": "{value} पर बनाया गया",
+    "notAvailable": "उपलब्ध नहीं",
+    "pipeline": {
+      "title": "पाइपलाइन अवलोकन",
+      "description": "डील गणना, जीत दर, वर्तमान चरण वितरण, और वर्तमान फ़नल अनुपात।",
+      "summaryLabel": "पाइपलाइन रिपोर्ट सारांश",
+      "winRate": "जीत दर",
+      "winRateDetail": "जीती हुई डील को बंद डील से विभाजित किया गया।",
+      "openDeals": "खुली डील",
+      "openDealsDetail": "वे डील जो जीती या हारी चिह्नित नहीं हैं।",
+      "closedWon": "जीती हुई",
+      "closedLost": "हारी हुई",
+      "totalDeals": "कुल डील",
+      "stageDistribution": "वर्तमान चरण वितरण",
+      "currentFunnel": "वर्तमान फ़नल अनुपात",
+      "currentFunnelNote": "अनुपात पास-पास के चरणों के वर्तमान काउंट की तुलना करते हैं; ये ऐतिहासिक रूपांतरण दरें नहीं हैं।",
+      "empty": "अभी कोई पाइपलाइन डेटा नहीं है।",
+      "emptyStages": "अभी कोई चरण वितरण उपलब्ध नहीं है।",
+      "emptyFunnel": "अभी कोई वर्तमान फ़नल अनुपात उपलब्ध नहीं है।",
+      "loadFailed": "पाइपलाइन मीट्रिक अस्थायी रूप से उपलब्ध नहीं हैं।"
+    },
+    "activity": {
+      "title": "गतिविधि अवलोकन",
+      "description": "पूर्णता, अतिदेय भार, देयता समूह, और गतिविधि प्रकार मिश्रण।",
+      "summaryLabel": "गतिविधि रिपोर्ट सारांश",
+      "completionRate": "पूर्णता दर",
+      "completionRateDetail": "पूर्ण गतिविधियाँ सभी गतिविधियों से विभाजित।",
+      "overdueRate": "अतिदेय दर",
+      "overdueRateDetail": "अतिदेय गतिविधियाँ सभी गतिविधियों से विभाजित।",
+      "completed": "पूर्ण",
+      "pending": "लंबित",
+      "overdue": "अतिदेय",
+      "byType": "प्रकार के अनुसार मिश्रण",
+      "empty": "अभी कोई गतिविधि डेटा नहीं है।",
+      "emptyTypes": "अभी गतिविधि प्रकार विभाजन उपलब्ध नहीं है।",
+      "loadFailed": "गतिविधि मीट्रिक अस्थायी रूप से उपलब्ध नहीं हैं।",
+      "dueBuckets": {
+        "title": "देयता समूह",
+        "overdue": "अतिदेय",
+        "dueToday": "आज देय",
+        "dueNext7Days": "अगले 7 दिन",
+        "dueLater": "बाद में",
+        "noDueDate": "कोई देय तिथि नहीं"
+      }
+    }
   }
 }
