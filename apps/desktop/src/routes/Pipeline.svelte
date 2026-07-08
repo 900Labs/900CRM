@@ -10,15 +10,26 @@
    * Stage moves call dealStore.moveDealStage() with optimistic updates.
    */
 
-  import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
   import { dealStore } from '$lib/stores/deals';
+  import { activityStore } from '$lib/stores/activities';
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
+  import { listActivities, type Activity } from '$lib/api/activities';
   import type { Contact } from '$lib/api/contacts';
-  import type { DealStage } from '$lib/api/deals';
+  import type { Deal, DealStage } from '$lib/api/deals';
   import { DEAL_STAGES } from '$lib/api/deals';
   import type { Organization } from '$lib/api/organizations';
+  import {
+    filterActivitiesByRelationship,
+    loadActivityLinkIndex,
+    loadActivityRelationshipLookups,
+    relationshipLabelsByActivityId,
+    sortActivitiesForDetailTimeline,
+    type ActivityLinkIndex,
+    type ActivityRelationshipLabels,
+    type ActivityRelationshipLookups,
+  } from '$lib/utils/activityRelationships';
   import {
     listCustomFieldDefinitions,
     listCustomFieldValuesForEntityType,
@@ -31,7 +42,13 @@
     deriveDealRelationshipLabels,
     loadDealRelationshipLookups,
   } from '$lib/utils/dealRelationships';
+  import {
+    derivePipelineGuidance,
+    type PipelineGuidance,
+    type PipelineGuidanceTone,
+  } from '$lib/utils/pipelineGuidance';
   import DealCard from '$lib/components/DealCard.svelte';
+  import DealDetailDrawer from '$lib/components/DealDetailDrawer.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
   // ── State ────────────────────────────────────────────────────────────────────
@@ -50,26 +67,72 @@
   let customFieldValueIndex = $state<Record<string, Record<string, string>>>({});
   let relationshipContacts = $state<Contact[]>([]);
   let relationshipOrganizations = $state<Organization[]>([]);
+  let allActivities = $state<Activity[]>([]);
+  let activityLinkIndex = $state<ActivityLinkIndex>({});
+  let activityRelationshipLookups = $state<ActivityRelationshipLookups>({
+    contacts: [],
+    organizations: [],
+    deals: [],
+  });
+  let activityContextReady = $state(false);
+  let activityContextError = $state<string | null>(null);
+  let dealActivitiesLoading = $state(false);
+  let selectedDeal = $state<Deal | null>(null);
+  let lastActivityRefreshVersion = $state(-1);
+  let pipelineBootstrapped = false;
+  let pipelineBootstrapComplete = $state(false);
+  let suppressNextCardClick = false;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
-  onMount(async () => {
-    await Promise.all([
-      dealStore.loadPipelineBoard(),
-      ensureRelationshipLookups(),
-      loadCustomFieldDefinitions(),
-    ]);
+  $effect(() => {
+    if (pipelineBootstrapped) {
+      return;
+    }
+
+    pipelineBootstrapped = true;
+    void (async () => {
+      lastActivityRefreshVersion = activityStore.relationshipRefreshVersion;
+      await Promise.all([
+        dealStore.loadPipelineBoard(),
+        ensureRelationshipLookups(),
+        loadCustomFieldDefinitions(),
+        loadPipelineActivityContext(),
+      ]);
+      lastActivityRefreshVersion = activityStore.relationshipRefreshVersion;
+      pipelineBootstrapComplete = true;
+    })();
+  });
+
+  $effect(() => {
+    if (!pipelineBootstrapComplete) {
+      return;
+    }
+
+    const version = activityStore.relationshipRefreshVersion;
+    if (lastActivityRefreshVersion === version) {
+      return;
+    }
+
+    lastActivityRefreshVersion = version;
+    if (version > 0) {
+      void loadPipelineActivityContext();
+    }
   });
 
   // ── Drag & drop handlers ────────────────────────────────────────────────────
 
   function handleDragStart(dealId: string, _stage: DealStage) {
     draggingId = dealId;
+    suppressNextCardClick = true;
   }
 
   function handleDragEnd() {
     draggingId = null;
     dragOverStage = null;
+    setTimeout(() => {
+      suppressNextCardClick = false;
+    }, 0);
   }
 
   function handleDragOver(event: DragEvent, stage: DealStage) {
@@ -109,6 +172,36 @@
     } catch (err) {
       console.error('[Pipeline] Failed to load deal relationship lookups:', err);
       uiStore.toastError('Failed to load deal relationships.');
+    }
+  }
+
+  async function loadPipelineActivityContext() {
+    dealActivitiesLoading = true;
+    activityContextReady = false;
+    activityContextError = null;
+    try {
+      const activities = await listActivities({
+        sortBy: 'dueDate',
+        sortDir: 'asc',
+        pageSize: 500,
+      });
+      const linkIndex = await loadActivityLinkIndex(activities.map((activity) => activity.id));
+
+      allActivities = activities;
+      activityLinkIndex = linkIndex;
+      activityContextReady = true;
+
+      try {
+        activityRelationshipLookups = await loadActivityRelationshipLookups();
+      } catch (lookupErr) {
+        console.error('[Pipeline] Failed to load activity relationship labels:', lookupErr);
+      }
+    } catch (err) {
+      console.error('[Pipeline] Failed to load deal activity context:', err);
+      activityContextError = t('deals.guidance.activityContextFailed');
+      uiStore.toastError(activityContextError);
+    } finally {
+      dealActivitiesLoading = false;
     }
   }
 
@@ -192,6 +285,125 @@
       return { stage, deals, currencyTotals };
     })
   );
+
+  const allDeals = $derived.by(() =>
+    DEAL_STAGES.flatMap((stage) => dealStore.dealsByStage[stage] ?? [])
+  );
+
+  const dealActivitiesById = $derived.by<Record<string, Activity[]>>(() => {
+    if (!activityContextReady) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      allDeals.map((deal) => [
+        deal.id,
+        sortActivitiesForDetailTimeline(
+          filterActivitiesByRelationship(allActivities, activityLinkIndex, {
+            dealId: deal.id,
+          })
+        ),
+      ])
+    );
+  });
+
+  const selectedDealActivities = $derived.by(() =>
+    selectedDeal && activityContextReady ? dealActivitiesById[selectedDeal.id] ?? [] : []
+  );
+
+  const selectedDealRelationshipLabels = $derived.by<Record<string, ActivityRelationshipLabels>>(() =>
+    relationshipLabelsByActivityId(
+      selectedDealActivities,
+      activityLinkIndex,
+      activityRelationshipLookups,
+    )
+  );
+
+  const selectedDealRelationshipNames = $derived.by(() =>
+    selectedDeal
+      ? deriveDealRelationshipLabels(
+          selectedDeal,
+          relationshipContacts,
+          relationshipOrganizations,
+        )
+      : { primaryContactName: null, organizationName: null }
+  );
+
+  const guidanceByDealId = $derived.by<Record<string, PipelineGuidance>>(() => {
+    if (!activityContextReady || activityContextError) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      allDeals.map((deal) => [
+        deal.id,
+        derivePipelineGuidance({
+          deal,
+          activities: dealActivitiesById[deal.id] ?? [],
+        }),
+      ])
+    );
+  });
+
+  const selectedDealGuidance = $derived<PipelineGuidance | null>(
+    selectedDeal ? guidanceByDealId[selectedDeal.id] ?? null : null
+  );
+
+  function guidanceLabel(guidance: PipelineGuidance): string {
+    return t(`deals.guidance.${guidance.state}`);
+  }
+
+  const guidanceBadgeByDealId = $derived.by<Record<string, { label: string; tone: PipelineGuidanceTone }>>(() =>
+    Object.fromEntries(
+      allDeals.map((deal) => {
+        const guidance = guidanceByDealId[deal.id];
+        return [
+          deal.id,
+          guidance
+            ? {
+                label: guidanceLabel(guidance),
+                tone: guidance.tone,
+              }
+            : {
+                label: activityContextError ? t('deals.guidance.unavailable') : t('deals.guidance.loading'),
+                tone: 'neutral',
+              },
+        ];
+      })
+    )
+  );
+
+  function openDealDrawer(deal: Deal) {
+    if (suppressNextCardClick) {
+      return;
+    }
+
+    selectedDeal = deal;
+    dealStore.selectDeal(deal);
+  }
+
+  function closeDealDrawer() {
+    selectedDeal = null;
+    dealStore.selectDeal(null);
+  }
+
+  function openDealFollowUp(deal: Deal) {
+    selectedDeal = deal;
+    dealStore.selectDeal(deal);
+    uiStore.openModal('addActivity', {
+      dealId: deal.id,
+      contactId: deal.contactId ?? '',
+      organizationId: deal.organizationId ?? '',
+    });
+  }
+
+  function openSelectedDealFollowUp() {
+    if (!selectedDeal) {
+      return;
+    }
+
+    openDealFollowUp(selectedDeal);
+  }
 
   // ── Stage label colors ───────────────────────────────────────────────────────
 
@@ -339,6 +551,7 @@
                   relationshipContacts,
                   relationshipOrganizations,
                 )}
+                {@const guidanceBadge = guidanceBadgeByDealId[deal.id]}
                 <div
                   class="card-wrapper"
                   class:card-wrapper--dragging={draggingId === deal.id}
@@ -351,6 +564,9 @@
                     {deal}
                     primaryContactName={relationships.primaryContactName}
                     organizationName={relationships.organizationName}
+                    guidanceLabel={guidanceBadge?.label ?? t('deals.guidance.loading')}
+                    guidanceTone={guidanceBadge?.tone ?? 'neutral'}
+                    onclick={openDealDrawer}
                   />
                 </div>
               {/each}
@@ -359,6 +575,21 @@
         </div>
       {/each}
     </div>
+  {/if}
+
+  {#if selectedDeal && !uiStore.activeModal}
+    <DealDetailDrawer
+      deal={selectedDeal}
+      guidance={selectedDealGuidance}
+      activities={selectedDealActivities}
+      activitiesLoading={dealActivitiesLoading}
+      activityContextError={activityContextError}
+      relationshipsByActivityId={selectedDealRelationshipLabels}
+      primaryContactName={selectedDealRelationshipNames.primaryContactName}
+      organizationName={selectedDealRelationshipNames.organizationName}
+      onclose={closeDealDrawer}
+      onaddfollowup={openSelectedDealFollowUp}
+    />
   {/if}
 </div>
 
