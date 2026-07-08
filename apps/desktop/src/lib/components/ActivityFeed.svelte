@@ -8,8 +8,25 @@
 
   import type { Activity } from '$lib/api/activities';
   import { t } from '$lib/i18n';
+  import type {
+    ActivityRelationshipItem,
+    ActivityRelationshipLabels,
+  } from '$lib/utils/activityRelationships';
   import { formatRelativeTime } from '$lib/utils/formatters';
   import EmptyState from './EmptyState.svelte';
+
+  type ActivityRelationshipEntityType = 'contact' | 'organization' | 'deal';
+
+  interface ActivityRelationshipGroup {
+    type: ActivityRelationshipEntityType;
+    label: string;
+    items: ActivityRelationshipItem[];
+  }
+
+  export interface ActivityFeedRelationshipNavigation {
+    type: ActivityRelationshipEntityType;
+    id: string;
+  }
 
   // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -19,12 +36,18 @@
     maxItems = 10,
     showEmpty = true,
     compact = false,
+    relationshipsByActivityId = {},
+    showRelationshipBreadcrumbs = false,
+    onNavigateEntity = undefined,
   }: {
     activities?: Activity[];
     loading?: boolean;
     maxItems?: number;
     showEmpty?: boolean;
     compact?: boolean;
+    relationshipsByActivityId?: Record<string, ActivityRelationshipLabels>;
+    showRelationshipBreadcrumbs?: boolean;
+    onNavigateEntity?: (entity: ActivityFeedRelationshipNavigation) => void;
   } = $props();
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -56,6 +79,52 @@
     };
     return map[type] ?? type;
   }
+
+  function relationshipLabels(activityId: string): ActivityRelationshipLabels {
+    return relationshipsByActivityId[activityId] ?? {
+      contacts: [],
+      organizations: [],
+      deals: [],
+    };
+  }
+
+  function relationshipGroups(labels: ActivityRelationshipLabels): ActivityRelationshipGroup[] {
+    const groups: ActivityRelationshipGroup[] = [
+      {
+        type: 'contact',
+        label: t('activities.relationshipContact'),
+        items: labels.contacts,
+      },
+      {
+        type: 'organization',
+        label: t('activities.relationshipOrganization'),
+        items: labels.organizations,
+      },
+      {
+        type: 'deal',
+        label: t('activities.relationshipDeal'),
+        items: labels.deals,
+      },
+    ];
+
+    return groups.filter((group) => group.items.length > 0);
+  }
+
+  function hasRelationships(labels: ActivityRelationshipLabels): boolean {
+    return labels.contacts.length > 0 || labels.organizations.length > 0 || labels.deals.length > 0;
+  }
+
+  function canNavigate(type: ActivityRelationshipEntityType): boolean {
+    return type !== 'deal' && typeof onNavigateEntity === 'function';
+  }
+
+  function navigateRelationship(type: ActivityRelationshipEntityType, id: string) {
+    if (!canNavigate(type)) {
+      return;
+    }
+
+    onNavigateEntity?.({ type, id });
+  }
 </script>
 
 <div class="activity-feed" class:compact>
@@ -80,6 +149,7 @@
   {:else}
     <ul class="activity-list" role="list">
       {#each visible as activity (activity.id)}
+        {@const labels = relationshipLabels(activity.id)}
         <li class="activity-item" class:completed={activity.status === 'completed'}>
           <!-- Icon -->
           <div
@@ -111,6 +181,33 @@
                 </span>
               {/if}
             </div>
+            {#if showRelationshipBreadcrumbs && hasRelationships(labels)}
+              <div class="activity-relationships" aria-label={t('activities.relationshipsLabel')}>
+                {#each relationshipGroups(labels) as group (group.type)}
+                  {#each group.items as item (group.type + item.id)}
+                    {#if canNavigate(group.type)}
+                      <button
+                        class="activity-breadcrumb"
+                        type="button"
+                        onclick={() => navigateRelationship(group.type, item.id)}
+                        aria-label={t('activities.openRelationship', {
+                          type: group.label,
+                          label: item.label,
+                        })}
+                      >
+                        <span class="activity-breadcrumb-type">{group.label}</span>
+                        <span>{item.label}</span>
+                      </button>
+                    {:else}
+                      <span class="activity-breadcrumb activity-breadcrumb-static">
+                        <span class="activity-breadcrumb-type">{group.label}</span>
+                        <span>{item.label}</span>
+                      </span>
+                    {/if}
+                  {/each}
+                {/each}
+              </div>
+            {/if}
           </div>
 
           <!-- Status badge -->
@@ -202,6 +299,47 @@
 
   .activity-time.overdue {
     color: var(--text-danger);
+  }
+
+  .activity-relationships {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-block-start: var(--space-1);
+  }
+
+  .activity-breadcrumb {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    gap: 4px;
+    padding: 2px var(--space-2);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-sm);
+    background-color: var(--surface-raised);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    line-height: 1.3;
+  }
+
+  button.activity-breadcrumb {
+    cursor: pointer;
+  }
+
+  button.activity-breadcrumb:hover {
+    border-color: var(--border-strong);
+    color: var(--text-accent);
+  }
+
+  .activity-breadcrumb-static {
+    cursor: default;
+  }
+
+  .activity-breadcrumb-type {
+    flex-shrink: 0;
+    color: var(--text-tertiary);
+    font-weight: var(--weight-medium);
   }
 
   .activity-status {

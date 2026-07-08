@@ -54,6 +54,24 @@ function linkedIds(
     .map((link) => link.entityId);
 }
 
+function normalizeId(id: string | null | undefined): string | null {
+  const normalized = id?.trim();
+  return normalized ? normalized : null;
+}
+
+function hasActiveLink(
+  links: ActivityLink[],
+  entityType: ActivityLink['entityType'],
+  entityId: string,
+): boolean {
+  return links.some(
+    (link) =>
+      link.entityType === entityType &&
+      link.entityId === entityId &&
+      !link.deletedAt,
+  );
+}
+
 export function deriveActivityRelationshipLabels(
   activity: Pick<Activity, 'contactId' | 'contactName' | 'dealId' | 'dealName'>,
   links: ActivityLink[],
@@ -86,6 +104,90 @@ export function deriveActivityRelationshipLabels(
       };
     }),
   };
+}
+
+export function activityMatchesRelationship(
+  activity: Pick<Activity, 'contactId' | 'dealId'>,
+  links: ActivityLink[],
+  selection: ActivityRelationshipSelection,
+): boolean {
+  const contactId = normalizeId(selection.contactId);
+  if (
+    contactId &&
+    (normalizeId(activity.contactId) === contactId || hasActiveLink(links, 'contact', contactId))
+  ) {
+    return true;
+  }
+
+  const organizationId = normalizeId(selection.organizationId);
+  if (organizationId && hasActiveLink(links, 'organization', organizationId)) {
+    return true;
+  }
+
+  const dealId = normalizeId(selection.dealId);
+  if (
+    dealId &&
+    (normalizeId(activity.dealId) === dealId || hasActiveLink(links, 'deal', dealId))
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export function filterActivitiesByRelationship(
+  activities: Activity[],
+  linkIndex: ActivityLinkIndex,
+  selection: ActivityRelationshipSelection,
+): Activity[] {
+  return activities.filter((activity) =>
+    activityMatchesRelationship(activity, linkIndex[activity.id] ?? [], selection)
+  );
+}
+
+function parsedTime(value: string | null | undefined): number | null {
+  const time = Date.parse(value ?? '');
+  return Number.isFinite(time) ? time : null;
+}
+
+export function activityUpdatedTime(
+  activity: Pick<Activity, 'updatedAt' | 'createdAt'>,
+): number {
+  return parsedTime(activity.updatedAt) ?? parsedTime(activity.createdAt) ?? 0;
+}
+
+export function sortActivitiesForDetailTimeline(activities: Activity[]): Activity[] {
+  return [...activities].sort((left, right) => {
+    const leftDue = parsedTime(left.dueDate);
+    const rightDue = parsedTime(right.dueDate);
+
+    if (leftDue !== null && rightDue !== null) {
+      return leftDue - rightDue;
+    }
+
+    if (leftDue !== null) {
+      return -1;
+    }
+
+    if (rightDue !== null) {
+      return 1;
+    }
+
+    return activityUpdatedTime(right) - activityUpdatedTime(left);
+  });
+}
+
+export function relationshipLabelsByActivityId(
+  activities: Activity[],
+  linkIndex: ActivityLinkIndex,
+  lookups: ActivityRelationshipLookups,
+): Record<string, ActivityRelationshipLabels> {
+  return Object.fromEntries(
+    activities.map((activity) => [
+      activity.id,
+      deriveActivityRelationshipLabels(activity, linkIndex[activity.id] ?? [], lookups),
+    ])
+  );
 }
 
 export async function loadActivityRelationshipContacts(): Promise<Contact[]> {

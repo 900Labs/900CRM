@@ -15,7 +15,7 @@ or not implemented.
 requirement, local SQLite data ownership, backup/restore, import/export depth,
 audit evidence, and a narrow optional MCP stdio boundary. That is meaningful.
 
-The weakness is the daily CRM experience. As of Sprint 102, the left navigation
+The weakness is the daily CRM experience. As of Sprint 104, the left navigation
 is visually grouped into:
 
 - Workspace: Dashboard, Contacts, Organizations, Pipeline, Activities
@@ -26,11 +26,13 @@ That grouping is a better information architecture than the original flat menu,
 the dashboard now has a first-run starter checklist plus optional synthetic
 sample workspace, and contact detail now starts to behave like a Customer 360
 workspace with open-deal, pipeline, next-follow-up, recent-activity, and
-attention-status summary signals. The product still undersells its foundation
-because several core CRM jobs remain shallow or absent. Comparable CRMs make
-sales work feel richer through leads, inbox and communication history, calendar
-views, reports, saved views, automation, guided onboarding, and clearer account
-and deal workspaces.
+attention-status summary signals. Organization/account detail now has its own
+workspace, and contact/account timelines now show relationship breadcrumbs for
+linked contacts, accounts, and deals. The product still undersells its
+foundation because several core CRM jobs remain shallow or absent. Comparable
+CRMs make sales work feel richer through leads, inbox and communication
+history, calendar views, reports, saved views, automation, guided onboarding,
+and clearer deal workspaces.
 
 The next phase should therefore be a product-depth phase, not another foundation
 phase. The priority is to make 900CRM feel useful in the first 10 minutes for a
@@ -41,8 +43,8 @@ real small business owner.
 | Area | Current state | Product issue |
 |---|---|---|
 | Dashboard | KPI cards, reports, activity feed, quick actions, first-run starter checklist, optional synthetic sample workspace | Useful start, but not yet a true command center. No saved goals, no forecast view, and no "what needs attention" queue. |
-| Contacts | Search, type filter, duplicate review, import/export, custom-field filtering, contact detail Customer 360 summary | Contacts and lead/account work are blended. The detail view now has a useful at-a-glance summary, but there is no lead capture stage, saved segment, list view preset, or full interaction timeline. |
-| Organizations | List, create/edit, notes/tags, contact linking | Important, but weaker than account management in competing CRMs. No account health, open deals summary, recent activity, owner, or next step at list level. |
+| Contacts | Search, type filter, duplicate review, import/export, custom-field filtering, contact detail Customer 360 summary, relationship-aware activity timeline | Contacts and lead/account work are blended. The detail view now has useful at-a-glance and timeline context, but there is no lead capture stage, saved segment, list view preset, files/links section, or deal-detail context. |
+| Organizations | List, create/edit, notes/tags, contact linking, account detail workspace with linked people/deals/activity and relationship-aware account timeline | Account detail is now useful, but list-level account management still lacks owner, health, next step, and saved account views. |
 | Pipeline | Kanban by stage, custom-field filter, deal cards | Good foundation. Needs drag/drop confidence, stage conversion metrics, stale deal detection, forecast view, and deal detail workspace. |
 | Activities | Task/call/meeting/email list with filters and completion | Useful but should become a calendar/task center with due buckets, day/week views, reminders, and relationship context. |
 | Audit Log | Read-only table grouped under Review | Good trust feature, now visually separated from daily work. Later, it may still move deeper into Admin once Review counts are more prominent. |
@@ -101,7 +103,7 @@ Recommended outcome: extend first-run guidance into module empty states,
 import/backup prompts, and customer/deal workspace guidance without adding
 marketing-style tours.
 
-### 2. Customer workspaces now cover contacts and accounts, but timeline depth is still thin
+### 2. Customer workspaces now cover contacts and accounts, but still need attached context
 
 The contact detail page exists, notes/tags/custom fields exist, and Sprint 102
 added a contact-level Customer 360 summary for open deals, open pipeline value,
@@ -109,9 +111,11 @@ next follow-up, recent activity, and attention status. Sprint 103 added a
 first-class organization/account detail workspace with profile metadata, linked
 people, linked deals, account activity, account health, direct account routes,
 and global-search routing into account records. That makes core records feel
-less like static tables. The product still needs the fuller "customer 360"
-pattern: richer interaction timeline, relationship breadcrumbs, files/links,
-deal detail context, and next-action guidance across more workflows.
+less like static tables. Sprint 104 deepened the activity timeline by including
+relationship-link-only contact activity and showing contact, organization, and
+deal breadcrumbs in contact and account detail timelines. The product still
+needs the fuller "customer 360" pattern: files/links, deal detail context, and
+next-action guidance across more workflows.
 
 Recommended outcome: richer contact and organization detail workspaces before
 adding unrelated modules.
@@ -169,15 +173,17 @@ These are ordered to improve perceived product value fastest.
    - Remaining work: module-specific empty states, guided import/backup prompts,
      and richer onboarding inside customer/deal workspaces.
 
-3. **Customer 360 Workspaces** - started for contact and account summaries
+3. **Customer 360 Workspaces** - contact/account summaries and timeline
+   breadcrumbs completed
    - Added contact detail open-deal, open-pipeline, next-follow-up,
      recent-activity, and attention-status summary.
    - Added organization/account detail with account profile, linked people,
      linked deals, account activity, account health, direct account routes, and
      global-search routing into contact/account record views.
-   - Remaining work: fuller interaction timeline, relationship breadcrumbs,
-     files/links, deal detail context, and richer record routing for records
-     that do not yet have detail pages.
+   - Added relationship-aware activity timelines for contact and account detail,
+     including link-only contact activities and contact/account/deal breadcrumbs.
+   - Remaining work: files/links, deal detail context, and richer record routing
+     for records that do not yet have detail pages.
 
 4. **Pipeline Depth**
    - Add deal detail drawer/page.
