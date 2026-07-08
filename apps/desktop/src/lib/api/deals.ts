@@ -66,6 +66,7 @@ export interface AddDealContactPayload {
 export interface ListDealsParams {
   stage?: DealStage;
   contactId?: string;
+  organizationId?: string;
   sortBy?: 'name' | 'value' | 'createdAt' | 'expectedCloseDate';
   sortDir?: 'asc' | 'desc';
   page?: number;
@@ -267,6 +268,10 @@ export async function listDeals(params: ListDealsParams = {}): Promise<Deal[]> {
 
   if (params.contactId) {
     mapped = mapped.filter((deal) => deal.contactId === params.contactId);
+  }
+
+  if (params.organizationId) {
+    mapped = mapped.filter((deal) => deal.organizationId === params.organizationId);
   }
 
   mapped = sortDeals(mapped, params);

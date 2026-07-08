@@ -101,15 +101,17 @@ Recommended outcome: extend first-run guidance into module empty states,
 import/backup prompts, and customer/deal workspace guidance without adding
 marketing-style tours.
 
-### 2. Contacts are becoming a customer workspace, but accounts are still thin
+### 2. Customer workspaces now cover contacts and accounts, but timeline depth is still thin
 
 The contact detail page exists, notes/tags/custom fields exist, and Sprint 102
 added a contact-level Customer 360 summary for open deals, open pipeline value,
-next follow-up, recent activity, and attention status. That makes contacts feel
-less like a static address book. The product still needs the fuller "customer
-360" pattern: profile, timeline, linked organization, activities, notes, tags,
-files/links, and next action in one place. Organizations also still lack a real
-account workspace.
+next follow-up, recent activity, and attention status. Sprint 103 added a
+first-class organization/account detail workspace with profile metadata, linked
+people, linked deals, account activity, account health, direct account routes,
+and global-search routing into account records. That makes core records feel
+less like static tables. The product still needs the fuller "customer 360"
+pattern: richer interaction timeline, relationship breadcrumbs, files/links,
+deal detail context, and next-action guidance across more workflows.
 
 Recommended outcome: richer contact and organization detail workspaces before
 adding unrelated modules.
@@ -167,12 +169,15 @@ These are ordered to improve perceived product value fastest.
    - Remaining work: module-specific empty states, guided import/backup prompts,
      and richer onboarding inside customer/deal workspaces.
 
-3. **Customer 360 Workspaces** - started for contact detail summary
+3. **Customer 360 Workspaces** - started for contact and account summaries
    - Added contact detail open-deal, open-pipeline, next-follow-up,
      recent-activity, and attention-status summary.
-   - Remaining work: organization/account detail workspace, fuller interaction
-     timeline, linked records, files/links, and richer record routing.
-   - Make global search route directly into useful record views.
+   - Added organization/account detail with account profile, linked people,
+     linked deals, account activity, account health, direct account routes, and
+     global-search routing into contact/account record views.
+   - Remaining work: fuller interaction timeline, relationship breadcrumbs,
+     files/links, deal detail context, and richer record routing for records
+     that do not yet have detail pages.
 
 4. **Pipeline Depth**
    - Add deal detail drawer/page.
