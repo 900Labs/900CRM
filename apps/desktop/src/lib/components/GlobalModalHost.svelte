@@ -350,7 +350,7 @@
 
   async function submitContact() {
     if (!contactFirstName.trim()) {
-      uiStore.toastError('First name is required.');
+      uiStore.toastError(t('contacts.firstNameRequired'));
       return;
     }
 
@@ -368,11 +368,16 @@
         website: null,
         address: null,
       });
-      await persistCustomFields(contact.id, contactCustomFieldValues);
       uiStore.closeModal();
+      try {
+        await persistCustomFields(contact.id, contactCustomFieldValues);
+      } catch (cfErr) {
+        console.error('[GlobalModalHost] Failed to save contact custom fields:', cfErr);
+        uiStore.toastError(t('contacts.customFieldsSaveFailed'));
+      }
     } catch (err) {
       console.error('[GlobalModalHost] Failed to create contact:', err);
-      uiStore.toastError('Failed to save contact custom fields.');
+      uiStore.toastError(t('errors.saveFailed'));
     } finally {
       isSavingContact = false;
     }
@@ -380,7 +385,7 @@
 
   async function submitDeal() {
     if (!dealName.trim()) {
-      uiStore.toastError('Deal name is required.');
+      uiStore.toastError(t('deals.nameRequired'));
       return;
     }
 
@@ -398,11 +403,16 @@
         description: dealDescription.trim() || null,
         tags: [],
       });
-      await persistCustomFields(deal.id, dealCustomFieldValues);
       uiStore.closeModal();
+      try {
+        await persistCustomFields(deal.id, dealCustomFieldValues);
+      } catch (cfErr) {
+        console.error('[GlobalModalHost] Failed to save deal custom fields:', cfErr);
+        uiStore.toastError(t('deals.customFieldsSaveFailed'));
+      }
     } catch (err) {
       console.error('[GlobalModalHost] Failed to create deal:', err);
-      uiStore.toastError('Failed to save deal custom fields.');
+      uiStore.toastError(t('errors.saveFailed'));
     } finally {
       isSavingDeal = false;
     }
@@ -410,7 +420,7 @@
 
   async function submitActivity() {
     if (!activitySubject.trim()) {
-      uiStore.toastError('Activity subject is required.');
+      uiStore.toastError(t('activities.subjectRequired'));
       return;
     }
 
@@ -424,17 +434,22 @@
         contactId: activityContactId || null,
         dealId: activityDealId || null,
       });
+      uiStore.closeModal();
       await addSelectedActivityLinks(activity.id, {
         contactId: activityContactId || null,
         organizationId: activityOrganizationId || null,
         dealId: activityDealId || null,
       });
       activityStore.notifyRelationshipLinksChanged();
-      await persistCustomFields(activity.id, activityCustomFieldValues);
-      uiStore.closeModal();
+      try {
+        await persistCustomFields(activity.id, activityCustomFieldValues);
+      } catch (cfErr) {
+        console.error('[GlobalModalHost] Failed to save activity custom fields:', cfErr);
+        uiStore.toastError(t('activities.customFieldsSaveFailed'));
+      }
     } catch (err) {
       console.error('[GlobalModalHost] Failed to create activity:', err);
-      uiStore.toastError('Failed to save activity custom fields.');
+      uiStore.toastError(t('errors.saveFailed'));
     } finally {
       isSavingActivity = false;
     }

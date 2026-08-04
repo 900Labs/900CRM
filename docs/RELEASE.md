@@ -1,7 +1,7 @@
 # Release Readiness
 
 Date: 2026-06-24
-Last updated: 2026-07-08
+Last updated: 2026-08-04
 
 This document records the current release status for 900CRM and the manual
 checks required before publishing a public release. For a phase-by-phase
@@ -139,6 +139,17 @@ manual.
 - [ ] Run `cargo test --workspace`.
 - [ ] Manually smoke test the desktop app on every target platform that will
   receive an installer.
+- [ ] Refresh the application icon set before publishing. The source SVG is
+  `apps/desktop/src-tauri/icons/app-icon.svg`; regenerate all platform icon
+  assets (PNG, `.icns`, `.ico`, and the Android/iOS sets under
+  `apps/desktop/src-tauri/icons/`) from it using the Tauri icon generator
+  (`npm run tauri -- icon <path-to-source-svg>`) so packaged installers and
+  taskbar/dock/Store icons are consistent and up to date.
+- [ ] Confirm that code signing and notarization are still required and
+  arranged before public distribution. The repository does not perform signing
+  or macOS notarization today (see "Still Not Implemented" below); unsigned and
+  unnotarized packages are release-candidate evidence only and must not be
+  distributed to non-technical end users.
 - [ ] Manually import the synthetic CSV samples under `samples/` for contacts
   and organizations.
 - [ ] Manually create, edit, search, export, back up, validate, and restore a

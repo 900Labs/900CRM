@@ -909,9 +909,11 @@ impl CrmCore {
         }
 
         Ok(SyncStatus {
-            state: "success".to_string(),
-            last_sync_at: Some(now_iso8601()),
-            error_message: None,
+            state: "not_implemented".to_string(),
+            last_sync_at: None,
+            error_message: Some(
+                "Multi-device sync transport is not implemented yet. Local changes are recorded to the changelog for future sync.".to_string(),
+            ),
             pending_changes,
         })
     }
@@ -1037,7 +1039,7 @@ impl CrmCore {
                                 if let Some(action) = rollback_action {
                                     rollback_actions.push(action);
                                 }
-                                let _ = storage::audit::record_audit(
+                                if let Err(e) = storage::audit::record_audit(
                                     &self.db.conn,
                                     ACTOR_IMPORT,
                                     None,
@@ -1047,7 +1049,12 @@ impl CrmCore {
                                     None,
                                     None,
                                     &self.device_id,
-                                );
+                                ) {
+                                    errors.push(format!(
+                                        "Row {}: audit record failed: {}",
+                                        row_number, e
+                                    ));
+                                }
                                 merged += 1;
                                 continue;
                             }
@@ -1098,7 +1105,7 @@ impl CrmCore {
                                     custom_fields,
                                 ),
                             );
-                            let _ = storage::audit::record_audit(
+                            if let Err(e) = storage::audit::record_audit(
                                 &self.db.conn,
                                 ACTOR_IMPORT,
                                 None,
@@ -1108,7 +1115,12 @@ impl CrmCore {
                                 None,
                                 None,
                                 &self.device_id,
-                            );
+                            ) {
+                                errors.push(format!(
+                                    "Row {}: audit record failed: {}",
+                                    row_number, e
+                                ));
+                            }
                             created += 1;
                         }
                         Err(e) => {
@@ -1511,7 +1523,7 @@ impl CrmCore {
                                 if let Some(action) = rollback_action {
                                     rollback_actions.push(action);
                                 }
-                                let _ = storage::audit::record_audit(
+                                if let Err(e) = storage::audit::record_audit(
                                     &self.db.conn,
                                     ACTOR_IMPORT,
                                     None,
@@ -1521,7 +1533,12 @@ impl CrmCore {
                                     None,
                                     None,
                                     &self.device_id,
-                                );
+                                ) {
+                                    errors.push(format!(
+                                        "Row {}: audit record failed: {}",
+                                        row_number, e
+                                    ));
+                                }
                                 merged += 1;
                                 continue;
                             }
@@ -1572,7 +1589,7 @@ impl CrmCore {
                                     custom_fields,
                                 ),
                             );
-                            let _ = storage::audit::record_audit(
+                            if let Err(e) = storage::audit::record_audit(
                                 &self.db.conn,
                                 ACTOR_IMPORT,
                                 None,
@@ -1582,7 +1599,12 @@ impl CrmCore {
                                 None,
                                 None,
                                 &self.device_id,
-                            );
+                            ) {
+                                errors.push(format!(
+                                    "Row {}: audit record failed: {}",
+                                    row_number, e
+                                ));
+                            }
                             created += 1;
                         }
                         Err(e) => {
@@ -1952,7 +1974,7 @@ impl CrmCore {
                                             custom_fields,
                                         ),
                                     );
-                                    let _ = storage::audit::record_audit(
+                                    if let Err(e) = storage::audit::record_audit(
                                         &self.db.conn,
                                         ACTOR_IMPORT,
                                         None,
@@ -1962,7 +1984,12 @@ impl CrmCore {
                                         None,
                                         None,
                                         &self.device_id,
-                                    );
+                                    ) {
+                                        errors.push(format!(
+                                            "Row {}: audit record failed: {}",
+                                            row_number, e
+                                        ));
+                                    }
                                     created += 1;
                                 }
                                 Err(e) => {
@@ -2216,7 +2243,7 @@ impl CrmCore {
                     rollback_actions.push(import_rollback::ImportRollbackAction::created_note(
                         row_number, &note,
                     ));
-                    let _ = storage::audit::record_audit(
+                    if let Err(e) = storage::audit::record_audit(
                         &self.db.conn,
                         ACTOR_IMPORT,
                         None,
@@ -2226,7 +2253,9 @@ impl CrmCore {
                         None,
                         None,
                         &self.device_id,
-                    );
+                    ) {
+                        errors.push(format!("Row {}: audit record failed: {}", row_number, e));
+                    }
                     created += 1;
                 }
                 Err(e) => {
@@ -2441,7 +2470,7 @@ impl CrmCore {
                             row_number, &tag,
                         ),
                     );
-                    let _ = storage::audit::record_audit(
+                    if let Err(e) = storage::audit::record_audit(
                         &self.db.conn,
                         ACTOR_IMPORT,
                         None,
@@ -2451,7 +2480,9 @@ impl CrmCore {
                         None,
                         None,
                         &self.device_id,
-                    );
+                    ) {
+                        errors.push(format!("Row {}: audit record failed: {}", row_number, e));
+                    }
                     created += 1;
                 }
                 Err(e) => {
@@ -2702,7 +2733,7 @@ impl CrmCore {
                             &definition,
                         ),
                     );
-                    let _ = storage::audit::record_audit(
+                    if let Err(e) = storage::audit::record_audit(
                         &self.db.conn,
                         ACTOR_IMPORT,
                         None,
@@ -2712,7 +2743,9 @@ impl CrmCore {
                         None,
                         None,
                         &self.device_id,
-                    );
+                    ) {
+                        errors.push(format!("Row {}: audit record failed: {}", row_number, e));
+                    }
                     created += 1;
                 }
                 Err(e) => {
@@ -2986,7 +3019,7 @@ impl CrmCore {
                     ));
                     let audit_entity_id =
                         tag_link_rollback_entity_id(&entity_type, &entity_id, &tag_id);
-                    let _ = storage::audit::record_audit(
+                    if let Err(e) = storage::audit::record_audit(
                         &self.db.conn,
                         ACTOR_IMPORT,
                         None,
@@ -2996,7 +3029,9 @@ impl CrmCore {
                         None,
                         None,
                         &self.device_id,
-                    );
+                    ) {
+                        errors.push(format!("Row {}: audit record failed: {}", row_number, e));
+                    }
                     created += 1;
                 }
                 Err(e) => {
@@ -3220,7 +3255,7 @@ impl CrmCore {
                                 if let Some(action) = rollback_action {
                                     rollback_actions.push(action);
                                 }
-                                let _ = storage::audit::record_audit(
+                                if let Err(e) = storage::audit::record_audit(
                                     &self.db.conn,
                                     ACTOR_IMPORT,
                                     None,
@@ -3230,7 +3265,12 @@ impl CrmCore {
                                     None,
                                     None,
                                     &self.device_id,
-                                );
+                                ) {
+                                    errors.push(format!(
+                                        "Row {}: audit record failed: {}",
+                                        row_number, e
+                                    ));
+                                }
                                 merged += 1;
                                 continue;
                             }
@@ -3278,7 +3318,7 @@ impl CrmCore {
                                     custom_fields,
                                 ),
                             );
-                            let _ = storage::audit::record_audit(
+                            if let Err(e) = storage::audit::record_audit(
                                 &self.db.conn,
                                 ACTOR_IMPORT,
                                 None,
@@ -3288,7 +3328,12 @@ impl CrmCore {
                                 None,
                                 None,
                                 &self.device_id,
-                            );
+                            ) {
+                                errors.push(format!(
+                                    "Row {}: audit record failed: {}",
+                                    row_number, e
+                                ));
+                            }
                             created += 1;
                         }
                         Err(e) => {
@@ -3617,6 +3662,9 @@ impl CrmCore {
 
     fn set_activity_completion(&mut self, id: &str, completed: bool) -> CrmResult<Activity> {
         let before = storage::activities::get_activity(&self.db.conn, id)?;
+        if before.completed == completed {
+            return Ok(before);
+        }
         let device_id = self.device_id.clone();
         let tx = self.db.conn.unchecked_transaction()?;
         let activity = if completed {
@@ -3629,7 +3677,7 @@ impl CrmCore {
             "activity",
             id,
             "completed",
-            Some(if completed { "0" } else { "1" }),
+            Some(if before.completed { "1" } else { "0" }),
             Some(if completed { "1" } else { "0" }),
             &device_id,
         )?;
@@ -4238,9 +4286,11 @@ fn sync_status_from_settings(
     }
 
     Ok(SyncStatus {
-        state: "idle".to_string(),
+        state: "not_implemented".to_string(),
         last_sync_at,
-        error_message: None,
+        error_message: Some(
+            "Multi-device sync transport is not implemented yet. Local changes are recorded to the changelog for future sync.".to_string(),
+        ),
         pending_changes,
     })
 }

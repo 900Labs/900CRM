@@ -175,7 +175,7 @@ export async function createContact(data: CreateContactPayload): Promise<Contact
     address: data.address ?? '',
     city: '',
     country: '',
-    org_id: null,
+    org_id: data.organizationId ?? null,
     notes: data.notes ?? '',
   });
 

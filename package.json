@@ -9,6 +9,9 @@
     "url": "https://github.com/900Labs/900CRM"
   },
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "workspaces": [
     "apps/desktop"
   ],

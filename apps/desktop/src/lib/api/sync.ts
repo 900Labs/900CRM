@@ -4,7 +4,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 
-export type SyncState = 'idle' | 'syncing' | 'error' | 'success';
+export type SyncState = 'idle' | 'syncing' | 'error' | 'success' | 'not_implemented';
 
 export interface SyncStatus {
   state: SyncState;

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::storage::activities as activity_storage;
 use crate::utils::{
-    datetime::now_iso8601,
+    datetime::{now_iso8601, parse_iso8601},
     errors::{CrmError, CrmResult},
 };
 
@@ -89,7 +89,10 @@ pub fn is_overdue(due_date: Option<&str>, completed: bool) -> bool {
     }
     let Some(due) = due_date else { return false };
     let now = now_iso8601();
-    due < now.as_str()
+    match (parse_iso8601(due).ok(), parse_iso8601(&now).ok()) {
+        (Some(due_dt), Some(now_dt)) => due_dt < now_dt,
+        _ => due < now.as_str(),
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

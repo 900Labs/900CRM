@@ -91,12 +91,19 @@ export function formatDate(
 /**
  * Format an ISO timestamp as a relative time string (e.g. "3 hours ago").
  *
- * Falls back to absolute date if the timestamp is older than 7 days.
+ * Uses `Intl.RelativeTimeFormat` with the active i18n locale and
+ * `{ numeric: 'auto' }` so values like "now", "yesterday", or "in 2 days"
+ * are produced naturally. Falls back to compact English when `Intl` is
+ * unavailable.
  *
- * @param iso  ISO 8601 string or timestamp
- * @returns    Human-readable relative time string
+ * @param iso    ISO 8601 string or timestamp
+ * @param locale Optional BCP 47 locale override (defaults to active i18n locale)
+ * @returns      Human-readable relative time string
  */
-export function formatRelativeTime(iso: string | null | undefined): string {
+export function formatRelativeTime(
+  iso: string | null | undefined,
+  locale?: string,
+): string {
   if (!iso) return '';
 
   const date = new Date(iso);
@@ -109,14 +116,38 @@ export function formatRelativeTime(iso: string | null | undefined): string {
   const hours = Math.floor(mins / 60);
   const days  = Math.floor(hours / 24);
 
-  if (secs < 60)        return 'just now';
-  if (mins < 60)        return `${mins}m ago`;
-  if (hours < 24)       return `${hours}h ago`;
-  if (days === 1)       return 'yesterday';
-  if (days < 7)         return `${days}d ago`;
-  if (days < 30)        return `${Math.floor(days / 7)}w ago`;
-  if (days < 365)       return `${Math.floor(days / 30)}mo ago`;
-  return `${Math.floor(days / 365)}y ago`;
+  const resolvedLocale =
+    locale ??
+    (typeof document !== 'undefined' && document.documentElement.lang
+      ? document.documentElement.lang
+      : 'en');
+
+  if (typeof Intl === 'undefined' || typeof Intl.RelativeTimeFormat !== 'function') {
+    if (secs < 60)  return 'just now';
+    if (mins < 60)  return `${mins}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days === 1) return 'yesterday';
+    if (days < 7)   return `${days}d ago`;
+    if (days < 30)  return `${Math.floor(days / 7)}w ago`;
+    if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+    return `${Math.floor(days / 365)}y ago`;
+  }
+
+  const rtf = new Intl.RelativeTimeFormat(resolvedLocale, { numeric: 'auto' });
+
+  try {
+    if (secs < 60)  return rtf.format(-Math.round(diff / 1000), 'second');
+    if (mins < 60)  return rtf.format(-mins, 'minute');
+    if (hours < 24) return rtf.format(-hours, 'hour');
+    if (days < 7)   return rtf.format(-days, 'day');
+    if (days < 30)  return rtf.format(-Math.floor(days / 7), 'week');
+    if (days < 365) return rtf.format(-Math.floor(days / 30), 'month');
+    return rtf.format(-Math.floor(days / 365), 'year');
+  } catch {
+    if (days < 30)  return `${Math.floor(days / 7)}w ago`;
+    if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+    return `${Math.floor(days / 365)}y ago`;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
