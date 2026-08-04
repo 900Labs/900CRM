@@ -9,7 +9,7 @@
 //! - Contact merge (combine two contacts into one, keeping best data).
 //! - Organization linking (attach a person to an organization contact).
 
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
 use crate::storage::contacts::{self, Contact};
@@ -301,6 +301,125 @@ pub fn merge_contacts(
         Some(merged_organization_id),
         Some(&merged_notes),
     )?;
+
+    let now = crate::utils::datetime::now_iso8601();
+    let tx = conn.unchecked_transaction()?;
+
+    tx.execute(
+        "UPDATE deals SET contact_id = ?1 WHERE contact_id = ?2",
+        params![target_id, source_id],
+    )?;
+
+    tx.execute(
+        "UPDATE activities SET contact_id = ?1 WHERE contact_id = ?2",
+        params![target_id, source_id],
+    )?;
+
+    tx.execute(
+        "UPDATE notes SET entity_id = ?1 WHERE entity_type = 'contact' AND entity_id = ?2",
+        params![target_id, source_id],
+    )?;
+
+    tx.execute(
+        r#"
+        DELETE FROM custom_field_values
+        WHERE entity_id = ?2
+          AND field_def_id IN (SELECT id FROM custom_field_defs WHERE entity_type = 'contact')
+          AND field_def_id IN (
+              SELECT field_def_id FROM custom_field_values WHERE entity_id = ?1
+          )
+        "#,
+        params![target_id, source_id],
+    )?;
+    tx.execute(
+        r#"
+        UPDATE custom_field_values
+        SET entity_id = ?1
+        WHERE entity_id = ?2
+          AND field_def_id IN (SELECT id FROM custom_field_defs WHERE entity_type = 'contact')
+        "#,
+        params![target_id, source_id],
+    )?;
+
+    tx.execute(
+        r#"
+        UPDATE deal_contacts
+        SET deleted_at = ?3
+        WHERE contact_id = ?2
+          AND deleted_at IS NULL
+          AND deal_id IN (
+              SELECT deal_id FROM deal_contacts
+              WHERE contact_id = ?1 AND deleted_at IS NULL
+          )
+        "#,
+        params![target_id, source_id, now],
+    )?;
+    tx.execute(
+        "UPDATE deal_contacts SET contact_id = ?1 WHERE contact_id = ?2",
+        params![target_id, source_id],
+    )?;
+
+    tx.execute(
+        r#"
+        UPDATE activity_links
+        SET deleted_at = ?3
+        WHERE entity_type = 'contact'
+          AND entity_id = ?2
+          AND deleted_at IS NULL
+          AND activity_id IN (
+              SELECT activity_id FROM activity_links
+              WHERE entity_type = 'contact' AND entity_id = ?1 AND deleted_at IS NULL
+          )
+        "#,
+        params![target_id, source_id, now],
+    )?;
+    tx.execute(
+        "UPDATE activity_links SET entity_id = ?1 WHERE entity_type = 'contact' AND entity_id = ?2",
+        params![target_id, source_id],
+    )?;
+
+    tx.execute(
+        r#"
+        DELETE FROM entity_tags
+        WHERE entity_type = 'contact'
+          AND entity_id = ?2
+          AND tag_id IN (
+              SELECT tag_id FROM entity_tags
+              WHERE entity_type = 'contact' AND entity_id = ?1
+          )
+        "#,
+        params![target_id, source_id],
+    )?;
+    tx.execute(
+        "UPDATE entity_tags SET entity_id = ?1 WHERE entity_type = 'contact' AND entity_id = ?2",
+        params![target_id, source_id],
+    )?;
+
+    tx.execute(
+        r#"
+        UPDATE tag_links
+        SET deleted_at = ?3
+        WHERE entity_type = 'contact'
+          AND entity_id = ?2
+          AND deleted_at IS NULL
+          AND tag_id IN (
+              SELECT tag_id FROM tag_links
+              WHERE entity_type = 'contact' AND entity_id = ?1 AND deleted_at IS NULL
+          )
+        "#,
+        params![target_id, source_id, now],
+    )?;
+    tx.execute(
+        "UPDATE tag_links SET entity_id = ?1 WHERE entity_type = 'contact' AND entity_id = ?2",
+        params![target_id, source_id],
+    )?;
+
+    tx.execute(
+        "UPDATE contacts SET org_id = ?1, updated_at = ?3 WHERE org_id = ?2",
+        params![target_id, source_id, now],
+    )?;
+
+    tx.commit()?;
 
     // Soft-delete the source contact.
     contacts::soft_delete_contact(conn, source_id)?;

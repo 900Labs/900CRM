@@ -3,6 +3,9 @@ use tauri::State;
 
 use crate::AppState;
 
+const DEFAULT_UPCOMING_ACTIVITIES_LIMIT: u32 = 10;
+const MAX_UPCOMING_ACTIVITIES_LIMIT: u32 = 200;
+
 #[tauri::command]
 pub async fn create_activity(
     state: State<'_, AppState>,
@@ -63,7 +66,7 @@ pub async fn list_upcoming_activities(
     limit: Option<u32>,
 ) -> Result<Vec<Activity>, String> {
     let core = super::lock_core(&state)?;
-    core.list_upcoming_activities(limit.unwrap_or(10))
+    core.list_upcoming_activities(upcoming_activities_limit(limit))
         .map_err(|e| e.to_string())
 }
 
@@ -134,6 +137,12 @@ pub(crate) fn nullable_update_from_args(
     })
 }
 
+fn upcoming_activities_limit(limit: Option<u32>) -> u32 {
+    limit
+        .unwrap_or(DEFAULT_UPCOMING_ACTIVITIES_LIMIT)
+        .clamp(1, MAX_UPCOMING_ACTIVITIES_LIMIT)
+}
+
 #[tauri::command]
 pub async fn delete_activity(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let mut core = super::lock_core(&state)?;
@@ -176,7 +185,10 @@ pub async fn remove_activity_link(
 
 #[cfg(test)]
 mod tests {
-    use super::nullable_update_from_args;
+    use super::{
+        nullable_update_from_args, upcoming_activities_limit, DEFAULT_UPCOMING_ACTIVITIES_LIMIT,
+        MAX_UPCOMING_ACTIVITIES_LIMIT,
+    };
 
     #[test]
     fn nullable_update_from_args_distinguishes_no_change_reset_blank_and_set() {
@@ -198,6 +210,20 @@ mod tests {
         assert_eq!(
             nullable_update_from_args(Some("deal-1".to_string()), Some(true)),
             Some(None)
+        );
+    }
+
+    #[test]
+    fn upcoming_activities_limit_defaults_and_clamps_to_storage_bounds() {
+        assert_eq!(
+            upcoming_activities_limit(None),
+            DEFAULT_UPCOMING_ACTIVITIES_LIMIT
+        );
+        assert_eq!(upcoming_activities_limit(Some(0)), 1);
+        assert_eq!(upcoming_activities_limit(Some(25)), 25);
+        assert_eq!(
+            upcoming_activities_limit(Some(5_000)),
+            MAX_UPCOMING_ACTIVITIES_LIMIT
         );
     }
 }

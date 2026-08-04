@@ -20,6 +20,8 @@ use crate::AppState;
 
 static PRE_IMPORT_BACKUP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+const MAX_IMPORT_FILE_BYTES: u64 = 100 * 1024 * 1024;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportWithBackupResult {
     pub import: ImportResult,
@@ -42,6 +44,11 @@ pub async fn import_contacts_csv(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_contacts_csv_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -55,6 +62,11 @@ pub async fn import_contacts_csv_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_contacts_csv_with_mapping_and_options(
             &file_path,
@@ -71,6 +83,11 @@ pub async fn import_contacts_json(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_contacts_json_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -84,6 +101,11 @@ pub async fn import_contacts_json_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_contacts_json_with_mapping_and_options(
             &file_path,
@@ -99,6 +121,11 @@ pub async fn preview_contacts_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<JsonImportPreview, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preview_contacts_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -109,6 +136,11 @@ pub async fn preflight_contacts_csv_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_contacts_csv_import(&file_path)
         .map_err(|e| e.to_string())
@@ -120,6 +152,11 @@ pub async fn preflight_contacts_csv_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_contacts_csv_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -130,6 +167,11 @@ pub async fn preflight_contacts_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_contacts_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -141,6 +183,11 @@ pub async fn preflight_contacts_json_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_contacts_json_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -151,6 +198,10 @@ pub async fn export_contacts_csv(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_contacts_csv(&file_path)
         .map_err(|e| e.to_string())
@@ -161,6 +212,10 @@ pub async fn export_contacts_json(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_contacts_json(&file_path)
         .map_err(|e| e.to_string())
@@ -171,6 +226,10 @@ pub async fn export_audit_log_csv(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_audit_log_csv(&file_path)
         .map_err(|e| e.to_string())
@@ -181,6 +240,10 @@ pub async fn export_audit_log_json(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_audit_log_json(&file_path)
         .map_err(|e| e.to_string())
@@ -191,6 +254,10 @@ pub async fn export_proposed_actions_csv(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_proposed_actions_csv(&file_path)
         .map_err(|e| e.to_string())
@@ -201,6 +268,10 @@ pub async fn export_proposed_actions_json(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_proposed_actions_json(&file_path)
         .map_err(|e| e.to_string())
@@ -211,6 +282,10 @@ pub async fn export_external_clients_csv(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_external_clients_csv(&file_path)
         .map_err(|e| e.to_string())
@@ -221,6 +296,10 @@ pub async fn export_external_clients_json(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_external_clients_json(&file_path)
         .map_err(|e| e.to_string())
@@ -231,6 +310,10 @@ pub async fn export_external_client_permissions_csv(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_external_client_permissions_csv(&file_path)
         .map_err(|e| e.to_string())
@@ -241,6 +324,10 @@ pub async fn export_external_client_permissions_json(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_external_client_permissions_json(&file_path)
         .map_err(|e| e.to_string())
@@ -252,6 +339,11 @@ pub async fn import_deals_csv(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_deals_csv_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -265,6 +357,11 @@ pub async fn import_deals_csv_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_deals_csv_with_mapping_and_options(
             &file_path,
@@ -281,6 +378,11 @@ pub async fn import_deals_json(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_deals_json_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -294,6 +396,11 @@ pub async fn import_deals_json_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_deals_json_with_mapping_and_options(
             &file_path,
@@ -309,6 +416,11 @@ pub async fn preview_deals_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<JsonImportPreview, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preview_deals_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -319,6 +431,11 @@ pub async fn preflight_deals_csv_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_deals_csv_import(&file_path)
         .map_err(|e| e.to_string())
@@ -330,6 +447,11 @@ pub async fn preflight_deals_csv_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_deals_csv_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -340,6 +462,11 @@ pub async fn preflight_deals_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_deals_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -351,6 +478,11 @@ pub async fn preflight_deals_json_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_deals_json_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -361,6 +493,10 @@ pub async fn export_deals_csv(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_deals_csv(&file_path).map_err(|e| e.to_string())
 }
@@ -370,6 +506,10 @@ pub async fn export_deals_json(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_deals_json(&file_path)
         .map_err(|e| e.to_string())
@@ -381,6 +521,11 @@ pub async fn import_activities_csv(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_activities_csv_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -394,6 +539,11 @@ pub async fn import_activities_csv_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_activities_csv_with_mapping_and_options(
             &file_path,
@@ -410,6 +560,11 @@ pub async fn import_activities_json(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_activities_json_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -423,6 +578,11 @@ pub async fn import_activities_json_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_activities_json_with_mapping_and_options(
             &file_path,
@@ -438,6 +598,11 @@ pub async fn preview_activities_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<JsonImportPreview, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preview_activities_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -448,6 +613,11 @@ pub async fn preflight_activities_csv_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_activities_csv_import(&file_path)
         .map_err(|e| e.to_string())
@@ -459,6 +629,11 @@ pub async fn preflight_activities_csv_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_activities_csv_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -469,6 +644,11 @@ pub async fn preflight_activities_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_activities_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -480,6 +660,11 @@ pub async fn preflight_activities_json_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_activities_json_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -490,6 +675,10 @@ pub async fn export_activities_csv(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_activities_csv(&file_path)
         .map_err(|e| e.to_string())
@@ -500,6 +689,10 @@ pub async fn export_activities_json(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_activities_json(&file_path)
         .map_err(|e| e.to_string())
@@ -511,6 +704,11 @@ pub async fn import_notes_csv(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_notes_csv_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -524,6 +722,11 @@ pub async fn import_notes_csv_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_notes_csv_with_mapping_and_options(
             &file_path,
@@ -540,6 +743,11 @@ pub async fn import_notes_json(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_notes_json_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -553,6 +761,11 @@ pub async fn import_notes_json_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_notes_json_with_mapping_and_options(
             &file_path,
@@ -568,6 +781,11 @@ pub async fn preview_notes_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<JsonImportPreview, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preview_notes_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -578,6 +796,11 @@ pub async fn preflight_notes_csv_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_notes_csv_import(&file_path)
         .map_err(|e| e.to_string())
@@ -589,6 +812,11 @@ pub async fn preflight_notes_csv_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_notes_csv_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -599,6 +827,11 @@ pub async fn preflight_notes_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_notes_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -610,6 +843,11 @@ pub async fn preflight_notes_json_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_notes_json_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -620,6 +858,10 @@ pub async fn export_notes_csv(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_notes_csv(&file_path).map_err(|e| e.to_string())
 }
@@ -629,6 +871,10 @@ pub async fn export_notes_json(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_notes_json(&file_path)
         .map_err(|e| e.to_string())
@@ -640,6 +886,11 @@ pub async fn import_tag_definitions_csv(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_tag_definitions_csv_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -653,6 +904,11 @@ pub async fn import_tag_definitions_csv_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_tag_definitions_csv_with_mapping_and_options(
             &file_path,
@@ -669,6 +925,11 @@ pub async fn import_tag_definitions_json(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_tag_definitions_json_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -682,6 +943,11 @@ pub async fn import_tag_definitions_json_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_tag_definitions_json_with_mapping_and_options(
             &file_path,
@@ -697,6 +963,11 @@ pub async fn preview_tag_definitions_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<JsonImportPreview, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preview_tag_definitions_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -707,6 +978,11 @@ pub async fn preflight_tag_definitions_csv_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_tag_definitions_csv_import(&file_path)
         .map_err(|e| e.to_string())
@@ -718,6 +994,11 @@ pub async fn preflight_tag_definitions_csv_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_tag_definitions_csv_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -728,6 +1009,11 @@ pub async fn preflight_tag_definitions_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_tag_definitions_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -739,6 +1025,11 @@ pub async fn preflight_tag_definitions_json_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_tag_definitions_json_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -749,6 +1040,10 @@ pub async fn export_tag_definitions_csv(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_tag_definitions_csv(&file_path)
         .map_err(|e| e.to_string())
@@ -759,6 +1054,10 @@ pub async fn export_tag_definitions_json(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_tag_definitions_json(&file_path)
         .map_err(|e| e.to_string())
@@ -770,6 +1069,11 @@ pub async fn import_custom_field_definitions_csv(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_custom_field_definitions_csv_with_options(
             &file_path,
@@ -786,6 +1090,11 @@ pub async fn import_custom_field_definitions_csv_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_custom_field_definitions_csv_with_mapping_and_options(
             &file_path,
@@ -802,6 +1111,11 @@ pub async fn import_custom_field_definitions_json(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_custom_field_definitions_json_with_options(
             &file_path,
@@ -818,6 +1132,11 @@ pub async fn import_custom_field_definitions_json_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_custom_field_definitions_json_with_mapping_and_options(
             &file_path,
@@ -833,6 +1152,11 @@ pub async fn preview_custom_field_definitions_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<JsonImportPreview, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preview_custom_field_definitions_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -843,6 +1167,11 @@ pub async fn preflight_custom_field_definitions_csv_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_custom_field_definitions_csv_import(&file_path)
         .map_err(|e| e.to_string())
@@ -854,6 +1183,11 @@ pub async fn preflight_custom_field_definitions_csv_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_custom_field_definitions_csv_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -864,6 +1198,11 @@ pub async fn preflight_custom_field_definitions_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_custom_field_definitions_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -875,6 +1214,11 @@ pub async fn preflight_custom_field_definitions_json_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_custom_field_definitions_json_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -885,6 +1229,10 @@ pub async fn export_custom_field_definitions_csv(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_custom_field_definitions_csv(&file_path)
         .map_err(|e| e.to_string())
@@ -895,6 +1243,10 @@ pub async fn export_custom_field_definitions_json(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_custom_field_definitions_json(&file_path)
         .map_err(|e| e.to_string())
@@ -906,6 +1258,11 @@ pub async fn import_tag_links_csv(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_tag_links_csv_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -919,6 +1276,11 @@ pub async fn import_tag_links_csv_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_tag_links_csv_with_mapping_and_options(
             &file_path,
@@ -935,6 +1297,11 @@ pub async fn import_tag_links_json(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_tag_links_json_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -948,6 +1315,11 @@ pub async fn import_tag_links_json_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_tag_links_json_with_mapping_and_options(
             &file_path,
@@ -963,6 +1335,11 @@ pub async fn preview_tag_links_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<JsonImportPreview, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preview_tag_links_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -973,6 +1350,11 @@ pub async fn preflight_tag_links_csv_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_tag_links_csv_import(&file_path)
         .map_err(|e| e.to_string())
@@ -984,6 +1366,11 @@ pub async fn preflight_tag_links_csv_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_tag_links_csv_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -994,6 +1381,11 @@ pub async fn preflight_tag_links_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_tag_links_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -1005,6 +1397,11 @@ pub async fn preflight_tag_links_json_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_tag_links_json_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -1015,6 +1412,10 @@ pub async fn export_tag_links_csv(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_tag_links_csv(&file_path)
         .map_err(|e| e.to_string())
@@ -1025,6 +1426,10 @@ pub async fn export_tag_links_json(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_tag_links_json(&file_path)
         .map_err(|e| e.to_string())
@@ -1036,6 +1441,11 @@ pub async fn import_organizations_csv(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_organizations_csv_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -1049,6 +1459,11 @@ pub async fn import_organizations_csv_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_organizations_csv_with_mapping_and_options(
             &file_path,
@@ -1065,6 +1480,11 @@ pub async fn import_organizations_json(
     file_path: String,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_organizations_json_with_options(&file_path, import_options(merge_duplicates))
             .map_err(|e| e.to_string())
@@ -1078,6 +1498,11 @@ pub async fn import_organizations_json_with_mapping(
     mapping: ImportColumnMapping,
     merge_duplicates: Option<bool>,
 ) -> Result<ImportWithBackupResult, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     import_with_pre_import_backup(&state, |core| {
         core.import_organizations_json_with_mapping_and_options(
             &file_path,
@@ -1093,6 +1518,11 @@ pub async fn preview_organizations_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<JsonImportPreview, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preview_organizations_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -1103,6 +1533,11 @@ pub async fn preflight_organizations_csv_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_organizations_csv_import(&file_path)
         .map_err(|e| e.to_string())
@@ -1114,6 +1549,11 @@ pub async fn preflight_organizations_csv_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_organizations_csv_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -1124,6 +1564,11 @@ pub async fn preflight_organizations_json_import(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_organizations_json_import(&file_path)
         .map_err(|e| e.to_string())
@@ -1135,6 +1580,11 @@ pub async fn preflight_organizations_json_import_with_mapping(
     file_path: String,
     mapping: ImportColumnMapping,
 ) -> Result<ImportPreflightReport, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
+    enforce_size_limit(&file_path)?;
     let core = super::lock_core(&state)?;
     core.preflight_organizations_json_import_with_mapping(&file_path, mapping)
         .map_err(|e| e.to_string())
@@ -1145,6 +1595,10 @@ pub async fn export_organizations_csv(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_organizations_csv(&file_path)
         .map_err(|e| e.to_string())
@@ -1155,6 +1609,10 @@ pub async fn export_organizations_json(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.export_organizations_json(&file_path)
         .map_err(|e| e.to_string())
@@ -1170,6 +1628,26 @@ where
     let mut core = super::lock_core(state)?;
     let backup_dir = next_pre_import_backup_dir(&state.data_dir)?;
     create_backup_then_import(&mut core, &backup_dir, import)
+}
+
+/// Rejects import paths that are not regular files or that exceed the size cap.
+fn enforce_size_limit(path: &str) -> Result<(), String> {
+    use std::fs;
+    let meta = match fs::metadata(path) {
+        Ok(m) => m,
+        Err(_) => return Ok(()),
+    };
+    if !meta.is_file() {
+        return Err("Import path is not a regular file.".to_string());
+    }
+    if meta.len() > MAX_IMPORT_FILE_BYTES {
+        return Err(format!(
+            "Import file is too large ({} bytes); the maximum is {} bytes.",
+            meta.len(),
+            MAX_IMPORT_FILE_BYTES
+        ));
+    }
+    Ok(())
 }
 
 fn import_options(merge_duplicates: Option<bool>) -> ImportOptions {

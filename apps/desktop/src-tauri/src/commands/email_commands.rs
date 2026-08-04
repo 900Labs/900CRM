@@ -5,7 +5,7 @@
 //! introducing always-on background sync or heavy protocol stacks.
 
 use std::io::{Read, Write};
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::{IpAddr, SocketAddr, TcpStream, ToSocketAddrs};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -74,8 +74,8 @@ pub async fn test_email_server_connection(
         let started = Instant::now();
         let addr_string = format!("{}:{}", host_for_task, port);
 
-        let mut addrs = match addr_string.to_socket_addrs() {
-            Ok(it) => it,
+        let addrs: Vec<SocketAddr> = match addr_string.to_socket_addrs() {
+            Ok(it) => it.collect(),
             Err(err) => {
                 return EmailConnectionTestResult {
                     protocol,
@@ -89,7 +89,7 @@ pub async fn test_email_server_connection(
             }
         };
 
-        let addr = match addrs.next() {
+        let addr = match addrs.into_iter().find(|a| !is_disallowed_address(a.ip())) {
             Some(a) => a,
             None => {
                 return EmailConnectionTestResult {
@@ -98,7 +98,8 @@ pub async fn test_email_server_connection(
                     port,
                     success: false,
                     latency_ms: started.elapsed().as_millis(),
-                    details: "No address resolved for host".to_string(),
+                    details: "Host resolves to a disallowed (private/loopback/metadata) address"
+                        .to_string(),
                     banner: None,
                 };
             }
@@ -176,5 +177,24 @@ fn probe_banner(stream: &mut TcpStream, protocol: &EmailProtocol, port: u16) -> 
             }
         }
         _ => None,
+    }
+}
+
+/// Returns `true` for addresses a connection test must not contact: loopback,
+/// unspecified, private, link-local (incl. cloud metadata `169.254.169.254`),
+/// broadcast/multicast, and IPv6 unique-local ranges.
+fn is_disallowed_address(addr: IpAddr) -> bool {
+    if addr.is_loopback() || addr.is_unspecified() || addr.is_multicast() {
+        return true;
+    }
+    match addr {
+        IpAddr::V4(v4) => v4.is_private() || v4.is_link_local() || v4.is_broadcast(),
+        IpAddr::V6(v6) => {
+            let octets = v6.octets();
+            if octets[0] == 0xFE && (octets[1] & 0xC0) == 0x80 {
+                return true;
+            }
+            (octets[0] & 0xFE) == 0xFC
+        }
     }
 }

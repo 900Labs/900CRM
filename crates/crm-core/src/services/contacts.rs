@@ -5,6 +5,7 @@ use crate::storage::{
     self,
     contacts::{Contact, ContactDuplicateCandidate, ContactListParams, ContactListResult},
 };
+use crate::utils::errors::CrmError;
 
 use super::{record_audit_json, CrmCore};
 
@@ -104,6 +105,17 @@ impl CrmCore {
         country: Option<String>,
         notes: Option<String>,
     ) -> CrmResult<Contact> {
+        if let Some(ct) = contact_type.as_deref() {
+            if ct != "person" && ct != "organization" {
+                return Err(CrmError::InvalidInput(format!(
+                    "Invalid contact_type '{}'. Must be 'person' or 'organization'",
+                    ct
+                )));
+            }
+        }
+
+        contact_engine::validate_email_if_present(email.as_deref())?;
+
         let before = storage::contacts::get_contact(&self.db.conn, id)?;
         let device_id = self.device_id.clone();
         let tx = self.db.conn.unchecked_transaction()?;

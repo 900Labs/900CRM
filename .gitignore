@@ -1,4 +1,3 @@
-/pdf/
 node_modules/
 .svelte-kit/
 dist/
@@ -9,4 +8,13 @@ src-tauri/target/
 apps/desktop/src-tauri/target/
 src-tauri/gen/
 apps/desktop/src-tauri/gen/
+.env
+.env.*
+!.env.example
+*.local
+.idea/
+.vscode/
+coverage/
+playwright-report/
+playwright/.cache/
 .DS_Store

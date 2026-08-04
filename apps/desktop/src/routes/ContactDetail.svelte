@@ -15,6 +15,7 @@
 
   import { t } from '$lib/i18n';
   import { contactStore } from '$lib/stores/contacts';
+  import { organizationStore } from '$lib/stores/organizations';
   import { dealStore } from '$lib/stores/deals';
   import { activityStore } from '$lib/stores/activities';
   import { uiStore } from '$lib/stores/ui';
@@ -44,7 +45,6 @@
   import { navigateHash } from '$lib/utils/hashRouter';
   import { validateEmail, validateUrl } from '$lib/utils/validators';
   import NoteEditor from '$lib/components/NoteEditor.svelte';
-  import TagPicker from '$lib/components/TagPicker.svelte';
   import EntityNotesPanel from '$lib/components/EntityNotesPanel.svelte';
   import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
@@ -72,6 +72,7 @@
   let email = $state('');
   let phone = $state('');
   let organization = $state('');
+  let selectedOrgId = $state('');
   let website = $state('');
   let address = $state('');
   let contactType = $state<'person' | 'org'>('person');
@@ -109,7 +110,7 @@
     contact ? formatInitials(contact.firstName, contact.lastName) : '?'
   );
 
-  const avatarColor = $derived(() => {
+  const avatarColor = $derived.by(() => {
     if (!contact) return 0;
     const str = contact.firstName + contact.lastName;
     let hash = 0;
@@ -272,6 +273,9 @@
         dealStore.loadDeals({ contactId }),
         loadContactTimeline(contactId),
         loadCustomFields(contactId),
+        organizationStore.organizations.length === 0
+          ? organizationStore.loadOrganizations()
+          : Promise.resolve(),
       ]);
       lastActivityRefreshVersion = activityStore.relationshipRefreshVersion;
     } catch (err) {
@@ -316,6 +320,7 @@
     email        = c.email ?? '';
     phone        = c.phone ?? '';
     organization = c.organization ?? '';
+    selectedOrgId = c.organizationId ?? '';
     website      = c.website ?? '';
     address      = c.address ?? '';
     contactType  = c.type;
@@ -440,6 +445,12 @@
     isDirty = true;
   }
 
+  function handleOrgChange() {
+    const org = organizationStore.organizations.find((o) => o.id === selectedOrgId);
+    organization = org ? org.name : '';
+    markDirty();
+  }
+
   function validateForm(): boolean {
     emailError   = null;
     websiteError = null;
@@ -476,6 +487,16 @@
       const updated = await contactStore.updateContact(contact.id, payload);
       await persistCustomFields(contact.id);
       contact = updated;
+      const nextOrgId = selectedOrgId || null;
+      if (nextOrgId !== updated.organizationId) {
+        try {
+          await organizationStore.linkContactToOrganization(updated.id, nextOrgId);
+          contact = { ...updated, organizationId: nextOrgId };
+        } catch (linkErr) {
+          // error already toasted by store
+          console.error('[ContactDetail] Failed to link organization:', linkErr);
+        }
+      }
       originalCustomFieldValues = { ...customFieldValues };
       isDirty = false;
     } catch (err) {
@@ -521,11 +542,6 @@
     isDirty = true;
     // Auto-save notes immediately
     handleSave();
-  }
-
-  function handleTagsChange(newTags: string[]) {
-    tags = newTags;
-    isDirty = true;
   }
 
   async function handleComposeEmail() {
@@ -582,7 +598,7 @@
         </button>
 
         <div class="contact-identity">
-          <div class="avatar avatar-lg avatar-color-{avatarColor()}" aria-hidden="true">
+          <div class="avatar avatar-lg avatar-color-{avatarColor}" aria-hidden="true">
             {initials}
           </div>
           <div class="identity-text">
@@ -767,14 +783,18 @@
               <!-- Organization -->
               <div class="field-group">
                 <label class="field-label" for="organization">{t('contacts.organization')}</label>
-                <input
+                <select
                   id="organization"
                   class="input"
-                  type="text"
-                  bind:value={organization}
-                  oninput={markDirty}
-                  autocomplete="organization"
-                />
+                  bind:value={selectedOrgId}
+                  onchange={handleOrgChange}
+                  disabled={organizationStore.isLoading}
+                >
+                  <option value="">{t('common.none')}</option>
+                  {#each organizationStore.organizations as org (org.id)}
+                    <option value={org.id}>{org.name}</option>
+                  {/each}
+                </select>
               </div>
 
               <!-- Website -->
@@ -853,13 +873,13 @@
         <!-- Custom fields card -->
         <section class="card detail-custom-fields" aria-labelledby="custom-fields-heading">
           <div class="card-header">
-            <h2 class="section-title" id="custom-fields-heading">Custom Fields</h2>
+            <h2 class="section-title" id="custom-fields-heading">{t('common.customFields')}</h2>
           </div>
           <div class="card-body">
             {#if customFieldsLoading}
               <p class="custom-fields-placeholder">{t('common.loading')}</p>
             {:else if customFieldDefinitions.length === 0}
-              <p class="custom-fields-placeholder">No custom fields configured.</p>
+              <p class="custom-fields-placeholder">{t('common.noCustomFields')}</p>
             {:else}
               <CustomFieldInputs
                 definitions={customFieldDefinitions}
@@ -888,19 +908,6 @@
           </div>
           <div class="card-body">
             <EntityNotesPanel entityType="contact" entityId={contact.id} />
-          </div>
-        </section>
-
-        <!-- Legacy tags card -->
-        <section class="card detail-tags" aria-labelledby="legacy-tags-heading">
-          <div class="card-header">
-            <h2 class="section-title" id="legacy-tags-heading">{t('contacts.legacyTags')}</h2>
-          </div>
-          <div class="card-body">
-            <TagPicker
-              bind:tags={tags}
-              onchange={handleTagsChange}
-            />
           </div>
         </section>
 

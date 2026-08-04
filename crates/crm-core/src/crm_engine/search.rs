@@ -87,13 +87,11 @@ pub fn unified_search(conn: &Connection, query: &str, limit: u32) -> CrmResult<V
     let clamped_limit = limit.min(MAX_SEARCH_LIMIT) as i64;
     let mut results: Vec<SearchResult> = Vec::new();
 
-    let contact_results = search_storage::search_contacts_full_text(conn, q, clamped_limit)?;
+    let contact_results = match search_storage::search_contacts_full_text(conn, q, clamped_limit) {
+        Ok(records) if !records.is_empty() => records,
+        Ok(_) | Err(_) => search_storage::search_contacts_fallback(conn, q, clamped_limit)?,
+    };
     results.extend(contact_results.into_iter().map(contact_record_to_result));
-
-    if results.is_empty() {
-        let fallback = search_storage::search_contacts_fallback(conn, q, clamped_limit)?;
-        results.extend(fallback.into_iter().map(contact_record_to_result));
-    }
 
     let organization_results = search_storage::search_organizations(conn, q, clamped_limit)?;
     results.extend(
@@ -175,7 +173,11 @@ fn deal_record_to_result(record: DealSearchRecord) -> SearchResult {
 
 fn activity_record_to_result(record: ActivitySearchRecord) -> SearchResult {
     let subtitle = match record.due_date {
-        Some(d) => format!("{} — due {}", record.activity_type, &d[..10.min(d.len())]),
+        Some(d) => format!(
+            "{} — due {}",
+            record.activity_type,
+            d.chars().take(10).collect::<String>()
+        ),
         None => record.activity_type,
     };
 

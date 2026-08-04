@@ -96,7 +96,7 @@ Create local SQLite backups from Settings, validate backup integrity before rest
 The entire interface is localized. Switch languages in settings instantly. Full right-to-left (RTL) layout support for Arabic and future RTL languages. Community translations welcome.
 
 ### Offline-First by Design
-Every core CRM feature works without an internet connection. There is no "offline mode" to enable because offline is the default. Sync configuration and changelog foundations exist for future team workflows, but real multi-device sync transport is not implemented today.
+Every core CRM feature works without an internet connection. There is no "offline mode" to enable because offline is the default. Sync configuration and changelog foundations exist for future team workflows, but real multi-device sync transport is not implemented today: `trigger_sync` explicitly reports a `not_implemented` state rather than claiming a successful sync.
 
 ### MCP Readiness
 MCP support is optional and is not started by the desktop app today. `crates/crm-mcp` now has a disabled-by-default local stdio boundary for reviewed read tools plus `create_activity_draft` pending-action creation; it is not a network server, token surface, AI agent, or direct write runtime. See [MCP Readiness Baseline](docs/MCP_READINESS.md) for the current boundaries and future acceptance checklist.
@@ -262,15 +262,22 @@ current-vs-remaining phase map.
 | Language | Code | Coverage | Status |
 |---|---|---|---|
 | English | `en` | 100% | Complete — base language |
-| French | `fr` | 100% | Complete |
-| Spanish | `es` | 100% | Complete |
-| Arabic | `ar` | 100% | Complete (RTL layout supported) |
-| Swahili | `sw` | 100% | Complete |
-| Portuguese (Brazil) | `pt` | 100% | Complete |
-| Vietnamese | `vi` | 100% | Complete |
-| Hausa | `ha` | 100% | Complete |
-| Bengali | `bn` | 100% | Complete |
-| Hindi | `hi` | 85% | In progress — contributions welcome |
+| Arabic | `ar` | 73% | In progress — contributions welcome (RTL layout supported) |
+| Hausa | `ha` | 73% | In progress — contributions welcome |
+| Bengali | `bn` | 71% | In progress — contributions welcome |
+| French | `fr` | 71% | In progress — contributions welcome |
+| Hindi | `hi` | 71% | In progress — contributions welcome |
+| Portuguese (Brazil) | `pt` | 71% | In progress — contributions welcome |
+| Spanish | `es` | 71% | In progress — contributions welcome |
+| Swahili | `sw` | 71% | In progress — contributions welcome |
+| Vietnamese | `vi` | 71% | In progress — contributions welcome |
+
+Coverage is measured by translation-key parity against the English base locale
+(`en.json` is 100%). Each percentage is the count of localized keys present in a
+locale divided by the count in `en.json`, rounded to the nearest whole percent.
+The app falls back to English for any missing key, so untranslated strings still
+render in English; the numbers above show how much of the UI each locale fully
+localizes.
 
 To add a new language or improve an existing translation, see the [Translation Guide in CONTRIBUTING.md](CONTRIBUTING.md#translation-guide).
 
@@ -409,11 +416,13 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for full details on how to get st
 - [x] Custom fields on any entity type
 - [x] Reports and conversion funnels
 - [x] Desktop reminders and notifications
-- [x] Email integration (IMAP/SMTP, optional)
 - [x] Multi-currency display
 - [x] Local backup validation and restore UI
 - [x] Additional languages: Portuguese (Brazilian), Vietnamese
 - [x] Additional languages: Hausa, Bengali
+
+### In Progress
+- [ ] Email server connection test (SMTP/IMAP TCP reachability/banner probe only; full send/receive is not implemented)
 
 ### v2.0.0 — Planned (Long-term)
 - [ ] Plugin system for community extensions
