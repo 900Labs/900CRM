@@ -191,4 +191,5 @@ jobs:
         run: npm ci
 
       - name: Build and bundle (debug .deb)
-        run: npm run tauri -- build --bundles deb --debug
+        working-directory: apps/desktop
+        run: npx tauri build --bundles deb --debug
