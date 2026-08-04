@@ -13,6 +13,10 @@ pub async fn create_local_backup(
     state: State<'_, AppState>,
     backup_dir: String,
 ) -> Result<LocalBackup, String> {
+    let backup_dir = match super::path_guard::validate_export_path(&backup_dir) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.create_local_backup(Path::new(&backup_dir))
         .map_err(|e| e.to_string())

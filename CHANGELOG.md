@@ -8,6 +8,46 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Security — 2026-08-04
+- Tightened Tauri capability grants and narrowed the filesystem scope exposed to
+  the WebView so IPC and disk access match only what the app actually needs.
+- Added SSRF guards (private/loopback/link-local and cloud-metadata address
+  blocklist) to the email connection test so the reachability probe cannot be
+  used to scan internal networks.
+- Added command-boundary path validation (defense-in-depth) for import, export,
+  and backup paths to keep operations within the expected data directory.
+- Added an import file-size cap (100 MB) and non-regular-file rejection so a
+  compromised WebView cannot exhaust memory or hang the backend on huge or
+  non-regular inputs.
+
+### Fixed — 2026-08-04
+- Contact merge now reassigns related records (deals, activities, notes, tags,
+  custom fields, and organization links) to the surviving contact instead of
+  orphaning them when the source contact is removed.
+- Full-text search no longer aborts on metacharacters such as quotes and
+  asterisks; special characters are sanitized before reaching the FTS index.
+- Pagination offset no longer overflows on large page values.
+- Activity-completion and import-audit errors are no longer silently swallowed;
+  failures now surface to the caller.
+- Activity completion no longer records a phantom sync/audit transition when the
+  requested state already matches the current state, and now records the actual
+  prior value.
+- External-client permission evaluation and its audit entry now run in a single
+  transaction so the audit trail cannot diverge from the decision.
+
+### Changed — 2026-08-04
+- Sync status now honestly reports `not_implemented` instead of a fake
+  `success` result from `trigger_sync`; the local changelog is still written, but
+  no transport runs.
+- Added deal currency (ISO 4217) and expected-close date validation, and contact
+  update input validation.
+- Clamped global-search and upcoming-activity result limits to bounded maximums.
+
+### Build/CI — 2026-08-04
+- Added a cross-OS (Windows, macOS, Linux) Rust check matrix.
+- Added Rust build caching.
+- Added Dependabot configuration and dependency-hygiene cleanup.
+
 ### Added — 2026-06-24
 - Added release-readiness documentation that states the current verification-only
   CI status, manual release checklist, required future artifacts, and release

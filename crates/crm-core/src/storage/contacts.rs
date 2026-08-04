@@ -306,8 +306,10 @@ pub fn list_contacts(
     } else {
         "ASC"
     };
-    let offset = ((params.page.max(1) - 1) * params.per_page) as i64;
-    let limit = params.per_page as i64;
+    let per_page = params.per_page.clamp(1, 200);
+    let page = params.page.max(1);
+    let offset = ((page as i64) - 1) * (per_page as i64);
+    let limit = per_page as i64;
 
     // If there is a search query, use FTS5.
     if let Some(ref query) = params.search_query {
@@ -414,8 +416,8 @@ pub fn list_contacts(
     Ok(ContactListResult {
         contacts,
         total,
-        page: params.page,
-        per_page: params.per_page,
+        page,
+        per_page,
     })
 }
 
@@ -651,7 +653,7 @@ pub fn restore_contact(conn: &Connection, id: &str) -> CrmResult<Contact> {
 ///
 /// Returns [`CrmError::Database`] on SQL failure.
 pub fn search_contacts(conn: &Connection, query: &str) -> CrmResult<Vec<Contact>> {
-    let fts_query = format!("{}*", query.trim());
+    let fts_query = crate::storage::search::build_fts_match_query(query);
 
     let mut stmt = conn.prepare(
         r#"
@@ -851,9 +853,11 @@ fn search_contacts_paged(
     query: &str,
     params: &ContactListParams,
 ) -> CrmResult<ContactListResult> {
-    let fts_query = format!("{}*", query.trim());
-    let offset = ((params.page.max(1) - 1) * params.per_page) as i64;
-    let limit = params.per_page as i64;
+    let fts_query = crate::storage::search::build_fts_match_query(query);
+    let per_page = params.per_page.clamp(1, 200);
+    let page = params.page.max(1);
+    let offset = ((page as i64) - 1) * (per_page as i64);
+    let limit = per_page as i64;
     let apply_type_filter = params.filter_type.is_some();
     let apply_custom_filter = params
         .custom_field_def_id
@@ -947,8 +951,8 @@ fn search_contacts_paged(
     Ok(ContactListResult {
         contacts,
         total,
-        page: params.page,
-        per_page: params.per_page,
+        page,
+        per_page,
     })
 }
 

@@ -29,7 +29,13 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": [],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
     "shortDescription": "Offline-first CRM for developing nations",
     "longDescription": "900CRM is a free, open-source, offline-first Customer Relationship Management tool designed for businesses in developing economies. Built with Tauri, Svelte, and Rust, it works on low-bandwidth connections, older hardware, and intermittent internet. No cloud dependency required.",
     "copyright": "Copyright © 2026 900 Labs",
@@ -41,6 +47,8 @@
     }
   },
   "plugins": {
-    "fs": {}
+    "fs": {},
+    "shell": { "open": true },
+    "notification": {}
   }
 }

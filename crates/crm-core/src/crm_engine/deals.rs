@@ -10,6 +10,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::utils::datetime::parse_date_only;
 use crate::utils::errors::{CrmError, CrmResult};
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -101,6 +102,27 @@ pub fn validate_deal_for_create(input: &DealInput) -> CrmResult<()> {
                 "Probability must be between 0 and 100, got {}",
                 p
             )));
+        }
+    }
+
+    if let Some(currency) = &input.currency {
+        if !currency.is_empty() {
+            let is_iso4217 =
+                currency.len() == 3 && currency.chars().all(|c| c.is_ascii_uppercase());
+            if !is_iso4217 {
+                return Err(CrmError::InvalidInput(format!(
+                    "Currency must be a 3-letter ISO 4217 code (e.g. USD), got '{}'",
+                    currency
+                )));
+            }
+        }
+    }
+
+    if let Some(expected_close) = &input.expected_close {
+        if !expected_close.is_empty() && parse_date_only(expected_close).is_err() {
+            return Err(CrmError::InvalidInput(
+                "expected_close must be a valid date (YYYY-MM-DD)".to_string(),
+            ));
         }
     }
 

@@ -4,6 +4,23 @@ use rusqlite::{params, Connection};
 
 use crate::utils::errors::CrmResult;
 
+/// Builds a safe FTS5 MATCH string from arbitrary user input.
+///
+/// Each whitespace-separated token is wrapped in FTS5 phrase quotes — which
+/// neutralizes metacharacters (`"`, `*`, `(`, `)`, `:`) and reserved keywords
+/// such as `OR`/`AND`/`NOT` — and suffixed with a prefix `*` operator. Tokens
+/// that become empty after stripping embedded quotes are dropped. Returns an
+/// empty string for blank input.
+pub(crate) fn build_fts_match_query(raw: &str) -> String {
+    raw.split_whitespace()
+        .filter_map(|token| {
+            let cleaned: String = token.chars().filter(|c| *c != '"').collect();
+            (!cleaned.is_empty()).then(|| format!("\"{}\"*", cleaned))
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 #[derive(Debug, Clone)]
 pub struct ContactSearchRecord {
     pub id: String,
@@ -65,7 +82,7 @@ pub fn search_contacts_full_text(
     query: &str,
     limit: i64,
 ) -> CrmResult<Vec<ContactSearchRecord>> {
-    let fts_query = format!("{}*", query.trim());
+    let fts_query = build_fts_match_query(query);
     let mut stmt = conn.prepare(
         r#"
         SELECT c.id,
@@ -179,7 +196,7 @@ fn search_deals_full_text(
     query: &str,
     limit: i64,
 ) -> CrmResult<Vec<DealSearchRecord>> {
-    let fts_query = format!("{}*", query.trim());
+    let fts_query = build_fts_match_query(query);
     let mut stmt = conn.prepare(
         r#"
         SELECT d.id, d.title, d.stage, d.value, d.currency
@@ -222,7 +239,7 @@ fn search_activities_full_text(
     query: &str,
     limit: i64,
 ) -> CrmResult<Vec<ActivitySearchRecord>> {
-    let fts_query = format!("{}*", query.trim());
+    let fts_query = build_fts_match_query(query);
     let mut stmt = conn.prepare(
         r#"
         SELECT a.id, a.title, a.activity_type, a.due_date
@@ -300,7 +317,7 @@ fn search_organizations_full_text(
     query: &str,
     limit: i64,
 ) -> CrmResult<Vec<OrganizationSearchRecord>> {
-    let fts_query = format!("{}*", query.trim());
+    let fts_query = build_fts_match_query(query);
     let mut stmt = conn.prepare(
         r#"
         SELECT o.id, o.name, o.email, o.website, o.city, o.country
@@ -393,7 +410,7 @@ fn search_notes_full_text(
     query: &str,
     limit: i64,
 ) -> CrmResult<Vec<NoteSearchRecord>> {
-    let fts_query = format!("{}*", query.trim());
+    let fts_query = build_fts_match_query(query);
     let mut stmt = conn.prepare(
         r#"
         SELECT n.id,
@@ -471,7 +488,7 @@ fn search_tags_full_text(
     query: &str,
     limit: i64,
 ) -> CrmResult<Vec<TagSearchRecord>> {
-    let fts_query = format!("{}*", query.trim());
+    let fts_query = build_fts_match_query(query);
     let mut stmt = conn.prepare(
         r#"
         SELECT t.id, t.name, t.color

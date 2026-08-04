@@ -130,15 +130,18 @@ impl CrmCore {
         let client_id = required_external_client_field("client_id", client_id)?;
         let tool_name = required_external_client_field("tool_name", tool_name)?;
 
-        evaluate_external_client_permission_with_audit(
-            &self.db.conn,
+        let tx = self.db.conn.unchecked_transaction()?;
+        let outcome = evaluate_external_client_permission_with_audit(
+            &tx,
             ACTOR_DESKTOP_APP,
             &self.device_id,
             ExternalClientAccessKind::Read,
             &client_id,
             &tool_name,
             None,
-        )
+        );
+        tx.commit()?;
+        outcome
     }
 
     pub fn evaluate_external_client_draft_permission(
@@ -149,15 +152,18 @@ impl CrmCore {
         let client_id = required_external_client_field("client_id", client_id)?;
         let tool_name = required_external_client_field("tool_name", tool_name)?;
 
-        evaluate_external_client_permission_with_audit(
-            &self.db.conn,
+        let tx = self.db.conn.unchecked_transaction()?;
+        let outcome = evaluate_external_client_permission_with_audit(
+            &tx,
             ACTOR_DESKTOP_APP,
             &self.device_id,
             ExternalClientAccessKind::Draft,
             &client_id,
             &tool_name,
             None,
-        )
+        );
+        tx.commit()?;
+        outcome
     }
 
     pub fn record_external_client_tool_result(
