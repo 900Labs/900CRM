@@ -12,6 +12,8 @@
     "fs:allow-read-text-file",
     "shell:allow-open",
     "notification:default",
+    "updater:default",
+    "process:default",
     {
       "identifier": "fs:scope",
       "allow": ["$APPDATA/**", "$DOCUMENT/**", "$DESKTOP/**", "$DOWNLOAD/**"]
