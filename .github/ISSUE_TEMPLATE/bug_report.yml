@@ -1,0 +1,90 @@
+name: Bug report
+description: Report something that is not working as expected in 900CRM
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report! 900CRM is an offline-first
+        desktop app, so details about your OS and how to reproduce the issue help a lot.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug. What did you expect to happen, and what happened instead?
+      placeholder: "When I ..., I expected ... but instead ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The smallest set of steps that triggers the issue.
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 900CRM version
+      description: App version, or "from source" if you are running a development build.
+      placeholder: "e.g. 1.0.0 or from source"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error output
+      description: Paste any relevant error messages or console output. No need for backticks.
+      render: shell
+    validations:
+      required: false
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: Interface language
+      description: The language you had selected when the issue occurred (if relevant).
+      options:
+        - English
+        - French
+        - Spanish
+        - Arabic
+        - Swahili
+        - Portuguese (Brazil)
+        - Vietnamese
+        - Hausa
+        - Bengali
+        - Hindi
+        - Not relevant
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting, you agree to follow our [Code of Conduct](../CODE_OF_CONDUCT.md).
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
