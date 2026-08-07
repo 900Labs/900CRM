@@ -37,6 +37,8 @@
     type ExternalClient,
   } from '$lib/api/externalClients';
   import { testEmailServerConnection } from '$lib/api/email';
+  import { checkForUpdates, downloadAndInstallUpdate } from '$lib/api/updater';
+  import type { Update } from '@tauri-apps/plugin-updater';
   import ExternalClientPermissions from '$lib/components/ExternalClientPermissions.svelte';
   import ImportExport from '$lib/components/ImportExport.svelte';
 
@@ -45,6 +47,7 @@
   type ThemeOption = 'light' | 'dark' | 'system';
   type DateFormat  = 'YYYY-MM-DD' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'MMM D, YYYY';
   type ExternalClientActivationMode = EditableExternalClientPermissionMode;
+  type UpdateStatus = 'idle' | 'checking' | 'up-to-date' | 'update-available' | 'downloading' | 'error';
 
   interface SettingsShortcut {
     id: string;
@@ -149,6 +152,9 @@
   let externalClientActivationSaving = $state<Record<string, boolean>>({});
   let externalClientActivationMessages = $state<Record<string, string>>({});
   let externalClientActivationErrors = $state<Record<string, string>>({});
+
+  let updateStatus = $state<UpdateStatus>('idle');
+  let availableUpdate = $state<Update | null>(null);
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -666,6 +672,41 @@
       uiStore.toastError(`${t('settings.backupFailed')}: ${backupError}`);
     } finally {
       backupBusy = null;
+    }
+  }
+
+  // ── Updater ──────────────────────────────────────────────────────────────────
+
+  async function handleCheckForUpdates() {
+    if (updateStatus === 'checking' || updateStatus === 'downloading') return;
+    updateStatus = 'checking';
+    availableUpdate = null;
+    try {
+      const update = await checkForUpdates();
+      if (update) {
+        availableUpdate = update;
+        updateStatus = 'update-available';
+      } else {
+        updateStatus = 'up-to-date';
+      }
+    } catch (err) {
+      console.error('[Settings] update check failed:', err);
+      updateStatus = 'error';
+    }
+  }
+
+  async function handleDownloadAndInstall() {
+    const update = availableUpdate;
+    if (!update || updateStatus === 'downloading') return;
+    updateStatus = 'downloading';
+    try {
+      await downloadAndInstallUpdate(update);
+      updateStatus = 'idle';
+      availableUpdate = null;
+    } catch (err) {
+      console.error('[Settings] update install failed:', err);
+      uiStore.toastError(t('updater.installFailed'));
+      updateStatus = 'error';
     }
   }
 </script>
@@ -1198,6 +1239,58 @@
               GitHub
             </a>
           </div>
+        </div>
+      </section>
+
+      <!-- Check for Updates -->
+      <section class="card settings-section settings-updater" aria-labelledby="updater-heading">
+        <div class="card-header">
+          <h2 class="section-title" id="updater-heading">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/>
+            </svg>
+            {t('updater.title')}
+          </h2>
+        </div>
+        <div class="card-body updater-body">
+          <div class="updater-actions" aria-live="polite">
+            <button
+              class="btn btn-secondary btn-sm"
+              type="button"
+              onclick={handleCheckForUpdates}
+              disabled={updateStatus === 'checking' || updateStatus === 'downloading'}
+            >
+              {updateStatus === 'checking' ? t('updater.checking') : t('updater.checkForUpdates')}
+            </button>
+
+            {#if updateStatus === 'up-to-date'}
+              <span class="updater-message updater-message--success">{t('updater.upToDate')}</span>
+            {:else if updateStatus === 'error'}
+              <span class="updater-message updater-message--error">{t('updater.checkFailed')}</span>
+            {/if}
+          </div>
+
+          {#if (updateStatus === 'update-available' || updateStatus === 'downloading') && availableUpdate}
+            <div class="updater-available">
+              <span class="updater-message">
+                {t('updater.updateAvailable', { version: availableUpdate.version })}
+              </span>
+              <button
+                class="btn btn-primary btn-sm"
+                type="button"
+                onclick={handleDownloadAndInstall}
+                disabled={updateStatus === 'downloading'}
+              >
+                {updateStatus === 'downloading'
+                  ? t('updater.installing')
+                  : t('updater.downloadAndInstall')}
+              </button>
+            </div>
+          {/if}
+
+          {#if updateStatus === 'downloading'}
+            <span class="updater-message">{t('updater.downloading')}</span>
+          {/if}
         </div>
       </section>
 
@@ -1923,6 +2016,41 @@
 
   .about-meta-link:hover {
     text-decoration: underline;
+  }
+
+  /* ── Updater section ─────────────────────────────────────────────────────── */
+
+  .updater-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .updater-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+
+  .updater-available {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+
+  .updater-message {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+  }
+
+  .updater-message--success {
+    color: var(--color-success-600);
+  }
+
+  .updater-message--error {
+    color: var(--color-danger-600);
   }
 
   /* ── Data management ─────────────────────────────────────────────────────── */

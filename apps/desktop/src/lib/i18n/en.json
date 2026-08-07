@@ -775,5 +775,17 @@
     "decisionFailed": "Failed to decide pending action",
     "approveFailed": "Approval failed",
     "rejectFailed": "Rejection failed"
+  },
+  "updater": {
+    "title": "Updates",
+    "checkForUpdates": "Check for Updates",
+    "checking": "Checking for updates…",
+    "upToDate": "900CRM is up to date.",
+    "updateAvailable": "Version {version} is available.",
+    "downloadAndInstall": "Download and Install",
+    "downloading": "Downloading update…",
+    "installing": "Installing and restarting…",
+    "checkFailed": "Could not check for updates. Make sure you are connected to the internet.",
+    "installFailed": "Update installation failed."
   }
 }
