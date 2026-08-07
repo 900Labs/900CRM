@@ -262,22 +262,20 @@ current-vs-remaining phase map.
 | Language | Code | Coverage | Status |
 |---|---|---|---|
 | English | `en` | 100% | Complete — base language |
-| Arabic | `ar` | 73% | In progress — contributions welcome (RTL layout supported) |
-| Hausa | `ha` | 73% | In progress — contributions welcome |
-| Bengali | `bn` | 71% | In progress — contributions welcome |
-| French | `fr` | 71% | In progress — contributions welcome |
-| Hindi | `hi` | 71% | In progress — contributions welcome |
-| Portuguese (Brazil) | `pt` | 71% | In progress — contributions welcome |
-| Spanish | `es` | 71% | In progress — contributions welcome |
-| Swahili | `sw` | 71% | In progress — contributions welcome |
-| Vietnamese | `vi` | 71% | In progress — contributions welcome |
+| Arabic | `ar` | 100% | Machine-assisted — native review welcome (RTL layout supported) |
+| Hausa | `ha` | 100% | Machine-assisted — native review welcome |
+| Bengali | `bn` | 100% | Machine-assisted — native review welcome |
+| French | `fr` | 100% | Machine-assisted — native review welcome |
+| Hindi | `hi` | 100% | Machine-assisted — native review welcome |
+| Portuguese (Brazil) | `pt` | 100% | Machine-assisted — native review welcome |
+| Spanish | `es` | 100% | Machine-assisted — native review welcome |
+| Swahili | `sw` | 100% | Machine-assisted — native review welcome |
+| Vietnamese | `vi` | 100% | Machine-assisted — native review welcome |
 
-Coverage is measured by translation-key parity against the English base locale
-(`en.json` is 100%). Each percentage is the count of localized keys present in a
-locale divided by the count in `en.json`, rounded to the nearest whole percent.
-The app falls back to English for any missing key, so untranslated strings still
-render in English; the numbers above show how much of the UI each locale fully
-localizes.
+All locales have 100% translation-key parity with the English base. Non-English
+translations are machine-assisted and benefit from native-speaker review — see
+the [Translation Guide](CONTRIBUTING.md#translation-guide) to contribute
+corrections. The app falls back to English for any missing key.
 
 To add a new language or improve an existing translation, see the [Translation Guide in CONTRIBUTING.md](CONTRIBUTING.md#translation-guide).
 
