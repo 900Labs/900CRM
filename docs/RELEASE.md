@@ -45,14 +45,12 @@ The current repository can be built and tested locally by contributors, but the
 presence of source code, CI checks, or Tauri configuration is not a release
 artifact.
 
-Current external blocker: recent GitHub Actions check runs are not starting
-because of account billing/spending-limit state, not because of product or test
-failures. The check-run annotation says: `The job was not started because recent
-account payments have failed or your spending limit needs to be increased.
-Please check the 'Billing & plans' section in your settings`. While this is
-active, Actions-backed package artifacts, release artifacts, and GitHub Release
-proof cannot be produced from the repository workflows. Local verification may
-still pass, but it does not prove installability for non-technical users.
+Previous external blocker (resolved): GitHub Actions check runs were
+previously not starting because of account billing/spending-limit state. As
+of 2026-08-07, Actions jobs start and pass normally (the full CI suite ran
+green across Ubuntu, Windows, and macOS on recent pull requests). The
+remaining release blockers are therefore product/distribution items
+(macOS notarization credentials, code signing), not CI availability.
 
 Local macOS package smoke evidence from 2026-06-27 is recorded in
 [Sprint 096](sprint_096_macos_package_smoke_evidence_2026-06-27.md). That run
@@ -96,9 +94,9 @@ automatically by the manual release packaging workflow preflight before package
 artifacts are built; the platform, data, signing, and release-note checks remain
 manual.
 
-- [ ] Confirm GitHub Actions jobs can start. Recent check runs were externally
-  blocked with the billing/spending-limit annotation documented above; this must
-  be resolved before package or release proof can be produced in Actions.
+- [ ] Confirm GitHub Actions jobs can start and pass. (This was previously
+  blocked by an account billing/spending-limit issue, since resolved as of
+  2026-08-07; the CI suite now runs green across Ubuntu, Windows, and macOS.)
 - [ ] Confirm the repository contains no local machine paths, private hostnames,
   secrets, tokens, or real customer data in source, docs, scripts, samples, or
   packaged assets.
@@ -178,7 +176,8 @@ pattern scan cannot reliably identify.
 A public desktop release should include, at minimum:
 
 - Windows installer: `.msi` or `.exe`.
-- macOS disk image: `.dmg`.
+- macOS disk image: `.dmg` (currently deferred — requires Apple Developer ID
+  signing + notarization, not yet available).
 - Linux package: `.deb`.
 - Linux portable image: `.AppImage`.
 - Checksums for every uploaded artifact.
@@ -271,14 +270,20 @@ npm run release:artifacts:verify -- --artifact-root release-download --release-v
 ```
 
 The verifier expects metadata for `windows`, `macos`, and `linux` by default.
+**Note:** the manual packaging workflow currently builds only `windows` and
+`linux`; macOS (`.dmg`) is deferred until Apple Developer ID signing +
+notarization credentials are available (see "Still Not Implemented" below).
+When verifying a Windows+Linux-only run, pass `--platforms windows,linux` so
+the verifier does not expect macOS metadata that was intentionally not produced.
 It checks that each platform has release metadata, SHA-256 checksums, and an
 SPDX 2.3 SBOM; that metadata uses schema version 1 and the requested release
 version; that metadata artifacts have `fileName`, `relativePath`, `kind`,
 `sizeBytes`, and 64-character SHA-256 values; that package files under the
 download root match the metadata size and SHA-256; that checksum entries match
 metadata exactly; that SBOM JSON has non-empty packages; and that workflow
-package kinds are present for Windows (`.msi` and NSIS/`.exe`), macOS (`.dmg`),
-and Linux (`.deb` and `.AppImage`).
+package kinds are present for Windows (`.msi` and NSIS/`.exe`) and Linux
+(`.deb` and `.AppImage`). macOS (`.dmg`) verification applies only once macOS
+builds are re-enabled with signing/notarization.
 
 `npm run release:artifacts:verify:sample` creates a deterministic synthetic
 downloaded-artifact tree under ignored `dist/release-artifact-verifier-sample/`

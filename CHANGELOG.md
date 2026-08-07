@@ -48,6 +48,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Added Rust build caching.
 - Added Dependabot configuration and dependency-hygiene cleanup.
 
+### Fixed — 2026-08-07
+- Fixed the manual release packaging workflow: the `tauri build` invocation
+  was mangling flags through two layers of npm script forwarding (the same
+  defect that affected CI), so it never successfully produced a bundle. It now
+  invokes the Tauri CLI directly (`npx tauri build --bundles ...`) from the
+  desktop workspace.
+- Removed the macOS (`.dmg`) build target from the release workflow until Apple
+  Developer ID signing + notarization credentials are available; unsigned and
+  unnotarized macOS builds would be blocked by Gatekeeper for the non-technical
+  target audience.
+
+### Changed — 2026-08-07
+- Release/readiness docs (RELEASE.md, ALPHA_READINESS.md) updated: the GitHub
+  Actions billing/spending-limit blocker was resolved as of 2026-08-07 and the
+  CI suite now runs green across Ubuntu, Windows, and macOS.
+
 ### Added — 2026-06-24
 - Added release-readiness documentation that states the current verification-only
   CI status, manual release checklist, required future artifacts, and release

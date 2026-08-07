@@ -126,9 +126,6 @@ jobs:
           - platform: windows
             os: windows-latest
             bundles: msi,nsis
-          - platform: macos
-            os: macos-latest
-            bundles: dmg
           - platform: linux
             os: ubuntu-latest
             bundles: deb,appimage
@@ -174,9 +171,10 @@ jobs:
         run: npm ci
 
       - name: Build Tauri bundles
+        working-directory: apps/desktop
         env:
           CI: true
-        run: npm run tauri -- build -- --bundles ${{ matrix.bundles }}
+        run: npx tauri build --bundles ${{ matrix.bundles }}
 
       - name: Generate release metadata, checksums, and SBOM
         env:
