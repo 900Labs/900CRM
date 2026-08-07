@@ -29,12 +29,10 @@ summary. The next product phase should keep deepening customer/account
 workspaces, pipeline guidance, activities/calendar workflows, reports, and
 navigation structure before broad new platform work.
 
-Recent GitHub Actions failures must not be treated as product or test failures.
-The check-run annotation says: `The job was not started because recent account
-payments have failed or your spending limit needs to be increased. Please check
-the 'Billing & plans' section in your settings`. While that external blocker is
-active, Actions-backed package artifacts, release artifacts, and GitHub Release
-proof cannot be produced from the repository workflows.
+The previously active GitHub Actions billing/spending-limit blocker was
+resolved as of 2026-08-07: the CI suite now runs green across Ubuntu, Windows,
+and macOS. The remaining Phase 6 (Alpha Release) gaps are distribution items
+(macOS signing/notarization credentials, code signing), not CI availability.
 
 Local verification can increase confidence in source health, but it does not
 prove installability for non-technical users. Installability needs actual
@@ -70,8 +68,8 @@ Current evidence:
 
 Remaining caveats:
 
-- GitHub Actions cannot currently provide fresh passing evidence because of the
-  external billing/spending-limit blocker above.
+- GitHub Actions now provides fresh passing evidence (the billing/spending-limit
+  blocker noted above was resolved as of 2026-08-07).
 - The foundation is sufficient for source contributors, but does not satisfy
   non-technical installation or release distribution by itself.
 
@@ -153,7 +151,7 @@ Remaining caveats:
 ### Phase 4 - Verification, Public Docs, And Release Guardrails
 
 Status: `Currently accepted` / materially complete for source verification;
-current Actions evidence is externally blocked.
+Actions evidence is now available (billing blocker resolved 2026-08-07).
 
 Current evidence:
 
@@ -174,8 +172,8 @@ Current evidence:
 
 Remaining caveats:
 
-- Fresh GitHub Actions evidence is blocked externally by billing/spending
-  limits. This is not a product/test failure, but it prevents CI-backed proof.
+- Fresh GitHub Actions evidence is now available (the billing/spending-limit
+  blocker was resolved 2026-08-07).
 - Source verification does not replace platform installer generation or manual
   cross-platform desktop smoke testing.
 
@@ -252,10 +250,12 @@ Current evidence:
 
 Remaining before Phase 6 can be called complete:
 
-- Resolve the GitHub Actions billing/spending-limit blocker so jobs can start.
+- ~~Resolve the GitHub Actions billing/spending-limit blocker so jobs can start.~~
+  (Resolved 2026-08-07; CI runs green across Ubuntu/Windows/macOS.)
 - Run the manual release packaging workflow from the intended ref and preserve
   evidence that preflight and all package jobs completed.
-- Produce and inspect Windows, macOS, and Linux package artifacts.
+- Produce and inspect Windows and Linux package artifacts. (macOS `.dmg` is
+  deferred until Apple Developer ID signing + notarization are available.)
 - Produce workflow-backed macOS package evidence. A local headless DMG helper
   and local macOS smoke wrapper can create and inspect a basic unsigned and
   unnotarized DMG for maintainer evidence, but they do not replace manual
@@ -312,9 +312,10 @@ MCP boundary is accepted; a future network server package is not complete.
 ## Primary Alpha Gap
 
 The main remaining alpha gap is distribution proof, not source feature shape.
-The repository has a manual packaging workflow and release metadata helpers, but
-there are no current Actions-backed package artifacts or GitHub Release
-artifacts because Actions jobs are externally blocked by billing/spending
-limits. Until that blocker is resolved and platform artifacts are produced and
-smoke-tested, 900CRM should continue to be described as source-evaluable rather
-than installable by non-technical alpha users.
+The repository has a manual packaging workflow and release metadata helpers.
+The Actions billing/spending-limit blocker was resolved (2026-08-07) and the CI
+suite runs green across Ubuntu, Windows, and macOS, but a manual packaging run
+that produces and smoke-tests real platform artifacts (and, for macOS,
+signing/notarization credentials) has not yet been completed. Until platform
+artifacts are produced and smoke-tested, 900CRM should continue to be described
+as source-evaluable rather than installable by non-technical alpha users.
