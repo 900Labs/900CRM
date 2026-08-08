@@ -39,10 +39,32 @@ pub async fn get_deal(state: State<'_, AppState>, id: String) -> Result<Deal, St
     core.get_deal(&id).map_err(|e| e.to_string())
 }
 
+/// List deals. When `limit` is `None`, all deals are returned (legacy callers
+/// like the pipeline board). When `Some`, the result is windowed by
+/// `offset`/`limit` (clamped to `MAX_LIST_DEALS_LIMIT`) to bound the IPC payload.
 #[tauri::command]
-pub async fn list_deals(state: State<'_, AppState>) -> Result<Vec<Deal>, String> {
+pub async fn list_deals(
+    state: State<'_, AppState>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> Result<Vec<Deal>, String> {
     let core = super::lock_core(&state)?;
-    core.list_deals().map_err(|e| e.to_string())
+    let mut deals = core.list_deals().map_err(|e| e.to_string())?;
+    if let Some(clamped) = list_deals_limit(limit) {
+        let skip = offset.unwrap_or(0) as usize;
+        deals = deals
+            .into_iter()
+            .skip(skip)
+            .take(clamped as usize)
+            .collect();
+    }
+    Ok(deals)
+}
+
+const MAX_LIST_DEALS_LIMIT: u32 = 500;
+
+fn list_deals_limit(limit: Option<u32>) -> Option<u32> {
+    limit.map(|value| value.clamp(1, MAX_LIST_DEALS_LIMIT))
 }
 
 #[tauri::command]
@@ -178,7 +200,7 @@ pub async fn get_pipeline_summary(
 
 #[cfg(test)]
 mod tests {
-    use super::nullable_update_from_args;
+    use super::{list_deals_limit, nullable_update_from_args, MAX_LIST_DEALS_LIMIT};
 
     #[test]
     fn nullable_update_from_args_distinguishes_no_change_reset_blank_and_set() {
@@ -205,5 +227,13 @@ mod tests {
             nullable_update_from_args(Some("org-1".to_string()), Some(true)),
             Some(None)
         );
+    }
+
+    #[test]
+    fn list_deals_limit_preserves_none_and_clamps_some_to_max() {
+        assert_eq!(list_deals_limit(None), None);
+        assert_eq!(list_deals_limit(Some(0)), Some(1));
+        assert_eq!(list_deals_limit(Some(25)), Some(25));
+        assert_eq!(list_deals_limit(Some(5_000)), Some(MAX_LIST_DEALS_LIMIT));
     }
 }

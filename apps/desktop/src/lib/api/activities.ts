@@ -226,7 +226,15 @@ export async function getActivity(id: string): Promise<Activity> {
 }
 
 export async function listActivities(params: ListActivitiesParams = {}): Promise<Activity[]> {
-  const activities = await invoke<BackendActivity[]>('list_activities');
+  const invokeArgs: Record<string, unknown> = {};
+  if (params.pageSize != null || params.page != null) {
+    const pageSize = params.pageSize ?? 50;
+    const page = params.page ?? 1;
+    invokeArgs.limit = pageSize;
+    invokeArgs.offset = Math.max(0, (page - 1) * pageSize);
+  }
+
+  const activities = await invoke<BackendActivity[]>('list_activities', invokeArgs);
 
   let mapped = activities.map(mapActivity);
 
