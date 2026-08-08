@@ -1,4 +1,6 @@
 use std::path::Path;
+use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 use crm_core::{
     services::{LocalBackup, LocalBackupValidation, LocalRestoreResult},
@@ -68,19 +70,32 @@ fn close_active_core(state: &State<'_, AppState>) -> Result<(), String> {
         .core
         .lock()
         .map_err(|e| format!("Lock error: {}", e))?;
-    let active_core = core_slot
-        .take()
-        .ok_or_else(|| "CrmCore is unavailable during local restore".to_string())?;
-    drop(active_core);
+    drop(core_slot.take());
+    state.needs_reopen.store(false, Ordering::SeqCst);
     Ok(())
 }
 
 fn reopen_core(state: &State<'_, AppState>, app_data_dir: &Path) -> Result<(), String> {
-    let reopened_core = CrmCore::open(app_data_dir).map_err(|e| e.to_string())?;
-    let mut core_slot = state
-        .core
-        .lock()
-        .map_err(|e| format!("Lock error: {}", e))?;
-    *core_slot = Some(reopened_core);
-    Ok(())
+    let mut last_error: Option<String> = None;
+    for attempt in 0..3 {
+        match CrmCore::open(app_data_dir) {
+            Ok(reopened_core) => {
+                let mut core_slot = state
+                    .core
+                    .lock()
+                    .map_err(|e| format!("Lock error: {}", e))?;
+                *core_slot = Some(reopened_core);
+                state.needs_reopen.store(false, Ordering::SeqCst);
+                return Ok(());
+            }
+            Err(e) => {
+                last_error = Some(e.to_string());
+                if attempt + 1 < 3 {
+                    std::thread::sleep(Duration::from_millis(250));
+                }
+            }
+        }
+    }
+    state.needs_reopen.store(true, Ordering::SeqCst);
+    Err(last_error.unwrap_or_else(|| "Unknown reopen error".to_string()))
 }

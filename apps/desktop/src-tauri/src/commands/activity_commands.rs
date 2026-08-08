@@ -5,6 +5,7 @@ use crate::AppState;
 
 const DEFAULT_UPCOMING_ACTIVITIES_LIMIT: u32 = 10;
 const MAX_UPCOMING_ACTIVITIES_LIMIT: u32 = 200;
+const MAX_LIST_ACTIVITIES_LIMIT: u32 = 500;
 
 #[tauri::command]
 pub async fn create_activity(
@@ -34,10 +35,30 @@ pub async fn get_activity(state: State<'_, AppState>, id: String) -> Result<Acti
     core.get_activity(&id).map_err(|e| e.to_string())
 }
 
+/// List activities. When `limit` is `None`, all activities are returned (legacy
+/// callers). When `Some`, the result is windowed by `offset`/`limit` (clamped to
+/// `MAX_LIST_ACTIVITIES_LIMIT`) to bound the IPC payload.
 #[tauri::command]
-pub async fn list_activities(state: State<'_, AppState>) -> Result<Vec<Activity>, String> {
+pub async fn list_activities(
+    state: State<'_, AppState>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> Result<Vec<Activity>, String> {
     let core = super::lock_core(&state)?;
-    core.list_activities().map_err(|e| e.to_string())
+    let mut activities = core.list_activities().map_err(|e| e.to_string())?;
+    if let Some(clamped) = list_activities_limit(limit) {
+        let skip = offset.unwrap_or(0) as usize;
+        activities = activities
+            .into_iter()
+            .skip(skip)
+            .take(clamped as usize)
+            .collect();
+    }
+    Ok(activities)
+}
+
+fn list_activities_limit(limit: Option<u32>) -> Option<u32> {
+    limit.map(|value| value.clamp(1, MAX_LIST_ACTIVITIES_LIMIT))
 }
 
 #[tauri::command]
@@ -186,7 +207,8 @@ pub async fn remove_activity_link(
 #[cfg(test)]
 mod tests {
     use super::{
-        nullable_update_from_args, upcoming_activities_limit, DEFAULT_UPCOMING_ACTIVITIES_LIMIT,
+        list_activities_limit, nullable_update_from_args, upcoming_activities_limit,
+        DEFAULT_UPCOMING_ACTIVITIES_LIMIT, MAX_LIST_ACTIVITIES_LIMIT,
         MAX_UPCOMING_ACTIVITIES_LIMIT,
     };
 
@@ -224,6 +246,17 @@ mod tests {
         assert_eq!(
             upcoming_activities_limit(Some(5_000)),
             MAX_UPCOMING_ACTIVITIES_LIMIT
+        );
+    }
+
+    #[test]
+    fn list_activities_limit_preserves_none_and_clamps_some_to_max() {
+        assert_eq!(list_activities_limit(None), None);
+        assert_eq!(list_activities_limit(Some(0)), Some(1));
+        assert_eq!(list_activities_limit(Some(25)), Some(25));
+        assert_eq!(
+            list_activities_limit(Some(5_000)),
+            Some(MAX_LIST_ACTIVITIES_LIMIT)
         );
     }
 }

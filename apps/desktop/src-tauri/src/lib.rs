@@ -4,6 +4,7 @@
 //! Business logic, SQLite storage, audit, and MCP-readiness foundations live in
 //! the Tauri-independent `crm-core` crate.
 
+use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 
 use crm_core::CrmCore;
@@ -58,6 +59,7 @@ pub fn run() {
             app.manage(AppState {
                 core: Mutex::new(Some(core)),
                 data_dir: app_data_dir,
+                needs_reopen: AtomicBool::new(false),
             });
 
             Ok(())

@@ -259,7 +259,15 @@ export async function getDeal(id: string): Promise<Deal> {
 }
 
 export async function listDeals(params: ListDealsParams = {}): Promise<Deal[]> {
-  const deals = await invoke<BackendDeal[]>('list_deals');
+  const invokeArgs: Record<string, unknown> = {};
+  if (params.pageSize != null || params.page != null) {
+    const pageSize = params.pageSize ?? 50;
+    const page = params.page ?? 1;
+    invokeArgs.limit = pageSize;
+    invokeArgs.offset = Math.max(0, (page - 1) * pageSize);
+  }
+
+  const deals = await invoke<BackendDeal[]>('list_deals', invokeArgs);
   let mapped = deals.map(mapDeal);
 
   if (params.stage) {

@@ -1,4 +1,5 @@
 use std::ops::{Deref, DerefMut};
+use std::sync::atomic::Ordering;
 use std::sync::MutexGuard;
 
 use crm_core::CrmCore;
@@ -48,12 +49,25 @@ impl DerefMut for CoreGuard<'_> {
 }
 
 pub(crate) fn lock_core<'a>(state: &'a State<'_, AppState>) -> Result<CoreGuard<'a>, String> {
-    let guard = state
+    let mut guard = state
         .core
         .lock()
         .map_err(|e| format!("Lock error: {}", e))?;
     if guard.is_none() {
-        return Err("CrmCore is unavailable during local restore".to_string());
+        if state.needs_reopen.swap(false, Ordering::SeqCst) {
+            match CrmCore::open(&state.data_dir) {
+                Ok(core) => *guard = Some(core),
+                Err(e) => {
+                    state.needs_reopen.store(true, Ordering::SeqCst);
+                    return Err(format!(
+                        "CrmCore failed to reopen after restore: {}. Please restart the app.",
+                        e
+                    ));
+                }
+            }
+        } else {
+            return Err("CrmCore is unavailable during local restore".to_string());
+        }
     }
     Ok(CoreGuard { guard })
 }
