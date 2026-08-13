@@ -18,3 +18,7 @@ coverage/
 playwright-report/
 playwright/.cache/
 .DS_Store
+
+# Internal Karpathy-style wiki. Local-only living knowledge base.
+# Never commit this directory. Keep it current after every session.
+wiki/

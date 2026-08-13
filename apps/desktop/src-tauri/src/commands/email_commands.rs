@@ -182,19 +182,105 @@ fn probe_banner(stream: &mut TcpStream, protocol: &EmailProtocol, port: u16) -> 
 
 /// Returns `true` for addresses a connection test must not contact: loopback,
 /// unspecified, private, link-local (incl. cloud metadata `169.254.169.254`),
-/// broadcast/multicast, and IPv6 unique-local ranges.
+/// CGNAT, broadcast/multicast, IPv6 unique-local ranges, and IPv4-mapped IPv6
+/// forms of those ranges (`::ffff:127.0.0.1`, `::ffff:169.254.169.254`).
 fn is_disallowed_address(addr: IpAddr) -> bool {
+    match canonicalize_ip(addr) {
+        IpAddr::V4(v4) => is_disallowed_ipv4(v4),
+        IpAddr::V6(v6) => is_disallowed_ipv6(v6),
+    }
+}
+
+fn canonicalize_ip(addr: IpAddr) -> IpAddr {
+    match addr {
+        IpAddr::V6(v6) => v6.to_ipv4_mapped().map(IpAddr::V4).unwrap_or(addr),
+        other => other,
+    }
+}
+
+fn is_disallowed_ipv4(addr: std::net::Ipv4Addr) -> bool {
+    addr.is_loopback()
+        || addr.is_unspecified()
+        || addr.is_multicast()
+        || addr.is_private()
+        || addr.is_link_local()
+        || addr.is_broadcast()
+        || is_carrier_grade_nat(addr)
+}
+
+fn is_disallowed_ipv6(addr: std::net::Ipv6Addr) -> bool {
     if addr.is_loopback() || addr.is_unspecified() || addr.is_multicast() {
         return true;
     }
-    match addr {
-        IpAddr::V4(v4) => v4.is_private() || v4.is_link_local() || v4.is_broadcast(),
-        IpAddr::V6(v6) => {
-            let octets = v6.octets();
-            if octets[0] == 0xFE && (octets[1] & 0xC0) == 0x80 {
-                return true;
-            }
-            (octets[0] & 0xFE) == 0xFC
-        }
+    if let Some(v4) = addr.to_ipv4_mapped() {
+        return is_disallowed_ipv4(v4);
+    }
+    let octets = addr.octets();
+    // Link-local fe80::/10
+    if octets[0] == 0xFE && (octets[1] & 0xC0) == 0x80 {
+        return true;
+    }
+    // Unique local fc00::/7
+    (octets[0] & 0xFE) == 0xFC
+}
+
+fn is_carrier_grade_nat(addr: std::net::Ipv4Addr) -> bool {
+    let octets = addr.octets();
+    octets[0] == 100 && (octets[1] & 0xC0) == 64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_disallowed_address;
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+    #[test]
+    fn rejects_loopback_and_private_v4() {
+        assert!(is_disallowed_address(IpAddr::V4(Ipv4Addr::LOCALHOST)));
+        assert!(is_disallowed_address(IpAddr::V4(Ipv4Addr::new(
+            10, 0, 0, 1
+        ))));
+        assert!(is_disallowed_address(IpAddr::V4(Ipv4Addr::new(
+            192, 168, 1, 1
+        ))));
+        assert!(is_disallowed_address(IpAddr::V4(Ipv4Addr::new(
+            172, 16, 0, 1
+        ))));
+    }
+
+    #[test]
+    fn rejects_link_local_metadata_and_cgnat() {
+        assert!(is_disallowed_address(IpAddr::V4(Ipv4Addr::new(
+            169, 254, 169, 254
+        ))));
+        assert!(is_disallowed_address(IpAddr::V4(Ipv4Addr::new(
+            100, 64, 0, 1
+        ))));
+    }
+
+    #[test]
+    fn rejects_ipv4_mapped_loopback_and_metadata() {
+        assert!(is_disallowed_address(IpAddr::V6(Ipv6Addr::new(
+            0, 0, 0, 0, 0, 0xffff, 0x7f00, 1
+        ))));
+        assert!(is_disallowed_address(IpAddr::V6(
+            Ipv4Addr::new(127, 0, 0, 1).to_ipv6_mapped()
+        )));
+        assert!(is_disallowed_address(IpAddr::V6(
+            Ipv4Addr::new(169, 254, 169, 254).to_ipv6_mapped()
+        )));
+        assert!(is_disallowed_address(IpAddr::V6(
+            Ipv4Addr::new(10, 1, 2, 3).to_ipv6_mapped()
+        )));
+    }
+
+    #[test]
+    fn allows_public_v4_and_v6() {
+        assert!(!is_disallowed_address(IpAddr::V4(Ipv4Addr::new(
+            8, 8, 8, 8
+        ))));
+        assert!(!is_disallowed_address(IpAddr::V6(Ipv6Addr::new(
+            0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8888
+        ))));
     }
 }

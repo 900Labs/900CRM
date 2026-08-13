@@ -29,6 +29,27 @@ test('loads the dashboard sample workspace and shows the follow-up on the dashbo
   await expect.poll(storedSampleState).toContain('Solar inventory rollout');
   await expect.poll(storedSampleState).toContain('Call Amara about rollout timeline');
 
+  const sampleOrganizationId = await page.evaluate(() => {
+    const raw = window.localStorage.getItem('900crm.browser-smoke.state');
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as {
+      organizations?: Array<{ id: string; name: string }>;
+    };
+    return parsed.organizations?.find((organization) => organization.name === 'Northstar Cooperative')
+      ?.id ?? null;
+  });
+  expect(sampleOrganizationId).toBeTruthy();
+
+  await loadHashRoute(page, `/organizations/${sampleOrganizationId}`);
+  await expect(page.getByRole('heading', { name: 'Northstar Cooperative' })).toBeVisible();
+  const sampleWorkspace = page.locator('.account-workspace');
+  await expect(
+    sampleWorkspace.locator('.workspace-metric').filter({ hasText: 'People' }).getByText('1'),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Amara Okafor' })).toBeVisible();
+
   await assertNoConsoleErrors();
 });
 

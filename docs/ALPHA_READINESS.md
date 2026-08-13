@@ -1,7 +1,7 @@
 # Alpha Release Readiness Audit
 
 Date: 2026-06-27
-Last updated: 2026-07-08
+Last updated: 2026-08-13
 Branch: `codex/alpha-release-readiness-audit`
 Baseline: canonical `main` before this branch was `c912f669baf7bfdaac9dab163a15e1e0fe08c6ab`.
 

@@ -387,6 +387,7 @@
     "emailIntegration": "Ujumuishaji wa barua pepe",
     "emailIntegrationEnabled": "Washa ujumuishaji wa hiari wa IMAP/SMTP",
     "emailComposeHint": "Sanidi seva za hiari na tumia kutunga barua pepe kwa mailto kwenye kifaa hiki.",
+    "emailProbeOnly": "Jaribio la kufikiwa tu. 900CRM haitumi wala kupokea barua pepe na haihifadhi nywila za barua pepe.",
     "smtpHost": "Mwenyeji wa SMTP",
     "smtpPort": "Bandari ya SMTP",
     "smtpUsername": "Jina la mtumiaji la SMTP",

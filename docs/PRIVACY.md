@@ -1,6 +1,7 @@
 # Privacy
 
 Date: 2026-06-24
+Last updated: 2026-08-13
 
 900CRM is designed as an offline-first desktop CRM. This document describes the
 current privacy behavior and caveats. It is not a legal privacy policy for a
@@ -31,10 +32,11 @@ data directory. It contains CRM data such as contacts, organizations, deals,
 activities, notes, tags, custom fields, settings, audit log entries, sync
 changelog entries, proposed actions, and external-client readiness records.
 
-Settings are stored in the same local SQLite database. Optional email settings,
-including server hostnames, usernames, and passwords if the user enters them,
-are stored as local settings strings. 900CRM does not add application-level
-encryption for those values today.
+Settings are stored in the same local SQLite database. Optional email settings
+store host, port, username, and from-address strings only. Mailbox passwords
+are not collected in the current UI and leftover password values are cleared
+on settings load. 900CRM does not add application-level encryption for
+settings today.
 
 ## Backups And Exports
 
@@ -63,9 +65,13 @@ paths can use networking when the user or developer initiates them:
 
 - The development server uses a local dev URL during development builds.
 - Optional email connection tests can make DNS and TCP connection attempts to
-  user-entered SMTP or IMAP endpoints.
+  user-entered SMTP or IMAP endpoints. Private, loopback, link-local, CGNAT,
+  and IPv4-mapped forms of those ranges are rejected.
 - Local email compose opens the system mail client with a `mailto:` URL; the
   system mail client is outside 900CRM.
+- The updater plugin is compiled in and configured against the public GitHub
+  Releases `latest.json` URL. The Settings update control is hidden until a
+  signed public release exists. No launch-time update poll runs.
 - Sync settings and sync status placeholders exist, but real sync transport is
   not implemented in the current app.
 
@@ -76,9 +82,11 @@ reachability and may read a short server banner from plaintext ports.
 
 900CRM currently has no built-in AI agent.
 
-`crates/crm-mcp` is a placeholder and is not an implemented MCP server. The
-desktop app and `crm-core` do not start an MCP server, bind a localhost MCP
-listener, expose MCP tools/resources/prompts, manage MCP tokens, or call a
+`crates/crm-mcp` is an optional, disabled-by-default local stdio boundary. It
+can expose reviewed read tools and `create_activity_draft` as a pending
+proposed action when a user starts the `crm-mcp` process with an explicit
+config. The desktop app and `crm-core` do not start that process, bind a
+localhost listener, expose prompts/resources, manage MCP tokens, or call a
 model provider.
 
 External-client records, permissions, proposed actions, and audit entries are

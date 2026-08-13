@@ -387,6 +387,7 @@
     "emailIntegration": "ईमेल एकीकरण",
     "emailIntegrationEnabled": "वैकल्पिक IMAP/SMTP एकीकरण सक्षम करें",
     "emailComposeHint": "वैकल्पिक मेल सर्वर कॉन्फ़िगर करें और स्थानीय mailto कंपोज़ क्रियाओं का उपयोग करें।",
+    "emailProbeOnly": "केवल पहुँच जाँच। 900CRM ईमेल भेजता या प्राप्त नहीं करता और मेलबॉक्स पासवर्ड नहीं रखता।",
     "smtpHost": "SMTP होस्ट",
     "smtpPort": "SMTP पोर्ट",
     "smtpUsername": "SMTP उपयोगकर्ता नाम",

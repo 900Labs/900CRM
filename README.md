@@ -50,9 +50,9 @@ Your business data stays on your device. Nothing is ever uploaded anywhere.
 
 ## Current Status
 
-The source app has a strong local-first CRM foundation, but the visible product
-still needs more depth before it feels competitive with established CRMs. The
-current product-depth review is tracked in
+The source app is version `0.9.0`: a strong local-first CRM foundation, but
+not a published 1.0 installer and still thinner than established CRMs in
+daily-work depth. The current product-depth review is tracked in
 [Product Review and Competitive Benchmark](docs/PRODUCT_REVIEW_AND_BENCHMARK.md).
 
 Use [Documentation Index](docs/README.md) as the starting point for current
@@ -64,7 +64,7 @@ they are not the best source for current product truth.
 ## Features
 
 ### Contacts
-Manage your full network of people and organizations. Add custom fields, tag contacts, write notes, and attach file links. Search across your entire contact database instantly.
+Manage your full network of people and organizations. Add custom fields, tag contacts, write notes, and store a website URL. Search across your entire contact database instantly.
 
 ![900CRM contacts management screen](docs/assets/readme/900crm-contacts.png)
 
@@ -240,12 +240,12 @@ inventory.
 
 The intended public release artifacts are:
 
-| Platform | Artifact | Minimum target |
-|---|---|---|
-| **Windows** | `.msi` or `.exe` installer | Windows 10 (1803+) |
-| **macOS** | `.dmg` disk image | macOS 11 Big Sur (Intel & Apple Silicon) |
-| **Linux** | `.deb` package | Ubuntu 20.04 / Debian 11 |
-| **Linux** | `.AppImage` | Any modern Linux distribution |
+| Platform | Artifact | Minimum target | Current status |
+|---|---|---|---|
+| **Windows** | `.msi` or `.exe` installer | Windows 10 (1803+) | Unsigned release-candidate workflow exists |
+| **macOS** | `.dmg` disk image | macOS 11 Big Sur (Intel & Apple Silicon) | Deferred until Developer ID signing and notarization |
+| **Linux** | `.deb` package | Ubuntu 20.04 / Debian 11 | Unsigned release-candidate workflow exists |
+| **Linux** | `.AppImage` | Any modern Linux distribution | Unsigned release-candidate workflow exists |
 
 See [Release Readiness](docs/RELEASE.md) for the manual verification checklist,
 the guarded release-packaging workflow, generated checksums/SBOM metadata, and
@@ -383,7 +383,7 @@ Current implementation baselines are documented in [Data Model](docs/DATA_MODEL.
 ├── Cargo.toml                    # Rust workspace manifest
 ├── package.json                  # Root npm workspace scripts
 ├── package-lock.json
-└── pnpm-workspace.yaml
+└── playwright.config.ts
 ```
 
 ---

@@ -387,6 +387,7 @@
     "emailIntegration": "Email Integration",
     "emailIntegrationEnabled": "Enable Optional IMAP/SMTP Integration",
     "emailComposeHint": "Configure optional mail servers and use local mailto compose actions.",
+    "emailProbeOnly": "Reachability only. 900CRM does not send or receive email and does not store mailbox passwords.",
     "smtpHost": "SMTP Host",
     "smtpPort": "SMTP Port",
     "smtpUsername": "SMTP Username",

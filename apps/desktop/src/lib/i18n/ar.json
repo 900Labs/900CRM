@@ -387,6 +387,7 @@
     "emailIntegration": "تكامل البريد الإلكتروني",
     "emailIntegrationEnabled": "تفعيل تكامل IMAP/SMTP الاختياري",
     "emailComposeHint": "قم بإعداد خوادم اختيارية واستخدم إنشاء الرسائل محليًا عبر mailto.",
+    "emailProbeOnly": "للتحقق من الوصول فقط. لا يرسل 900CRM البريد ولا يستقبله ولا يخزن كلمات مرور صندوق البريد.",
     "smtpHost": "مضيف SMTP",
     "smtpPort": "منفذ SMTP",
     "smtpUsername": "اسم مستخدم SMTP",

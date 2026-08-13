@@ -97,13 +97,17 @@ class SettingsStore {
       this.smtpHost = data.smtpHost;
       this.smtpPort = data.smtpPort;
       this.smtpUsername = data.smtpUsername;
-      this.smtpPassword = data.smtpPassword;
+      this.smtpPassword = '';
       this.smtpFrom = data.smtpFrom;
       this.imapHost = data.imapHost;
       this.imapPort = data.imapPort;
       this.imapUsername = data.imapUsername;
-      this.imapPassword = data.imapPassword;
+      this.imapPassword = '';
       this.loaded     = true;
+
+      if (data.smtpPassword || data.imapPassword) {
+        void this.clearStoredEmailPasswords();
+      }
 
       // Apply immediately
       this._applyTheme(data.theme);
@@ -130,10 +134,15 @@ class SettingsStore {
     const old = this[key as keyof SettingsStore];
 
     try {
-      // Optimistic update
-      (this as Record<string, unknown>)[key] = value;
+      const nextValue =
+        key === 'smtpPassword' || key === 'imapPassword'
+          ? ('' as AppSettings[K])
+          : value;
 
-      await updateSetting(key, value);
+      // Optimistic update
+      (this as Record<string, unknown>)[key] = nextValue;
+
+      await updateSetting(key, nextValue);
 
       // Apply side effects
       if (key === 'theme') {
@@ -157,6 +166,19 @@ class SettingsStore {
   _applyTheme(theme: 'light' | 'dark' | 'system'): void {
     if (typeof document === 'undefined') return;
     document.documentElement.setAttribute('data-theme', theme);
+  }
+
+  /**
+   * Mail send/receive is not implemented. Wipe leftover plaintext passwords
+   * so a previous settings form cannot keep mailbox secrets in SQLite.
+   */
+  private async clearStoredEmailPasswords(): Promise<void> {
+    try {
+      await updateSetting('smtpPassword', '');
+      await updateSetting('imapPassword', '');
+    } catch (err) {
+      console.error('[settings] Failed to clear leftover email passwords:', err);
+    }
   }
 }
 

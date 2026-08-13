@@ -1,7 +1,7 @@
 # Release Roadmap
 
-Date: 2026-08-07
-Status: Source-evaluable alpha (public). Binary release in progress.
+Date: 2026-08-13
+Status: Source-evaluable alpha (public), version `0.9.0`. Binary release in progress.
 
 This document is the single source of truth for what remains before 900CRM
 ships a real, distributable release. It replaces ad-hoc checklist notes and
@@ -45,9 +45,9 @@ These must ALL be satisfied before a public `v1.0.0` tag is cut.
 
 ### Strongly Recommended (before promoting beyond alpha)
 
-- [ ] **Deferred audit debt resolved.** Restore reopen-failure resilience,
-      `f64` → integer currency, server-side deals/activities pagination,
-      enabling TS/Svelte ESLint. See the audit report (CHANGELOG 2026-08-04).
+- [x] **Restore reopen-failure resilience, TS/Svelte ESLint, bounded list
+      windows.** Landed in `#142`. Remaining: true SQL `LIMIT`/`OFFSET` for
+      deals/activities, and `f64` → integer minor-unit currency.
 - [ ] **Translations reviewed by native speakers.** All 10 locales now have
       100% key parity. The non-English translations are machine-assisted
       and need community review before they are considered production-quality.

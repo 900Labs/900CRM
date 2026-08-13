@@ -29,6 +29,10 @@ pub async fn validate_local_backup(
     state: State<'_, AppState>,
     backup_dir: String,
 ) -> Result<LocalBackupValidation, String> {
+    let backup_dir = match super::path_guard::validate_import_path(&backup_dir) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let core = super::lock_core(&state)?;
     core.validate_local_backup(Path::new(&backup_dir))
         .map_err(|e| e.to_string())
@@ -40,6 +44,10 @@ pub async fn restore_local_backup_to_app_data(
     backup_dir: String,
     confirm_destructive_restore: bool,
 ) -> Result<LocalRestoreResult, String> {
+    let backup_dir = match super::path_guard::validate_import_path(&backup_dir) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(msg) => return Err(msg),
+    };
     let app_data_dir = state.data_dir.clone();
     close_active_core(&state)?;
 

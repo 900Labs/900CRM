@@ -387,6 +387,7 @@
     "emailIntegration": "Tích hợp email",
     "emailIntegrationEnabled": "Bật tích hợp IMAP/SMTP tùy chọn",
     "emailComposeHint": "Cấu hình máy chủ tùy chọn và dùng thao tác soạn thư cục bộ qua mailto.",
+    "emailProbeOnly": "Chỉ kiểm tra khả năng kết nối. 900CRM không gửi hoặc nhận email và không lưu mật khẩu hộp thư.",
     "smtpHost": "Máy chủ SMTP",
     "smtpPort": "Cổng SMTP",
     "smtpUsername": "Tên đăng nhập SMTP",

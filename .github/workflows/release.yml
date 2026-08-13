@@ -14,7 +14,7 @@ on:
       release_version:
         description: Version label to write into release metadata.
         required: true
-        default: 1.0.0
+        default: 0.9.0
       publish_github_release:
         description: Attach artifacts to a GitHub Release. Requires running this workflow from the matching tag.
         type: boolean

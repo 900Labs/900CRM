@@ -8,7 +8,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "1.0.0"
+version = "0.9.0"
 authors = ["900 Labs <hello@900labs.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/900Labs/900CRM"
