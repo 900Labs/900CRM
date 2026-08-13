@@ -1,7 +1,7 @@
 {
   "name": "@900crm/desktop",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.9.0",
   "description": "900CRM desktop application",
   "license": "Apache-2.0",
   "type": "module",

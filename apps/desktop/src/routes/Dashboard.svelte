@@ -10,18 +10,16 @@
 
   import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
-  import { createActivity, listActivities } from '$lib/api/activities';
+  import { listActivities } from '$lib/api/activities';
   import type { Activity } from '$lib/api/activities';
-  import { createContact } from '$lib/api/contacts';
   import { getDashboardStats } from '$lib/api/dashboard';
   import type { DashboardStats } from '$lib/api/dashboard';
-  import { createDeal } from '$lib/api/deals';
-  import { createOrganization } from '$lib/api/organizations';
   import { activityStore } from '$lib/stores/activities';
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
   import { formatCurrency } from '$lib/utils/formatters';
   import { buildDashboardAttentionSummary } from '$lib/utils/localAutomation';
+  import { buildDefaultSampleWorkspaceDeps, seedSampleWorkspace } from '$lib/utils/sampleWorkspace';
   import StatCard from '$lib/components/StatCard.svelte';
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
 
@@ -151,13 +149,6 @@
     ]);
   }
 
-  function futureIsoDate(daysFromNow: number): string {
-    const date = new Date();
-    date.setDate(date.getDate() + daysFromNow);
-    date.setHours(9, 0, 0, 0);
-    return date.toISOString();
-  }
-
   function openDataSettings(): void {
     window.location.hash = '#/settings';
   }
@@ -170,51 +161,9 @@
     sampleError = null;
 
     try {
-      const organization = await createOrganization({
-        name: 'Northstar Cooperative',
-        email: 'hello@northstar.example',
-        phone: '+1 555 0140',
-        website: 'https://northstar.example',
-        city: 'Austin',
-        region: 'TX',
-        country: 'United States',
-        description: 'Sample account for reviewing 900CRM workflows.',
-      });
-
-      const contact = await createContact({
-        firstName: 'Amara',
-        lastName: 'Okafor',
-        email: 'amara@northstar.example',
-        phone: '+1 555 0141',
-        organization: organization.name,
-        type: 'person',
-        tags: [],
-        notes: 'Sample contact created by the dashboard starter.',
-        website: null,
-        address: '120 Market Street',
-      });
-
-      const deal = await createDeal({
-        name: 'Solar inventory rollout',
-        value: 18500,
-        currency: settingsStore.currency,
-        stage: 'proposal',
-        probability: 65,
-        expectedCloseDate: futureIsoDate(21),
-        contactId: contact.id,
-        organizationId: organization.id,
-        description: 'Sample opportunity for a staged inventory rollout.',
-        tags: [],
-      });
-
-      await createActivity({
-        type: 'call',
-        subject: 'Call Amara about rollout timeline',
-        notes: 'Confirm stakeholders, target install dates, and next quote details.',
-        dueDate: futureIsoDate(2),
-        contactId: contact.id,
-        dealId: deal.id,
-      });
+      await seedSampleWorkspace(
+        buildDefaultSampleWorkspaceDeps(settingsStore.currency),
+      );
 
       sampleMessage = t('dashboard.firstRun.sampleLoaded');
       sampleLoaded = true;

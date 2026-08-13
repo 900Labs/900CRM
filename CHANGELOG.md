@@ -8,6 +8,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed — 2026-08-13
+- Set the application version to `0.9.0` across npm, Cargo, and Tauri
+  manifests. This is an honest source-evaluable alpha identity; no public
+  `1.0.0` installer has been published.
+- First-run sample workspace now links the sample person to the sample
+  organization so Account 360 people lists are not empty.
+- Settings no longer collects or persists SMTP/IMAP passwords. Leftover
+  password values are cleared on settings load. Email remains a TCP
+  reachability probe plus local `mailto:` compose.
+- Hidden the Settings update-check control until a signed public release
+  exists. The updater plugin remains compiled in but is not user-initiated
+  from the current UI.
+
+### Security — 2026-08-13
+- Email connection tests now reject IPv4-mapped IPv6 forms of loopback,
+  private, link-local, and CGNAT addresses.
+- Backup validate and restore now use the same path guard as import/export
+  before the live database is closed.
+
 ### Security — 2026-08-04
 - Tightened Tauri capability grants and narrowed the filesystem scope exposed to
   the WebView so IPC and disk access match only what the app actually needs.
@@ -136,108 +155,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
-## [1.0.0] — Planned
+## [1.0.0] — Future stable target
 
-### Summary
+This heading is **not** a shipped release. Current manifests use `0.9.0`.
+Do not copy the bullets below into GitHub Release notes.
 
-The planned initial release of 900CRM is a free, open-source, offline-first desktop CRM built with Tauri v2 (Rust), Svelte 5, and SQLite. It is designed for small businesses, NGOs, and sales teams that need reliable CRM tooling without cloud dependencies, per-seat subscription costs, or reliable internet access.
+The eventual stable 1.0 should be a free, open-source, offline-first desktop
+CRM built with Tauri v2 (Rust), Svelte 5, and SQLite. Public installers have
+not been published. See [Release Readiness](docs/RELEASE.md) and
+[Release Roadmap](docs/ROADMAP.md).
 
-As of 2026-06-24, public release installers have not been published. See
-[Release Readiness](docs/RELEASE.md) for the current verification-only CI status
-and the future packaging checklist.
+Implemented alpha behavior lives in `[Unreleased]` and the current app.
+The following historical target list is kept for planning only. Several
+items are still incomplete or were overstated:
 
----
-
-### Added
-
-#### Contacts
-- Create, view, update, and delete contacts (people and organizations)
-- Fields: name, email, phone, address, company, job title, website, notes
-- Tag contacts with custom labels for categorization and filtering
-- Link contacts to deals and activities
-- Contact detail panel with full activity history
-- Bulk import contacts from CSV with field mapping interface
-- Export contacts to CSV
-
-#### Pipeline (Deals)
-- Visual kanban board with drag-and-drop deal cards
-- Default pipeline stages: Lead, Qualified, Proposal, Negotiation, Closed Won, Closed Lost
-- Rename and reorder pipeline stages
-- Deal fields: name, value, currency, expected close date, contact link, notes
-- Deal detail panel showing linked contact, all activities, and stage history
-- Pipeline summary: total value by stage, count of deals per stage
-- Export deals to CSV
-
-#### Activities
-- Create activities of type: Task, Call, Meeting, Email, Note
-- Link activities to contacts and/or deals
-- Set due dates and mark activities complete
-- Activity feed sorted by due date with overdue highlighting
-- Filter activities by type, status (open/complete), contact, or deal
-- Bulk mark activities complete
-
-#### Dashboard
-- At-a-glance metrics panel on application launch
-- Pipeline total value (sum of all open deals)
-- Deals by stage — visual breakdown
-- Activities due today and overdue count
-- Recent contacts added (last 7 days)
-- Upcoming activities (next 7 days)
-- Pipeline win rate (closed won / total closed)
-
-#### Search
-- Full-text search across contacts, deals, and activities simultaneously
-- Instant results as you type (debounced, no latency)
-- Results grouped by entity type with contextual previews
-- Keyboard navigation through results
-- SQLite FTS5 index for fast offline full-text search
-
-#### Import / Export
-- CSV import for contacts: supports standard exports from Salesforce, HubSpot, Google Contacts, and generic CSV
-- Field mapping interface for non-standard column names
-- Duplicate detection on import (by email address)
-- Export supported CSV entity types: contacts, deals, and organizations
-- All import/export operations run entirely offline
-
-#### Internationalization
-- Full i18n support with language switching in settings (no restart required)
-- English (en) — 100% complete (base language)
-- French (fr) — 100% complete
-- Spanish (es) — 100% complete
-- Arabic (ar) — 100% complete with full RTL layout
-- Swahili (sw) — 100% complete
-- Hindi (hi) — 85% complete
-- RTL (right-to-left) layout support for Arabic and future RTL languages
-
-#### Settings
-- Language selection
-- Date format preference (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD)
-- Currency display preferences
-- Theme (light, dark, system default)
-- Data directory location (for backup purposes)
-
-#### Performance and Compatibility
-- Application startup in under 500ms on typical hardware
-- Handles 10,000+ contacts without performance degradation
-- Installer under 8 MB on all platforms
-- Memory usage under 80 MB at idle
-- Optimized for hardware from 2015 onward (dual-core, 4 GB RAM)
-
-#### Platform Support Targets
-- Windows 10 and later (x64) — future `.msi` or `.exe` installer
-- macOS 11 (Big Sur) and later — Intel x64 and Apple Silicon ARM64 — future `.dmg`
-- Linux — future `.deb` (Debian/Ubuntu 20.04+) and `.AppImage` (universal)
-
-#### Developer / Community
-- Full source code under Apache License 2.0
-- Rust backend with complete `///` doc comments on all public APIs
-- Svelte 5 frontend with typed props and component documentation headers
-- GitHub Actions CI pipeline running verification checks on Ubuntu
-- Automated release builds on version tags are not implemented yet
-- Community issue templates (bug report, feature request)
-- Contributor guide ([CONTRIBUTING.md](CONTRIBUTING.md))
-- Architecture guide ([ARCHITECTURE.md](ARCHITECTURE.md))
-- Plugin system architecture defined (implementation planned for v2.0)
+- Pipeline stages are the built-in set; there is no rename/reorder UI.
+- Deal stage-transition history is not stored.
+- Contacts do not have a job-title field or file attachments.
+- Search results do not yet have full keyboard list navigation.
+- CSV import is generic mapped CSV, not vendor-specific Salesforce/HubSpot
+  connectors.
+- There is no Settings "data directory location" control.
+- Bulk mark-complete for activities is not implemented.
+- Installer size, RAM, and "10,000+ contacts" claims are not release
+  evidence.
 
 ---
 

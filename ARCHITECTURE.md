@@ -194,7 +194,7 @@ crates/crm-core/src/
 
 ```
 crates/crm-mcp/src/main.rs     Optional local MCP stdio boundary.
-crates/crm-sdk/src/lib.rs      Placeholder for future SDK exports.
+crates/crm-sdk/src/lib.rs      Read-only local SDK facade over crm-core.
 ```
 
 The current MCP package is optional and is not started by the desktop app or `crm-core`.

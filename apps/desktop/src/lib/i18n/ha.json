@@ -387,6 +387,7 @@
     "emailIntegration": "Hadin Imel",
     "emailIntegrationEnabled": "Kunna Zabin Hadin IMAP/SMTP",
     "emailComposeHint": "Saita uwar garken imel na zabi kuma yi amfani da mailto na gida.",
+    "emailProbeOnly": "Gwaji na isa kawai. 900CRM ba ya aika ko karɓar imel kuma ba ya adana kalmomin shiga na akwatin imel.",
     "smtpHost": "Mai Masaukin SMTP",
     "smtpPort": "Tashar SMTP",
     "smtpUsername": "Sunan Mai Amfani na SMTP",

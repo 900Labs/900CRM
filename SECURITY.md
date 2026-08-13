@@ -60,13 +60,32 @@ We will credit researchers who report valid security vulnerabilities in the secu
 
 Understanding 900CRM's security model helps clarify what kinds of issues are in scope.
 
-### No Network Calls
+### Offline By Default, With Named Optional Network Paths
 
-900CRM makes **zero outbound network requests** by default. There is no telemetry, no auto-update pings, no licence verification, no analytics, no cloud sync. The Tauri application is built with all network-related capabilities disabled in `tauri.conf.json`.
+Normal CRM use — contacts, pipeline, activities, search, import/export, backup —
+makes **no outbound network requests**. There is no telemetry, no licence
+verification, no analytics, and no cloud sync.
 
-The only exception is the optional team sync feature (when explicitly configured by the user), which connects to a self-hosted sync server that the user controls. This connection is entirely opt-in and user-initiated.
+The desktop shell does compile a few optional network-capable plugins. They are
+not used by core CRM workflows:
 
-If you observe unexpected network traffic from 900CRM that you did not initiate, please report it immediately — this would be a serious and unintended behaviour.
+- **Updater plugin** — configured to check
+  `https://github.com/900Labs/900CRM/releases/latest/download/latest.json`.
+  The Settings "Check for Updates" control is hidden until a signed public
+  release exists. No automatic update poll runs on launch.
+- **Email reachability test** — if the user enables optional email settings and
+  clicks Test Connection, the app may perform DNS and TCP connect to the
+  host/port they entered. The test does not log in and does not send mail.
+  Private, loopback, link-local, CGNAT, and IPv4-mapped forms of those ranges
+  are blocked.
+- **`mailto:` and `https://` links** — opening a mail composer or a website uses
+  the OS handler via `shell.open`. The system mail client or browser is outside
+  900CRM.
+- **Team sync** is **not implemented**. `trigger_sync` reports `not_implemented`.
+  A sync URL field may exist in Settings; it does not connect.
+
+If you observe unexpected network traffic that is not one of the paths above,
+please report it.
 
 ### No Telemetry
 
@@ -76,9 +95,9 @@ There is no analytics, no crash reporting, no usage tracking, and no data collec
 
 All CRM data — contacts, deals, activities, settings — is stored in a SQLite database on the user's local machine:
 
-- **Windows:** `%APPDATA%\900CRM\data.db`
-- **macOS:** `~/Library/Application Support/900CRM/data.db`
-- **Linux:** `~/.local/share/900CRM/data.db`
+- **Windows:** `%APPDATA%\900CRM\900crm.db`
+- **macOS:** `~/Library/Application Support/900CRM/900crm.db`
+- **Linux:** `~/.local/share/900CRM/900crm.db`
 
 No data is ever written outside of the application data directory and files the user explicitly exports.
 

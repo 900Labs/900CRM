@@ -387,6 +387,7 @@
     "emailIntegration": "ইমেইল ইন্টিগ্রেশন",
     "emailIntegrationEnabled": "ঐচ্ছিক IMAP/SMTP ইন্টিগ্রেশন চালু করুন",
     "emailComposeHint": "ঐচ্ছিক মেইল সার্ভার কনফিগার করুন এবং লোকাল mailto কম্পোজ ব্যবহার করুন।",
+    "emailProbeOnly": "শুধু পৌঁছানো যায় কি না দেখা হয়। 900CRM ইমেইল পাঠায় বা গ্রহণ করে না এবং মেইলবক্স পাসওয়ার্ড রাখে না।",
     "smtpHost": "SMTP হোস্ট",
     "smtpPort": "SMTP পোর্ট",
     "smtpUsername": "SMTP ব্যবহারকারীর নাম",

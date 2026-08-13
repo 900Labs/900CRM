@@ -1,7 +1,7 @@
 # Release Readiness
 
 Date: 2026-06-24
-Last updated: 2026-08-04
+Last updated: 2026-08-13
 
 This document records the current release status for 900CRM and the manual
 checks required before publishing a public release. For a phase-by-phase
@@ -11,6 +11,8 @@ current-vs-remaining assessment, see
 ## Current Status
 
 900CRM is not published as a packaged public desktop release yet.
+Application manifests currently identify the source tree as `0.9.0`
+(source-evaluable alpha), not a stable `1.0.0`.
 
 Current CI is verification-only, and release packaging is intentionally
 separate. Manual release packaging now has an automated Ubuntu preflight gate
