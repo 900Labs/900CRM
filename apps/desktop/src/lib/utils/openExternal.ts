@@ -43,7 +43,7 @@ export async function openLocalPath(raw: string): Promise<void> {
     throw new Error('File links must be a local path, not a URL');
   }
 
-  if (/[\u0000\r\n]/.test(value)) {
+  if (value.includes('\0') || value.includes('\r') || value.includes('\n')) {
     throw new Error('File path is invalid');
   }
 

@@ -44,4 +44,9 @@ describe('openLocalPath', () => {
     await expect(openLocalPath('file:///etc/passwd')).rejects.toThrow(/local path/i);
     expect(openMock).not.toHaveBeenCalled();
   });
+
+  it('rejects paths with control characters', async () => {
+    await expect(openLocalPath('/tmp/quote.pdf\n/etc/passwd')).rejects.toThrow(/invalid/i);
+    expect(openMock).not.toHaveBeenCalled();
+  });
 });
