@@ -135,6 +135,19 @@ async function installTauriShim(page: Page) {
       device_id: string;
     };
 
+    type BackendEntityLink = {
+      id: string;
+      entity_type: string;
+      entity_id: string;
+      title: string;
+      kind: string;
+      target: string;
+      created_at: string;
+      updated_at: string;
+      deleted_at: string | null;
+      device_id: string;
+    };
+
     type BackendGlobalSearchResult = {
       entity_type: 'contact' | 'organization' | 'deal' | 'activity' | 'note' | 'tag';
       entity_id: string;
@@ -171,7 +184,11 @@ async function installTauriShim(page: Page) {
       deals: [] as BackendDeal[],
       activities: [] as BackendActivity[],
       activityLinks: [] as BackendActivityLink[],
+      entityLinks: [] as BackendEntityLink[],
     };
+    if (!Array.isArray(state.entityLinks)) {
+      state.entityLinks = [];
+    }
 
     function persistState(): void {
       window.localStorage.setItem(stateStorageKey, JSON.stringify(state));
@@ -417,6 +434,46 @@ async function installTauriShim(page: Page) {
       contact.updated_at = timestamp;
       persistState();
       return contact;
+    }
+
+    function listEntityLinks(args: InvokeArgs): BackendEntityLink[] {
+      const entityType = stringArg(args, 'entity_type');
+      const entityId = stringArg(args, 'entity_id');
+      return state.entityLinks.filter((link) =>
+        !link.deleted_at && link.entity_type === entityType && link.entity_id === entityId
+      );
+    }
+
+    function createEntityLink(args: InvokeArgs): BackendEntityLink {
+      const kind = stringArg(args, 'kind') === 'path' ? 'path' : 'url';
+      const target = stringArg(args, 'target');
+      const title = nullableStringArg(args, 'title')
+        ?? (kind === 'path' ? target.split(/[\\/]/).pop() || target : target);
+      const link: BackendEntityLink = {
+        id: nextId('link'),
+        entity_type: stringArg(args, 'entity_type'),
+        entity_id: stringArg(args, 'entity_id'),
+        title,
+        kind,
+        target,
+        created_at: timestamp,
+        updated_at: timestamp,
+        deleted_at: null,
+        device_id: 'browser-smoke-device',
+      };
+      state.entityLinks.unshift(link);
+      persistState();
+      return link;
+    }
+
+    function deleteEntityLink(args: InvokeArgs): void {
+      const id = stringArg(args, 'id');
+      const link = state.entityLinks.find((candidate) => candidate.id === id);
+      if (!link) {
+        throw new Error(`Link not found: ${id}`);
+      }
+      link.deleted_at = timestamp;
+      persistState();
     }
 
     function createActivity(args: InvokeArgs): BackendActivity {
@@ -761,6 +818,15 @@ async function installTauriShim(page: Page) {
             return createContact(args);
           case 'set_contact_lifecycle':
             return setContactLifecycle(args);
+          case 'list_entity_links':
+            return listEntityLinks(args);
+          case 'create_entity_link':
+            return createEntityLink(args);
+          case 'delete_entity_link':
+            deleteEntityLink(args);
+            return;
+          case 'update_entity_link':
+            throw new Error('update_entity_link is not used in browser smoke tests');
           case 'get_contact': {
             const id = stringArg(args, 'id');
             const contact = state.contacts.find((candidate) => candidate.id === id && !candidate.deleted_at);

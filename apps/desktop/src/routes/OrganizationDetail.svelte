@@ -40,6 +40,7 @@
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
   import EntityNotesPanel from '$lib/components/EntityNotesPanel.svelte';
+  import EntityLinksPanel from '$lib/components/EntityLinksPanel.svelte';
   import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
 
   const { organizationId }: { organizationId: string } = $props();
@@ -538,6 +539,12 @@
           </div>
           <div class="card-body">
             <EntityNotesPanel entityType="organization" entityId={organization.id} />
+          </div>
+        </section>
+
+        <section class="card account-links">
+          <div class="card-body">
+            <EntityLinksPanel entityType="organization" entityId={organization.id} />
           </div>
         </section>
       </div>

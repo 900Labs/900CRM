@@ -225,6 +225,24 @@
     "saveFailed": "فشل حفظ الملاحظة",
     "deleteFailed": "فشل حذف الملاحظة"
   },
+  "entityLinks": {
+    "title": "روابط",
+    "help": "احفظ موقعًا أو مسار ملف محلي. يخزن 900CRM الموقع كنص ولا ينسخ الملف ولا يرفعه.",
+    "titleLabel": "عنوان الرابط",
+    "titlePlaceholder": "العنوان (اختياري)",
+    "urlLabel": "موقع ويب",
+    "urlPlaceholder": "https://",
+    "addUrl": "إضافة موقع",
+    "chooseFile": "اختيار ملف",
+    "empty": "لا توجد روابط بعد",
+    "website": "موقع ويب",
+    "filePath": "مسار ملف",
+    "confirmDelete": "هل تريد إزالة هذا الرابط؟",
+    "loadFailed": "فشل تحميل الروابط",
+    "saveFailed": "فشل حفظ الرابط",
+    "deleteFailed": "فشل حذف الرابط",
+    "openFailed": "تعذر فتح هذا الرابط"
+  },
   "entityTags": {
     "title": "الوسوم",
     "inputPlaceholder": "أضف أو ابحث عن وسم",

@@ -225,6 +225,24 @@
     "saveFailed": "নোট সংরক্ষণ করা যায়নি",
     "deleteFailed": "নোট মুছে ফেলা যায়নি"
   },
+  "entityLinks": {
+    "title": "লিঙ্ক",
+    "help": "একটি ওয়েবসাইট বা স্থানীয় ফাইল পথ সংরক্ষণ করুন। 900CRM অবস্থানটি লেখা হিসেবে রাখে এবং ফাইল কপি বা আপলোড করে না।",
+    "titleLabel": "লিঙ্কের শিরোনাম",
+    "titlePlaceholder": "শিরোনাম (ঐচ্ছিক)",
+    "urlLabel": "ওয়েবসাইট",
+    "urlPlaceholder": "https://",
+    "addUrl": "ওয়েবসাইট যোগ করুন",
+    "chooseFile": "ফাইল বেছে নিন",
+    "empty": "এখনও কোনো লিঙ্ক নেই",
+    "website": "ওয়েবসাইট",
+    "filePath": "ফাইল পথ",
+    "confirmDelete": "এই লিঙ্কটি সরাতে চান?",
+    "loadFailed": "লিঙ্ক লোড করা যায়নি",
+    "saveFailed": "লিঙ্ক সংরক্ষণ করা যায়নি",
+    "deleteFailed": "লিঙ্ক মুছে ফেলা যায়নি",
+    "openFailed": "এই লিঙ্ক খোলা যায়নি"
+  },
   "entityTags": {
     "title": "ট্যাগ",
     "inputPlaceholder": "ট্যাগ যোগ করুন বা খুঁজুন",

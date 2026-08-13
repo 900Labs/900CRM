@@ -225,6 +225,24 @@
     "saveFailed": "An kasa adana bayani",
     "deleteFailed": "An kasa share bayani"
   },
+  "entityLinks": {
+    "title": "Hanyoyi",
+    "help": "Ajiye gidan yanar gizo ko hanyar fayil na gida. 900CRM yana adana wurin a matsayin rubutu kuma ba ya kwafi ko loda fayil.",
+    "titleLabel": "Taken hanya",
+    "titlePlaceholder": "Take (na zaɓi)",
+    "urlLabel": "Gidan yanar gizo",
+    "urlPlaceholder": "https://",
+    "addUrl": "Ƙara gidan yanar gizo",
+    "chooseFile": "Zaɓi fayil",
+    "empty": "Babu hanyoyi tukuna",
+    "website": "Gidan yanar gizo",
+    "filePath": "Hanyar fayil",
+    "confirmDelete": "A cire wannan hanyar?",
+    "loadFailed": "An kasa lodin hanyoyi",
+    "saveFailed": "An kasa adana hanya",
+    "deleteFailed": "An kasa share hanya",
+    "openFailed": "An kasa buɗe wannan hanyar"
+  },
   "entityTags": {
     "title": "Tambari",
     "inputPlaceholder": "Kara ko nemo tambari",

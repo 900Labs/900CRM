@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-13
+- Contacts, organizations, and deals can store website and local-file
+  bookmarks. 900CRM saves the location as text and does not copy or upload
+  the file.
 - Person contacts now have a lifecycle: lead or customer. Existing people stay
   customers. New people can be created as leads, filtered on the contacts list,
   and converted to customers from the contact page.

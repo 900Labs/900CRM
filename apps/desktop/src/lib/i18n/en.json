@@ -225,6 +225,24 @@
     "saveFailed": "Failed to save note",
     "deleteFailed": "Failed to delete note"
   },
+  "entityLinks": {
+    "title": "Links",
+    "help": "Save a website or a local file path. 900CRM stores the location as text and does not copy or upload the file.",
+    "titleLabel": "Link title",
+    "titlePlaceholder": "Title (optional)",
+    "urlLabel": "Website URL",
+    "urlPlaceholder": "https://",
+    "addUrl": "Add website",
+    "chooseFile": "Choose file",
+    "empty": "No links yet",
+    "website": "Website",
+    "filePath": "File path",
+    "confirmDelete": "Remove this link?",
+    "loadFailed": "Failed to load links",
+    "saveFailed": "Failed to save link",
+    "deleteFailed": "Failed to delete link",
+    "openFailed": "Could not open this link"
+  },
   "entityTags": {
     "title": "Tags",
     "inputPlaceholder": "Add or find tag",

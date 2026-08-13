@@ -225,6 +225,24 @@
     "saveFailed": "Échec de l’enregistrement de la note",
     "deleteFailed": "Échec de la suppression de la note"
   },
+  "entityLinks": {
+    "title": "Liens",
+    "help": "Enregistrez un site web ou un chemin de fichier local. 900CRM stocke l’emplacement comme texte et ne copie ni n’envoie le fichier.",
+    "titleLabel": "Titre du lien",
+    "titlePlaceholder": "Titre (facultatif)",
+    "urlLabel": "Site web",
+    "urlPlaceholder": "https://",
+    "addUrl": "Ajouter un site",
+    "chooseFile": "Choisir un fichier",
+    "empty": "Aucun lien pour l’instant",
+    "website": "Site web",
+    "filePath": "Chemin de fichier",
+    "confirmDelete": "Supprimer ce lien ?",
+    "loadFailed": "Échec du chargement des liens",
+    "saveFailed": "Échec de l’enregistrement du lien",
+    "deleteFailed": "Échec de la suppression du lien",
+    "openFailed": "Impossible d’ouvrir ce lien"
+  },
   "entityTags": {
     "title": "Étiquettes",
     "inputPlaceholder": "Ajouter ou trouver une étiquette",

@@ -225,6 +225,24 @@
     "saveFailed": "Không lưu được ghi chú",
     "deleteFailed": "Không xóa được ghi chú"
   },
+  "entityLinks": {
+    "title": "Liên kết",
+    "help": "Lưu một trang web hoặc đường dẫn tệp cục bộ. 900CRM lưu vị trí dạng văn bản và không sao chép hay tải tệp lên.",
+    "titleLabel": "Tiêu đề liên kết",
+    "titlePlaceholder": "Tiêu đề (không bắt buộc)",
+    "urlLabel": "Trang web",
+    "urlPlaceholder": "https://",
+    "addUrl": "Thêm trang web",
+    "chooseFile": "Chọn tệp",
+    "empty": "Chưa có liên kết",
+    "website": "Trang web",
+    "filePath": "Đường dẫn tệp",
+    "confirmDelete": "Xóa liên kết này?",
+    "loadFailed": "Không tải được liên kết",
+    "saveFailed": "Không lưu được liên kết",
+    "deleteFailed": "Không xóa được liên kết",
+    "openFailed": "Không mở được liên kết này"
+  },
   "entityTags": {
     "title": "Thẻ",
     "inputPlaceholder": "Thêm hoặc tìm thẻ",

@@ -21,3 +21,31 @@ export async function openExternalUrl(raw: string): Promise<void> {
 
   await open(parsed.toString());
 }
+
+/**
+ * Open a stored local file path in the OS handler.
+ * This is for user-saved bookmarks only. It rejects URLs.
+ */
+export async function openLocalPath(raw: string): Promise<void> {
+  const value = raw.trim();
+  if (!value) {
+    throw new Error('File path is required');
+  }
+
+  const lower = value.toLowerCase();
+  if (
+    lower.startsWith('http://')
+    || lower.startsWith('https://')
+    || lower.startsWith('javascript:')
+    || lower.startsWith('data:')
+    || lower.startsWith('file:')
+  ) {
+    throw new Error('File links must be a local path, not a URL');
+  }
+
+  if (value.includes('\0') || value.includes('\r') || value.includes('\n')) {
+    throw new Error('File path is invalid');
+  }
+
+  await open(value);
+}
