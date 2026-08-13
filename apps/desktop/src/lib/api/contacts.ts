@@ -5,6 +5,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export type ContactType = 'person' | 'org';
+export type ContactLifecycle = 'lead' | 'customer';
 
 export interface Contact {
   id: string;
@@ -15,6 +16,7 @@ export interface Contact {
   organization: string | null;
   organizationId: string | null;
   type: ContactType;
+  lifecycle: ContactLifecycle;
   tags: string[];
   notes: string | null;
   website: string | null;
@@ -26,15 +28,17 @@ export interface Contact {
 
 export type CreateContactPayload = Omit<
   Contact,
-  'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'organizationId'
+  'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'organizationId' | 'lifecycle'
 > & {
   organizationId?: string | null;
+  lifecycle?: ContactLifecycle;
 };
 export type UpdateContactPayload = Partial<CreateContactPayload>;
 
 export interface ListContactsParams {
   search?: string;
   type?: ContactType;
+  lifecycle?: ContactLifecycle;
   tags?: string[];
   customFieldDefId?: string;
   customFieldQuery?: string;
@@ -77,6 +81,7 @@ interface BackendContact {
   org_id: string | null;
   organization_id?: string | null;
   notes: string;
+  lifecycle?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -121,6 +126,7 @@ function mapContact(contact: BackendContact): Contact {
     organization: toNullable(contact.org_name),
     organizationId: toNullable(contact.organization_id),
     type: contact.contact_type === 'organization' ? 'org' : 'person',
+    lifecycle: contact.lifecycle === 'lead' ? 'lead' : 'customer',
     tags: [],
     notes: toNullable(contact.notes),
     website: null,
@@ -177,6 +183,7 @@ export async function createContact(data: CreateContactPayload): Promise<Contact
     country: '',
     org_id: data.organizationId ?? null,
     notes: data.notes ?? '',
+    lifecycle: data.type === 'person' ? (data.lifecycle ?? 'customer') : 'customer',
   });
 
   return mapContact(contact);
@@ -195,6 +202,7 @@ export async function listContacts(params: ListContactsParams = {}): Promise<Con
       sort_by: toBackendSortKey(params.sortBy),
       sort_dir: params.sortDir ?? 'asc',
       filter_type: toBackendContactType(params.type),
+      filter_lifecycle: params.lifecycle,
       search_query: params.search?.trim() ? params.search.trim() : undefined,
       custom_field_def_id: params.customFieldDefId?.trim() || undefined,
       custom_field_query: params.customFieldQuery?.trim() || undefined,
@@ -247,6 +255,17 @@ export async function mergeContacts(sourceId: string, targetId: string): Promise
   const contact = await invoke<BackendContact>('merge_contacts', {
     target_id: targetId,
     source_id: sourceId,
+  });
+  return mapContact(contact);
+}
+
+export async function setContactLifecycle(
+  id: string,
+  lifecycle: ContactLifecycle,
+): Promise<Contact> {
+  const contact = await invoke<BackendContact>('set_contact_lifecycle', {
+    id,
+    lifecycle,
   });
   return mapContact(contact);
 }

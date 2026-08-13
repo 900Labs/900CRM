@@ -14,11 +14,13 @@ import {
   searchContacts,
   listContactDuplicateCandidates,
   mergeContacts,
+  setContactLifecycle,
 } from '$lib/api/contacts';
 import { t } from '$lib/i18n';
 import type {
   Contact,
   ContactDuplicateCandidate,
+  ContactLifecycle,
   CreateContactPayload,
   UpdateContactPayload,
   ListContactsParams,
@@ -224,6 +226,28 @@ class ContactStore {
   /**
    * Merge one duplicate contact into another and refresh affected state.
    */
+  async setLifecycle(id: string, lifecycle: ContactLifecycle): Promise<Contact> {
+    this.isSaving = true;
+    try {
+      const contact = await setContactLifecycle(id, lifecycle);
+      this.contacts = this.contacts.map((item) => (item.id === id ? contact : item));
+      if (this.selectedContact?.id === id) {
+        this.selectedContact = contact;
+      }
+      uiStore.toastSuccess(
+        lifecycle === 'customer'
+          ? t('contacts.convertedToCustomer')
+          : t('toasts.updated', { name: t('entities.contact') }),
+      );
+      return contact;
+    } catch (err) {
+      uiStore.toastError(t('errors.updateNamed', { name: t('entities.contact') }));
+      throw err;
+    } finally {
+      this.isSaving = false;
+    }
+  }
+
   async mergeDuplicateContacts(sourceId: string, targetId: string): Promise<Contact> {
     this.isMergingDuplicates = true;
     try {

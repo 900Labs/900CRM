@@ -44,6 +44,7 @@ describe('seedSampleWorkspace', () => {
         lastName: SAMPLE_CONTACT_LAST_NAME,
         organization: SAMPLE_ORGANIZATION_NAME,
         organizationId: 'org-sample',
+        lifecycle: 'lead',
       }),
     );
     expect(createDeal).toHaveBeenCalledWith(

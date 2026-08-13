@@ -138,6 +138,7 @@
   "contacts": {
     "title": "Contactos",
     "addContact": "Agregar contacto",
+    "addLead": "Añadir lead",
     "editContact": "Editar contacto",
     "deleteContact": "Eliminar contacto",
     "search": "Buscar contactos…",
@@ -146,6 +147,13 @@
     "phone": "Teléfono",
     "organization": "Organización",
     "type": "Tipo",
+    "lifecycle": "Ciclo de vida",
+    "lifecycleLead": "Lead",
+    "lifecycleCustomer": "Cliente",
+    "filterLeads": "Leads",
+    "filterCustomers": "Clientes",
+    "convertToCustomer": "Convertir en cliente",
+    "convertedToCustomer": "Convertido en cliente",
     "person": "Persona",
     "org": "Organización",
     "import": "Importar",
@@ -202,7 +210,9 @@
       "healthOnTrack": "En camino",
       "healthOnTrackDetail": "El próximo seguimiento está programado: {subject}.",
       "healthNurture": "Cultivar",
-      "healthNurtureDetail": "Aún no hay ningún negocio abierto ni seguimiento programado."
+      "healthNurtureDetail": "Aún no hay ningún negocio abierto ni seguimiento programado.",
+      "eyebrowLead": "Espacio del lead",
+      "titleLead": "Resumen del lead"
     }
   },
   "entityNotes": {
@@ -227,6 +237,17 @@
   "deals": {
     "title": "Pipeline",
     "addDeal": "Agregar negocio",
+    "openDeal": "Abrir negocio",
+    "backToPipeline": "Volver al pipeline",
+    "notFound": "No se encontró este negocio.",
+    "deleteDeal": "Eliminar negocio",
+    "confirmDelete": "¿Seguro que quieres eliminar este negocio?",
+    "organization": "Organización",
+    "workspace": {
+      "eyebrow": "Espacio del negocio",
+      "title": "Resumen del negocio",
+      "actionsLabel": "Acciones del espacio del negocio"
+    },
     "editDeal": "Editar negocio",
     "value": "Valor",
     "stage": "Etapa",

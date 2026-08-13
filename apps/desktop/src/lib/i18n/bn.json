@@ -138,6 +138,7 @@
   "contacts": {
     "title": "যোগাযোগ",
     "addContact": "যোগাযোগ যোগ করুন",
+    "addLead": "লিড যোগ করুন",
     "editContact": "যোগাযোগ সম্পাদনা করুন",
     "deleteContact": "যোগাযোগ মুছুন",
     "search": "যোগাযোগ খুঁজুন…",
@@ -146,6 +147,13 @@
     "phone": "ফোন",
     "organization": "প্রতিষ্ঠান",
     "type": "ধরন",
+    "lifecycle": "জীবনচক্র",
+    "lifecycleLead": "লিড",
+    "lifecycleCustomer": "গ্রাহক",
+    "filterLeads": "লিড",
+    "filterCustomers": "গ্রাহক",
+    "convertToCustomer": "গ্রাহকে রূপান্তর করুন",
+    "convertedToCustomer": "গ্রাহকে রূপান্তরিত",
     "person": "ব্যক্তি",
     "org": "প্রতিষ্ঠান",
     "import": "ইমপোর্ট",
@@ -202,7 +210,9 @@
       "healthOnTrack": "সঠিক পথে",
       "healthOnTrackDetail": "পরবর্তী ফলো-আপ নির্ধারিত হয়েছে: {subject}।",
       "healthNurture": "নার্সার",
-      "healthNurtureDetail": "এখনও কোনো খোলা ডিল বা ফলো-আপ নির্ধারিত নেই।"
+      "healthNurtureDetail": "এখনও কোনো খোলা ডিল বা ফলো-আপ নির্ধারিত নেই।",
+      "eyebrowLead": "লিড ওয়ার্কস্পেস",
+      "titleLead": "লিড সারাংশ"
     }
   },
   "entityNotes": {
@@ -227,6 +237,17 @@
   "deals": {
     "title": "পাইপলাইন",
     "addDeal": "ডিল যোগ করুন",
+    "openDeal": "ডিল খুলুন",
+    "backToPipeline": "পাইপলাইনে ফিরুন",
+    "notFound": "এই ডিলটি পাওয়া যায়নি।",
+    "deleteDeal": "ডিল মুছুন",
+    "confirmDelete": "আপনি কি এই ডিলটি মুছতে চান?",
+    "organization": "সংস্থা",
+    "workspace": {
+      "eyebrow": "ডিল ওয়ার্কস্পেস",
+      "title": "ডিল সারাংশ",
+      "actionsLabel": "ডিল ওয়ার্কস্পেস কার্যক্রম"
+    },
     "editDeal": "ডিল সম্পাদনা করুন",
     "value": "মূল্য",
     "stage": "ধাপ",

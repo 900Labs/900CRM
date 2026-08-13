@@ -66,6 +66,12 @@ test('loads the dashboard sample workspace and shows the follow-up on the dashbo
   await expect(page.getByRole('heading', { name: 'Pipeline' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Solar inventory rollout' })).toBeVisible();
 
+  await page.getByRole('button', { name: 'Open deal' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/deals/${sampleDealId}$`));
+  await expect(page.getByRole('heading', { name: 'Solar inventory rollout' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Deal Summary' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Amara Okafor', exact: true })).toBeVisible();
+
   await assertNoConsoleErrors();
 });
 
@@ -96,6 +102,41 @@ test('creates a contact through the visible UI and shows it in Contacts and glob
   await expect(searchResults).toBeVisible();
   await expect(searchResults.getByText('Ada Lovelace')).toBeVisible();
   await expect(searchResults.getByText('Contacts')).toBeVisible();
+
+  await assertNoConsoleErrors();
+});
+
+test('creates a lead, filters the lead list, and converts it to a customer', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/contacts');
+  await expect(page.getByRole('heading', { name: 'Contacts', exact: true })).toBeVisible();
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Lead' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add Contact' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('Lifecycle')).toHaveValue('lead');
+  await dialog.getByLabel('First Name').fill('Kofi');
+  await dialog.getByLabel('Last Name').fill('Mensah');
+  await dialog.getByLabel('Email').fill('kofi.lead@example.test');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden();
+
+  await page.getByRole('group', { name: 'Lifecycle' }).getByRole('button', { name: 'Leads' }).click();
+  await expect(page.getByText('Kofi Mensah')).toBeVisible();
+  await expect(page.getByText('Lead').first()).toBeVisible();
+
+  await page.getByText('Kofi Mensah').click();
+  await expect(page.getByRole('heading', { name: 'Kofi Mensah' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Lead Summary' })).toBeVisible();
+  await page.getByRole('button', { name: 'Convert to customer' }).click();
+  await expect(page.getByText('Customer').first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Customer 360 Summary' })).toBeVisible();
+
+  await loadHashRoute(page, '/contacts');
+  await page.getByRole('group', { name: 'Lifecycle' }).getByRole('button', { name: 'Customers' }).click();
+  await expect(page.getByText('Kofi Mensah')).toBeVisible();
 
   await assertNoConsoleErrors();
 });

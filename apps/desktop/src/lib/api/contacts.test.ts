@@ -12,6 +12,7 @@ import {
   listContacts,
   listContactDuplicateCandidates,
   mergeContacts,
+  setContactLifecycle,
 } from './contacts';
 
 const backendContact = {
@@ -98,8 +99,49 @@ describe('contacts API', () => {
         {
           id: 'contact-linked',
           organizationId: 'organization-1',
+          lifecycle: 'customer',
         },
       ],
+    });
+  });
+
+  it('maps lead lifecycle and list filters', async () => {
+    invokeMock.mockResolvedValueOnce({
+      contacts: [
+        {
+          ...backendContact,
+          id: 'contact-lead',
+          lifecycle: 'lead',
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 50,
+    });
+
+    await expect(listContacts({ lifecycle: 'lead' })).resolves.toMatchObject({
+      contacts: [{ id: 'contact-lead', lifecycle: 'lead' }],
+    });
+    expect(invokeMock).toHaveBeenCalledWith('list_contacts', {
+      params: expect.objectContaining({
+        filter_lifecycle: 'lead',
+      }),
+    });
+  });
+
+  it('maps setContactLifecycle to the dedicated command', async () => {
+    invokeMock.mockResolvedValueOnce({
+      ...backendContact,
+      lifecycle: 'customer',
+    });
+
+    await expect(setContactLifecycle('contact-target', 'customer')).resolves.toMatchObject({
+      id: 'contact-target',
+      lifecycle: 'customer',
+    });
+    expect(invokeMock).toHaveBeenCalledWith('set_contact_lifecycle', {
+      id: 'contact-target',
+      lifecycle: 'customer',
     });
   });
 });

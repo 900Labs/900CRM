@@ -534,6 +534,26 @@
 
     if (entity.type === 'organization') {
       navigateHash(`/organizations/${entity.id}`);
+      return;
+    }
+
+    navigateHash(`/deals/${entity.id}`);
+  }
+
+  async function handleConvertToCustomer() {
+    if (!contact || contact.lifecycle !== 'lead') {
+      return;
+    }
+
+    isSaving = true;
+    try {
+      const updated = await contactStore.setLifecycle(contact.id, 'customer');
+      contact = updated;
+      populateForm(updated);
+    } catch (err) {
+      console.error('[ContactDetail] Convert error:', err);
+    } finally {
+      isSaving = false;
     }
   }
 
@@ -603,7 +623,14 @@
           </div>
           <div class="identity-text">
             <h1 class="page-title">{displayName}</h1>
-            <span class="contact-type-badge">{t(`contacts.${contact.type}`)}</span>
+            <div class="identity-badges">
+              <span class="contact-type-badge">{t(`contacts.${contact.type}`)}</span>
+              {#if contact.type === 'person'}
+                <span class="contact-lifecycle-badge lifecycle-{contact.lifecycle}">
+                  {t(`contacts.lifecycle${contact.lifecycle === 'lead' ? 'Lead' : 'Customer'}`)}
+                </span>
+              {/if}
+            </div>
           </div>
         </div>
       </div>
@@ -630,6 +657,16 @@
             type="button"
           >
             {t('common.cancel')}
+          </button>
+        {/if}
+        {#if contact.type === 'person' && contact.lifecycle === 'lead'}
+          <button
+            class="btn btn-primary btn-sm"
+            onclick={handleConvertToCustomer}
+            disabled={isSaving}
+            type="button"
+          >
+            {t('contacts.convertToCustomer')}
           </button>
         {/if}
         {#if contact.email}
@@ -663,9 +700,15 @@
     <section class="customer-workspace" aria-labelledby="customer-workspace-heading">
       <div class="customer-workspace-header">
         <div>
-          <p class="workspace-eyebrow">{t('contacts.workspace.eyebrow')}</p>
+          <p class="workspace-eyebrow">
+            {contact.lifecycle === 'lead'
+              ? t('contacts.workspace.eyebrowLead')
+              : t('contacts.workspace.eyebrow')}
+          </p>
           <h2 class="section-title" id="customer-workspace-heading">
-            {t('contacts.workspace.title')}
+            {contact.lifecycle === 'lead'
+              ? t('contacts.workspace.titleLead')
+              : t('contacts.workspace.title')}
           </h2>
         </div>
         <span class="health-badge health-{customerHealth.tone}">
@@ -961,15 +1004,21 @@
               <ul class="deals-list" role="list">
                 {#each linkedDeals as deal (deal.id)}
                   <li class="deal-row">
-                    <div class="deal-row-info">
-                      <span class="deal-row-name">{deal.name}</span>
-                      <span class="deal-row-stage stage-badge stage-{deal.stage}">
-                        {t(`deals.stages.${deal.stage}`)}
+                    <button
+                      class="deal-row-button"
+                      type="button"
+                      onclick={() => navigateHash(`/deals/${deal.id}`)}
+                    >
+                      <div class="deal-row-info">
+                        <span class="deal-row-name">{deal.name}</span>
+                        <span class="deal-row-stage stage-badge stage-{deal.stage}">
+                          {t(`deals.stages.${deal.stage}`)}
+                        </span>
+                      </div>
+                      <span class="deal-row-value">
+                        {formatCurrency(deal.value, deal.currency, settingsStore.language)}
                       </span>
-                    </div>
-                    <span class="deal-row-value">
-                      {formatCurrency(deal.value, deal.currency, settingsStore.language)}
-                    </span>
+                    </button>
                   </li>
                 {/each}
               </ul>
@@ -1091,7 +1140,14 @@
     gap: var(--space-1);
   }
 
-  .contact-type-badge {
+  .identity-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .contact-type-badge,
+  .contact-lifecycle-badge {
     display: inline-block;
     font-size: var(--text-xs);
     font-weight: var(--weight-medium);
@@ -1100,6 +1156,18 @@
     border-radius: 9999px;
     padding: 2px var(--space-3);
     border: var(--border-width) solid var(--border-default);
+  }
+
+  .lifecycle-lead {
+    color: #20808D;
+    background: #E8F4F7;
+    border-color: #B7DEE4;
+  }
+
+  .lifecycle-customer {
+    color: #2D8659;
+    background: #E8F5EC;
+    border-color: #B7DCC6;
   }
 
   /* ── Avatar ──────────────────────────────────────────────────────────────── */
@@ -1379,10 +1447,24 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+    padding: 0;
     border-radius: var(--radius-md);
     border: var(--border-width) solid var(--border-default);
     background-color: var(--surface-default);
+  }
+
+  .deal-row-button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
   }
 
   .deal-row-info {

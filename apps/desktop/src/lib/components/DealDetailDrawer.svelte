@@ -10,6 +10,7 @@
   import { weightedForecastValue } from '$lib/utils/pipelineGuidance';
   import { formatCurrency, formatDate, formatPercent, formatRelativeTime } from '$lib/utils/formatters';
   import { settingsStore } from '$lib/stores/settings';
+  import { navigateHash } from '$lib/utils/hashRouter';
   import ActivityFeed from './ActivityFeed.svelte';
 
   let {
@@ -109,6 +110,10 @@
     onaddfollowup?.();
   }
 
+  function openDealPage() {
+    navigateHash(`/deals/${deal.id}`);
+  }
+
   function focusFirstElement() {
     const first = drawerEl?.querySelector<HTMLElement>(
       'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex="0"]'
@@ -181,11 +186,16 @@
         <p class="drawer-eyebrow">{t('deals.guidance.drawerEyebrow')}</p>
         <h2 id="deal-drawer-title" class="drawer-title">{deal.name}</h2>
       </div>
+      <div class="drawer-header-actions">
+        <button class="btn btn-secondary btn-sm" type="button" onclick={openDealPage}>
+          {t('deals.openDeal')}
+        </button>
       <button class="btn btn-ghost btn-sm" type="button" onclick={close} aria-label={t('common.close')}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
           <path d="M18 6 6 18M6 6l12 12"/>
         </svg>
       </button>
+      </div>
     </header>
 
     <section class="guidance-card guidance-{guidanceTone}" aria-labelledby="deal-guidance-heading">
@@ -292,6 +302,12 @@
     justify-content: space-between;
     gap: var(--space-4);
     margin-block-end: var(--space-5);
+  }
+
+  .drawer-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
   }
 
   .drawer-eyebrow {

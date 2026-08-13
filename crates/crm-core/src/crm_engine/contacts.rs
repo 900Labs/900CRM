@@ -301,6 +301,16 @@ pub fn merge_contacts(
         Some(merged_organization_id),
         Some(&merged_notes),
     )?;
+    let merged_lifecycle = if target.lifecycle == "customer" || source.lifecycle == "customer" {
+        "customer"
+    } else {
+        target.lifecycle.as_str()
+    };
+    let updated = if updated.lifecycle == merged_lifecycle {
+        updated
+    } else {
+        contacts::set_contact_lifecycle(conn, target_id, merged_lifecycle)?
+    };
 
     let now = crate::utils::datetime::now_iso8601();
     let tx = conn.unchecked_transaction()?;

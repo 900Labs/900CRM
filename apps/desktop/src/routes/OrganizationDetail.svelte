@@ -328,7 +328,10 @@
 
     if (entity.type === 'organization') {
       navigateHash(`/organizations/${entity.id}`);
+      return;
     }
+
+    navigateHash(`/deals/${entity.id}`);
   }
 </script>
 
@@ -565,15 +568,21 @@
               <ul class="deals-list" role="list">
                 {#each linkedDeals as deal (deal.id)}
                   <li class="deal-row">
-                    <div class="deal-row-info">
-                      <span class="deal-row-name">{deal.name}</span>
-                      <span class="deal-row-stage stage-badge stage-{deal.stage}">
-                        {t(`deals.stages.${deal.stage}`)}
+                    <button
+                      class="deal-row-button"
+                      type="button"
+                      onclick={() => navigateHash(`/deals/${deal.id}`)}
+                    >
+                      <div class="deal-row-info">
+                        <span class="deal-row-name">{deal.name}</span>
+                        <span class="deal-row-stage stage-badge stage-{deal.stage}">
+                          {t(`deals.stages.${deal.stage}`)}
+                        </span>
+                      </div>
+                      <span class="deal-row-value">
+                        {formatCurrency(deal.value, deal.currency, settingsStore.language)}
                       </span>
-                    </div>
-                    <span class="deal-row-value">
-                      {formatCurrency(deal.value, deal.currency, settingsStore.language)}
-                    </span>
+                    </button>
                   </li>
                 {/each}
               </ul>
@@ -918,6 +927,20 @@
     gap: var(--space-3);
     padding-block: var(--space-2);
     border-block-end: var(--border-width) solid var(--border-subtle);
+  }
+
+  .deal-row-button {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
   }
 
   .deal-row:last-child {

@@ -1372,6 +1372,7 @@ impl CrmCore {
             sort_by: "first_name".to_string(),
             sort_dir: "asc".to_string(),
             filter_type: None,
+            filter_lifecycle: None,
             search_query: None,
             custom_field_def_id: None,
             custom_field_query: None,

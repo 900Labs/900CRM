@@ -15,7 +15,7 @@ future data access.
 - The desktop shell opens `900crm.db` in the platform app data directory.
 - SQLite runs in WAL mode with foreign keys enabled.
 - Schema state is tracked with `PRAGMA user_version`; the current schema version
-  is `10`.
+  is `11`.
 - Migrations are idempotent and run at startup through
   `crates/crm-core/src/storage/db.rs`.
 - Tauri command handlers and future optional integrations should call typed
@@ -37,7 +37,9 @@ Important fields include:
 - relationship compatibility fields: legacy `org_id` and normalized
   `organization_id`;
 - local metadata: `notes`, `created_at`, `updated_at`, `deleted_at`,
-  `device_id`.
+  `device_id`;
+- person lifecycle: `lifecycle`, either `lead` or `customer`. Existing rows
+  default to `customer`. Organizations keep `customer` and cannot be leads.
 
 Contacts are soft-deleted by setting `deleted_at`. Active list and search paths
 exclude soft-deleted contacts. Contact search uses the `contacts_fts` FTS5

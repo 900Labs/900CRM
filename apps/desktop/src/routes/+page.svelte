@@ -8,6 +8,7 @@
   import Contacts from './Contacts.svelte';
   import Organizations from './Organizations.svelte';
   import Pipeline from './Pipeline.svelte';
+  import DealDetail from './DealDetail.svelte';
   import Activities from './Activities.svelte';
   import Reports from './Reports.svelte';
   import Settings from './Settings.svelte';
@@ -48,6 +49,15 @@
     if (normalized.startsWith('/organizations/')) {
       const id = normalized.split('/')[2] ?? '';
       return { route: '/organizations/:id', contactId: null, organizationId: id || null, dealId: null };
+    }
+
+    if (normalized === '/deals') {
+      return emptyRoute('/pipeline');
+    }
+
+    if (normalized.startsWith('/deals/')) {
+      const id = normalized.split('/')[2] ?? '';
+      return { route: '/deals/:id', contactId: null, organizationId: null, dealId: id || null };
     }
 
     if (normalized === '/pipeline') {
@@ -136,6 +146,8 @@
   <Contacts />
 {:else if route === '/organizations'}
   <Organizations />
+{:else if route === '/deals/:id' && dealId}
+  <DealDetail {dealId} />
 {:else if route === '/pipeline' || route === '/pipeline/:id'}
   <Pipeline {dealId} />
 {:else if route === '/activities'}

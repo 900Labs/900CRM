@@ -43,7 +43,7 @@ use rusqlite::{params, Connection};
 use crate::utils::errors::{CrmError, CrmResult};
 
 /// The current schema version. Increment whenever a new migration is added.
-const CURRENT_SCHEMA_VERSION: u32 = 10;
+const CURRENT_SCHEMA_VERSION: u32 = 11;
 const DATABASE_FILENAME: &str = "900crm.db";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -245,6 +245,10 @@ impl Database {
 
         if current_version < 10 {
             self.migrate_v10_global_search_fts_parity()?;
+        }
+
+        if current_version < 11 {
+            self.migrate_v11_contact_lifecycle()?;
         }
 
         self.conn.execute_batch(&format!(
@@ -1408,6 +1412,34 @@ impl Database {
         }
 
         log::info!("Migration v10 global search FTS parity complete");
+        Ok(())
+    }
+
+    fn migrate_v11_contact_lifecycle(&mut self) -> CrmResult<()> {
+        log::info!("Running database migration v11 contact lifecycle");
+
+        self.add_column_if_missing(
+            "contacts",
+            "lifecycle",
+            "lifecycle TEXT NOT NULL DEFAULT 'customer'",
+        )?;
+
+        if self.table_exists("contacts")? {
+            self.conn.execute_batch(
+                r#"
+                UPDATE contacts
+                SET lifecycle = 'customer'
+                WHERE TRIM(COALESCE(lifecycle, '')) = ''
+                   OR lifecycle NOT IN ('lead', 'customer');
+
+                CREATE INDEX IF NOT EXISTS idx_contacts_lifecycle
+                    ON contacts (lifecycle)
+                    WHERE deleted_at IS NULL;
+                "#,
+            )?;
+        }
+
+        log::info!("Migration v11 contact lifecycle complete");
         Ok(())
     }
 

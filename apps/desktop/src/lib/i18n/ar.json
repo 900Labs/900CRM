@@ -138,6 +138,7 @@
   "contacts": {
     "title": "جهات الاتصال",
     "addContact": "إضافة جهة اتصال",
+    "addLead": "إضافة عميل محتمل",
     "editContact": "تعديل جهة الاتصال",
     "deleteContact": "حذف جهة الاتصال",
     "search": "البحث في جهات الاتصال…",
@@ -146,6 +147,13 @@
     "phone": "الهاتف",
     "organization": "المنظمة",
     "type": "النوع",
+    "lifecycle": "دورة الحياة",
+    "lifecycleLead": "عميل محتمل",
+    "lifecycleCustomer": "عميل",
+    "filterLeads": "العملاء المحتملون",
+    "filterCustomers": "العملاء",
+    "convertToCustomer": "تحويل إلى عميل",
+    "convertedToCustomer": "تم التحويل إلى عميل",
     "person": "شخص",
     "org": "مؤسسة",
     "import": "استيراد",
@@ -202,7 +210,9 @@
       "healthOnTrack": "على المسار",
       "healthOnTrackDetail": "المتابعة التالية مجدولة: {subject}.",
       "healthNurture": "رعاية",
-      "healthNurtureDetail": "لا توجد صفقة مفتوحة أو متابعة مجدولة بعد."
+      "healthNurtureDetail": "لا توجد صفقة مفتوحة أو متابعة مجدولة بعد.",
+      "eyebrowLead": "مساحة العميل المحتمل",
+      "titleLead": "ملخص العميل المحتمل"
     }
   },
   "entityNotes": {
@@ -227,6 +237,17 @@
   "deals": {
     "title": "خط المبيعات",
     "addDeal": "إضافة صفقة",
+    "openDeal": "فتح الصفقة",
+    "backToPipeline": "العودة إلى المسار",
+    "notFound": "تعذر العثور على هذه الصفقة.",
+    "deleteDeal": "حذف الصفقة",
+    "confirmDelete": "هل أنت متأكد من حذف هذه الصفقة؟",
+    "organization": "منظمة",
+    "workspace": {
+      "eyebrow": "مساحة الصفقة",
+      "title": "ملخص الصفقة",
+      "actionsLabel": "إجراءات مساحة الصفقة"
+    },
     "editDeal": "تعديل الصفقة",
     "value": "القيمة",
     "stage": "المرحلة",

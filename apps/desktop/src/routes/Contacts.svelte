@@ -11,7 +11,7 @@
   import { t } from '$lib/i18n';
   import { contactStore } from '$lib/stores/contacts';
   import { uiStore } from '$lib/stores/ui';
-  import type { Contact, ContactDuplicateCandidate } from '$lib/api/contacts';
+  import type { Contact, ContactDuplicateCandidate, ContactLifecycle } from '$lib/api/contacts';
   import type { Column } from '$lib/components/DataTable.svelte';
   import { formatFullName, formatDate } from '$lib/utils/formatters';
   import { settingsStore } from '$lib/stores/settings';
@@ -27,6 +27,7 @@
 
   let searchQuery = $state('');
   let typeFilter = $state<'' | 'person' | 'org'>('');
+  let lifecycleFilter = $state<'' | ContactLifecycle>('');
   let showImportExport = $state(false);
   let selectedContact = $state<Contact | null>(null);
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -109,6 +110,17 @@
       render: (c) => t(`contacts.${(c as Contact).type}`),
     },
     {
+      key: 'lifecycle',
+      label: t('contacts.lifecycle'),
+      sortable: true,
+      render: (c) => {
+        const contact = c as Contact;
+        return contact.type === 'person'
+          ? t(`contacts.lifecycle${contact.lifecycle === 'lead' ? 'Lead' : 'Customer'}`)
+          : '—';
+      },
+    },
+    {
       key: 'createdAt',
       label: t('contacts.created'),
       sortable: true,
@@ -135,6 +147,7 @@
       contactStore.setFilters({
         search: searchQuery,
         type: typeFilter || undefined,
+        lifecycle: lifecycleFilter || undefined,
         customFieldDefId: selectedCustomFieldDefId || undefined,
         customFieldQuery: customFieldQuery.trim() || undefined,
         page: 1,
@@ -146,6 +159,18 @@
     typeFilter = type;
     await contactStore.setFilters({
       type: type || undefined,
+      lifecycle: lifecycleFilter || undefined,
+      customFieldDefId: selectedCustomFieldDefId || undefined,
+      customFieldQuery: customFieldQuery.trim() || undefined,
+      page: 1,
+    });
+  }
+
+  async function handleLifecycleFilter(lifecycle: '' | ContactLifecycle) {
+    lifecycleFilter = lifecycle;
+    await contactStore.setFilters({
+      type: typeFilter || undefined,
+      lifecycle: lifecycle || undefined,
       customFieldDefId: selectedCustomFieldDefId || undefined,
       customFieldQuery: customFieldQuery.trim() || undefined,
       page: 1,
@@ -182,6 +207,7 @@
     await contactStore.setFilters({
       search: searchQuery,
       type: typeFilter || undefined,
+      lifecycle: lifecycleFilter || undefined,
       customFieldDefId: selectedCustomFieldDefId || undefined,
       customFieldQuery: customFieldQuery.trim() || undefined,
       page: 1,
@@ -273,6 +299,13 @@
       </button>
       <button
         class="btn btn-secondary btn-sm"
+        onclick={() => uiStore.openModal('addContact', { lifecycle: 'lead' })}
+        type="button"
+      >
+        {t('contacts.addLead')}
+      </button>
+      <button
+        class="btn btn-secondary btn-sm"
         onclick={() => showImportExport = true}
         type="button"
       >
@@ -315,6 +348,23 @@
           class="filter-chip"
           class:active={typeFilter === option.value}
           onclick={() => handleTypeFilter(option.value as '' | 'person' | 'org')}
+          type="button"
+        >
+          {option.label}
+        </button>
+      {/each}
+    </div>
+
+    <div class="type-filters" role="group" aria-label={t('contacts.lifecycle')}>
+      {#each [
+        { value: '', label: t('common.all') },
+        { value: 'lead', label: t('contacts.filterLeads') },
+        { value: 'customer', label: t('contacts.filterCustomers') },
+      ] as option (option.value)}
+        <button
+          class="filter-chip"
+          class:active={lifecycleFilter === option.value}
+          onclick={() => handleLifecycleFilter(option.value as '' | ContactLifecycle)}
           type="button"
         >
           {option.label}
