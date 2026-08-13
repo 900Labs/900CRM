@@ -35,8 +35,8 @@ describe('openLocalPath', () => {
   });
 
   it('opens a local filesystem path', async () => {
-    await openLocalPath('/Users/shared/quote.pdf');
-    expect(openMock).toHaveBeenCalledWith('/Users/shared/quote.pdf');
+    await openLocalPath('/tmp/900crm-quote.pdf');
+    expect(openMock).toHaveBeenCalledWith('/tmp/900crm-quote.pdf');
   });
 
   it('rejects URL schemes', async () => {

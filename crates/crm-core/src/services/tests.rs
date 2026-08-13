@@ -12003,11 +12003,11 @@ fn entity_links_store_http_urls_and_local_paths_without_copying_files() {
             contact.id.clone(),
             None,
             "path".to_string(),
-            "/Users/shared/quote.pdf".to_string(),
+            "/tmp/900crm-quote.pdf".to_string(),
         )
         .expect("path link should be created");
     assert_eq!(file.kind, "path");
-    assert_eq!(file.title, "quote.pdf");
+    assert_eq!(file.title, "900crm-quote.pdf");
 
     let listed = core
         .list_entity_links("contact".to_string(), contact.id.clone())
