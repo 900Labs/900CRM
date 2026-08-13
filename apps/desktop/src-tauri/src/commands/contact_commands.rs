@@ -21,22 +21,35 @@ pub async fn create_contact(
     country: Option<String>,
     org_id: Option<String>,
     notes: Option<String>,
+    lifecycle: Option<String>,
 ) -> Result<Contact, String> {
     let mut core = lock_core(&state)?;
-    core.create_contact(
-        contact_type,
-        first_name,
-        last_name,
-        org_name,
-        email,
-        phone,
-        address,
-        city,
-        country,
-        org_id,
-        notes,
-    )
-    .map_err(|e| e.to_string())
+    let contact = core
+        .create_contact(
+            contact_type,
+            first_name,
+            last_name,
+            org_name,
+            email,
+            phone,
+            address,
+            city,
+            country,
+            org_id,
+            notes,
+        )
+        .map_err(|e| e.to_string())?;
+
+    let Some(lifecycle) = lifecycle.filter(|value| !value.trim().is_empty()) else {
+        return Ok(contact);
+    };
+
+    if lifecycle == contact.lifecycle {
+        return Ok(contact);
+    }
+
+    core.set_contact_lifecycle(&contact.id, &lifecycle)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -126,5 +139,16 @@ pub async fn merge_contacts(
 ) -> Result<Contact, String> {
     let mut core = lock_core(&state)?;
     core.merge_contacts(&target_id, &source_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_contact_lifecycle(
+    state: State<'_, AppState>,
+    id: String,
+    lifecycle: String,
+) -> Result<Contact, String> {
+    let mut core = lock_core(&state)?;
+    core.set_contact_lifecycle(&id, &lifecycle)
         .map_err(|e| e.to_string())
 }

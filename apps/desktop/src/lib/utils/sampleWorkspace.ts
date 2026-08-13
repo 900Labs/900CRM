@@ -89,6 +89,7 @@ export async function seedSampleWorkspace(
     organization: organization.name,
     organizationId: organization.id,
     type: 'person',
+    lifecycle: 'lead',
     tags: [],
     notes: 'Sample contact created by the dashboard starter.',
     website: null,

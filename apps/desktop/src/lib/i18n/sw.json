@@ -138,6 +138,7 @@
   "contacts": {
     "title": "Anwani",
     "addContact": "Ongeza Anwani",
+    "addLead": "Ongeza mteja mtarajiwa",
     "editContact": "Hariri Anwani",
     "deleteContact": "Futa Anwani",
     "search": "Tafuta anwani…",
@@ -146,6 +147,13 @@
     "phone": "Simu",
     "organization": "Shirika",
     "type": "Aina",
+    "lifecycle": "Mzunguko wa maisha",
+    "lifecycleLead": "Mteja mtarajiwa",
+    "lifecycleCustomer": "Mteja",
+    "filterLeads": "Wateja watarajiwa",
+    "filterCustomers": "Wateja",
+    "convertToCustomer": "Geuza kuwa mteja",
+    "convertedToCustomer": "Imegeuzwa kuwa mteja",
     "person": "Mtu",
     "org": "Shirika",
     "import": "Ingiza",
@@ -202,7 +210,9 @@
       "healthOnTrack": "Inaendelea Vizuri",
       "healthOnTrackDetail": "Ufuatiliaji ujao umepangwa: {subject}.",
       "healthNurture": "Lea",
-      "healthNurtureDetail": "Hakuna dili iliyo wazi au ufuatiliaji uliopangwa bado."
+      "healthNurtureDetail": "Hakuna dili iliyo wazi au ufuatiliaji uliopangwa bado.",
+      "eyebrowLead": "Nafasi ya mteja mtarajiwa",
+      "titleLead": "Muhtasari wa mteja mtarajiwa"
     }
   },
   "entityNotes": {
@@ -227,6 +237,17 @@
   "deals": {
     "title": "Mtiririko",
     "addDeal": "Ongeza Mkataba",
+    "openDeal": "Fungua biashara",
+    "backToPipeline": "Rudi kwenye bomba",
+    "notFound": "Biashara hii haikupatikana.",
+    "deleteDeal": "Futa biashara",
+    "confirmDelete": "Una uhakika unataka kufuta biashara hii?",
+    "organization": "Shirika",
+    "workspace": {
+      "eyebrow": "Nafasi ya biashara",
+      "title": "Muhtasari wa biashara",
+      "actionsLabel": "Vitendo vya nafasi ya biashara"
+    },
     "editDeal": "Hariri Mkataba",
     "value": "Thamani",
     "stage": "Hatua",

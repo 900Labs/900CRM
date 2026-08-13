@@ -11890,10 +11890,75 @@ fn migration_v2_creates_required_readiness_tables() {
     assert_eq!(
         count(
             &core,
+            "SELECT COUNT(*) FROM pragma_table_info('contacts') WHERE name = 'lifecycle'"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            &core,
             "SELECT COUNT(*) FROM pragma_table_info('sync_changelog') WHERE name = 'operation'"
         ),
         1
     );
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn contact_lifecycle_defaults_to_customer_and_can_convert_a_lead() {
+    let (mut core, path) = open_test_core();
+
+    let created = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Amara".to_string()),
+            Some("Okafor".to_string()),
+            None,
+            Some("amara@example.test".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+    assert_eq!(created.lifecycle, "customer");
+
+    let lead = core
+        .set_contact_lifecycle(&created.id, "lead")
+        .expect("contact should become a lead");
+    assert_eq!(lead.lifecycle, "lead");
+
+    let customers = core
+        .list_contacts(Some(crate::storage::contacts::ContactListParams {
+            filter_lifecycle: Some("customer".to_string()),
+            ..Default::default()
+        }))
+        .expect("customer list should load");
+    assert!(customers
+        .contacts
+        .iter()
+        .all(|contact| contact.id != created.id));
+
+    let leads = core
+        .list_contacts(Some(crate::storage::contacts::ContactListParams {
+            filter_lifecycle: Some("lead".to_string()),
+            ..Default::default()
+        }))
+        .expect("lead list should load");
+    assert_eq!(leads.total, 1);
+    assert_eq!(leads.contacts[0].id, created.id);
+
+    let customer = core
+        .set_contact_lifecycle(&created.id, "customer")
+        .expect("lead should convert to customer");
+    assert_eq!(customer.lifecycle, "customer");
+
+    let invalid = core.set_contact_lifecycle(&created.id, "prospect");
+    assert!(matches!(invalid, Err(CrmError::InvalidInput(_))));
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);

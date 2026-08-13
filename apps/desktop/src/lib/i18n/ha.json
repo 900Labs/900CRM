@@ -138,6 +138,7 @@
   "contacts": {
     "title": "Lambobi",
     "addContact": "Kara Lamba",
+    "addLead": "Ƙara mai yiwuwar ciniki",
     "editContact": "Gyara Lamba",
     "deleteContact": "Goge Lamba",
     "search": "Bincika lambobi…",
@@ -146,6 +147,13 @@
     "phone": "Waya",
     "organization": "Kungiya",
     "type": "Nau'i",
+    "lifecycle": "Zagayen rayuwa",
+    "lifecycleLead": "Mai yiwuwar ciniki",
+    "lifecycleCustomer": "Abokin ciniki",
+    "filterLeads": "Masu yiwuwar ciniki",
+    "filterCustomers": "Abokan ciniki",
+    "convertToCustomer": "Canza zuwa abokin ciniki",
+    "convertedToCustomer": "An canza zuwa abokin ciniki",
     "person": "Mutum",
     "org": "Kungiya",
     "import": "Shigo",
@@ -202,7 +210,9 @@
       "healthOnTrack": "Akan Hanyar",
       "healthOnTrackDetail": "Bibiya ta gaba an tsara: {subject}.",
       "healthNurture": "Kula",
-      "healthNurtureDetail": "Babu yarjejeniya a bude ko bibiya da aka tsara tukuna."
+      "healthNurtureDetail": "Babu yarjejeniya a bude ko bibiya da aka tsara tukuna.",
+      "eyebrowLead": "Wurin mai yiwuwar ciniki",
+      "titleLead": "Taƙaitaccen mai yiwuwar ciniki"
     }
   },
   "entityNotes": {
@@ -227,6 +237,17 @@
   "deals": {
     "title": "Pipeline",
     "addDeal": "Kara Yarjejeniya",
+    "openDeal": "Buɗe yarjejeniya",
+    "backToPipeline": "Koma pipeline",
+    "notFound": "Ba a sami wannan yarjejeniyar ba.",
+    "deleteDeal": "Share yarjejeniya",
+    "confirmDelete": "Ka tabbata kana son share wannan yarjejeniya?",
+    "organization": "Ƙungiya",
+    "workspace": {
+      "eyebrow": "Wurin yarjejeniya",
+      "title": "Taƙaitaccen yarjejeniya",
+      "actionsLabel": "Ayyukan wurin yarjejeniya"
+    },
     "editDeal": "Gyara Yarjejeniya",
     "value": "Daraja",
     "stage": "Mataki",

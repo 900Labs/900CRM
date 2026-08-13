@@ -226,4 +226,34 @@ impl CrmCore {
         tx.commit()?;
         Ok(contact)
     }
+
+    pub fn set_contact_lifecycle(&mut self, id: &str, lifecycle: &str) -> CrmResult<Contact> {
+        let before = storage::contacts::get_contact(&self.db.conn, id)?;
+        let device_id = self.device_id.clone();
+        let tx = self.db.conn.unchecked_transaction()?;
+        let contact = storage::contacts::set_contact_lifecycle(&tx, id, lifecycle)?;
+        if contact.lifecycle != before.lifecycle {
+            storage::sync::record_change(
+                &tx,
+                "contact",
+                id,
+                "lifecycle",
+                Some(&before.lifecycle),
+                Some(&contact.lifecycle),
+                &device_id,
+            )?;
+            record_audit_json(
+                &tx,
+                ACTOR_DESKTOP_APP,
+                "update",
+                Some("contact"),
+                Some(id),
+                Some(&before),
+                Some(&contact),
+                &device_id,
+            )?;
+        }
+        tx.commit()?;
+        Ok(contact)
+    }
 }

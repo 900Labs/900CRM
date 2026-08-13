@@ -138,6 +138,7 @@
   "contacts": {
     "title": "Contacts",
     "addContact": "Ajouter un contact",
+    "addLead": "Ajouter une piste",
     "editContact": "Modifier le contact",
     "deleteContact": "Supprimer le contact",
     "search": "Rechercher des contacts…",
@@ -146,6 +147,13 @@
     "phone": "Téléphone",
     "organization": "Organisation",
     "type": "Type",
+    "lifecycle": "Cycle de vie",
+    "lifecycleLead": "Piste",
+    "lifecycleCustomer": "Client",
+    "filterLeads": "Pistes",
+    "filterCustomers": "Clients",
+    "convertToCustomer": "Convertir en client",
+    "convertedToCustomer": "Converti en client",
     "person": "Personne",
     "org": "Organisation",
     "import": "Importer",
@@ -202,7 +210,9 @@
       "healthOnTrack": "Sur les rails",
       "healthOnTrackDetail": "La prochaine relance est planifiée : {subject}.",
       "healthNurture": "À cultiver",
-      "healthNurtureDetail": "Aucune affaire ouverte ou relance planifiée pour l'instant."
+      "healthNurtureDetail": "Aucune affaire ouverte ou relance planifiée pour l'instant.",
+      "eyebrowLead": "Espace piste",
+      "titleLead": "Synthèse de la piste"
     }
   },
   "entityNotes": {
@@ -227,6 +237,17 @@
   "deals": {
     "title": "Pipeline",
     "addDeal": "Ajouter une affaire",
+    "openDeal": "Ouvrir l’affaire",
+    "backToPipeline": "Retour au pipeline",
+    "notFound": "Cette affaire est introuvable.",
+    "deleteDeal": "Supprimer l’affaire",
+    "confirmDelete": "Voulez-vous vraiment supprimer cette affaire ?",
+    "organization": "Organisation",
+    "workspace": {
+      "eyebrow": "Espace affaire",
+      "title": "Synthèse de l’affaire",
+      "actionsLabel": "Actions de l’espace affaire"
+    },
     "editDeal": "Modifier l'affaire",
     "value": "Valeur",
     "stage": "Étape",

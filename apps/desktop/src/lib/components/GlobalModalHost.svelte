@@ -9,7 +9,7 @@
   import { settingsStore } from '$lib/stores/settings';
   import { DEAL_STAGES } from '$lib/api/deals';
   import type { Deal, DealStage } from '$lib/api/deals';
-  import type { Contact } from '$lib/api/contacts';
+  import type { Contact, ContactLifecycle } from '$lib/api/contacts';
   import type { ActivityType } from '$lib/api/activities';
   import type { Organization } from '$lib/api/organizations';
   import { normalizeCurrencyCode } from '$lib/utils/currency';
@@ -36,6 +36,7 @@
   let contactPhone = $state('');
   let contactOrganization = $state('');
   let contactType = $state<'person' | 'org'>('person');
+  let contactLifecycle = $state<ContactLifecycle>('lead');
 
   let isSavingDeal = $state(false);
   let dealName = $state('');
@@ -181,6 +182,7 @@
     contactPhone = '';
     contactOrganization = '';
     contactType = 'person';
+    contactLifecycle = modalDataString('lifecycle') === 'lead' ? 'lead' : 'customer';
   }
 
   function resetDealForm() {
@@ -363,6 +365,7 @@
         phone: contactPhone.trim() || null,
         organization: contactOrganization.trim() || null,
         type: contactType,
+        lifecycle: contactType === 'person' ? contactLifecycle : 'customer',
         tags: [],
         notes: null,
         website: null,
@@ -487,6 +490,15 @@
             <option value="org">{t('contacts.org')}</option>
           </select>
         </div>
+        {#if contactType === 'person'}
+          <div class="form-group form-group--full">
+            <label class="form-label" for="modal-contact-lifecycle">{t('contacts.lifecycle')}</label>
+            <select id="modal-contact-lifecycle" class="select" bind:value={contactLifecycle}>
+              <option value="lead">{t('contacts.lifecycleLead')}</option>
+              <option value="customer">{t('contacts.lifecycleCustomer')}</option>
+            </select>
+          </div>
+        {/if}
       </div>
       {#if loadingContactCustomFields}
         <p class="custom-field-loading">{t('common.loading')}</p>

@@ -138,6 +138,7 @@
   "contacts": {
     "title": "संपर्क",
     "addContact": "संपर्क जोड़ें",
+    "addLead": "लीड जोड़ें",
     "editContact": "संपर्क संपादित करें",
     "deleteContact": "संपर्क हटाएँ",
     "search": "संपर्क खोजें…",
@@ -146,6 +147,13 @@
     "phone": "फ़ोन",
     "organization": "संगठन",
     "type": "प्रकार",
+    "lifecycle": "जीवनचक्र",
+    "lifecycleLead": "लीड",
+    "lifecycleCustomer": "ग्राहक",
+    "filterLeads": "लीड",
+    "filterCustomers": "ग्राहक",
+    "convertToCustomer": "ग्राहक में बदलें",
+    "convertedToCustomer": "ग्राहक में बदला गया",
     "person": "व्यक्ति",
     "org": "संगठन",
     "import": "आयात करें",
@@ -202,7 +210,9 @@
       "healthOnTrack": "ट्रैक पर",
       "healthOnTrackDetail": "अगला फॉलो-अप शेड्यूल है: {subject}।",
       "healthNurture": "पोषण",
-      "healthNurtureDetail": "अभी कोई खुला सौदा या फॉलो-अप शेड्यूल नहीं है।"
+      "healthNurtureDetail": "अभी कोई खुला सौदा या फॉलो-अप शेड्यूल नहीं है।",
+      "eyebrowLead": "लीड कार्यक्षेत्र",
+      "titleLead": "लीड सारांश"
     }
   },
   "entityNotes": {
@@ -227,6 +237,17 @@
   "deals": {
     "title": "पाइपलाइन",
     "addDeal": "सौदा जोड़ें",
+    "openDeal": "डील खोलें",
+    "backToPipeline": "पाइपलाइन पर वापस जाएँ",
+    "notFound": "यह डील नहीं मिली.",
+    "deleteDeal": "डील हटाएँ",
+    "confirmDelete": "क्या आप वाकई इस डील को हटाना चाहते हैं?",
+    "organization": "संगठन",
+    "workspace": {
+      "eyebrow": "डील कार्यक्षेत्र",
+      "title": "डील सारांश",
+      "actionsLabel": "डील कार्यक्षेत्र क्रियाएँ"
+    },
     "editDeal": "सौदा संपादित करें",
     "value": "मूल्य",
     "stage": "चरण",

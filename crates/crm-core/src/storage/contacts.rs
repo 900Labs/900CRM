@@ -75,6 +75,12 @@ pub struct Contact {
     /// Freeform notes.
     pub notes: String,
 
+    /// Person lifecycle: `"lead"` or `"customer"`.
+    ///
+    /// Existing contacts default to `"customer"` so a schema upgrade does not
+    /// silently reclassify people as leads. Organizations stay `"customer"`.
+    pub lifecycle: String,
+
     /// ISO 8601 creation timestamp.
     pub created_at: String,
 
@@ -106,6 +112,9 @@ pub struct ContactListParams {
     /// Optional filter by `contact_type`.
     pub filter_type: Option<String>,
 
+    /// Optional filter by person lifecycle (`"lead"` or `"customer"`).
+    pub filter_lifecycle: Option<String>,
+
     /// Optional full-text search query.
     pub search_query: Option<String>,
 
@@ -125,6 +134,7 @@ impl Default for ContactListParams {
             sort_by: "first_name".to_string(),
             sort_dir: "asc".to_string(),
             filter_type: None,
+            filter_lifecycle: None,
             search_query: None,
             custom_field_def_id: None,
             custom_field_query: None,
@@ -270,7 +280,7 @@ pub fn get_contact(conn: &Connection, id: &str) -> CrmResult<Contact> {
             r#"
         SELECT id, contact_type, first_name, last_name, org_name, email, phone,
                address, city, country, org_id, organization_id, notes, created_at, updated_at,
-               deleted_at, device_id
+               deleted_at, device_id, lifecycle
         FROM contacts
         WHERE id = ?1 AND deleted_at IS NULL
         "#,
@@ -319,6 +329,7 @@ pub fn list_contacts(
     }
 
     let apply_type_filter = params.filter_type.is_some();
+    let apply_lifecycle_filter = params.filter_lifecycle.is_some();
     let apply_custom_filter = params
         .custom_field_def_id
         .as_ref()
@@ -335,13 +346,14 @@ pub fn list_contacts(
         FROM contacts c
         WHERE c.deleted_at IS NULL
           AND (?1 = 0 OR c.contact_type = ?2)
+          AND (?3 = 0 OR c.lifecycle = ?4)
           AND (
-            ?3 = 0 OR EXISTS (
+            ?5 = 0 OR EXISTS (
               SELECT 1
               FROM custom_field_values cfv
               WHERE cfv.entity_id = c.id
-                AND cfv.field_def_id = ?4
-                AND LOWER(cfv.value) LIKE LOWER(?5)
+                AND cfv.field_def_id = ?6
+                AND LOWER(cfv.value) LIKE LOWER(?7)
             )
           )
     "#;
@@ -350,26 +362,28 @@ pub fn list_contacts(
         r#"
         SELECT id, contact_type, first_name, last_name, org_name, email, phone,
                address, city, country, org_id, organization_id, notes, created_at, updated_at,
-               deleted_at, device_id
+               deleted_at, device_id, lifecycle
         FROM contacts c
         WHERE c.deleted_at IS NULL
           AND (?1 = 0 OR c.contact_type = ?2)
+          AND (?3 = 0 OR c.lifecycle = ?4)
           AND (
-            ?3 = 0 OR EXISTS (
+            ?5 = 0 OR EXISTS (
               SELECT 1
               FROM custom_field_values cfv
               WHERE cfv.entity_id = c.id
-                AND cfv.field_def_id = ?4
-                AND LOWER(cfv.value) LIKE LOWER(?5)
+                AND cfv.field_def_id = ?6
+                AND LOWER(cfv.value) LIKE LOWER(?7)
             )
           )
         ORDER BY c.{} {}
-        LIMIT ?6 OFFSET ?7
+        LIMIT ?8 OFFSET ?9
         "#,
         safe_sort_by, safe_sort_dir
     );
 
     let filter_type = params.filter_type.as_deref().unwrap_or("");
+    let filter_lifecycle = params.filter_lifecycle.as_deref().unwrap_or("");
     let custom_field_def_id = params.custom_field_def_id.as_deref().unwrap_or("");
     let custom_field_query = params
         .custom_field_query
@@ -383,6 +397,8 @@ pub fn list_contacts(
             params![
                 if apply_type_filter { 1 } else { 0 },
                 filter_type,
+                if apply_lifecycle_filter { 1 } else { 0 },
+                filter_lifecycle,
                 if apply_custom_filter { 1 } else { 0 },
                 custom_field_def_id,
                 custom_field_query,
@@ -396,6 +412,8 @@ pub fn list_contacts(
         params![
             if apply_type_filter { 1 } else { 0 },
             filter_type,
+            if apply_lifecycle_filter { 1 } else { 0 },
+            filter_lifecycle,
             if apply_custom_filter { 1 } else { 0 },
             custom_field_def_id,
             custom_field_query,
@@ -491,6 +509,53 @@ pub fn update_contact(
 
     log::debug!("Updated contact id={}", id);
     get_contact(conn, id)
+}
+
+/// Sets a person contact's lifecycle to `"lead"` or `"customer"`.
+///
+/// Organizations cannot be leads. Existing rows stay `"customer"` unless this
+/// path is called explicitly.
+pub fn set_contact_lifecycle(conn: &Connection, id: &str, lifecycle: &str) -> CrmResult<Contact> {
+    let current = get_contact(conn, id)?;
+    let normalized = normalize_lifecycle(lifecycle)?;
+
+    if current.contact_type != "person" && normalized == "lead" {
+        return Err(CrmError::InvalidInput(
+            "Only person contacts can be marked as leads".to_string(),
+        ));
+    }
+
+    if current.lifecycle == normalized {
+        return Ok(current);
+    }
+
+    let now = now_iso8601();
+    let changed = conn.execute(
+        r#"
+        UPDATE contacts
+        SET lifecycle = ?1, updated_at = ?2
+        WHERE id = ?3 AND deleted_at IS NULL
+        "#,
+        params![normalized, now, id],
+    )?;
+
+    if changed == 0 {
+        return Err(CrmError::NotFound(format!("Contact '{}' not found", id)));
+    }
+
+    log::debug!("Set contact {} lifecycle to {}", id, normalized);
+    get_contact(conn, id)
+}
+
+pub fn normalize_lifecycle(lifecycle: &str) -> CrmResult<String> {
+    match lifecycle.trim().to_ascii_lowercase().as_str() {
+        "lead" => Ok("lead".to_string()),
+        "customer" => Ok("customer".to_string()),
+        other => Err(CrmError::InvalidInput(format!(
+            "Invalid lifecycle '{}'. Must be 'lead' or 'customer'",
+            other
+        ))),
+    }
 }
 
 /// Links or unlinks a contact to a normalized organization.
@@ -660,7 +725,7 @@ pub fn search_contacts(conn: &Connection, query: &str) -> CrmResult<Vec<Contact>
         SELECT c.id, c.contact_type, c.first_name, c.last_name, c.org_name,
                c.email, c.phone, c.address, c.city, c.country, c.org_id,
                c.organization_id, c.notes, c.created_at, c.updated_at,
-               c.deleted_at, c.device_id
+               c.deleted_at, c.device_id, c.lifecycle
         FROM contacts c
         INNER JOIN contacts_fts fts ON c.rowid = fts.rowid
         WHERE contacts_fts MATCH ?1 AND c.deleted_at IS NULL
@@ -686,7 +751,7 @@ pub fn find_active_contacts_by_email(conn: &Connection, email: &str) -> CrmResul
         r#"
         SELECT id, contact_type, first_name, last_name, org_name, email, phone,
                address, city, country, org_id, organization_id, notes,
-               created_at, updated_at, deleted_at, device_id
+               created_at, updated_at, deleted_at, device_id, lifecycle
         FROM contacts
         WHERE LOWER(email) = LOWER(?1) AND deleted_at IS NULL
         "#,
@@ -702,7 +767,7 @@ pub fn find_active_contacts_by_phone(conn: &Connection, phone: &str) -> CrmResul
         r#"
         SELECT id, contact_type, first_name, last_name, org_name, email, phone,
                address, city, country, org_id, organization_id, notes,
-               created_at, updated_at, deleted_at, device_id
+               created_at, updated_at, deleted_at, device_id, lifecycle
         FROM contacts
         WHERE TRIM(phone) = TRIM(?1) AND deleted_at IS NULL
         "#,
@@ -832,7 +897,7 @@ pub fn find_active_contacts_by_name(
         r#"
         SELECT id, contact_type, first_name, last_name, org_name, email, phone,
                address, city, country, org_id, organization_id, notes,
-               created_at, updated_at, deleted_at, device_id
+               created_at, updated_at, deleted_at, device_id, lifecycle
         FROM contacts
         WHERE LOWER(first_name) = ?1 AND LOWER(last_name) = ?2
           AND deleted_at IS NULL
@@ -859,6 +924,7 @@ fn search_contacts_paged(
     let offset = ((page as i64) - 1) * (per_page as i64);
     let limit = per_page as i64;
     let apply_type_filter = params.filter_type.is_some();
+    let apply_lifecycle_filter = params.filter_lifecycle.is_some();
     let apply_custom_filter = params
         .custom_field_def_id
         .as_ref()
@@ -870,6 +936,7 @@ fn search_contacts_paged(
             .map(|v| !v.trim().is_empty())
             .unwrap_or(false);
     let filter_type = params.filter_type.as_deref().unwrap_or("");
+    let filter_lifecycle = params.filter_lifecycle.as_deref().unwrap_or("");
     let custom_field_def_id = params.custom_field_def_id.as_deref().unwrap_or("");
     let custom_field_query = params
         .custom_field_query
@@ -886,13 +953,14 @@ fn search_contacts_paged(
             WHERE contacts_fts MATCH ?1
               AND c.deleted_at IS NULL
               AND (?2 = 0 OR c.contact_type = ?3)
+              AND (?4 = 0 OR c.lifecycle = ?5)
               AND (
-                ?4 = 0 OR EXISTS (
+                ?6 = 0 OR EXISTS (
                   SELECT 1
                   FROM custom_field_values cfv
                   WHERE cfv.entity_id = c.id
-                    AND cfv.field_def_id = ?5
-                    AND LOWER(cfv.value) LIKE LOWER(?6)
+                    AND cfv.field_def_id = ?7
+                    AND LOWER(cfv.value) LIKE LOWER(?8)
                 )
               )
             "#,
@@ -900,6 +968,8 @@ fn search_contacts_paged(
                 fts_query,
                 if apply_type_filter { 1 } else { 0 },
                 filter_type,
+                if apply_lifecycle_filter { 1 } else { 0 },
+                filter_lifecycle,
                 if apply_custom_filter { 1 } else { 0 },
                 custom_field_def_id,
                 custom_field_query
@@ -913,23 +983,24 @@ fn search_contacts_paged(
         SELECT c.id, c.contact_type, c.first_name, c.last_name, c.org_name,
                c.email, c.phone, c.address, c.city, c.country, c.org_id,
                c.organization_id, c.notes, c.created_at, c.updated_at,
-               c.deleted_at, c.device_id
+               c.deleted_at, c.device_id, c.lifecycle
         FROM contacts c
         INNER JOIN contacts_fts fts ON c.rowid = fts.rowid
         WHERE contacts_fts MATCH ?1
           AND c.deleted_at IS NULL
           AND (?2 = 0 OR c.contact_type = ?3)
+          AND (?4 = 0 OR c.lifecycle = ?5)
           AND (
-            ?4 = 0 OR EXISTS (
+            ?6 = 0 OR EXISTS (
               SELECT 1
               FROM custom_field_values cfv
               WHERE cfv.entity_id = c.id
-                AND cfv.field_def_id = ?5
-                AND LOWER(cfv.value) LIKE LOWER(?6)
+                AND cfv.field_def_id = ?7
+                AND LOWER(cfv.value) LIKE LOWER(?8)
             )
           )
         ORDER BY rank
-        LIMIT ?7 OFFSET ?8
+        LIMIT ?9 OFFSET ?10
         "#,
     )?;
 
@@ -938,6 +1009,8 @@ fn search_contacts_paged(
             fts_query,
             if apply_type_filter { 1 } else { 0 },
             filter_type,
+            if apply_lifecycle_filter { 1 } else { 0 },
+            filter_lifecycle,
             if apply_custom_filter { 1 } else { 0 },
             custom_field_def_id,
             custom_field_query,
@@ -978,6 +1051,10 @@ fn row_to_contact(row: &rusqlite::Row<'_>) -> rusqlite::Result<Contact> {
         updated_at: row.get(14)?,
         deleted_at: row.get(15)?,
         device_id: row.get(16)?,
+        lifecycle: row
+            .get::<_, Option<String>>(17)?
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "customer".to_string()),
     })
 }
 
@@ -985,7 +1062,7 @@ fn row_to_contact(row: &rusqlite::Row<'_>) -> rusqlite::Result<Contact> {
 fn sanitize_sort_column<'a>(col: &'a str, default: &'a str) -> &'a str {
     match col {
         "first_name" | "last_name" | "org_name" | "email" | "phone" | "city" | "country"
-        | "created_at" | "updated_at" | "contact_type" => col,
+        | "created_at" | "updated_at" | "contact_type" | "lifecycle" => col,
         _ => default,
     }
 }

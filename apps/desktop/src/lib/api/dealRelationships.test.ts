@@ -27,6 +27,7 @@ function contact(overrides: Partial<Contact>): Contact {
     phone: null,
     organization: null,
     type: 'person',
+    lifecycle: 'customer',
     tags: [],
     notes: null,
     website: null,

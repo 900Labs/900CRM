@@ -71,6 +71,7 @@ async function installTauriShim(page: Page) {
       org_id: string | null;
       organization_id: string | null;
       notes: string;
+      lifecycle: string;
       created_at: string;
       updated_at: string;
       deleted_at: string | null;
@@ -213,11 +214,15 @@ async function installTauriShim(page: Page) {
       const page = typeof params.page === 'number' ? params.page : 1;
       const perPage = typeof params.per_page === 'number' ? params.per_page : 50;
       const filterType = typeof params.filter_type === 'string' ? params.filter_type : undefined;
+      const filterLifecycle = typeof params.filter_lifecycle === 'string' ? params.filter_lifecycle : undefined;
       const searchQuery = typeof params.search_query === 'string' ? params.search_query : undefined;
 
       let contacts = state.contacts.filter((contact) => !contact.deleted_at);
       if (filterType) {
         contacts = contacts.filter((contact) => contact.contact_type === filterType);
+      }
+      if (filterLifecycle) {
+        contacts = contacts.filter((contact) => (contact.lifecycle || 'customer') === filterLifecycle);
       }
       contacts = contacts.filter((contact) =>
         matchesText(
@@ -260,6 +265,7 @@ async function installTauriShim(page: Page) {
         org_id: nullableStringArg(args, 'org_id'),
         organization_id: organizationId,
         notes: stringArg(args, 'notes'),
+        lifecycle: stringArg(args, 'lifecycle') === 'lead' ? 'lead' : 'customer',
         created_at: timestamp,
         updated_at: timestamp,
         deleted_at: null,
@@ -336,6 +342,81 @@ async function installTauriShim(page: Page) {
       state.deals.push(deal);
       persistState();
       return deal;
+    }
+
+    function getDeal(args: InvokeArgs): BackendDeal {
+      const id = stringArg(args, 'id');
+      const deal = state.deals.find((candidate) => candidate.id === id);
+      if (!deal) {
+        throw new Error(`Deal not found: ${id}`);
+      }
+      return deal;
+    }
+
+    function updateDeal(args: InvokeArgs): BackendDeal {
+      const deal = getDeal(args);
+      const title = stringArg(args, 'title');
+      if (title) deal.title = title;
+      if (typeof args?.value === 'number') deal.value = args.value;
+      const currency = stringArg(args, 'currency');
+      if (currency) deal.currency = currency;
+      const stage = stringArg(args, 'stage');
+      if (stage) deal.stage = stage;
+      if (typeof args?.probability === 'number') deal.probability = args.probability;
+      if (Object.prototype.hasOwnProperty.call(args ?? {}, 'expected_close')) {
+        deal.expected_close = nullableStringArg(args, 'expected_close');
+      }
+      if (args?.reset_expected_close === true) {
+        deal.expected_close = null;
+      }
+      if (Object.prototype.hasOwnProperty.call(args ?? {}, 'contact_id')) {
+        deal.contact_id = nullableStringArg(args, 'contact_id');
+      }
+      if (args?.reset_contact_id === true) {
+        deal.contact_id = null;
+      }
+      if (Object.prototype.hasOwnProperty.call(args ?? {}, 'organization_id')) {
+        deal.organization_id = nullableStringArg(args, 'organization_id');
+      }
+      if (args?.reset_organization_id === true) {
+        deal.organization_id = null;
+      }
+      if (Object.prototype.hasOwnProperty.call(args ?? {}, 'notes')) {
+        deal.notes = stringArg(args, 'notes');
+      }
+      deal.updated_at = timestamp;
+      persistState();
+      return deal;
+    }
+
+    function moveDealStage(args: InvokeArgs): BackendDeal {
+      const deal = getDeal(args);
+      const stage = stringArg(args, 'stage');
+      if (stage) {
+        deal.stage = stage;
+        deal.updated_at = timestamp;
+        persistState();
+      }
+      return deal;
+    }
+
+    function deleteDeal(args: InvokeArgs): void {
+      const id = stringArg(args, 'id');
+      state.deals = state.deals.filter((deal) => deal.id !== id);
+      persistState();
+    }
+
+    function setContactLifecycle(args: InvokeArgs): BackendContact {
+      const id = stringArg(args, 'id');
+      const contact = state.contacts.find((candidate) => candidate.id === id && !candidate.deleted_at);
+      if (!contact) {
+        throw new Error(`Contact not found: ${id}`);
+      }
+      const lifecycle = stringArg(args, 'lifecycle') === 'lead' ? 'lead' : 'customer';
+      contact.lifecycle = lifecycle;
+      contact.updated_at = timestamp;
+      persistState();
+      return contact;
     }
 
     function createActivity(args: InvokeArgs): BackendActivity {
@@ -660,6 +741,9 @@ async function installTauriShim(page: Page) {
       list_custom_field_defs: [],
       list_custom_field_values: [],
       list_custom_field_values_for_type: [],
+      list_notes_for_entity: [],
+      list_tags_for_entity: [],
+      list_tags: [],
       list_recent_audit_log: [],
       list_pending_proposed_actions: [],
       list_external_clients: [],
@@ -675,6 +759,8 @@ async function installTauriShim(page: Page) {
             return listContacts(args);
           case 'create_contact':
             return createContact(args);
+          case 'set_contact_lifecycle':
+            return setContactLifecycle(args);
           case 'get_contact': {
             const id = stringArg(args, 'id');
             const contact = state.contacts.find((candidate) => candidate.id === id && !candidate.deleted_at);
@@ -701,6 +787,15 @@ async function installTauriShim(page: Page) {
             return state.deals;
           case 'create_deal':
             return createDeal(args);
+          case 'get_deal':
+            return getDeal(args);
+          case 'update_deal':
+            return updateDeal(args);
+          case 'move_deal_stage':
+            return moveDealStage(args);
+          case 'delete_deal':
+            deleteDeal(args);
+            return;
           case 'get_pipeline_summary':
             return [];
           case 'list_activities':

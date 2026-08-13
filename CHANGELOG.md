@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added — 2026-08-13
+- Person contacts now have a lifecycle: lead or customer. Existing people stay
+  customers. New people can be created as leads, filtered on the contacts list,
+  and converted to customers from the contact page.
+- Deals have a full workspace page at `#/deals/:id` with stage, guidance,
+  people, notes, tags, and follow-ups. Search and linked-deal rows open that
+  page. The pipeline board still has a quick drawer with an Open deal action.
+
 ### Changed — 2026-08-13
 - Settings Sync is labeled as not available. The toggle and server URL are
   gone so the app no longer looks like it can sync.

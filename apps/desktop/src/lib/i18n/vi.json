@@ -138,6 +138,7 @@
   "contacts": {
     "title": "Liên hệ",
     "addContact": "Thêm liên hệ",
+    "addLead": "Thêm khách tiềm năng",
     "editContact": "Sửa liên hệ",
     "deleteContact": "Xóa liên hệ",
     "search": "Tìm kiếm liên hệ…",
@@ -146,6 +147,13 @@
     "phone": "Điện thoại",
     "organization": "Tổ chức",
     "type": "Loại",
+    "lifecycle": "Vòng đời",
+    "lifecycleLead": "Khách tiềm năng",
+    "lifecycleCustomer": "Khách hàng",
+    "filterLeads": "Khách tiềm năng",
+    "filterCustomers": "Khách hàng",
+    "convertToCustomer": "Chuyển thành khách hàng",
+    "convertedToCustomer": "Đã chuyển thành khách hàng",
     "person": "Cá nhân",
     "org": "Tổ chức",
     "import": "Nhập",
@@ -202,7 +210,9 @@
       "healthOnTrack": "Đúng tiến độ",
       "healthOnTrackDetail": "Theo dõi tiếp theo đã lên lịch: {subject}.",
       "healthNurture": "Nuôi dưỡng",
-      "healthNurtureDetail": "Chưa có cơ hội mở hay theo dõi nào được lên lịch."
+      "healthNurtureDetail": "Chưa có cơ hội mở hay theo dõi nào được lên lịch.",
+      "eyebrowLead": "Không gian khách tiềm năng",
+      "titleLead": "Tóm tắt khách tiềm năng"
     }
   },
   "entityNotes": {
@@ -227,6 +237,17 @@
   "deals": {
     "title": "Pipeline",
     "addDeal": "Thêm cơ hội",
+    "openDeal": "Mở giao dịch",
+    "backToPipeline": "Quay lại pipeline",
+    "notFound": "Không tìm thấy giao dịch này.",
+    "deleteDeal": "Xóa giao dịch",
+    "confirmDelete": "Bạn có chắc muốn xóa giao dịch này?",
+    "organization": "Tổ chức",
+    "workspace": {
+      "eyebrow": "Không gian giao dịch",
+      "title": "Tóm tắt giao dịch",
+      "actionsLabel": "Thao tác không gian giao dịch"
+    },
     "editDeal": "Sửa cơ hội",
     "value": "Giá trị",
     "stage": "Giai đoạn",
