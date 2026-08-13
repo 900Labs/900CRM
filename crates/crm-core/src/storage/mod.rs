@@ -28,6 +28,7 @@ pub mod db;
 pub mod deals;
 pub mod external_client_permissions;
 pub mod external_clients;
+pub mod links;
 pub mod migration_readiness;
 pub mod notes;
 pub mod organizations;

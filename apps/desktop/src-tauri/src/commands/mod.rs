@@ -17,6 +17,7 @@ pub mod deal_commands;
 pub mod email_commands;
 pub mod external_client_commands;
 pub mod import_export;
+pub mod link_commands;
 pub mod note_commands;
 pub mod organization_commands;
 pub(crate) mod path_guard;

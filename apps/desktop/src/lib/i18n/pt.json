@@ -225,6 +225,24 @@
     "saveFailed": "Falha ao salvar nota",
     "deleteFailed": "Falha ao excluir nota"
   },
+  "entityLinks": {
+    "title": "Links",
+    "help": "Salve um site ou um caminho de arquivo local. O 900CRM guarda o local como texto e não copia nem envia o arquivo.",
+    "titleLabel": "Título do link",
+    "titlePlaceholder": "Título (opcional)",
+    "urlLabel": "Site",
+    "urlPlaceholder": "https://",
+    "addUrl": "Adicionar site",
+    "chooseFile": "Escolher arquivo",
+    "empty": "Nenhum link ainda",
+    "website": "Site",
+    "filePath": "Caminho do arquivo",
+    "confirmDelete": "Remover este link?",
+    "loadFailed": "Falha ao carregar os links",
+    "saveFailed": "Falha ao salvar o link",
+    "deleteFailed": "Falha ao excluir o link",
+    "openFailed": "Não foi possível abrir este link"
+  },
   "entityTags": {
     "title": "Tags",
     "inputPlaceholder": "Adicionar ou buscar tag",

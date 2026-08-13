@@ -42,6 +42,7 @@
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
   import EntityNotesPanel from '$lib/components/EntityNotesPanel.svelte';
+  import EntityLinksPanel from '$lib/components/EntityLinksPanel.svelte';
   import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
   import Modal from '$lib/components/Modal.svelte';
 
@@ -438,6 +439,7 @@
 
         <EntityNotesPanel entityType="deal" entityId={deal.id} />
         <EntityTagsPanel entityType="deal" entityId={deal.id} />
+        <EntityLinksPanel entityType="deal" entityId={deal.id} />
       </div>
 
       <div class="detail-sidebar">

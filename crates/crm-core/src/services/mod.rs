@@ -69,6 +69,7 @@ mod deal_relationships;
 mod external_client_permissions;
 mod external_clients;
 mod import_rollback;
+mod links;
 mod migration_readiness;
 mod notes_tags;
 mod organizations;

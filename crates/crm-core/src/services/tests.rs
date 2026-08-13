@@ -11872,6 +11872,7 @@ fn migration_v2_creates_required_readiness_tables() {
         "external_clients",
         "external_client_permissions",
         "proposed_actions",
+        "entity_links",
     ] {
         let sql = format!(
             "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '{}'",
@@ -11959,6 +11960,86 @@ fn contact_lifecycle_defaults_to_customer_and_can_convert_a_lead() {
 
     let invalid = core.set_contact_lifecycle(&created.id, "prospect");
     assert!(matches!(invalid, Err(CrmError::InvalidInput(_))));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn entity_links_store_http_urls_and_local_paths_without_copying_files() {
+    let (mut core, path) = open_test_core();
+
+    let contact = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Nia".to_string()),
+            Some("Mensah".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("contact should be created");
+
+    let website = core
+        .create_entity_link(
+            "contact".to_string(),
+            contact.id.clone(),
+            Some("Quote sheet".to_string()),
+            "url".to_string(),
+            "https://northstar.example/quote".to_string(),
+        )
+        .expect("url link should be created");
+    assert_eq!(website.kind, "url");
+    assert_eq!(website.target, "https://northstar.example/quote");
+
+    let file = core
+        .create_entity_link(
+            "contact".to_string(),
+            contact.id.clone(),
+            None,
+            "path".to_string(),
+            "/Users/shared/quote.pdf".to_string(),
+        )
+        .expect("path link should be created");
+    assert_eq!(file.kind, "path");
+    assert_eq!(file.title, "quote.pdf");
+
+    let listed = core
+        .list_entity_links("contact".to_string(), contact.id.clone())
+        .expect("links should list");
+    assert_eq!(listed.len(), 2);
+
+    assert!(core
+        .create_entity_link(
+            "contact".to_string(),
+            contact.id.clone(),
+            None,
+            "url".to_string(),
+            "javascript:alert(1)".to_string(),
+        )
+        .is_err());
+    assert!(core
+        .create_entity_link(
+            "contact".to_string(),
+            contact.id,
+            None,
+            "path".to_string(),
+            "https://evil.example/file".to_string(),
+        )
+        .is_err());
+
+    core.delete_entity_link(&website.id)
+        .expect("url link should delete");
+    let remaining = core
+        .list_entity_links("contact".to_string(), listed[0].entity_id.clone())
+        .expect("remaining links should list");
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].id, file.id);
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);

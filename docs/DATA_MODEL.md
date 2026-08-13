@@ -15,7 +15,7 @@ future data access.
 - The desktop shell opens `900crm.db` in the platform app data directory.
 - SQLite runs in WAL mode with foreign keys enabled.
 - Schema state is tracked with `PRAGMA user_version`; the current schema version
-  is `11`.
+  is `12`.
 - Migrations are idempotent and run at startup through
   `crates/crm-core/src/storage/db.rs`.
 - Tauri command handlers and future optional integrations should call typed
@@ -100,7 +100,7 @@ mirrored into activity links for compatibility.
 Notes are stored in `notes` and use a polymorphic parent reference:
 `entity_type` plus `entity_id`. Service and API paths validate note attachment
 for contacts, organizations, deals, and activities. The currently visible
-reusable notes UI is wired for contacts and organizations; deal and activity
+reusable notes UI is wired for contacts, organizations, and deals; activity
 note support exists at the service/API boundary but is not exposed through a
 dedicated visible panel today.
 
@@ -113,6 +113,14 @@ deleted rows, device IDs, tag links, or legacy flat `contacts.notes`/
 The table has both legacy `content` and newer `body` columns. Current storage
 writes both columns and reads `body` when present, falling back to `content`.
 Notes are soft-deleted with `deleted_at`.
+
+### Entity Links
+
+Links are stored in `entity_links` and attach to a `contact`, `organization`,
+or `deal`. Each row has `title`, `kind` (`url` or `path`), and `target`. A
+`url` must be `http://` or `https://`. A `path` is a local filesystem path
+stored as text. 900CRM does not copy, upload, or encrypt the referenced file.
+Moving a local file will break that bookmark. Links are soft-deleted.
 
 ### Tags
 

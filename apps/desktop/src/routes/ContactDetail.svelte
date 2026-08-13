@@ -46,6 +46,7 @@
   import { validateEmail, validateUrl } from '$lib/utils/validators';
   import NoteEditor from '$lib/components/NoteEditor.svelte';
   import EntityNotesPanel from '$lib/components/EntityNotesPanel.svelte';
+  import EntityLinksPanel from '$lib/components/EntityLinksPanel.svelte';
   import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
@@ -951,6 +952,12 @@
           </div>
           <div class="card-body">
             <EntityNotesPanel entityType="contact" entityId={contact.id} />
+          </div>
+        </section>
+
+        <section class="card detail-entity-links">
+          <div class="card-body">
+            <EntityLinksPanel entityType="contact" entityId={contact.id} />
           </div>
         </section>
 

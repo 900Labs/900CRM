@@ -225,6 +225,24 @@
     "saveFailed": "No se pudo guardar la nota",
     "deleteFailed": "No se pudo eliminar la nota"
   },
+  "entityLinks": {
+    "title": "Enlaces",
+    "help": "Guarda un sitio web o una ruta de archivo local. 900CRM guarda la ubicación como texto y no copia ni sube el archivo.",
+    "titleLabel": "Título del enlace",
+    "titlePlaceholder": "Título (opcional)",
+    "urlLabel": "Sitio web",
+    "urlPlaceholder": "https://",
+    "addUrl": "Añadir sitio",
+    "chooseFile": "Elegir archivo",
+    "empty": "Aún no hay enlaces",
+    "website": "Sitio web",
+    "filePath": "Ruta de archivo",
+    "confirmDelete": "¿Quitar este enlace?",
+    "loadFailed": "No se pudieron cargar los enlaces",
+    "saveFailed": "No se pudo guardar el enlace",
+    "deleteFailed": "No se pudo eliminar el enlace",
+    "openFailed": "No se pudo abrir este enlace"
+  },
   "entityTags": {
     "title": "Etiquetas",
     "inputPlaceholder": "Agregar o buscar etiqueta",

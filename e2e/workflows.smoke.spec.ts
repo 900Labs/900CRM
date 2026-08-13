@@ -141,6 +141,32 @@ test('creates a lead, filters the lead list, and converts it to a customer', asy
   await assertNoConsoleErrors();
 });
 
+test('saves a website bookmark on a contact workspace', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/contacts');
+  await page.locator('.page-header').getByRole('button', { name: 'Add Contact' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add Contact' });
+  await dialog.getByLabel('First Name').fill('Imani');
+  await dialog.getByLabel('Last Name').fill('Okello');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden();
+
+  await page.getByText('Imani Okello').click();
+  await expect(page.getByRole('heading', { name: 'Imani Okello' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Links' })).toBeVisible();
+  await expect(page.getByText('does not copy or upload the file')).toBeVisible();
+
+  await page.getByLabel('Link title').fill('Clinic map');
+  await page.getByLabel('Website URL').fill('https://maps.example/clinic');
+  await page.getByRole('button', { name: 'Add website' }).click();
+  await expect(page.getByRole('button', { name: 'Clinic map' })).toBeVisible();
+  await expect(page.getByText('https://maps.example/clinic')).toBeVisible();
+
+  await assertNoConsoleErrors();
+});
+
 test('shows a customer 360 summary for a contact with linked sales work', async ({
   page,
   assertNoConsoleErrors,

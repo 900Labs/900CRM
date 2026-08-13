@@ -225,6 +225,24 @@
     "saveFailed": "Imeshindwa kuhifadhi dokezo",
     "deleteFailed": "Imeshindwa kufuta dokezo"
   },
+  "entityLinks": {
+    "title": "Viungo",
+    "help": "Hifadhi tovuti au njia ya faili ya ndani. 900CRM huhifadhi mahali kama maandishi na haikopi wala kupakia faili.",
+    "titleLabel": "Kichwa cha kiungo",
+    "titlePlaceholder": "Kichwa (si lazima)",
+    "urlLabel": "Tovuti",
+    "urlPlaceholder": "https://",
+    "addUrl": "Ongeza tovuti",
+    "chooseFile": "Chagua faili",
+    "empty": "Bado hakuna viungo",
+    "website": "Tovuti",
+    "filePath": "Njia ya faili",
+    "confirmDelete": "Ondoa kiungo hiki?",
+    "loadFailed": "Imeshindwa kupakia viungo",
+    "saveFailed": "Imeshindwa kuhifadhi kiungo",
+    "deleteFailed": "Imeshindwa kufuta kiungo",
+    "openFailed": "Imeshindwa kufungua kiungo hiki"
+  },
   "entityTags": {
     "title": "Tagi",
     "inputPlaceholder": "Ongeza au tafuta tagi",

@@ -43,7 +43,7 @@ use rusqlite::{params, Connection};
 use crate::utils::errors::{CrmError, CrmResult};
 
 /// The current schema version. Increment whenever a new migration is added.
-const CURRENT_SCHEMA_VERSION: u32 = 11;
+const CURRENT_SCHEMA_VERSION: u32 = 12;
 const DATABASE_FILENAME: &str = "900crm.db";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -249,6 +249,10 @@ impl Database {
 
         if current_version < 11 {
             self.migrate_v11_contact_lifecycle()?;
+        }
+
+        if current_version < 12 {
+            self.migrate_v12_entity_links()?;
         }
 
         self.conn.execute_batch(&format!(
@@ -1440,6 +1444,34 @@ impl Database {
         }
 
         log::info!("Migration v11 contact lifecycle complete");
+        Ok(())
+    }
+
+    fn migrate_v12_entity_links(&mut self) -> CrmResult<()> {
+        log::info!("Running database migration v12 entity links");
+
+        self.conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS entity_links (
+                id           TEXT PRIMARY KEY NOT NULL,
+                entity_type  TEXT NOT NULL,
+                entity_id    TEXT NOT NULL,
+                title        TEXT NOT NULL DEFAULT '',
+                kind         TEXT NOT NULL,
+                target       TEXT NOT NULL,
+                created_at   TEXT NOT NULL,
+                updated_at   TEXT NOT NULL,
+                deleted_at   TEXT,
+                device_id    TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_entity_links_parent
+                ON entity_links (entity_type, entity_id)
+                WHERE deleted_at IS NULL;
+            "#,
+        )?;
+
+        log::info!("Migration v12 entity links complete");
         Ok(())
     }
 
