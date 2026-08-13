@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Changed — 2026-08-13
+- Replaced the updater public key with a new keypair. No public installer
+  depended on the previous key. The private key stays outside the repository.
 - Set the application version to `0.9.0` across npm, Cargo, and Tauri
   manifests. This is an honest source-evaluable alpha identity; no public
   `1.0.0` installer has been published.
