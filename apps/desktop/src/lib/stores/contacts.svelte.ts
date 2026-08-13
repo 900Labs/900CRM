@@ -15,6 +15,7 @@ import {
   listContactDuplicateCandidates,
   mergeContacts,
 } from '$lib/api/contacts';
+import { t } from '$lib/i18n';
 import type {
   Contact,
   ContactDuplicateCandidate,
@@ -102,7 +103,7 @@ class ContactStore {
       this.total = result.total;
       this.page = result.page;
     } catch (err) {
-      uiStore.toastError('Failed to load contacts');
+      uiStore.toastError(t('errors.loadNamed', { name: t('entities.contact') }));
       throw err;
     } finally {
       this.isLoading = false;
@@ -120,10 +121,10 @@ class ContactStore {
     try {
       const contact = await createContact(data);
       await this.loadContacts();
-      uiStore.toastSuccess('Contact created');
+      uiStore.toastSuccess(t('toasts.created', { name: t('entities.contact') }));
       return contact;
     } catch (err) {
-      uiStore.toastError('Failed to create contact');
+      uiStore.toastError(t('errors.createNamed', { name: t('entities.contact') }));
       throw err;
     } finally {
       this.isSaving = false;
@@ -149,10 +150,10 @@ class ContactStore {
         this.selectedContact = contact;
       }
 
-      uiStore.toastSuccess('Contact updated');
+      uiStore.toastSuccess(t('toasts.updated', { name: t('entities.contact') }));
       return contact;
     } catch (err) {
-      uiStore.toastError('Failed to update contact');
+      uiStore.toastError(t('errors.updateNamed', { name: t('entities.contact') }));
       throw err;
     } finally {
       this.isSaving = false;
@@ -174,9 +175,9 @@ class ContactStore {
       }
 
       this.total = Math.max(0, this.total - 1);
-      uiStore.toastSuccess('Contact deleted');
+      uiStore.toastSuccess(t('toasts.deleted', { name: t('entities.contact') }));
     } catch (err) {
-      uiStore.toastError('Failed to delete contact');
+      uiStore.toastError(t('errors.deleteNamed', { name: t('entities.contact') }));
       throw err;
     }
   }
@@ -213,7 +214,7 @@ class ContactStore {
     } catch (err) {
       this.duplicateCandidates = [];
       this.duplicateCandidatesError = err instanceof Error ? err.message : 'Failed to check duplicates';
-      uiStore.toastError('Failed to check contact duplicates');
+      uiStore.toastError(t('errors.loadNamed', { name: t('entities.contact') }));
       throw err;
     } finally {
       this.duplicateCandidatesLoading = false;
@@ -238,10 +239,10 @@ class ContactStore {
       } else if (this.selectedContact?.id === targetId) {
         this.selectedContact = contact;
       }
-      uiStore.toastSuccess('Contacts merged');
+      uiStore.toastSuccess(t('toasts.merged', { name: t('nav.contacts') }));
       return contact;
     } catch (err) {
-      uiStore.toastError('Failed to merge contacts');
+      uiStore.toastError(t('errors.mergeNamed', { name: t('nav.contacts') }));
       throw err;
     } finally {
       this.isMergingDuplicates = false;

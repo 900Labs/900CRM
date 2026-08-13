@@ -151,7 +151,7 @@
     }
 
     if (result.type === 'deal') {
-      navigate('/pipeline');
+      navigate(`/pipeline/${result.id}`);
       return;
     }
 

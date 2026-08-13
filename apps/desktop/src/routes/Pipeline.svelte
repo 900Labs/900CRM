@@ -59,6 +59,9 @@
   import DealCard from '$lib/components/DealCard.svelte';
   import DealDetailDrawer from '$lib/components/DealDetailDrawer.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
+  import { navigateHash } from '$lib/utils/hashRouter';
+
+  let { dealId = null }: { dealId?: string | null } = $props();
 
   // ── State ────────────────────────────────────────────────────────────────────
 
@@ -199,7 +202,7 @@
       relationshipOrganizations = lookups.organizations;
     } catch (err) {
       console.error('[Pipeline] Failed to load deal relationship lookups:', err);
-      uiStore.toastError('Failed to load deal relationships.');
+      uiStore.toastError(t('errors.loadRelationships', { name: t('entities.deal') }));
     }
   }
 
@@ -317,6 +320,18 @@
   const allDeals = $derived.by(() =>
     DEAL_STAGES.flatMap((stage) => dealStore.dealsByStage[stage] ?? [])
   );
+
+  $effect(() => {
+    if (!pipelineBootstrapComplete || !dealId) {
+      return;
+    }
+
+    const deal = allDeals.find((item) => item.id === dealId);
+    if (deal && selectedDeal?.id !== deal.id) {
+      selectedDeal = deal;
+      dealStore.selectDeal(deal);
+    }
+  });
 
   const visibleDeals = $derived.by(() => columns.flatMap((column) => column.deals));
 
@@ -501,11 +516,17 @@
 
     selectedDeal = deal;
     dealStore.selectDeal(deal);
+    if (dealId !== deal.id) {
+      navigateHash(`/pipeline/${deal.id}`);
+    }
   }
 
   function closeDealDrawer() {
     selectedDeal = null;
     dealStore.selectDeal(null);
+    if (dealId) {
+      navigateHash('/pipeline');
+    }
   }
 
   function openDealFollowUp(deal: Deal) {

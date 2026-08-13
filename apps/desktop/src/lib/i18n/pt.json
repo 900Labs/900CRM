@@ -476,7 +476,9 @@
     "externalClientPermissionNoWrite": "Sem escrita",
     "externalClientPermissionRequiresConfirmation": "Exige confirmação",
     "externalClientPermissionNoConfirmation": "Sem confirmação",
-    "externalClientPermissionWriteRequiresConfirmation": "Linhas de permissão de escrita exigem confirmação; o backend rejeita linhas de escrita que não exijam confirmação."
+    "externalClientPermissionWriteRequiresConfirmation": "Linhas de permissão de escrita exigem confirmação; o backend rejeita linhas de escrita que não exijam confirmação.",
+    "syncUnavailable": "Ainda não disponível",
+    "syncUnavailableHint": "A sincronização entre dispositivos não está implementada. Seus dados ficam neste dispositivo. Nada aqui se conecta a um servidor."
   },
   "common": {
     "save": "Salvar",
@@ -545,7 +547,8 @@
     "invalidEmail": "Endereço de e-mail inválido",
     "invalidPhone": "Número de telefone inválido",
     "invalidUrl": "URL inválida",
-    "fieldRequired": "{field} é obrigatório"
+    "fieldRequired": "{field} é obrigatório",
+    "openLinkFailed": "Não foi possível abrir o link"
   },
   "mission": {
     "title": "900 para 900",
@@ -565,7 +568,19 @@
     "deleteFailed": "Falha ao excluir",
     "generic": "Algo deu errado",
     "networkError": "Erro de rede — verifique sua conexão",
-    "notFound": "Não encontrado"
+    "notFound": "Não encontrado",
+    "loadNamed": "Falha ao carregar {name}.",
+    "createNamed": "Falha ao criar {name}.",
+    "updateNamed": "Falha ao atualizar {name}.",
+    "deleteNamed": "Falha ao excluir {name}.",
+    "moveNamed": "Falha ao mover {name}.",
+    "mergeNamed": "Falha ao mesclar {name}.",
+    "saveSetting": "Falha ao salvar a configuração: {key}",
+    "loadRelationships": "Falha ao carregar relações de {name}.",
+    "loadCustomFields": "Falha ao carregar campos personalizados.",
+    "loadCustomFieldValues": "Falha ao carregar valores de campos personalizados.",
+    "markCompleteFailed": "Falha ao marcar a atividade como concluída",
+    "markIncompleteFailed": "Falha ao marcar a atividade como incompleta"
   },
   "import": {
     "title": "Importar",
@@ -788,5 +803,17 @@
     "installing": "Instalando e reiniciando…",
     "checkFailed": "Não foi possível verificar atualizações. Certifique-se de que você está conectado à internet.",
     "installFailed": "Falha na instalação da atualização."
+  },
+  "toasts": {
+    "created": "{name} criado",
+    "updated": "{name} atualizado",
+    "deleted": "{name} excluído",
+    "merged": "{name} mesclado"
+  },
+  "entities": {
+    "contact": "Contato",
+    "deal": "Negócio",
+    "activity": "Atividade",
+    "organization": "Organização"
   }
 }

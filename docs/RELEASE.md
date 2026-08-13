@@ -14,6 +14,12 @@ current-vs-remaining assessment, see
 Application manifests currently identify the source tree as `0.9.0`
 (source-evaluable alpha), not a stable `1.0.0`.
 
+A draft GitHub prerelease `v0.9.0` now holds unsigned Windows and Linux
+packages from workflow run 31685003675. They are not public until a
+maintainer publishes the draft. The current Linux binaries require
+**glibc 2.39+** (Ubuntu 24.04 / Debian 13). They do not run on Ubuntu 22.04.
+macOS remains deferred.
+
 Current CI is verification-only, and release packaging is intentionally
 separate. Manual release packaging now has an automated Ubuntu preflight gate
 before any platform packaging starts:

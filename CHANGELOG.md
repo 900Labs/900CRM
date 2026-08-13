@@ -9,6 +9,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Changed — 2026-08-13
+- Settings Sync is labeled as not available. The toggle and server URL are
+  gone so the app no longer looks like it can sync.
+- Organization website links open through the OS handler after an http(s)
+  allow-list check.
+- Minimum window size is 800×520 so common 1024×600 netbooks can open the app.
+- Store and route toasts go through translation keys instead of hardcoded
+  English.
+- Deal search and `#/pipeline/:id` open the existing deal guidance drawer.
 - Replaced the updater public key with a new keypair. No public installer
   depended on the previous key. The private key stays outside the repository.
 - Set the application version to `0.9.0` across npm, Cargo, and Tauri

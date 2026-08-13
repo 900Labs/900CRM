@@ -476,7 +476,9 @@
     "externalClientPermissionNoWrite": "Hakuna Kuandika",
     "externalClientPermissionRequiresConfirmation": "Inahitaji Uthibitisho",
     "externalClientPermissionNoConfirmation": "Hakuna Uthibitisho",
-    "externalClientPermissionWriteRequiresConfirmation": "Safu za ruhusa za kuandika zinahitaji uthibitisho; seva ya nyuma inakataa safu za kuandika zisizohitaji uthibitisho."
+    "externalClientPermissionWriteRequiresConfirmation": "Safu za ruhusa za kuandika zinahitaji uthibitisho; seva ya nyuma inakataa safu za kuandika zisizohitaji uthibitisho.",
+    "syncUnavailable": "Bado haipatikani",
+    "syncUnavailableHint": "Usawazishaji wa vifaa vingi haujatekelezwa. Data yako inabaki kwenye kifaa hiki. Hakuna kilicho hapa kinachounganisha na seva."
   },
   "common": {
     "save": "Hifadhi",
@@ -545,7 +547,8 @@
     "invalidEmail": "Anwani ya barua pepe si sahihi",
     "invalidPhone": "Nambari ya simu si sahihi",
     "invalidUrl": "URL si sahihi",
-    "fieldRequired": "{field} inahitajika"
+    "fieldRequired": "{field} inahitajika",
+    "openLinkFailed": "Imeshindwa kufungua kiungo"
   },
   "mission": {
     "title": "900 kwa 900",
@@ -565,7 +568,19 @@
     "deleteFailed": "Imeshindwa kufuta",
     "generic": "Kuna tatizo fulani",
     "networkError": "Hitilafu ya mtandao — angalia muunganisho wako",
-    "notFound": "Haikupatikana"
+    "notFound": "Haikupatikana",
+    "loadNamed": "Imeshindwa kupakia {name}.",
+    "createNamed": "Imeshindwa kuunda {name}.",
+    "updateNamed": "Imeshindwa kusasisha {name}.",
+    "deleteNamed": "Imeshindwa kufuta {name}.",
+    "moveNamed": "Imeshindwa kuhamisha {name}.",
+    "mergeNamed": "Imeshindwa kuunganisha {name}.",
+    "saveSetting": "Imeshindwa kuhifadhi mpangilio: {key}",
+    "loadRelationships": "Imeshindwa kupakia uhusiano wa {name}.",
+    "loadCustomFields": "Imeshindwa kupakia sehemu maalum.",
+    "loadCustomFieldValues": "Imeshindwa kupakia thamani za sehemu maalum.",
+    "markCompleteFailed": "Imeshindwa kuweka shughuli kama imekamilika",
+    "markIncompleteFailed": "Imeshindwa kuweka shughuli kama haijakamilika"
   },
   "import": {
     "title": "Ingiza",
@@ -788,5 +803,17 @@
     "installing": "Inasakinisha na kuanzisha upya…",
     "checkFailed": "Imeshindwa kukagua sasisho. Hakikisha umeunganishwa kwenye mtandao.",
     "installFailed": "Usakinishaji wa sasisho umeshindwa."
+  },
+  "toasts": {
+    "created": "{name} imeundwa",
+    "updated": "{name} imesasishwa",
+    "deleted": "{name} imefutwa",
+    "merged": "{name} imeunganishwa"
+  },
+  "entities": {
+    "contact": "Mwasiliani",
+    "deal": "Sogora",
+    "activity": "Shughuli",
+    "organization": "Shirika"
   }
 }

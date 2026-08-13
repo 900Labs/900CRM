@@ -36,6 +36,8 @@ test('renders key hash routes without native Tauri dialogs', async ({ page, asse
   await expect(page.getByRole('button', { name: 'Integrations' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Data', exact: true })).toBeVisible();
   await expect(page.getByText('Backup & Restore')).toBeVisible();
+  await expect(page.getByText('Not available yet')).toBeVisible();
+  await expect(page.getByText('Multi-device sync is not implemented')).toBeVisible();
 
   await assertNoConsoleErrors();
 });

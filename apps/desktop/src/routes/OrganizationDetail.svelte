@@ -4,6 +4,7 @@
   import { dealStore } from '$lib/stores/deals';
   import { activityStore } from '$lib/stores/activities';
   import { uiStore } from '$lib/stores/ui';
+  import { openExternalUrl } from '$lib/utils/openExternal';
   import { settingsStore } from '$lib/stores/settings';
   import type { Organization } from '$lib/api/organizations';
   import type { Contact } from '$lib/api/contacts';
@@ -291,6 +292,18 @@
     return formatFullName(contact.firstName, contact.lastName);
   }
 
+  async function openOrganizationWebsite(website: string | null): Promise<void> {
+    if (!website) {
+      return;
+    }
+
+    try {
+      await openExternalUrl(website);
+    } catch {
+      uiStore.toastError(t('common.openLinkFailed'));
+    }
+  }
+
   function openOrganizationDealModal() {
     if (!organization) return;
     organizationStore.selectOrganization(organization);
@@ -438,7 +451,13 @@
                 <dt>{t('organizations.website')}</dt>
                 <dd>
                   {#if organization.website}
-                    <a href={organization.website} target="_blank" rel="noreferrer">{organization.website}</a>
+                    <button
+                      class="link-button"
+                      type="button"
+                      onclick={() => void openOrganizationWebsite(organization?.website ?? null)}
+                    >
+                      {organization.website}
+                    </button>
                   {:else}
                     {t('common.none')}
                   {/if}
@@ -842,6 +861,17 @@
     color: var(--text-secondary);
     font-size: var(--text-sm);
     line-height: 1.5;
+  }
+
+  .link-button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-primary-600);
+    font: inherit;
+    text-align: start;
+    text-decoration: underline;
+    cursor: pointer;
   }
 
   .people-list,

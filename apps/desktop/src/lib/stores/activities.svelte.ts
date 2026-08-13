@@ -13,6 +13,7 @@ import {
   markIncomplete,
   deleteActivity,
 } from '$lib/api/activities';
+import { t } from '$lib/i18n';
 import type {
   Activity,
   CreateActivityPayload,
@@ -64,7 +65,7 @@ class ActivityStore {
     try {
       this.activities = await listActivities(this.filters);
     } catch (err) {
-      uiStore.toastError('Failed to load activities');
+      uiStore.toastError(t('errors.loadNamed', { name: t('entities.activity') }));
       throw err;
     } finally {
       this.isLoading = false;
@@ -93,10 +94,10 @@ class ActivityStore {
     try {
       const activity = await createActivity(data);
       this.activities = [activity, ...this.activities];
-      uiStore.toastSuccess('Activity created');
+      uiStore.toastSuccess(t('toasts.created', { name: t('entities.activity') }));
       return activity;
     } catch (err) {
-      uiStore.toastError('Failed to create activity');
+      uiStore.toastError(t('errors.createNamed', { name: t('entities.activity') }));
       throw err;
     } finally {
       this.isSaving = false;
@@ -118,7 +119,7 @@ class ActivityStore {
       this.activities = this.activities.map((a) => (a.id === id ? updated : a));
       this.upcoming = this.upcoming.filter((a) => a.id !== id);
     } catch (err) {
-      uiStore.toastError('Failed to mark activity complete');
+      uiStore.toastError(t('errors.markCompleteFailed'));
       throw err;
     }
   }
@@ -133,7 +134,7 @@ class ActivityStore {
       const updated = await markIncomplete(id);
       this.activities = this.activities.map((a) => (a.id === id ? updated : a));
     } catch (err) {
-      uiStore.toastError('Failed to mark activity incomplete');
+      uiStore.toastError(t('errors.markIncompleteFailed'));
       throw err;
     }
   }
@@ -149,10 +150,10 @@ class ActivityStore {
     try {
       const activity = await updateActivity(id, data);
       this.activities = this.activities.map((a) => (a.id === id ? activity : a));
-      uiStore.toastSuccess('Activity updated');
+      uiStore.toastSuccess(t('toasts.updated', { name: t('entities.activity') }));
       return activity;
     } catch (err) {
-      uiStore.toastError('Failed to update activity');
+      uiStore.toastError(t('errors.updateNamed', { name: t('entities.activity') }));
       throw err;
     } finally {
       this.isSaving = false;
@@ -169,9 +170,9 @@ class ActivityStore {
       await deleteActivity(id);
       this.activities = this.activities.filter((a) => a.id !== id);
       this.upcoming = this.upcoming.filter((a) => a.id !== id);
-      uiStore.toastSuccess('Activity deleted');
+      uiStore.toastSuccess(t('toasts.deleted', { name: t('entities.activity') }));
     } catch (err) {
-      uiStore.toastError('Failed to delete activity');
+      uiStore.toastError(t('errors.deleteNamed', { name: t('entities.activity') }));
       throw err;
     }
   }

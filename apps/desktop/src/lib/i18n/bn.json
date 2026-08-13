@@ -476,7 +476,9 @@
     "externalClientPermissionNoWrite": "লিখতে পারে না",
     "externalClientPermissionRequiresConfirmation": "নিশ্চিতকরণ প্রয়োজন",
     "externalClientPermissionNoConfirmation": "নিশ্চিতকরণ প্রয়োজন নেই",
-    "externalClientPermissionWriteRequiresConfirmation": "লেখার অনুমতি সারিতে নিশ্চিতকরণ প্রয়োজন; নিশ্চিতকরণ না চাওয়া লেখার সারি ব্যাকএন্ড প্রত্যাখ্যান করে।"
+    "externalClientPermissionWriteRequiresConfirmation": "লেখার অনুমতি সারিতে নিশ্চিতকরণ প্রয়োজন; নিশ্চিতকরণ না চাওয়া লেখার সারি ব্যাকএন্ড প্রত্যাখ্যান করে।",
+    "syncUnavailable": "এখনও উপলব্ধ নয়",
+    "syncUnavailableHint": "মাল্টি-ডিভাইস সিঙ্ক বাস্তবায়িত হয়নি। আপনার তথ্য এই ডিভাইসেই থাকে। এখানে কিছুই সার্ভারের সাথে সংযুক্ত হয় না।"
   },
   "common": {
     "save": "সংরক্ষণ",
@@ -545,7 +547,8 @@
     "invalidEmail": "অবৈধ ইমেইল ঠিকানা",
     "invalidPhone": "অবৈধ ফোন নম্বর",
     "invalidUrl": "অবৈধ URL",
-    "fieldRequired": "{field} আবশ্যক"
+    "fieldRequired": "{field} আবশ্যক",
+    "openLinkFailed": "লিঙ্ক খোলা যায়নি"
   },
   "mission": {
     "title": "900 এর জন্য 900",
@@ -565,7 +568,19 @@
     "deleteFailed": "মুছা যায়নি",
     "generic": "কিছু ভুল হয়েছে",
     "networkError": "নেটওয়ার্ক ত্রুটি — আপনার সংযোগ পরীক্ষা করুন",
-    "notFound": "পাওয়া যায়নি"
+    "notFound": "পাওয়া যায়নি",
+    "loadNamed": "{name} লোড করা যায়নি।",
+    "createNamed": "{name} তৈরি করা যায়নি।",
+    "updateNamed": "{name} আপডেট করা যায়নি।",
+    "deleteNamed": "{name} মুছে ফেলা যায়নি।",
+    "moveNamed": "{name} সরানো যায়নি।",
+    "mergeNamed": "{name} মার্জ করা যায়নি।",
+    "saveSetting": "সেটিং সংরক্ষণ করা যায়নি: {key}",
+    "loadRelationships": "{name} সম্পর্ক লোড করা যায়নি।",
+    "loadCustomFields": "কাস্টম ফিল্ড লোড করা যায়নি।",
+    "loadCustomFieldValues": "কাস্টম ফিল্ড মান লোড করা যায়নি।",
+    "markCompleteFailed": "কার্যক্রম সম্পন্ন চিহ্নিত করা যায়নি",
+    "markIncompleteFailed": "কার্যক্রম অসম্পূর্ণ চিহ্নিত করা যায়নি"
   },
   "import": {
     "title": "ইমপোর্ট",
@@ -788,5 +803,17 @@
     "installing": "ইনস্টল ও পুনরায় চালু হচ্ছে…",
     "checkFailed": "আপডেট পরীক্ষা করা যায়নি। নিশ্চিত করুন যে আপনি ইন্টারনেটে সংযুক্ত।",
     "installFailed": "আপডেট ইনস্টলেশন ব্যর্থ হয়েছে।"
+  },
+  "toasts": {
+    "created": "{name} তৈরি হয়েছে",
+    "updated": "{name} আপডেট হয়েছে",
+    "deleted": "{name} মুছে ফেলা হয়েছে",
+    "merged": "{name} মার্জ হয়েছে"
+  },
+  "entities": {
+    "contact": "যোগাযোগ",
+    "deal": "চুক্তি",
+    "activity": "কার্যক্রম",
+    "organization": "সংস্থা"
   }
 }

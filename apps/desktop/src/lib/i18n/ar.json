@@ -476,7 +476,9 @@
     "externalClientPermissionNoWrite": "بدون كتابة",
     "externalClientPermissionRequiresConfirmation": "يتطلب تأكيدًا",
     "externalClientPermissionNoConfirmation": "بدون تأكيد",
-    "externalClientPermissionWriteRequiresConfirmation": "تتطلب صفوف أذونات الكتابة تأكيدًا؛ يرفض الخادم صفوف الكتابة التي لا تتطلب تأكيدًا."
+    "externalClientPermissionWriteRequiresConfirmation": "تتطلب صفوف أذونات الكتابة تأكيدًا؛ يرفض الخادم صفوف الكتابة التي لا تتطلب تأكيدًا.",
+    "syncUnavailable": "غير متاح بعد",
+    "syncUnavailableHint": "المزامنة بين الأجهزة غير منفذة. تبقى بياناتك على هذا الجهاز. لا يتصل أي شيء هنا بخادم."
   },
   "common": {
     "save": "حفظ",
@@ -545,7 +547,8 @@
     "invalidEmail": "عنوان البريد الإلكتروني غير صالح",
     "invalidPhone": "رقم الهاتف غير صالح",
     "invalidUrl": "الرابط غير صالح",
-    "fieldRequired": "{field} مطلوب"
+    "fieldRequired": "{field} مطلوب",
+    "openLinkFailed": "تعذر فتح الرابط"
   },
   "mission": {
     "title": "٩٠٠ لـ ٩٠٠",
@@ -565,7 +568,19 @@
     "deleteFailed": "فشل الحذف",
     "generic": "حدث خطأ ما",
     "networkError": "خطأ في الشبكة — يرجى التحقق من الاتصال",
-    "notFound": "غير موجود"
+    "notFound": "غير موجود",
+    "loadNamed": "فشل تحميل {name}.",
+    "createNamed": "فشل إنشاء {name}.",
+    "updateNamed": "فشل تحديث {name}.",
+    "deleteNamed": "فشل حذف {name}.",
+    "moveNamed": "فشل نقل {name}.",
+    "mergeNamed": "فشل دمج {name}.",
+    "saveSetting": "فشل حفظ الإعداد: {key}",
+    "loadRelationships": "فشل تحميل علاقات {name}.",
+    "loadCustomFields": "فشل تحميل الحقول المخصصة.",
+    "loadCustomFieldValues": "فشل تحميل قيم الحقول المخصصة.",
+    "markCompleteFailed": "فشل تعليم النشاط كمكتمل",
+    "markIncompleteFailed": "فشل تعليم النشاط كغير مكتمل"
   },
   "import": {
     "title": "استيراد",
@@ -788,5 +803,17 @@
     "installing": "جارٍ التثبيت وإعادة التشغيل…",
     "checkFailed": "تعذّر التحقق من التحديثات. تأكد من اتصالك بالإنترنت.",
     "installFailed": "فشل تثبيت التحديث."
+  },
+  "toasts": {
+    "created": "تم إنشاء {name}",
+    "updated": "تم تحديث {name}",
+    "deleted": "تم حذف {name}",
+    "merged": "تم دمج {name}"
+  },
+  "entities": {
+    "contact": "جهة اتصال",
+    "deal": "صفقة",
+    "activity": "نشاط",
+    "organization": "منظمة"
   }
 }

@@ -350,7 +350,7 @@
       originalCustomFieldValues = { ...nextValues };
     } catch (err) {
       console.error('[ContactDetail] Failed to load custom fields:', err);
-      uiStore.toastError('Failed to load custom fields.');
+      uiStore.toastError(t('errors.loadCustomFields'));
       customFieldDefinitions = [];
       customFieldValues = {};
       originalCustomFieldValues = {};

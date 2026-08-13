@@ -136,7 +136,7 @@
       activityRelationshipLookups = await loadActivityRelationshipLookups();
     } catch (err) {
       console.error('[Activities] Failed to load activity relationship lookups:', err);
-      uiStore.toastError('Failed to load activity relationships.');
+      uiStore.toastError(t('errors.loadRelationships', { name: t('entities.activity') }));
     } finally {
       activityRelationshipsLoading = false;
     }
@@ -153,7 +153,7 @@
       activityLinkIndex = await loadActivityLinkIndex(activityStore.activities.map((activity) => activity.id));
     } catch (err) {
       console.error('[Activities] Failed to load activity links:', err);
-      uiStore.toastError('Failed to load activity relationships.');
+      uiStore.toastError(t('errors.loadRelationships', { name: t('entities.activity') }));
     }
   }
 

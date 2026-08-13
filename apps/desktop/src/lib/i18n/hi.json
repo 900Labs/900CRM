@@ -476,7 +476,9 @@
     "externalClientPermissionNoWrite": "लिख नहीं सकता",
     "externalClientPermissionRequiresConfirmation": "पुष्टि आवश्यक",
     "externalClientPermissionNoConfirmation": "कोई पुष्टि नहीं",
-    "externalClientPermissionWriteRequiresConfirmation": "लेखन अनुमति पंक्तियों के लिए पुष्टि आवश्यक है; बैकएंड उन लेखन पंक्तियों को अस्वीकार करता है जिनके लिए पुष्टि आवश्यक नहीं है।"
+    "externalClientPermissionWriteRequiresConfirmation": "लेखन अनुमति पंक्तियों के लिए पुष्टि आवश्यक है; बैकएंड उन लेखन पंक्तियों को अस्वीकार करता है जिनके लिए पुष्टि आवश्यक नहीं है।",
+    "syncUnavailable": "अभी उपलब्ध नहीं",
+    "syncUnavailableHint": "मल्टी-डिवाइस सिंक लागू नहीं है। आपका डेटा इस डिवाइस पर रहता है। यहाँ कुछ भी सर्वर से नहीं जुड़ता।"
   },
   "common": {
     "save": "सहेजें",
@@ -545,7 +547,8 @@
     "invalidEmail": "अमान्य ईमेल पता",
     "invalidPhone": "अमान्य फ़ोन नंबर",
     "invalidUrl": "अमान्य URL",
-    "fieldRequired": "{field} आवश्यक है"
+    "fieldRequired": "{field} आवश्यक है",
+    "openLinkFailed": "लिंक नहीं खोल सके"
   },
   "mission": {
     "title": "900 के लिए 900",
@@ -565,7 +568,19 @@
     "deleteFailed": "हटाने में विफल",
     "generic": "कुछ गलत हो गया",
     "networkError": "नेटवर्क त्रुटि — अपना कनेक्शन जाँचें",
-    "notFound": "नहीं मिला"
+    "notFound": "नहीं मिला",
+    "loadNamed": "{name} लोड करने में विफल।",
+    "createNamed": "{name} बनाने में विफल।",
+    "updateNamed": "{name} अपडेट करने में विफल।",
+    "deleteNamed": "{name} हटाने में विफल।",
+    "moveNamed": "{name} स्थानांतरित करने में विफल।",
+    "mergeNamed": "{name} मर्ज करने में विफल।",
+    "saveSetting": "सेटिंग सहेजने में विफल: {key}",
+    "loadRelationships": "{name} संबंध लोड करने में विफल।",
+    "loadCustomFields": "कस्टम फ़ील्ड लोड करने में विफल।",
+    "loadCustomFieldValues": "कस्टम फ़ील्ड मान लोड करने में विफल।",
+    "markCompleteFailed": "गतिविधि पूर्ण चिह्नित करने में विफल",
+    "markIncompleteFailed": "गतिविधि अपूर्ण चिह्नित करने में विफल"
   },
   "import": {
     "title": "आयात",
@@ -788,5 +803,17 @@
     "installing": "इंस्टॉल और पुनः आरंभ हो रहा है…",
     "checkFailed": "अपडेट जाँचे नहीं जा सके। सुनिश्चित करें कि आप इंटरनेट से जुड़े हैं।",
     "installFailed": "अपडेट इंस्टॉलेशन विफल हुआ।"
+  },
+  "toasts": {
+    "created": "{name} बनाया गया",
+    "updated": "{name} अपडेट किया गया",
+    "deleted": "{name} हटाया गया",
+    "merged": "{name} मर्ज किया गया"
+  },
+  "entities": {
+    "contact": "संपर्क",
+    "deal": "सौदा",
+    "activity": "गतिविधि",
+    "organization": "संगठन"
   }
 }

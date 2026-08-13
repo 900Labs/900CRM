@@ -476,7 +476,9 @@
     "externalClientPermissionNoWrite": "Không ghi",
     "externalClientPermissionRequiresConfirmation": "Cần xác nhận",
     "externalClientPermissionNoConfirmation": "Không xác nhận",
-    "externalClientPermissionWriteRequiresConfirmation": "Hàng quyền hạn ghi cần xác nhận; backend từ chối hàng ghi không yêu cầu xác nhận."
+    "externalClientPermissionWriteRequiresConfirmation": "Hàng quyền hạn ghi cần xác nhận; backend từ chối hàng ghi không yêu cầu xác nhận.",
+    "syncUnavailable": "Chưa có",
+    "syncUnavailableHint": "Đồng bộ nhiều thiết bị chưa được triển khai. Dữ liệu của bạn ở lại trên thiết bị này. Không có gì ở đây kết nối tới máy chủ."
   },
   "common": {
     "save": "Lưu",
@@ -545,7 +547,8 @@
     "invalidEmail": "Địa chỉ email không hợp lệ",
     "invalidPhone": "Số điện thoại không hợp lệ",
     "invalidUrl": "URL không hợp lệ",
-    "fieldRequired": "{field} là bắt buộc"
+    "fieldRequired": "{field} là bắt buộc",
+    "openLinkFailed": "Không mở được liên kết"
   },
   "mission": {
     "title": "900 cho 900",
@@ -565,7 +568,19 @@
     "deleteFailed": "Xóa thất bại",
     "generic": "Đã xảy ra lỗi",
     "networkError": "Lỗi mạng — vui lòng kiểm tra kết nối",
-    "notFound": "Không tìm thấy"
+    "notFound": "Không tìm thấy",
+    "loadNamed": "Không tải được {name}.",
+    "createNamed": "Không tạo được {name}.",
+    "updateNamed": "Không cập nhật được {name}.",
+    "deleteNamed": "Không xóa được {name}.",
+    "moveNamed": "Không di chuyển được {name}.",
+    "mergeNamed": "Không gộp được {name}.",
+    "saveSetting": "Không lưu được cài đặt: {key}",
+    "loadRelationships": "Không tải được quan hệ {name}.",
+    "loadCustomFields": "Không tải được trường tùy chỉnh.",
+    "loadCustomFieldValues": "Không tải được giá trị trường tùy chỉnh.",
+    "markCompleteFailed": "Không đánh dấu hoạt động là hoàn tất",
+    "markIncompleteFailed": "Không đánh dấu hoạt động là chưa xong"
   },
   "import": {
     "title": "Nhập",
@@ -788,5 +803,17 @@
     "installing": "Đang cài đặt và khởi động lại…",
     "checkFailed": "Không thể kiểm tra cập nhật. Hãy đảm bảo bạn có kết nối internet.",
     "installFailed": "Cài đặt cập nhật thất bại."
+  },
+  "toasts": {
+    "created": "Đã tạo {name}",
+    "updated": "Đã cập nhật {name}",
+    "deleted": "Đã xóa {name}",
+    "merged": "Đã gộp {name}"
+  },
+  "entities": {
+    "contact": "Liên hệ",
+    "deal": "Giao dịch",
+    "activity": "Hoạt động",
+    "organization": "Tổ chức"
   }
 }

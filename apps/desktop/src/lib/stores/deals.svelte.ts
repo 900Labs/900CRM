@@ -13,6 +13,7 @@ import {
   deleteDeal,
   getPipelineSummary,
 } from '$lib/api/deals';
+import { t } from '$lib/i18n';
 import type {
   Deal,
   CreateDealPayload,
@@ -66,7 +67,7 @@ class DealStore {
     try {
       this.deals = await listDeals(params);
     } catch (err) {
-      uiStore.toastError('Failed to load deals');
+      uiStore.toastError(t('errors.loadNamed', { name: t('entities.deal') }));
       throw err;
     } finally {
       this.isLoading = false;
@@ -81,7 +82,7 @@ class DealStore {
     try {
       this.dealsByStage = await listDealsByStage();
     } catch (err) {
-      uiStore.toastError('Failed to load pipeline');
+      uiStore.toastError(t('errors.loadNamed', { name: t('deals.title') }));
       throw err;
     } finally {
       this.isLoading = false;
@@ -117,10 +118,10 @@ class DealStore {
       };
       this.deals = [...this.deals, deal];
 
-      uiStore.toastSuccess('Deal created');
+      uiStore.toastSuccess(t('toasts.created', { name: t('entities.deal') }));
       return deal;
     } catch (err) {
-      uiStore.toastError('Failed to create deal');
+      uiStore.toastError(t('errors.createNamed', { name: t('entities.deal') }));
       throw err;
     } finally {
       this.isSaving = false;
@@ -147,10 +148,10 @@ class DealStore {
       // Refresh stage grouping
       await this.loadPipelineBoard();
 
-      uiStore.toastSuccess('Deal updated');
+      uiStore.toastSuccess(t('toasts.updated', { name: t('entities.deal') }));
       return deal;
     } catch (err) {
-      uiStore.toastError('Failed to update deal');
+      uiStore.toastError(t('errors.updateNamed', { name: t('entities.deal') }));
       throw err;
     } finally {
       this.isSaving = false;
@@ -191,7 +192,7 @@ class DealStore {
         [fromStage]: [...this.dealsByStage[fromStage], deal],
         [toStage]: this.dealsByStage[toStage].filter((d) => d.id !== id),
       };
-      uiStore.toastError('Failed to move deal');
+      uiStore.toastError(t('errors.moveNamed', { name: t('entities.deal') }));
       throw err;
     }
   }
@@ -217,9 +218,9 @@ class DealStore {
         this.selectedDeal = null;
       }
 
-      uiStore.toastSuccess('Deal deleted');
+      uiStore.toastSuccess(t('toasts.deleted', { name: t('entities.deal') }));
     } catch (err) {
-      uiStore.toastError('Failed to delete deal');
+      uiStore.toastError(t('errors.deleteNamed', { name: t('entities.deal') }));
       throw err;
     }
   }

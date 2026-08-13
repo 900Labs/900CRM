@@ -244,8 +244,8 @@ The intended public release artifacts are:
 |---|---|---|---|
 | **Windows** | `.msi` or `.exe` installer | Windows 10 (1803+) | Unsigned release-candidate workflow exists |
 | **macOS** | `.dmg` disk image | macOS 11 Big Sur (Intel & Apple Silicon) | Deferred until Developer ID signing and notarization |
-| **Linux** | `.deb` package | Ubuntu 20.04 / Debian 11 | Unsigned release-candidate workflow exists |
-| **Linux** | `.AppImage` | Any modern Linux distribution | Unsigned release-candidate workflow exists |
+| **Linux** | `.deb` package | Ubuntu 24.04 / Debian 13 (glibc 2.39+) | Unsigned release-candidate workflow exists |
+| **Linux** | `.AppImage` | glibc 2.39+ distributions | Unsigned release-candidate workflow exists |
 
 See [Release Readiness](docs/RELEASE.md) for the manual verification checklist,
 the guarded release-packaging workflow, generated checksums/SBOM metadata, and
