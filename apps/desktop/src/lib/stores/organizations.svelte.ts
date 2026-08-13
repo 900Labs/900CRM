@@ -34,7 +34,7 @@ class OrganizationStore {
     try {
       this.organizations = await listOrganizations();
     } catch (err) {
-      uiStore.toastError('Failed to load organizations');
+      uiStore.toastError(t('errors.loadNamed', { name: t('entities.organization') }));
       throw err;
     } finally {
       this.isLoading = false;
@@ -49,7 +49,7 @@ class OrganizationStore {
       this.organizations = this.upsertOrganization(organization);
       return organization;
     } catch (err) {
-      uiStore.toastError('Failed to load organization');
+      uiStore.toastError(t('errors.loadNamed', { name: t('entities.organization') }));
       throw err;
     } finally {
       this.isLoading = false;
@@ -61,10 +61,10 @@ class OrganizationStore {
     try {
       const organization = await createOrganization(data);
       this.organizations = this.upsertOrganization(organization);
-      uiStore.toastSuccess('Organization created');
+      uiStore.toastSuccess(t('toasts.created', { name: t('entities.organization') }));
       return organization;
     } catch (err) {
-      uiStore.toastError('Failed to create organization');
+      uiStore.toastError(t('errors.createNamed', { name: t('entities.organization') }));
       throw err;
     } finally {
       this.isSaving = false;
@@ -81,10 +81,10 @@ class OrganizationStore {
         this.selectedOrganization = organization;
       }
 
-      uiStore.toastSuccess('Organization updated');
+      uiStore.toastSuccess(t('toasts.updated', { name: t('entities.organization') }));
       return organization;
     } catch (err) {
-      uiStore.toastError('Failed to update organization');
+      uiStore.toastError(t('errors.updateNamed', { name: t('entities.organization') }));
       throw err;
     } finally {
       this.isSaving = false;
@@ -100,9 +100,9 @@ class OrganizationStore {
         this.selectedOrganization = null;
       }
 
-      uiStore.toastSuccess('Organization deleted');
+      uiStore.toastSuccess(t('toasts.deleted', { name: t('entities.organization') }));
     } catch (err) {
-      uiStore.toastError('Failed to delete organization');
+      uiStore.toastError(t('errors.deleteNamed', { name: t('entities.organization') }));
       throw err;
     }
   }
@@ -120,7 +120,7 @@ class OrganizationStore {
       );
       return contact;
     } catch (err) {
-      uiStore.toastError('Failed to update contact organization');
+      uiStore.toastError(t('errors.updateNamed', { name: t('entities.organization') }));
       throw err;
     } finally {
       this.isLinkingContact = false;

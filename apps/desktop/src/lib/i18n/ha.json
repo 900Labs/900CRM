@@ -476,7 +476,9 @@
     "externalClientPermissionNoWrite": "Ba Rubutu",
     "externalClientPermissionRequiresConfirmation": "Yana Bukatar Tabbatarwa",
     "externalClientPermissionNoConfirmation": "Ba Tabbatarwa",
-    "externalClientPermissionWriteRequiresConfirmation": "Layukan izinin rubutu suna bukatar tabbatarwa; baya na gaba yana ki layukan rubutu da ba su bukaci tabbatarwa."
+    "externalClientPermissionWriteRequiresConfirmation": "Layukan izinin rubutu suna bukatar tabbatarwa; baya na gaba yana ki layukan rubutu da ba su bukaci tabbatarwa.",
+    "syncUnavailable": "Har yanzu babu",
+    "syncUnavailableHint": "Daidaitawar na’urori da yawa ba a aiwatar da ita ba. Bayananku suna nan a wannan na’ura. Babu abin da ke nan da ke haɗawa da uwar garke."
   },
   "common": {
     "save": "Ajiye",
@@ -545,7 +547,8 @@
     "invalidEmail": "Adireshin imel ba daidai ba",
     "invalidPhone": "Lambar waya ba daidai ba",
     "invalidUrl": "URL ba daidai ba",
-    "fieldRequired": "{field} wajibi ne"
+    "fieldRequired": "{field} wajibi ne",
+    "openLinkFailed": "An kasa buɗe hanyar haɗi"
   },
   "mission": {
     "title": "900 don 900",
@@ -565,7 +568,19 @@
     "deleteFailed": "An kasa gogewa",
     "generic": "Wani abu ya tafi ba daidai ba",
     "networkError": "Kuskuren hanyar sadarwa — da fatan a duba hadinka",
-    "notFound": "Ba a samu ba"
+    "notFound": "Ba a samu ba",
+    "loadNamed": "An kasa lodin {name}.",
+    "createNamed": "An kasa ƙirƙirar {name}.",
+    "updateNamed": "An kasa sabunta {name}.",
+    "deleteNamed": "An kasa share {name}.",
+    "moveNamed": "An kasa motsa {name}.",
+    "mergeNamed": "An kasa haɗa {name}.",
+    "saveSetting": "An kasa adana saitawa: {key}",
+    "loadRelationships": "An kasa lodin alaƙar {name}.",
+    "loadCustomFields": "An kasa lodin filayen al’ada.",
+    "loadCustomFieldValues": "An kasa lodin ƙimar filayen al’ada.",
+    "markCompleteFailed": "An kasa yiwa aiki alamar kammala",
+    "markIncompleteFailed": "An kasa yiwa aiki alamar rashin kammala"
   },
   "import": {
     "title": "Shigo",
@@ -788,5 +803,17 @@
     "installing": "Ana sanyawa da sake farawa…",
     "checkFailed": "An kasa duba sabuntawa. Tabbatar cewa an hada ka da intanet.",
     "installFailed": "Sanya sabuntawa ya gaza."
+  },
+  "toasts": {
+    "created": "An ƙirƙiri {name}",
+    "updated": "An sabunta {name}",
+    "deleted": "An share {name}",
+    "merged": "An haɗa {name}"
+  },
+  "entities": {
+    "contact": "Mahada",
+    "deal": "Yarjejeniya",
+    "activity": "Aiki",
+    "organization": "Kungiya"
   }
 }

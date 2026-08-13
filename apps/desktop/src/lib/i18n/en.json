@@ -476,7 +476,9 @@
     "externalClientPermissionNoWrite": "No Write",
     "externalClientPermissionRequiresConfirmation": "Requires Confirmation",
     "externalClientPermissionNoConfirmation": "No Confirmation",
-    "externalClientPermissionWriteRequiresConfirmation": "Write permission rows require confirmation; the backend rejects write rows that do not require confirmation."
+    "externalClientPermissionWriteRequiresConfirmation": "Write permission rows require confirmation; the backend rejects write rows that do not require confirmation.",
+    "syncUnavailable": "Not available yet",
+    "syncUnavailableHint": "Multi-device sync is not implemented. Your data stays on this device. Nothing here connects to a server."
   },
   "common": {
     "save": "Save",
@@ -545,7 +547,8 @@
     "invalidEmail": "Invalid email address",
     "invalidPhone": "Invalid phone number",
     "invalidUrl": "Invalid URL",
-    "fieldRequired": "{field} is required"
+    "fieldRequired": "{field} is required",
+    "openLinkFailed": "Could not open link"
   },
   "mission": {
     "title": "900 for 900",
@@ -565,7 +568,19 @@
     "deleteFailed": "Failed to delete",
     "generic": "Something went wrong",
     "networkError": "Network error — please check your connection",
-    "notFound": "Not found"
+    "notFound": "Not found",
+    "loadNamed": "Failed to load {name}.",
+    "createNamed": "Failed to create {name}.",
+    "updateNamed": "Failed to update {name}.",
+    "deleteNamed": "Failed to delete {name}.",
+    "moveNamed": "Failed to move {name}.",
+    "mergeNamed": "Failed to merge {name}.",
+    "saveSetting": "Failed to save setting: {key}",
+    "loadRelationships": "Failed to load {name} relationships.",
+    "loadCustomFields": "Failed to load custom fields.",
+    "loadCustomFieldValues": "Failed to load custom field values.",
+    "markCompleteFailed": "Failed to mark activity complete",
+    "markIncompleteFailed": "Failed to mark activity incomplete"
   },
   "import": {
     "title": "Import",
@@ -788,5 +803,17 @@
     "installing": "Installing and restarting…",
     "checkFailed": "Could not check for updates. Make sure you are connected to the internet.",
     "installFailed": "Update installation failed."
+  },
+  "toasts": {
+    "created": "{name} created",
+    "updated": "{name} updated",
+    "deleted": "{name} deleted",
+    "merged": "{name} merged"
+  },
+  "entities": {
+    "contact": "Contact",
+    "deal": "Deal",
+    "activity": "Activity",
+    "organization": "Organization"
   }
 }

@@ -110,8 +110,7 @@
   let savingKey = $state<keyof AppSettings | null>(null);
 
   /** URL field local state — only committed on blur or Enter. */
-  let syncUrlLocal = $state('');
-  let syncUrlDirty = $state(false);
+
   let reminderLeadMinutesLocal = $state('30');
   let reminderLeadDirty = $state(false);
   let smtpHostLocal = $state('');
@@ -151,7 +150,7 @@
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
   onMount(() => {
-    syncUrlLocal = settingsStore.syncUrl;
+
     reminderLeadMinutesLocal = String(settingsStore.reminderLeadMinutes);
     smtpHostLocal = settingsStore.smtpHost;
     smtpPortLocal = String(settingsStore.smtpPort);
@@ -202,28 +201,6 @@
 
   async function handleDateFormatChange(format: string) {
     await updateSetting('dateFormat', format);
-  }
-
-  async function handleSyncToggle() {
-    await updateSetting('syncEnabled', !settingsStore.syncEnabled);
-  }
-
-  function handleSyncUrlInput(e: Event) {
-    syncUrlLocal = (e.target as HTMLInputElement).value;
-    syncUrlDirty = true;
-  }
-
-  async function handleSyncUrlCommit() {
-    if (!syncUrlDirty) return;
-    syncUrlDirty = false;
-    await updateSetting('syncUrl', syncUrlLocal);
-  }
-
-  async function handleSyncUrlKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') {
-      (e.target as HTMLInputElement).blur();
-      await handleSyncUrlCommit();
-    }
   }
 
   async function handleNotificationsToggle() {
@@ -847,54 +824,13 @@
             </svg>
             {t('settings.sync')}
           </h2>
-          {#if savingKey === 'syncEnabled' || savingKey === 'syncUrl'}
-            <span class="saving-indicator" aria-live="polite">{t('common.loading')}</span>
-          {/if}
+
         </div>
         <div class="card-body sync-body">
-          <!-- Sync enable toggle -->
-          <div class="toggle-row">
-            <div class="toggle-info">
-              <span class="toggle-label">{t('settings.syncEnabled')}</span>
-              <span class="toggle-desc">
-                {settingsStore.syncEnabled
-                  ? t('settings.sync') + ' ' + t('common.success').toLowerCase()
-                  : t('settings.sync') + ' ' + t('common.none').toLowerCase()}
-              </span>
-            </div>
-            <button
-              class="toggle-switch"
-              class:toggle-switch--on={settingsStore.syncEnabled}
-              onclick={handleSyncToggle}
-              role="switch"
-              aria-checked={settingsStore.syncEnabled}
-              aria-label={t('settings.syncEnabled')}
-              type="button"
-            >
-              <span class="toggle-thumb"></span>
-            </button>
+          <div class="toggle-info">
+            <span class="toggle-label">{t('settings.syncUnavailable')}</span>
+            <span class="toggle-desc">{t('settings.syncUnavailableHint')}</span>
           </div>
-
-          <!-- Sync URL (shown only when sync is enabled) -->
-          {#if settingsStore.syncEnabled}
-            <div class="field-row sync-url-row">
-              <label class="field-label" for="sync-url">{t('settings.syncUrl')}</label>
-              <div class="sync-url-input-wrap">
-                <input
-                  id="sync-url"
-                  class="input"
-                  type="url"
-                  value={syncUrlLocal}
-                  oninput={handleSyncUrlInput}
-                  onblur={handleSyncUrlCommit}
-                  onkeydown={handleSyncUrlKeydown}
-                  placeholder="https://sync.example.com"
-                  autocomplete="url"
-                  spellcheck={false}
-                />
-              </div>
-            </div>
-          {/if}
         </div>
       </section>
 

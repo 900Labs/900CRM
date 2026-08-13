@@ -21,6 +21,7 @@
   import EntityNotesPanel from '$lib/components/EntityNotesPanel.svelte';
   import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
   import { navigateHash } from '$lib/utils/hashRouter';
+  import { openExternalUrl } from '$lib/utils/openExternal';
 
   interface OrganizationFormState {
     name: string;
@@ -148,7 +149,7 @@
       resetCustomFieldsForCreate();
     } catch (err) {
       console.error('[Organizations] Failed to load custom fields:', err);
-      uiStore.toastError('Failed to load organization custom fields.');
+      uiStore.toastError(t('errors.loadCustomFields'));
       customFieldDefinitions = [];
       customFieldValues = {};
       originalCustomFieldValues = {};
@@ -169,7 +170,7 @@
       originalCustomFieldValues = { ...nextValues };
     } catch (err) {
       console.error('[Organizations] Failed to load custom field values:', err);
-      uiStore.toastError('Failed to load organization custom field values.');
+      uiStore.toastError(t('errors.loadCustomFieldValues'));
       customFieldValues = blankCustomFieldValues();
       originalCustomFieldValues = { ...customFieldValues };
     } finally {
@@ -242,7 +243,7 @@
       await persistOrganizationCustomFields(organization.id, Boolean(editingOrganization));
     } catch (err) {
       console.error('[Organizations] Failed to save organization:', err);
-      uiStore.toastError('Failed to save organization.');
+      uiStore.toastError(t('errors.updateNamed', { name: t('entities.organization') }));
       return;
     }
 
@@ -264,6 +265,18 @@
   function openOrganizationDetail(organization: Organization) {
     organizationStore.selectOrganization(organization);
     navigateHash(`/organizations/${organization.id}`);
+  }
+
+  async function openOrganizationWebsite(website: string | null): Promise<void> {
+    if (!website) {
+      return;
+    }
+
+    try {
+      await openExternalUrl(website);
+    } catch {
+      uiStore.toastError(t('common.openLinkFailed'));
+    }
   }
 
   function closeNotesTags() {
@@ -375,7 +388,13 @@
                 <td>{organization.phone ?? '—'}</td>
                 <td>
                   {#if organization.website}
-                    <a href={organization.website} target="_blank" rel="noreferrer">{organization.website}</a>
+                    <button
+                      class="link-button"
+                      type="button"
+                      onclick={() => void openOrganizationWebsite(organization.website)}
+                    >
+                      {organization.website}
+                    </button>
                   {:else}
                     —
                   {/if}
@@ -597,6 +616,17 @@
     border-block-end: var(--border-width) solid var(--border-subtle);
     text-align: start;
     vertical-align: top;
+  }
+
+  .link-button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-primary-600);
+    font: inherit;
+    text-align: start;
+    text-decoration: underline;
+    cursor: pointer;
   }
 
   .organization-list th {

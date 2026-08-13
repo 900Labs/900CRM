@@ -476,7 +476,9 @@
     "externalClientPermissionNoWrite": "Sin escritura",
     "externalClientPermissionRequiresConfirmation": "Requiere confirmación",
     "externalClientPermissionNoConfirmation": "Sin confirmación",
-    "externalClientPermissionWriteRequiresConfirmation": "Las filas de permisos de escritura requieren confirmación; el backend rechaza las filas de escritura que no requieren confirmación."
+    "externalClientPermissionWriteRequiresConfirmation": "Las filas de permisos de escritura requieren confirmación; el backend rechaza las filas de escritura que no requieren confirmación.",
+    "syncUnavailable": "Aún no disponible",
+    "syncUnavailableHint": "La sincronización entre dispositivos no está implementada. Sus datos permanecen en este dispositivo. Nada aquí se conecta a un servidor."
   },
   "common": {
     "save": "Guardar",
@@ -545,7 +547,8 @@
     "invalidEmail": "Correo electrónico inválido",
     "invalidPhone": "Número de teléfono inválido",
     "invalidUrl": "URL inválida",
-    "fieldRequired": "{field} es requerido"
+    "fieldRequired": "{field} es requerido",
+    "openLinkFailed": "No se pudo abrir el enlace"
   },
   "mission": {
     "title": "900 para 900",
@@ -565,7 +568,19 @@
     "deleteFailed": "Error al eliminar",
     "generic": "Algo salió mal",
     "networkError": "Error de red — verifica tu conexión",
-    "notFound": "No encontrado"
+    "notFound": "No encontrado",
+    "loadNamed": "No se pudo cargar {name}.",
+    "createNamed": "No se pudo crear {name}.",
+    "updateNamed": "No se pudo actualizar {name}.",
+    "deleteNamed": "No se pudo eliminar {name}.",
+    "moveNamed": "No se pudo mover {name}.",
+    "mergeNamed": "No se pudo fusionar {name}.",
+    "saveSetting": "No se pudo guardar el ajuste: {key}",
+    "loadRelationships": "No se pudieron cargar las relaciones de {name}.",
+    "loadCustomFields": "No se pudieron cargar los campos personalizados.",
+    "loadCustomFieldValues": "No se pudieron cargar los valores de campos personalizados.",
+    "markCompleteFailed": "No se pudo marcar la actividad como completada",
+    "markIncompleteFailed": "No se pudo marcar la actividad como incompleta"
   },
   "import": {
     "title": "Importar",
@@ -788,5 +803,17 @@
     "installing": "Instalando y reiniciando…",
     "checkFailed": "No se pudieron buscar actualizaciones. Asegúrate de estar conectado a internet.",
     "installFailed": "Error en la instalación de la actualización."
+  },
+  "toasts": {
+    "created": "{name} creado",
+    "updated": "{name} actualizado",
+    "deleted": "{name} eliminado",
+    "merged": "{name} fusionado"
+  },
+  "entities": {
+    "contact": "Contacto",
+    "deal": "Trato",
+    "activity": "Actividad",
+    "organization": "Organización"
   }
 }

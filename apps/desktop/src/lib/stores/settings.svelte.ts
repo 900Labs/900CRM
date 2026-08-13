@@ -9,7 +9,7 @@
 
 import { getSettings, updateSetting } from '$lib/api/settings';
 import type { AppSettings } from '$lib/api/settings';
-import { chooseLocale } from '$lib/i18n';
+import { chooseLocale, t } from '$lib/i18n';
 import { uiStore } from './ui';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ class SettingsStore {
     } catch (err) {
       // Rollback on failure
       (this as Record<string, unknown>)[key] = old;
-      uiStore.toastError(`Failed to save setting: ${key}`);
+      uiStore.toastError(t('errors.saveSetting', { key }));
       throw err;
     }
   }

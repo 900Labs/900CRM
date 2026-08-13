@@ -50,6 +50,22 @@ test('loads the dashboard sample workspace and shows the follow-up on the dashbo
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Amara Okafor' })).toBeVisible();
 
+  const sampleDealId = await page.evaluate(() => {
+    const raw = window.localStorage.getItem('900crm.browser-smoke.state');
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as {
+      deals?: Array<{ id: string; title?: string; name?: string }>;
+    };
+    return parsed.deals?.find((deal) => (deal.title ?? deal.name) === 'Solar inventory rollout')?.id ?? null;
+  });
+  expect(sampleDealId).toBeTruthy();
+
+  await loadHashRoute(page, `/pipeline/${sampleDealId}`);
+  await expect(page.getByRole('heading', { name: 'Pipeline' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Solar inventory rollout' })).toBeVisible();
+
   await assertNoConsoleErrors();
 });
 

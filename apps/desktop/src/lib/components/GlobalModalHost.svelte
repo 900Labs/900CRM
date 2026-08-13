@@ -233,7 +233,7 @@
       return await listCustomFieldDefinitions(entityType);
     } catch (err) {
       console.error(`[GlobalModalHost] Failed to load custom fields for ${entityType}:`, err);
-      uiStore.toastError('Failed to load custom fields.');
+      uiStore.toastError(t('errors.loadCustomFields'));
       return [];
     }
   }
@@ -270,7 +270,7 @@
       dealRelationshipOrganizations = lookups.organizations;
     } catch (err) {
       console.error('[GlobalModalHost] Failed to load deal relationships:', err);
-      uiStore.toastError('Failed to load deal relationships.');
+      uiStore.toastError(t('errors.loadRelationships', { name: t('entities.deal') }));
     } finally {
       loadingDealRelationships = false;
     }
@@ -295,7 +295,7 @@
       activityRelationshipDeals = lookups.deals;
     } catch (err) {
       console.error('[GlobalModalHost] Failed to load activity relationships:', err);
-      uiStore.toastError('Failed to load activity relationships.');
+      uiStore.toastError(t('errors.loadRelationships', { name: t('entities.activity') }));
     } finally {
       loadingActivityRelationships = false;
     }

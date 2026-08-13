@@ -21,6 +21,11 @@
     route: string;
     contactId: string | null;
     organizationId: string | null;
+    dealId: string | null;
+  }
+
+  function emptyRoute(route: string): ParsedRoute {
+    return { route, contactId: null, organizationId: null, dealId: null };
   }
 
   function parseRoutePath(path: string): ParsedRoute {
@@ -28,53 +33,58 @@
     const normalized = clean.replace(/\/+$/, '') || '/';
 
     if (normalized === '/contacts') {
-      return { route: '/contacts', contactId: null, organizationId: null };
+      return emptyRoute('/contacts');
     }
 
     if (normalized.startsWith('/contacts/')) {
       const id = normalized.split('/')[2] ?? '';
-      return { route: '/contacts/:id', contactId: id || null, organizationId: null };
+      return { route: '/contacts/:id', contactId: id || null, organizationId: null, dealId: null };
     }
 
     if (normalized === '/organizations') {
-      return { route: '/organizations', contactId: null, organizationId: null };
+      return emptyRoute('/organizations');
     }
 
     if (normalized.startsWith('/organizations/')) {
       const id = normalized.split('/')[2] ?? '';
-      return { route: '/organizations/:id', contactId: null, organizationId: id || null };
+      return { route: '/organizations/:id', contactId: null, organizationId: id || null, dealId: null };
     }
 
     if (normalized === '/pipeline') {
-      return { route: '/pipeline', contactId: null, organizationId: null };
+      return emptyRoute('/pipeline');
+    }
+
+    if (normalized.startsWith('/pipeline/')) {
+      const id = normalized.split('/')[2] ?? '';
+      return { route: '/pipeline/:id', contactId: null, organizationId: null, dealId: id || null };
     }
 
     if (normalized === '/activities') {
-      return { route: '/activities', contactId: null, organizationId: null };
+      return emptyRoute('/activities');
     }
 
     if (normalized === '/reports') {
-      return { route: '/reports', contactId: null, organizationId: null };
+      return emptyRoute('/reports');
     }
 
     if (normalized === '/settings') {
-      return { route: '/settings', contactId: null, organizationId: null };
+      return emptyRoute('/settings');
     }
 
     if (normalized === '/audit-log') {
-      return { route: '/audit-log', contactId: null, organizationId: null };
+      return emptyRoute('/audit-log');
     }
 
     if (normalized === '/pending-actions') {
-      return { route: '/pending-actions', contactId: null, organizationId: null };
+      return emptyRoute('/pending-actions');
     }
 
-    return { route: '/', contactId: null, organizationId: null };
+    return emptyRoute('/');
   }
 
   function readHashRoute(): ParsedRoute {
     if (!browser) {
-      return { route: '/', contactId: null, organizationId: null };
+      return emptyRoute('/');
     }
 
     return parseRoutePath(currentHashPath());
@@ -85,6 +95,7 @@
   let route = $state(initialRoute.route);
   let contactId = $state<string | null>(initialRoute.contactId);
   let organizationId = $state<string | null>(initialRoute.organizationId);
+  let dealId = $state<string | null>(initialRoute.dealId);
   let routeSyncInitialized = false;
 
   function parseRoute(path: string) {
@@ -92,6 +103,7 @@
     route = parsed.route;
     contactId = parsed.contactId;
     organizationId = parsed.organizationId;
+    dealId = parsed.dealId;
   }
 
   $effect(() => {
@@ -124,8 +136,8 @@
   <Contacts />
 {:else if route === '/organizations'}
   <Organizations />
-{:else if route === '/pipeline'}
-  <Pipeline />
+{:else if route === '/pipeline' || route === '/pipeline/:id'}
+  <Pipeline {dealId} />
 {:else if route === '/activities'}
   <Activities />
 {:else if route === '/reports'}

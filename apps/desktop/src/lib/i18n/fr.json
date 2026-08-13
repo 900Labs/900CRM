@@ -476,7 +476,9 @@
     "externalClientPermissionNoWrite": "Sans écriture",
     "externalClientPermissionRequiresConfirmation": "Confirmation requise",
     "externalClientPermissionNoConfirmation": "Sans confirmation",
-    "externalClientPermissionWriteRequiresConfirmation": "Les lignes de permission en écriture nécessitent une confirmation ; le backend rejette les lignes en écriture qui ne nécessitent pas de confirmation."
+    "externalClientPermissionWriteRequiresConfirmation": "Les lignes de permission en écriture nécessitent une confirmation ; le backend rejette les lignes en écriture qui ne nécessitent pas de confirmation.",
+    "syncUnavailable": "Pas encore disponible",
+    "syncUnavailableHint": "La synchronisation multi-appareils n’est pas implémentée. Vos données restent sur cet appareil. Rien ici ne se connecte à un serveur."
   },
   "common": {
     "save": "Enregistrer",
@@ -545,7 +547,8 @@
     "invalidEmail": "Adresse e-mail invalide",
     "invalidPhone": "Numéro de téléphone invalide",
     "invalidUrl": "URL invalide",
-    "fieldRequired": "{field} est requis"
+    "fieldRequired": "{field} est requis",
+    "openLinkFailed": "Impossible d’ouvrir le lien"
   },
   "mission": {
     "title": "900 pour 900",
@@ -565,7 +568,19 @@
     "deleteFailed": "Échec de la suppression",
     "generic": "Une erreur s'est produite",
     "networkError": "Erreur réseau — vérifiez votre connexion",
-    "notFound": "Introuvable"
+    "notFound": "Introuvable",
+    "loadNamed": "Échec du chargement de {name}.",
+    "createNamed": "Échec de la création de {name}.",
+    "updateNamed": "Échec de la mise à jour de {name}.",
+    "deleteNamed": "Échec de la suppression de {name}.",
+    "moveNamed": "Échec du déplacement de {name}.",
+    "mergeNamed": "Échec de la fusion de {name}.",
+    "saveSetting": "Échec de l’enregistrement du paramètre : {key}",
+    "loadRelationships": "Échec du chargement des relations {name}.",
+    "loadCustomFields": "Échec du chargement des champs personnalisés.",
+    "loadCustomFieldValues": "Échec du chargement des valeurs de champs personnalisés.",
+    "markCompleteFailed": "Échec du marquage de l’activité comme terminée",
+    "markIncompleteFailed": "Échec du marquage de l’activité comme incomplète"
   },
   "import": {
     "title": "Importer",
@@ -788,5 +803,17 @@
     "installing": "Installation et redémarrage…",
     "checkFailed": "Impossible de rechercher des mises à jour. Assurez-vous d'être connecté à Internet.",
     "installFailed": "L'installation de la mise à jour a échoué."
+  },
+  "toasts": {
+    "created": "{name} créé",
+    "updated": "{name} mis à jour",
+    "deleted": "{name} supprimé",
+    "merged": "{name} fusionné"
+  },
+  "entities": {
+    "contact": "Contact",
+    "deal": "Affaire",
+    "activity": "Activité",
+    "organization": "Organisation"
   }
 }
