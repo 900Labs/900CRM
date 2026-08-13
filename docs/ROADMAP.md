@@ -40,8 +40,11 @@ These must ALL be satisfied before a public `v1.0.0` tag is cut.
       wired up. What remains: add `TAURI_SIGNING_PRIVATE_KEY` and
       `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` as GitHub Actions secrets, produce
       a signed release, and verify the updater can fetch + apply an update.
-      The signing keypair has been generated (public key is in
-      `tauri.conf.json`); the private key is held outside the repo.
+      A new updater keypair was generated on 2026-08-13 because the previous
+      private key was not available on the maintainer machine and no public
+      installer yet depends on the old pubkey. The public key is in
+      `tauri.conf.json`. The private key and password are held outside the
+      repo and must stay backed up.
 
 ### Strongly Recommended (before promoting beyond alpha)
 
