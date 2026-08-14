@@ -176,6 +176,8 @@
     "website": "Sitio web",
     "address": "Dirección",
     "created": "Creado",
+    "health": "Salud",
+    "nextFollowUp": "Próximo seguimiento",
     "updated": "Última actualización",
     "legacyTags": "Etiquetas heredadas",
     "legacyNotes": "Notas heredadas",

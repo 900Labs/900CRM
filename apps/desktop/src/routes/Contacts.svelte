@@ -7,14 +7,23 @@
    * Click row to navigate to ContactDetail.
    */
 
-  import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
+  import { listActivities, type Activity } from '$lib/api/activities';
+  import { listDeals, type Deal } from '$lib/api/deals';
   import { contactStore } from '$lib/stores/contacts';
   import { uiStore } from '$lib/stores/ui';
   import type { Contact, ContactDuplicateCandidate, ContactLifecycle } from '$lib/api/contacts';
   import type { Column } from '$lib/components/DataTable.svelte';
   import { formatFullName, formatDate } from '$lib/utils/formatters';
   import { settingsStore } from '$lib/stores/settings';
+  import {
+    loadActivityLinkIndex,
+    type ActivityLinkIndex,
+  } from '$lib/utils/activityRelationships';
+  import {
+    buildContactListInsight,
+    type ContactHealthState,
+  } from '$lib/utils/contactWorkspace';
   import {
     listCustomFieldDefinitions,
     type CustomFieldDefinition,
@@ -52,6 +61,11 @@
   let viewsLoading = $state(false);
   let viewsSaving = $state(false);
   let viewsError = $state<string | null>(null);
+  let insightDeals = $state<Deal[]>([]);
+  let insightActivities = $state<Activity[]>([]);
+  let insightLinkIndex = $state<ActivityLinkIndex>({});
+  let insightsLoading = $state(true);
+  let contactsBootstrapped = false;
 
   const currentViewFilters = $derived(collectCurrentFilters());
   const selectedView = $derived(savedViews.find((view) => view.id === selectedViewId) ?? null);
@@ -96,9 +110,38 @@
     }
   });
 
+  const insightsById = $derived.by(() => {
+    const insights: Record<string, ReturnType<typeof buildContactListInsight>> = {};
+    for (const contact of contactStore.contacts) {
+      insights[contact.id] = buildContactListInsight({
+        contactId: contact.id,
+        deals: insightDeals,
+        activities: insightActivities,
+        linkIndex: insightLinkIndex,
+        isLoading: insightsLoading,
+      });
+    }
+    return insights;
+  });
+
+  function healthLabel(state: ContactHealthState | undefined): string {
+    switch (state) {
+      case 'overdue':
+        return t('contacts.workspace.healthOverdue');
+      case 'needsFollowUp':
+        return t('contacts.workspace.healthNeedsFollowUp');
+      case 'onTrack':
+        return t('contacts.workspace.healthOnTrack');
+      case 'nurture':
+        return t('contacts.workspace.healthNurture');
+      default:
+        return t('common.loading');
+    }
+  }
+
   // ── Column definitions ─────────────────────────────────────────────────────
 
-  const columns: Column<Contact>[] = [
+  const columns = $derived<Column<Contact>[]>([
     {
       key: 'name',
       label: t('contacts.name'),
@@ -139,23 +182,51 @@
       },
     },
     {
-      key: 'createdAt',
-      label: t('contacts.created'),
-      sortable: true,
-      render: (c) => formatDate((c as Contact).createdAt, settingsStore.dateFormat as 'MMM D, YYYY'),
+      key: 'health',
+      label: t('contacts.health'),
     },
-  ];
+    {
+      key: 'nextFollowUp',
+      label: t('contacts.nextFollowUp'),
+    },
+  ]);
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
-  onMount(async () => {
-    await Promise.all([
+  $effect(() => {
+    if (contactsBootstrapped) {
+      return;
+    }
+
+    contactsBootstrapped = true;
+    void Promise.all([
       contactStore.loadContacts(),
       contactStore.loadDuplicateCandidates().catch(() => undefined),
       loadCustomFieldDefinitions(),
       loadSavedViews(),
+      loadListInsights(),
     ]);
   });
+
+  async function loadListInsights(): Promise<void> {
+    insightsLoading = true;
+    try {
+      const [deals, activities] = await Promise.all([
+        listDeals({ sortBy: 'createdAt', sortDir: 'asc' }),
+        listActivities({ sortBy: 'dueDate', sortDir: 'asc', pageSize: 200 }),
+      ]);
+      insightLinkIndex = await loadActivityLinkIndex(activities.map((activity) => activity.id));
+      insightDeals = deals;
+      insightActivities = activities;
+    } catch (error) {
+      console.error('[Contacts] Failed to load contact health:', error);
+      insightDeals = [];
+      insightActivities = [];
+      insightLinkIndex = {};
+    } finally {
+      insightsLoading = false;
+    }
+  }
 
   function toSavedType(type: '' | 'person' | 'org'): ContactSavedViewFilters['type'] {
     if (type === 'person') return 'person';
@@ -677,8 +748,41 @@
 
   <!-- Table -->
   <div class="contacts-table card">
+    {#snippet healthCell(row: unknown)}
+      {@const contact = row as Contact}
+      {@const insight = insightsById[contact.id]}
+      <span class="health-badge health-{insight?.health.tone ?? 'neutral'}">
+        {healthLabel(insight?.health.state)}
+      </span>
+    {/snippet}
+
+    {#snippet nextFollowUpCell(row: unknown)}
+      {@const contact = row as Contact}
+      {@const insight = insightsById[contact.id]}
+      {#if insight?.nextActivity}
+        <div class="next-follow-up">
+          <span>{insight.nextActivity.subject}</span>
+          <small>
+            {insight.nextActivity.dueDate
+              ? formatDate(insight.nextActivity.dueDate, settingsStore.dateFormat as 'MMM D, YYYY')
+              : t('contacts.workspace.noDueDate')}
+          </small>
+        </div>
+      {:else}
+        {t('contacts.workspace.noneScheduled')}
+      {/if}
+    {/snippet}
+
     <DataTable
-      columns={columns as Column[]}
+      columns={columns.map((column) => {
+        if (column.key === 'health') {
+          return { ...column, cell: healthCell };
+        }
+        if (column.key === 'nextFollowUp') {
+          return { ...column, cell: nextFollowUpCell };
+        }
+        return column;
+      }) as Column[]}
       rows={contactStore.contacts}
       loading={contactStore.isLoading}
       total={contactStore.total}
@@ -747,6 +851,51 @@
   .saved-views-select,
   .saved-views-name {
     min-width: 160px;
+  }
+
+  .health-badge {
+    display: inline-flex;
+    padding: var(--space-1) var(--space-3);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: 9999px;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    white-space: nowrap;
+  }
+
+  .health-neutral {
+    color: var(--text-secondary);
+    background-color: var(--surface-raised);
+  }
+
+  .health-success {
+    color: #2d8659;
+    border-color: #bfe4cc;
+    background-color: #e8f5ec;
+  }
+
+  .health-warning {
+    color: #a84b2f;
+    border-color: #f4d1a1;
+    background-color: #fef3e2;
+  }
+
+  .health-danger {
+    color: #c0392b;
+    border-color: #f0b8b2;
+    background-color: #fff0f0;
+  }
+
+  .next-follow-up {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 140px;
+  }
+
+  .next-follow-up small {
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
   }
 
   .contacts-filters {

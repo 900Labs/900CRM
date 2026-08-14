@@ -176,6 +176,8 @@
     "website": "Website",
     "address": "Địa chỉ",
     "created": "Đã tạo",
+    "health": "Tình trạng",
+    "nextFollowUp": "Theo dõi tiếp theo",
     "updated": "Cập nhật lần cuối",
     "legacyTags": "Thẻ cũ",
     "legacyNotes": "Ghi chú cũ",

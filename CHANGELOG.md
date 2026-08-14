@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-14
+- Contacts list shows health and the next follow-up using the same local rules
+  as Customer 360.
 - Organizations list shows account health and the next follow-up using the same
   local rules as Account 360.
 - Dashboard shows a daily attention queue for overdue follow-ups, open deals
