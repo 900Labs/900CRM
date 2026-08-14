@@ -137,6 +137,20 @@
         "dueLater": "Más tarde",
         "noDueDate": "Sin fecha"
       }
+    },
+    "stale": {
+      "title": "Oportunidades estancadas",
+      "description": "Oportunidades abiertas que no han cambiado en {days} días y aún tienen un siguiente paso. Es la misma regla local que la etiqueta Estancado del pipeline.",
+      "count": "Estancadas",
+      "countDetail": "Oportunidades abiertas quietas durante {days} días o más.",
+      "deal": "Oportunidad",
+      "stage": "Etapa",
+      "quietFor": "Quietud",
+      "days": "{count} días",
+      "nextStep": "Siguiente paso",
+      "listLabel": "Oportunidades estancadas",
+      "empty": "No hay oportunidades estancadas ahora.",
+      "loadFailed": "No se pudo cargar el informe de oportunidades estancadas."
     }
   },
   "contacts": {

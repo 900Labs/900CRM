@@ -137,6 +137,20 @@
         "dueLater": "Plus tard",
         "noDueDate": "Sans échéance"
       }
+    },
+    "stale": {
+      "title": "Affaires stagnantes",
+      "description": "Affaires ouvertes inchangées depuis {days} jours et qui ont encore une prochaine étape. C’est la même règle locale que le badge Stagnant du pipeline.",
+      "count": "Stagnantes",
+      "countDetail": "Affaires ouvertes sans changement depuis {days} jours ou plus.",
+      "deal": "Affaire",
+      "stage": "Étape",
+      "quietFor": "Sans changement",
+      "days": "{count} jours",
+      "nextStep": "Prochaine étape",
+      "listLabel": "Affaires stagnantes",
+      "empty": "Aucune affaire stagnante pour le moment.",
+      "loadFailed": "Impossible de charger le rapport des affaires stagnantes."
     }
   },
   "contacts": {

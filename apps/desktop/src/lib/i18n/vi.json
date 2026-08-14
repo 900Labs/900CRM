@@ -137,6 +137,20 @@
         "dueLater": "Sau đó",
         "noDueDate": "Không có ngày đến hạn"
       }
+    },
+    "stale": {
+      "title": "Cơ hội đóng băng",
+      "description": "Cơ hội đang mở không thay đổi trong {days} ngày và vẫn còn bước tiếp theo. Đây là cùng quy tắc cục bộ với nhãn Đóng băng trên pipeline.",
+      "count": "Đóng băng",
+      "countDetail": "Cơ hội đang mở im ắng {days} ngày trở lên.",
+      "deal": "Cơ hội",
+      "stage": "Giai đoạn",
+      "quietFor": "Im ắng",
+      "days": "{count} ngày",
+      "nextStep": "Bước tiếp theo",
+      "listLabel": "Cơ hội đóng băng",
+      "empty": "Hiện không có cơ hội đóng băng.",
+      "loadFailed": "Không tải được báo cáo cơ hội đóng băng."
     }
   },
   "contacts": {

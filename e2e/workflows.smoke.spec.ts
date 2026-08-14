@@ -891,6 +891,56 @@ test('opens a pipeline deal guidance drawer and refreshes follow-up state', asyn
   await assertNoConsoleErrors();
 });
 
+test('lists a stale deal on Reports and opens the deal page', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/reports');
+  const laterDate = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+
+  await page.evaluate(async (dueDate) => {
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (!invoke) {
+      throw new Error('Tauri smoke shim is not installed.');
+    }
+
+    const deal = await invoke('create_deal', {
+      title: 'Quiet Clinic Rollout',
+      value: 18000,
+      currency: 'USD',
+      stage: 'Proposal',
+      probability: 40,
+      expected_close: dueDate,
+      contact_id: '',
+      organization_id: '',
+      notes: '',
+    }) as { id: string };
+
+    await invoke('create_activity', {
+      activity_type: 'task',
+      title: 'Later site visit',
+      description: '',
+      due_date: dueDate,
+      contact_id: '',
+      deal_id: deal.id,
+    });
+  }, laterDate);
+
+  await loadHashRoute(page, '/reports');
+  const report = page.getByTestId('stale-deal-report');
+  await expect(report.getByRole('heading', { name: 'Stale Deals' })).toBeVisible();
+  await expect(report.getByRole('button', { name: 'Quiet Clinic Rollout' })).toBeVisible();
+  await expect(report.getByText('Later site visit')).toBeVisible();
+
+  await report.getByRole('button', { name: 'Quiet Clinic Rollout' }).click();
+  await expect(page).toHaveURL(/#\/deals\//);
+  await expect(page.getByRole('heading', { name: 'Quiet Clinic Rollout' })).toBeVisible();
+
+  await assertNoConsoleErrors();
+});
+
 test('creates an activity through the visible UI and shows it in Activities', async ({
   page,
   assertNoConsoleErrors,

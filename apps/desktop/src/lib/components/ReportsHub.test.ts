@@ -6,9 +6,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   getActivityFunnelReportMock,
   getPipelineConversionReportMock,
+  listActivitiesMock,
+  listDealsMock,
+  loadActivityLinkIndexMock,
 } = vi.hoisted(() => ({
   getActivityFunnelReportMock: vi.fn(),
   getPipelineConversionReportMock: vi.fn(),
+  listActivitiesMock: vi.fn(),
+  listDealsMock: vi.fn(),
+  loadActivityLinkIndexMock: vi.fn(),
 }));
 
 vi.mock('$lib/i18n', () => ({
@@ -23,6 +29,18 @@ vi.mock('$lib/api/reports', () => ({
   getPipelineConversionReport: getPipelineConversionReportMock,
 }));
 
+vi.mock('$lib/api/activities', () => ({
+  listActivities: listActivitiesMock,
+}));
+
+vi.mock('$lib/api/deals', () => ({
+  listDeals: listDealsMock,
+}));
+
+vi.mock('$lib/utils/activityRelationships', () => ({
+  loadActivityLinkIndex: loadActivityLinkIndexMock,
+}));
+
 vi.mock('$lib/stores/settings', () => ({
   settingsStore: {
     language: 'en-US',
@@ -35,6 +53,12 @@ describe('Reports route', () => {
   beforeEach(() => {
     getActivityFunnelReportMock.mockReset();
     getPipelineConversionReportMock.mockReset();
+    listActivitiesMock.mockReset();
+    listDealsMock.mockReset();
+    loadActivityLinkIndexMock.mockReset();
+    listActivitiesMock.mockResolvedValue([]);
+    listDealsMock.mockResolvedValue([]);
+    loadActivityLinkIndexMock.mockResolvedValue({});
   });
 
   it('renders current pipeline and activity report data', async () => {
