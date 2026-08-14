@@ -122,4 +122,35 @@ describe('saved views API', () => {
       filters: { attention: 'needsFollowUp' },
     });
   });
+
+  it('maps activity type, status, and bucket filters', async () => {
+    invokeMock.mockResolvedValueOnce({
+      id: 'view-activity',
+      entity_type: 'activity',
+      name: 'Overdue calls',
+      filters_json: '{"type":"call","status":"overdue","bucket":"today"}',
+      created_at: '2026-08-14T10:00:00Z',
+      updated_at: '2026-08-14T10:00:00Z',
+    });
+
+    await expect(
+      createSavedView('activity', 'Overdue calls', {
+        type: 'call',
+        status: 'overdue',
+        bucket: 'today',
+      }),
+    ).resolves.toMatchObject({
+      entityType: 'activity',
+      filters: { type: 'call', status: 'overdue', bucket: 'today' },
+    });
+    expect(invokeMock).toHaveBeenCalledWith('create_saved_view', {
+      entity_type: 'activity',
+      name: 'Overdue calls',
+      filters_json: JSON.stringify({
+        type: 'call',
+        status: 'overdue',
+        bucket: 'today',
+      }),
+    });
+  });
 });

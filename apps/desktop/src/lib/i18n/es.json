@@ -260,6 +260,7 @@
     "deleteFailed": "No se pudo eliminar esta vista.",
     "helpOrganizations": "Guarda la búsqueda y el filtro de país de las organizaciones y ábrelos más tarde.",
     "helpPipeline": "Guarda la búsqueda del pipeline, el filtro de atención y el filtro de campo personalizado y ábrelos más tarde.",
+    "helpActivities": "Guarda los filtros de tipo, estado, vencimiento y campo personalizado de las actividades y ábrelos más tarde.",
     "allCountries": "Todos los países"
   },
   "entityLinks": {

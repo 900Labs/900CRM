@@ -10,7 +10,6 @@
    *   - Empty state, loading state, error state
    */
 
-  import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
   import { activityStore } from '$lib/stores/activities';
   import { uiStore } from '$lib/stores/ui';
@@ -22,6 +21,14 @@
     type CustomFieldDefinition,
     type EntityTypeCustomFieldValue,
   } from '$lib/api/customFields';
+  import {
+    createSavedView,
+    deleteSavedView,
+    filtersMatch,
+    listSavedViews,
+    type ContactSavedViewFilters,
+    type SavedView,
+  } from '$lib/api/savedViews';
   import { formatDate, formatRelativeTime } from '$lib/utils/formatters';
   import {
     ACTIVITY_DUE_BUCKETS,
@@ -61,6 +68,13 @@
   let activityRelationshipsLoading = $state(false);
   let loadedActivityLinkKey = $state('');
   let loadedActivityRelationshipVersion = $state(0);
+  let savedViews = $state<SavedView[]>([]);
+  let selectedViewId = $state('');
+  let viewName = $state('');
+  let viewsLoading = $state(false);
+  let viewsSaving = $state(false);
+  let viewsError = $state<string | null>(null);
+  let activitiesBootstrapped = false;
 
   // Quick-add form
   let showQuickAdd  = $state(false);
@@ -74,13 +88,21 @@
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
-  onMount(async () => {
-    await Promise.all([
-      activityStore.loadActivities(),
-      ensureActivityRelationshipLookups(),
-      loadCustomFieldDefinitions(),
-    ]);
-    await refreshActivityLinks();
+  $effect(() => {
+    if (activitiesBootstrapped) {
+      return;
+    }
+
+    activitiesBootstrapped = true;
+    void (async () => {
+      await Promise.all([
+        activityStore.loadActivities(),
+        ensureActivityRelationshipLookups(),
+        loadCustomFieldDefinitions(),
+        loadSavedViews(),
+      ]);
+      await refreshActivityLinks();
+    })();
   });
 
   $effect(() => {
@@ -106,6 +128,7 @@
       type: type || undefined,
       status: statusFilter || undefined,
     });
+    syncSelectedView();
     await refreshActivityLinks();
   }
 
@@ -116,6 +139,7 @@
       type: typeFilter || undefined,
       status: status || undefined,
     });
+    syncSelectedView();
     await refreshActivityLinks();
   }
 
@@ -127,6 +151,7 @@
       type: typeFilter || undefined,
       status: undefined,
     });
+    syncSelectedView();
     await refreshActivityLinks();
   }
 
@@ -198,6 +223,7 @@
     if (selectedCustomFieldDefId && customFieldQuery.trim()) {
       await ensureCustomFieldValueIndex();
     }
+    syncSelectedView();
   }
 
   async function handleCustomFieldQueryInput(event: Event) {
@@ -205,11 +231,141 @@
     if (selectedCustomFieldDefId && customFieldQuery.trim()) {
       await ensureCustomFieldValueIndex();
     }
+    syncSelectedView();
   }
 
   function clearCustomFieldFilter() {
     selectedCustomFieldDefId = '';
     customFieldQuery = '';
+    syncSelectedView();
+  }
+
+  function asActivityType(value: string | undefined): ActivityType | '' {
+    return value === 'task' || value === 'call' || value === 'meeting' || value === 'email'
+      ? value
+      : '';
+  }
+
+  function asActivityStatus(value: string | undefined): ActivityStatus | '' {
+    return value === 'pending' || value === 'completed' || value === 'overdue' ? value : '';
+  }
+
+  function asActivityBucket(value: string | undefined): ActivityDueBucket | '' {
+    return ACTIVITY_DUE_BUCKETS.includes(value as ActivityDueBucket)
+      ? (value as ActivityDueBucket)
+      : '';
+  }
+
+  function collectCurrentFilters(): ContactSavedViewFilters {
+    return {
+      type: typeFilter || undefined,
+      status: statusFilter || undefined,
+      bucket: bucketFilter || undefined,
+      customFieldDefId: selectedCustomFieldDefId || undefined,
+      customFieldQuery: customFieldQuery.trim() || undefined,
+    };
+  }
+
+  const currentViewFilters = $derived(collectCurrentFilters());
+  const selectedView = $derived(savedViews.find((view) => view.id === selectedViewId) ?? null);
+  const canSaveView = $derived(viewName.trim().length > 0 && !viewsSaving);
+
+  async function loadSavedViews(): Promise<void> {
+    viewsLoading = true;
+    viewsError = null;
+    try {
+      savedViews = await listSavedViews('activity');
+      if (selectedViewId && !savedViews.some((view) => view.id === selectedViewId)) {
+        selectedViewId = '';
+      }
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.loadFailed');
+    } finally {
+      viewsLoading = false;
+    }
+  }
+
+  async function applyView(view: SavedView): Promise<void> {
+    selectedViewId = view.id;
+    typeFilter = asActivityType(view.filters.type);
+    const nextBucket = asActivityBucket(view.filters.bucket);
+    const nextStatus = asActivityStatus(view.filters.status);
+    if (nextBucket) {
+      bucketFilter = nextBucket;
+      statusFilter = '';
+    } else {
+      bucketFilter = '';
+      statusFilter = nextStatus;
+    }
+    selectedCustomFieldDefId = view.filters.customFieldDefId ?? '';
+    customFieldQuery = view.filters.customFieldQuery ?? '';
+    await activityStore.setFilters({
+      type: typeFilter || undefined,
+      status: statusFilter || undefined,
+    });
+    if (selectedCustomFieldDefId && customFieldQuery.trim()) {
+      await ensureCustomFieldValueIndex();
+    }
+    await refreshActivityLinks();
+  }
+
+  function syncSelectedView(): void {
+    if (!selectedView || filtersMatch(selectedView.filters, currentViewFilters)) {
+      return;
+    }
+    selectedViewId = '';
+  }
+
+  async function handleSaveView(): Promise<void> {
+    const name = viewName.trim();
+    if (!name) {
+      return;
+    }
+    viewsSaving = true;
+    viewsError = null;
+    try {
+      const view = await createSavedView('activity', name, collectCurrentFilters());
+      savedViews = [...savedViews.filter((item) => item.id !== view.id), view]
+        .sort((left, right) => left.name.localeCompare(right.name));
+      selectedViewId = view.id;
+      viewName = '';
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.saveFailed');
+    } finally {
+      viewsSaving = false;
+    }
+  }
+
+  async function handleDeleteView(): Promise<void> {
+    if (!selectedView) {
+      return;
+    }
+    if (!window.confirm(t('savedViews.confirmDelete', { name: selectedView.name }))) {
+      return;
+    }
+    viewsSaving = true;
+    viewsError = null;
+    try {
+      await deleteSavedView(selectedView.id);
+      savedViews = savedViews.filter((view) => view.id !== selectedView.id);
+      selectedViewId = '';
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.deleteFailed');
+    } finally {
+      viewsSaving = false;
+    }
+  }
+
+  function handleViewChange(event: Event): void {
+    const id = (event.target as HTMLSelectElement).value;
+    if (!id) {
+      selectedViewId = '';
+      return;
+    }
+    const view = savedViews.find((item) => item.id === id);
+    if (view) {
+      void applyView(view);
+    }
   }
 
   async function handleToggleComplete(activity: { id: string; status: ActivityStatus }) {
@@ -372,6 +528,54 @@
       </button>
     </div>
   </div>
+
+  <section class="saved-views" aria-labelledby="activities-saved-views-heading">
+    <div class="saved-views-copy">
+      <h2 class="saved-views-title" id="activities-saved-views-heading">{t('savedViews.title')}</h2>
+      <p class="saved-views-help">{t('savedViews.helpActivities')}</p>
+    </div>
+    <div class="saved-views-controls">
+      <select
+        class="input saved-views-select"
+        value={selectedViewId}
+        onchange={handleViewChange}
+        aria-label={t('savedViews.selectLabel')}
+        disabled={viewsLoading || viewsSaving}
+      >
+        <option value="">{t('savedViews.none')}</option>
+        {#each savedViews as view (view.id)}
+          <option value={view.id}>{view.name}</option>
+        {/each}
+      </select>
+      <input
+        class="input saved-views-name"
+        type="text"
+        bind:value={viewName}
+        placeholder={t('savedViews.namePlaceholder')}
+        aria-label={t('savedViews.nameLabel')}
+        disabled={viewsSaving}
+      />
+      <button
+        class="btn btn-secondary btn-sm"
+        type="button"
+        onclick={() => void handleSaveView()}
+        disabled={!canSaveView}
+      >
+        {viewsSaving ? t('common.loading') : t('savedViews.save')}
+      </button>
+      <button
+        class="btn btn-ghost btn-sm"
+        type="button"
+        onclick={() => void handleDeleteView()}
+        disabled={!selectedView || viewsSaving}
+      >
+        {t('savedViews.delete')}
+      </button>
+    </div>
+    {#if viewsError}
+      <p class="saved-views-error" role="alert">{viewsError}</p>
+    {/if}
+  </section>
 
   <!-- Quick-add form -->
   {#if showQuickAdd}
@@ -819,6 +1023,42 @@
     display: flex;
     gap: var(--space-3);
     align-items: center;
+  }
+
+  .saved-views,
+  .saved-views-copy,
+  .saved-views-controls {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .saved-views {
+    justify-content: space-between;
+  }
+
+  .saved-views-title {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+  }
+
+  .saved-views-help,
+  .saved-views-error {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+  }
+
+  .saved-views-error {
+    color: var(--text-danger);
+    width: 100%;
+  }
+
+  .saved-views-select,
+  .saved-views-name {
+    min-width: 160px;
   }
 
   .activity-workbench {

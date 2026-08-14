@@ -250,6 +250,7 @@
     "help": "Keep the current contact filters and reopen them later.",
     "helpOrganizations": "Keep the current organization search and country filter and reopen them later.",
     "helpPipeline": "Keep the current pipeline search, attention filter, and custom-field filter and reopen them later.",
+    "helpActivities": "Keep the current activity type, status, due-bucket, and custom-field filters and reopen them later.",
     "allCountries": "All countries",
     "selectLabel": "Saved view",
     "none": "No saved view",

@@ -4,11 +4,11 @@
 
 import { invoke } from '@tauri-apps/api/core';
 
-export type SavedViewEntityType = 'contact' | 'organization' | 'deal';
+export type SavedViewEntityType = 'contact' | 'organization' | 'deal' | 'activity';
 
 export interface ContactSavedViewFilters {
   search?: string;
-  type?: 'person' | 'organization';
+  type?: 'person' | 'organization' | 'task' | 'call' | 'meeting' | 'email';
   lifecycle?: 'lead' | 'customer';
   country?: string;
   customFieldDefId?: string;
@@ -16,6 +16,8 @@ export interface ContactSavedViewFilters {
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   attention?: 'needsFollowUp' | 'stale' | 'overdue';
+  status?: 'pending' | 'completed' | 'overdue';
+  bucket?: 'overdue' | 'today' | 'thisWeek' | 'later' | 'unscheduled' | 'completed';
 }
 
 export interface SavedView<TFilters = ContactSavedViewFilters> {
@@ -38,7 +40,7 @@ interface BackendSavedView {
 
 interface BackendFilters {
   search?: string;
-  type?: 'person' | 'organization';
+  type?: 'person' | 'organization' | 'task' | 'call' | 'meeting' | 'email';
   lifecycle?: 'lead' | 'customer';
   country?: string;
   custom_field_def_id?: string;
@@ -46,6 +48,8 @@ interface BackendFilters {
   sort_by?: string;
   sort_dir?: 'asc' | 'desc';
   attention?: 'needsFollowUp' | 'stale' | 'overdue';
+  status?: 'pending' | 'completed' | 'overdue';
+  bucket?: 'overdue' | 'today' | 'thisWeek' | 'later' | 'unscheduled' | 'completed';
 }
 
 function toBackendFilters(filters: ContactSavedViewFilters): BackendFilters {
@@ -59,6 +63,8 @@ function toBackendFilters(filters: ContactSavedViewFilters): BackendFilters {
     sort_by: filters.sortBy,
     sort_dir: filters.sortDir,
     attention: filters.attention,
+    status: filters.status,
+    bucket: filters.bucket,
   };
 }
 
@@ -74,6 +80,8 @@ function fromBackendFilters(raw: string): ContactSavedViewFilters {
     sortBy: parsed.sort_by,
     sortDir: parsed.sort_dir,
     attention: parsed.attention,
+    status: parsed.status,
+    bucket: parsed.bucket,
   };
 }
 

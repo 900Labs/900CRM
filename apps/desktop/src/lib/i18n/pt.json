@@ -260,6 +260,7 @@
     "deleteFailed": "Não foi possível excluir esta visualização.",
     "helpOrganizations": "Guarde a busca e o filtro de país das organizações e reabra depois.",
     "helpPipeline": "Guarde a busca do pipeline, o filtro de atenção e o filtro de campo personalizado e reabra depois.",
+    "helpActivities": "Guarde os filtros de tipo, estado, prazo e campo personalizado das atividades e reabra depois.",
     "allCountries": "Todos os países"
   },
   "entityLinks": {
