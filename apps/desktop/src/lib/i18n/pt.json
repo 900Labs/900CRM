@@ -237,7 +237,9 @@
     "confirmDelete": "Excluir a visualização salva “{name}”?",
     "loadFailed": "Não foi possível carregar as visualizações salvas.",
     "saveFailed": "Não foi possível salvar esta visualização.",
-    "deleteFailed": "Não foi possível excluir esta visualização."
+    "deleteFailed": "Não foi possível excluir esta visualização.",
+    "helpOrganizations": "Guarde a busca e o filtro de país das organizações e reabra depois.",
+    "allCountries": "Todos os países"
   },
   "entityLinks": {
     "title": "Links",

@@ -22,6 +22,14 @@
   import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
   import { navigateHash } from '$lib/utils/hashRouter';
   import { openExternalUrl } from '$lib/utils/openExternal';
+  import {
+    createSavedView,
+    deleteSavedView,
+    filtersMatch,
+    listSavedViews,
+    type ContactSavedViewFilters,
+    type SavedView,
+  } from '$lib/api/savedViews';
 
   interface OrganizationFormState {
     name: string;
@@ -38,6 +46,7 @@
   }
 
   let searchQuery = $state('');
+  let countryFilter = $state('');
   let formOpen = $state(false);
   let linkOpen = $state(false);
   let notesTagsOpen = $state(false);
@@ -50,15 +59,36 @@
   let customFieldValues = $state<Record<string, string>>({});
   let originalCustomFieldValues = $state<Record<string, string>>({});
   let customFieldsLoading = $state(false);
+  let savedViews = $state<SavedView[]>([]);
+  let selectedViewId = $state('');
+  let viewName = $state('');
+  let viewsLoading = $state(false);
+  let viewsSaving = $state(false);
+  let viewsError = $state<string | null>(null);
+
+  const countryOptions = $derived(
+    [...new Set(
+      organizationStore.organizations
+        .map((organization) => organization.country?.trim())
+        .filter((country): country is string => Boolean(country)),
+    )].sort((left, right) => left.localeCompare(right)),
+  );
+
+  const currentViewFilters = $derived(collectCurrentFilters());
+  const selectedView = $derived(savedViews.find((view) => view.id === selectedViewId) ?? null);
+  const canSaveView = $derived(viewName.trim().length > 0 && !viewsSaving);
 
   const filteredOrganizations = $derived(
-    organizationStore.organizations.filter((organization) => organizationMatches(organization, searchQuery)),
+    organizationStore.organizations.filter((organization) =>
+      organizationMatches(organization, searchQuery, countryFilter),
+    ),
   );
 
   onMount(async () => {
     await Promise.all([
       organizationStore.loadOrganizations(),
       loadOrganizationCustomFieldDefinitions(),
+      loadSavedViews(),
     ]);
   });
 
@@ -78,7 +108,16 @@
     };
   }
 
-  function organizationMatches(organization: Organization, query: string): boolean {
+  function organizationMatches(
+    organization: Organization,
+    query: string,
+    country: string,
+  ): boolean {
+    const normalizedCountry = country.trim().toLowerCase();
+    if (normalizedCountry && (organization.country ?? '').trim().toLowerCase() !== normalizedCountry) {
+      return false;
+    }
+
     const normalized = query.trim().toLowerCase();
     if (!normalized) return true;
 
@@ -94,6 +133,98 @@
     ]
       .filter((value): value is string => Boolean(value))
       .some((value) => value.toLowerCase().includes(normalized));
+  }
+
+  function collectCurrentFilters(): ContactSavedViewFilters {
+    return {
+      search: searchQuery.trim() || undefined,
+      country: countryFilter.trim() || undefined,
+    };
+  }
+
+  async function loadSavedViews(): Promise<void> {
+    viewsLoading = true;
+    viewsError = null;
+    try {
+      savedViews = await listSavedViews('organization');
+      if (selectedViewId && !savedViews.some((view) => view.id === selectedViewId)) {
+        selectedViewId = '';
+      }
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.loadFailed');
+    } finally {
+      viewsLoading = false;
+    }
+  }
+
+  function applyView(view: SavedView): void {
+    selectedViewId = view.id;
+    searchQuery = view.filters.search ?? '';
+    countryFilter = view.filters.country ?? '';
+  }
+
+  function syncSelectedView(): void {
+    if (!selectedView || filtersMatch(selectedView.filters, currentViewFilters)) {
+      return;
+    }
+    selectedViewId = '';
+  }
+
+  async function handleSaveView(): Promise<void> {
+    const name = viewName.trim();
+    if (!name) {
+      return;
+    }
+    viewsSaving = true;
+    viewsError = null;
+    try {
+      const view = await createSavedView('organization', name, collectCurrentFilters());
+      savedViews = [...savedViews.filter((item) => item.id !== view.id), view]
+        .sort((left, right) => left.name.localeCompare(right.name));
+      selectedViewId = view.id;
+      viewName = '';
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.saveFailed');
+    } finally {
+      viewsSaving = false;
+    }
+  }
+
+  async function handleDeleteView(): Promise<void> {
+    if (!selectedView) {
+      return;
+    }
+    if (!window.confirm(t('savedViews.confirmDelete', { name: selectedView.name }))) {
+      return;
+    }
+    viewsSaving = true;
+    viewsError = null;
+    try {
+      await deleteSavedView(selectedView.id);
+      savedViews = savedViews.filter((view) => view.id !== selectedView.id);
+      selectedViewId = '';
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.deleteFailed');
+    } finally {
+      viewsSaving = false;
+    }
+  }
+
+  function handleViewChange(event: Event): void {
+    const id = (event.target as HTMLSelectElement).value;
+    if (!id) {
+      selectedViewId = '';
+      return;
+    }
+    const view = savedViews.find((item) => item.id === id);
+    if (view) {
+      applyView(view);
+    }
+  }
+
+  function handleCountryFilter(event: Event): void {
+    countryFilter = (event.target as HTMLSelectElement).value;
+    syncSelectedView();
   }
 
   function organizationLocation(organization: Organization): string {
@@ -319,6 +450,54 @@
     </button>
   </div>
 
+  <section class="saved-views" aria-labelledby="org-saved-views-heading">
+    <div class="saved-views-copy">
+      <h2 class="saved-views-title" id="org-saved-views-heading">{t('savedViews.title')}</h2>
+      <p class="saved-views-help">{t('savedViews.helpOrganizations')}</p>
+    </div>
+    <div class="saved-views-controls">
+      <select
+        class="input saved-views-select"
+        value={selectedViewId}
+        onchange={handleViewChange}
+        aria-label={t('savedViews.selectLabel')}
+        disabled={viewsLoading || viewsSaving}
+      >
+        <option value="">{t('savedViews.none')}</option>
+        {#each savedViews as view (view.id)}
+          <option value={view.id}>{view.name}</option>
+        {/each}
+      </select>
+      <input
+        class="input saved-views-name"
+        type="text"
+        bind:value={viewName}
+        placeholder={t('savedViews.namePlaceholder')}
+        aria-label={t('savedViews.nameLabel')}
+        disabled={viewsSaving}
+      />
+      <button
+        class="btn btn-secondary btn-sm"
+        type="button"
+        onclick={() => void handleSaveView()}
+        disabled={!canSaveView}
+      >
+        {viewsSaving ? t('common.loading') : t('savedViews.save')}
+      </button>
+      <button
+        class="btn btn-ghost btn-sm"
+        type="button"
+        onclick={() => void handleDeleteView()}
+        disabled={!selectedView || viewsSaving}
+      >
+        {t('savedViews.delete')}
+      </button>
+    </div>
+    {#if viewsError}
+      <p class="saved-views-error" role="alert">{viewsError}</p>
+    {/if}
+  </section>
+
   <div class="organizations-filters">
     <div class="search-wrap">
       <svg class="filter-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -328,10 +507,25 @@
         class="input filter-search selectable"
         type="search"
         bind:value={searchQuery}
+        oninput={syncSelectedView}
         placeholder={t('organizations.search')}
         aria-label={t('organizations.search')}
       />
     </div>
+    <select
+      class="input country-filter"
+      value={countryFilter}
+      onchange={handleCountryFilter}
+      aria-label={t('organizations.country')}
+    >
+      <option value="">{t('savedViews.allCountries')}</option>
+      {#if countryFilter && !countryOptions.includes(countryFilter)}
+        <option value={countryFilter}>{countryFilter}</option>
+      {/if}
+      {#each countryOptions as country (country)}
+        <option value={country}>{country}</option>
+      {/each}
+    </select>
   </div>
 
   <div class="organizations-table card">
@@ -562,11 +756,46 @@
     height: 100%;
   }
 
+  .saved-views,
+  .saved-views-copy,
+  .saved-views-controls,
   .organizations-filters {
     display: flex;
-    gap: var(--space-4);
+    gap: var(--space-3);
     align-items: center;
     flex-wrap: wrap;
+  }
+
+  .saved-views {
+    justify-content: space-between;
+  }
+
+  .saved-views-title {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+  }
+
+  .saved-views-help,
+  .saved-views-error {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+  }
+
+  .saved-views-error {
+    color: var(--text-danger);
+    width: 100%;
+  }
+
+  .saved-views-select,
+  .saved-views-name,
+  .country-filter {
+    min-width: 160px;
+  }
+
+  .organizations-filters {
+    gap: var(--space-4);
   }
 
   .search-wrap {

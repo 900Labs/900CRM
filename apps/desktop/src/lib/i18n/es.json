@@ -237,7 +237,9 @@
     "confirmDelete": "¿Eliminar la vista guardada “{name}”?",
     "loadFailed": "No se pudieron cargar las vistas guardadas.",
     "saveFailed": "No se pudo guardar esta vista.",
-    "deleteFailed": "No se pudo eliminar esta vista."
+    "deleteFailed": "No se pudo eliminar esta vista.",
+    "helpOrganizations": "Guarda la búsqueda y el filtro de país de las organizaciones y ábrelos más tarde.",
+    "allCountries": "Todos los países"
   },
   "entityLinks": {
     "title": "Enlaces",

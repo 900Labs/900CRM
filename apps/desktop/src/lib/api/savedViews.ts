@@ -10,6 +10,7 @@ export interface ContactSavedViewFilters {
   search?: string;
   type?: 'person' | 'organization';
   lifecycle?: 'lead' | 'customer';
+  country?: string;
   customFieldDefId?: string;
   customFieldQuery?: string;
   sortBy?: string;
@@ -38,6 +39,7 @@ interface BackendFilters {
   search?: string;
   type?: 'person' | 'organization';
   lifecycle?: 'lead' | 'customer';
+  country?: string;
   custom_field_def_id?: string;
   custom_field_query?: string;
   sort_by?: string;
@@ -49,6 +51,7 @@ function toBackendFilters(filters: ContactSavedViewFilters): BackendFilters {
     search: filters.search?.trim() || undefined,
     type: filters.type,
     lifecycle: filters.lifecycle,
+    country: filters.country?.trim() || undefined,
     custom_field_def_id: filters.customFieldDefId?.trim() || undefined,
     custom_field_query: filters.customFieldQuery?.trim() || undefined,
     sort_by: filters.sortBy,
@@ -62,6 +65,7 @@ function fromBackendFilters(raw: string): ContactSavedViewFilters {
     search: parsed.search,
     type: parsed.type,
     lifecycle: parsed.lifecycle,
+    country: parsed.country,
     customFieldDefId: parsed.custom_field_def_id,
     customFieldQuery: parsed.custom_field_query,
     sortBy: parsed.sort_by,

@@ -228,6 +228,8 @@
   "savedViews": {
     "title": "Saved views",
     "help": "Keep the current contact filters and reopen them later.",
+    "helpOrganizations": "Keep the current organization search and country filter and reopen them later.",
+    "allCountries": "All countries",
     "selectLabel": "Saved view",
     "none": "No saved view",
     "nameLabel": "View name",

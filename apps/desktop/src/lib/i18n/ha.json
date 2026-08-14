@@ -237,7 +237,9 @@
     "confirmDelete": "A share ra'ayin da aka ajiye “{name}”?",
     "loadFailed": "An kasa lodin ra'ayoyin da aka ajiye.",
     "saveFailed": "An kasa adana wannan ra'ayi.",
-    "deleteFailed": "An kasa share wannan ra'ayi."
+    "deleteFailed": "An kasa share wannan ra'ayi.",
+    "helpOrganizations": "Ajiye binciken ƙungiyoyi da tacewar ƙasa kuma a sake buɗe su daga baya.",
+    "allCountries": "Duk ƙasashe"
   },
   "entityLinks": {
     "title": "Hanyoyi",
