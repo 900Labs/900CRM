@@ -217,12 +217,9 @@ fn canonicalize_filters_json(raw: &str) -> CrmResult<String> {
                     "Saved view sort_dir must be asc or desc".to_string(),
                 ));
             }
-            "attention"
-                if text != "needsFollowUp" && text != "stale" && text != "overdue" =>
-            {
+            "attention" if text != "needsFollowUp" && text != "stale" && text != "overdue" => {
                 return Err(CrmError::InvalidInput(
-                    "Saved view attention must be needsFollowUp, stale, or overdue"
-                        .to_string(),
+                    "Saved view attention must be needsFollowUp, stale, or overdue".to_string(),
                 ));
             }
             "sort_by"

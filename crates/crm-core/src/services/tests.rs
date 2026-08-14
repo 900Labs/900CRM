@@ -12127,7 +12127,8 @@ fn saved_views_store_named_deal_filters() {
         .create_saved_view(
             "deal".to_string(),
             "Clinic rollouts".to_string(),
-            r#"{"search":"clinic","custom_field_query":"solar","attention":"needsFollowUp"}"#.to_string(),
+            r#"{"search":"clinic","custom_field_query":"solar","attention":"needsFollowUp"}"#
+                .to_string(),
         )
         .expect("deal saved view should be created");
     assert_eq!(view.entity_type, "deal");
