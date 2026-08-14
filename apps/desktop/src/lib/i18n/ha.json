@@ -137,6 +137,20 @@
         "dueLater": "Daga baya",
         "noDueDate": "Babu kwanan lokaci"
       }
+    },
+    "stale": {
+      "title": "Yarjejeniyoyi masu tsayawa",
+      "description": "Yarjejeniyoyi a bude da ba su canza ba cikin kwanaki {days} kuma suna da mataki na gaba. Wannan shi ne dokar gida iri daya da alamar Stale a pipeline.",
+      "count": "Masu tsayawa",
+      "countDetail": "Yarjejeniyoyi a bude da suka yi shiru kwanaki {days} ko fiye.",
+      "deal": "Yarjejeniya",
+      "stage": "Mataki",
+      "quietFor": "Shiru",
+      "days": "kwanaki {count}",
+      "nextStep": "Mataki na gaba",
+      "listLabel": "Yarjejeniyoyi masu tsayawa",
+      "empty": "Babu yarjejeniyoyi masu tsayawa yanzu.",
+      "loadFailed": "An kasa lodin rahoton yarjejeniyoyi masu tsayawa."
     }
   },
   "contacts": {

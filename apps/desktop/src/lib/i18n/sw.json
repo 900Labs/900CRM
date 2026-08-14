@@ -137,6 +137,20 @@
         "dueLater": "Baadaye",
         "noDueDate": "Hakuna tarehe"
       }
+    },
+    "stale": {
+      "title": "Mikataba iliyotuama",
+      "description": "Mikataba wazi ambayo haijabadilika kwa siku {days} na bado ina hatua inayofuata. Hii ni kanuni ile ile ya ndani kama beji ya Stale kwenye bomba.",
+      "count": "Zilizotuama",
+      "countDetail": "Mikataba wazi iliyotuama siku {days} au zaidi.",
+      "deal": "Mkataba",
+      "stage": "Hatua",
+      "quietFor": "Imetuama",
+      "days": "siku {count}",
+      "nextStep": "Hatua inayofuata",
+      "listLabel": "Mikataba iliyotuama",
+      "empty": "Hakuna mikataba iliyotuama sasa.",
+      "loadFailed": "Ripoti ya mikataba iliyotuama haikuweza kupakiwa."
     }
   },
   "contacts": {

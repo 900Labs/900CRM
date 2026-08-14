@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-14
+- Reports lists stale deals: open deals that have not changed in 14 days and
+  still have a next step. Each row opens the deal. This uses the same local
+  rule as the pipeline Stale badge.
 - Contacts list shows health and the next follow-up using the same local rules
   as Customer 360.
 - Organizations list shows account health and the next follow-up using the same

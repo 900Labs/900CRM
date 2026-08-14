@@ -3,8 +3,9 @@
    * Reports.svelte - Local reports hub for current pipeline and activity health.
    */
 
-  import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
+  import { listActivities } from '$lib/api/activities';
+  import { listDeals } from '$lib/api/deals';
   import {
     getActivityFunnelReport,
     getPipelineConversionReport,
@@ -16,7 +17,16 @@
     type StageTransitionMetric,
   } from '$lib/api/reports';
   import { settingsStore } from '$lib/stores/settings';
+  import { navigateHash } from '$lib/utils/hashRouter';
+  import {
+    loadActivityLinkIndex,
+    type ActivityLinkIndex,
+  } from '$lib/utils/activityRelationships';
   import { formatCompactNumber, formatPercent } from '$lib/utils/formatters';
+  import {
+    buildStaleDealReport,
+    type StaleDealReport,
+  } from '$lib/utils/staleDealReport';
 
   let pipelineReport = $state<PipelineConversionReport | null>(null);
   let activityReport = $state<ActivityFunnelReport | null>(null);
@@ -24,7 +34,10 @@
   let activityLoading = $state(true);
   let pipelineError = $state<string | null>(null);
   let activityError = $state<string | null>(null);
-  let componentMounted = false;
+  let staleReport = $state<StaleDealReport | null>(null);
+  let staleLoading = $state(true);
+  let staleError = $state<string | null>(null);
+  let reportsBootstrapped = false;
 
   const REPORT_LOAD_TIMEOUT_MS = 8_000;
 
@@ -53,7 +66,11 @@
     activityReport ? buildDueBucketRows(activityReport.due_buckets) : []
   );
 
-  const reportsLoading = $derived(pipelineLoading || activityLoading);
+  const reportsLoading = $derived(pipelineLoading || activityLoading || staleLoading);
+
+  const showStaleEmpty = $derived(
+    !staleLoading && !staleError && staleReport !== null && staleReport.count === 0
+  );
 
   const showPipelineEmpty = $derived(
     !pipelineLoading && !pipelineError && pipelineReport !== null && pipelineReport.total_deals === 0
@@ -143,15 +160,13 @@
 
     try {
       const report = await withTimeout(getPipelineConversionReport(), 'Pipeline report');
-      if (!componentMounted) return;
       pipelineReport = report;
     } catch (err) {
-      if (!componentMounted) return;
       pipelineReport = null;
       pipelineError = t('reports.pipeline.loadFailed');
       console.error('[Reports] Pipeline report load error:', err);
     } finally {
-      if (componentMounted) pipelineLoading = false;
+      pipelineLoading = false;
     }
   }
 
@@ -161,15 +176,38 @@
 
     try {
       const report = await withTimeout(getActivityFunnelReport(), 'Activity report');
-      if (!componentMounted) return;
       activityReport = report;
     } catch (err) {
-      if (!componentMounted) return;
       activityReport = null;
       activityError = t('reports.activity.loadFailed');
       console.error('[Reports] Activity report load error:', err);
     } finally {
-      if (componentMounted) activityLoading = false;
+      activityLoading = false;
+    }
+  }
+
+  async function loadStaleReport(): Promise<void> {
+    staleLoading = true;
+    staleError = null;
+
+    try {
+      const [deals, activities] = await withTimeout(
+        Promise.all([
+          listDeals({ sortBy: 'createdAt', sortDir: 'asc' }),
+          listActivities({ sortBy: 'dueDate', sortDir: 'asc', pageSize: 200 }),
+        ]),
+        'Stale deal report',
+      );
+      const linkIndex: ActivityLinkIndex = await loadActivityLinkIndex(
+        activities.map((activity) => activity.id),
+      );
+      staleReport = buildStaleDealReport({ deals, activities, linkIndex });
+    } catch (err) {
+      staleReport = null;
+      staleError = t('reports.stale.loadFailed');
+      console.error('[Reports] Stale deal report load error:', err);
+    } finally {
+      staleLoading = false;
     }
   }
 
@@ -177,16 +215,17 @@
     await Promise.allSettled([
       loadPipelineReport(),
       loadActivityReport(),
+      loadStaleReport(),
     ]);
   }
 
-  onMount(() => {
-    componentMounted = true;
-    void loadReports();
+  $effect(() => {
+    if (reportsBootstrapped) {
+      return;
+    }
 
-    return () => {
-      componentMounted = false;
-    };
+    reportsBootstrapped = true;
+    void loadReports();
   });
 </script>
 
@@ -221,6 +260,13 @@
       <span class="report-kpi-label">{t('reports.activity.overdueRate')}</span>
       <strong>{activityLoading || !activityReport ? '...' : asPercentRatio(activityReport.overdue_rate)}</strong>
       <small>{t('reports.activity.overdueRateDetail')}</small>
+    </article>
+    <article class="card report-kpi">
+      <span class="report-kpi-label">{t('reports.stale.count')}</span>
+      <strong>{staleLoading || !staleReport ? '...' : formatCompactNumber(staleReport.count)}</strong>
+      <small>
+        {t('reports.stale.countDetail', { days: staleReport?.staleDays ?? 14 })}
+      </small>
     </article>
   </section>
 
@@ -367,6 +413,58 @@
       {/if}
     </section>
   </div>
+
+  <section
+    class="card report-section stale-report"
+    aria-labelledby="stale-report-heading"
+    data-testid="stale-deal-report"
+  >
+    <div class="report-section-header">
+      <div>
+        <h2 class="section-title" id="stale-report-heading">{t('reports.stale.title')}</h2>
+        <p>{t('reports.stale.description', { days: staleReport?.staleDays ?? 14 })}</p>
+      </div>
+    </div>
+
+    {#if staleError}
+      <div class="report-alert" role="status">{staleError}</div>
+    {:else if staleLoading && !staleReport}
+      <div class="report-loading" role="status">{t('reports.loading')}</div>
+    {:else if showStaleEmpty}
+      <p class="report-empty">{t('reports.stale.empty')}</p>
+    {:else if staleReport}
+      <div class="table-scroll">
+        <table class="stale-deal-table" aria-label={t('reports.stale.listLabel')}>
+          <thead>
+            <tr>
+              <th>{t('reports.stale.deal')}</th>
+              <th>{t('reports.stale.stage')}</th>
+              <th>{t('reports.stale.quietFor')}</th>
+              <th>{t('reports.stale.nextStep')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each staleReport.rows as row (row.dealId)}
+              <tr>
+                <td>
+                  <button
+                    class="link-button"
+                    type="button"
+                    onclick={() => navigateHash(row.href)}
+                  >
+                    {row.name}
+                  </button>
+                </td>
+                <td>{t(`deals.stages.${row.stage}`)}</td>
+                <td>{t('reports.stale.days', { count: row.stageAgeDays })}</td>
+                <td>{row.nextActivitySubject ?? t('common.none')}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
+  </section>
 </div>
 
 <style>
@@ -618,6 +716,39 @@
   .report-empty {
     background: var(--surface-hover);
     color: var(--text-tertiary);
+  }
+
+  .stale-deal-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+  }
+
+  .stale-deal-table th,
+  .stale-deal-table td {
+    padding: var(--space-3) 0;
+    border-block-end: var(--border-width) solid var(--border-subtle);
+    text-align: start;
+    vertical-align: top;
+  }
+
+  .stale-deal-table th {
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    text-transform: uppercase;
+  }
+
+  .link-button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-primary-600);
+    font: inherit;
+    font-weight: var(--weight-semibold);
+    text-align: start;
+    text-decoration: underline;
+    cursor: pointer;
   }
 
   @media (max-width: 1100px) {

@@ -137,6 +137,20 @@
         "dueLater": "Later",
         "noDueDate": "No Due Date"
       }
+    },
+    "stale": {
+      "title": "Stale Deals",
+      "description": "Open deals that have not changed in {days} days and still have a next step. This is the same local rule as the pipeline Stale badge.",
+      "count": "Stale Deals",
+      "countDetail": "Open deals quiet for {days} days or more.",
+      "deal": "Deal",
+      "stage": "Stage",
+      "quietFor": "Quiet for",
+      "days": "{count} days",
+      "nextStep": "Next step",
+      "listLabel": "Stale deals",
+      "empty": "No stale deals right now.",
+      "loadFailed": "The stale deal report could not be loaded."
     }
   },
   "contacts": {

@@ -137,6 +137,20 @@
         "dueLater": "Mais tarde",
         "noDueDate": "Sem data"
       }
+    },
+    "stale": {
+      "title": "Negócios parados",
+      "description": "Negócios abertos sem mudança há {days} dias e que ainda têm um próximo passo. É a mesma regra local do selo Estagnado do pipeline.",
+      "count": "Parados",
+      "countDetail": "Negócios abertos quietos há {days} dias ou mais.",
+      "deal": "Negócio",
+      "stage": "Etapa",
+      "quietFor": "Parado há",
+      "days": "{count} dias",
+      "nextStep": "Próximo passo",
+      "listLabel": "Negócios parados",
+      "empty": "Não há negócios parados agora.",
+      "loadFailed": "Não foi possível carregar o relatório de negócios parados."
     }
   },
   "contacts": {
