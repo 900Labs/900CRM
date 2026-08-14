@@ -237,7 +237,9 @@
     "confirmDelete": "सहेजा गया दृश्य “{name}” हटाएँ?",
     "loadFailed": "सहेजे गए दृश्य लोड नहीं हो सके।",
     "saveFailed": "यह दृश्य सहेजा नहीं जा सका।",
-    "deleteFailed": "यह दृश्य हटाया नहीं जा सका।"
+    "deleteFailed": "यह दृश्य हटाया नहीं जा सका।",
+    "helpOrganizations": "संगठनों की खोज और देश फ़िल्टर सहेजें और बाद में फिर खोलें।",
+    "allCountries": "सभी देश"
   },
   "entityLinks": {
     "title": "लिंक",

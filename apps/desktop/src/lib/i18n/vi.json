@@ -237,7 +237,9 @@
     "confirmDelete": "Xóa khung nhìn đã lưu “{name}”?",
     "loadFailed": "Không tải được khung nhìn đã lưu.",
     "saveFailed": "Không lưu được khung nhìn này.",
-    "deleteFailed": "Không xóa được khung nhìn này."
+    "deleteFailed": "Không xóa được khung nhìn này.",
+    "helpOrganizations": "Giữ tìm kiếm tổ chức và bộ lọc quốc gia rồi mở lại sau.",
+    "allCountries": "Tất cả quốc gia"
   },
   "entityLinks": {
     "title": "Liên kết",

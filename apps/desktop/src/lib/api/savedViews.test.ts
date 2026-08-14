@@ -57,4 +57,22 @@ describe('saved views API', () => {
     expect(filtersMatch({ lifecycle: 'lead', search: ' ' }, { lifecycle: 'lead' })).toBe(true);
     expect(filtersMatch({ lifecycle: 'lead' }, { lifecycle: 'customer' })).toBe(false);
   });
+
+  it('maps organization country filters', async () => {
+    invokeMock.mockResolvedValueOnce({
+      id: 'view-org',
+      entity_type: 'organization',
+      name: 'Kenya accounts',
+      filters_json: '{"country":"Kenya","search":"clinic"}',
+      created_at: '2026-08-14T10:00:00Z',
+      updated_at: '2026-08-14T10:00:00Z',
+    });
+
+    await expect(
+      createSavedView('organization', 'Kenya accounts', { country: 'Kenya', search: 'clinic' }),
+    ).resolves.toMatchObject({
+      entityType: 'organization',
+      filters: { country: 'Kenya', search: 'clinic' },
+    });
+  });
 });

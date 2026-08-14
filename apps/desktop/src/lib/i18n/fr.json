@@ -237,7 +237,9 @@
     "confirmDelete": "Supprimer la vue enregistrée « {name} » ?",
     "loadFailed": "Impossible de charger les vues enregistrées.",
     "saveFailed": "Impossible d’enregistrer cette vue.",
-    "deleteFailed": "Impossible de supprimer cette vue."
+    "deleteFailed": "Impossible de supprimer cette vue.",
+    "helpOrganizations": "Conservez la recherche et le filtre pays des organisations et rouvrez-les plus tard.",
+    "allCountries": "Tous les pays"
   },
   "entityLinks": {
     "title": "Liens",

@@ -342,6 +342,34 @@ test('creates an organization through the visible UI and shows it in Organizatio
   await assertNoConsoleErrors();
 });
 
+test('saves the current organization filters as a named view and applies it later', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/organizations');
+  await page.locator('.page-header').getByRole('button', { name: 'Add Organization' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add Organization' });
+  await dialog.getByLabel('Name').fill('Rift Valley Clinics');
+  await dialog.getByLabel('City').fill('Nakuru');
+  await dialog.getByLabel('Country').fill('Kenya');
+  await dialog.getByRole('button', { name: 'Create Organization' }).click();
+  await expect(dialog).toBeHidden();
+
+  await page.locator('.country-filter').selectOption('Kenya');
+  await expect(page.getByText('Rift Valley Clinics')).toBeVisible();
+
+  await page.getByLabel('View name').fill('Kenya accounts');
+  await page.getByRole('button', { name: 'Save view' }).click();
+  await expect(page.getByLabel('Saved view', { exact: true })).toHaveValue(/view-/);
+
+  await page.locator('.country-filter').selectOption('');
+  await page.getByLabel('Saved view', { exact: true }).selectOption({ label: 'Kenya accounts' });
+  await expect(page.locator('.country-filter')).toHaveValue('Kenya');
+  await expect(page.getByText('Rift Valley Clinics')).toBeVisible();
+
+  await assertNoConsoleErrors();
+});
+
 test('shows an account 360 workspace for an organization with linked work', async ({
   page,
   assertNoConsoleErrors,

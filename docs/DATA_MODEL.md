@@ -126,8 +126,9 @@ Moving a local file will break that bookmark. Links are soft-deleted.
 
 Named list filters live in `saved_views`. Each row has `entity_type`
 (`contact`, `organization`, or `deal`), a unique active `name` per type, and
-`filters_json`. The first UI is the Contacts list: search, person/organization
-type, lifecycle, and custom-field filters. Views are soft-deleted.
+`filters_json`. The Contacts list can save search, person/organization type, lifecycle, and
+custom-field filters. The Organizations list can save search and country.
+Views are soft-deleted.
 
 ### Tags
 

@@ -237,7 +237,9 @@
     "confirmDelete": "Futa mwonekano uliohifadhiwa “{name}”?",
     "loadFailed": "Imeshindwa kupakia mwonekano uliohifadhiwa.",
     "saveFailed": "Imeshindwa kuhifadhi mwonekano huu.",
-    "deleteFailed": "Imeshindwa kufuta mwonekano huu."
+    "deleteFailed": "Imeshindwa kufuta mwonekano huu.",
+    "helpOrganizations": "Hifadhi utafutaji wa mashirika na kichujio cha nchi na uvifungue tena baadaye.",
+    "allCountries": "Nchi zote"
   },
   "entityLinks": {
     "title": "Viungo",

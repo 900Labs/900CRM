@@ -237,7 +237,9 @@
     "confirmDelete": "هل تريد حذف العرض المحفوظ “{name}”؟",
     "loadFailed": "تعذر تحميل العروض المحفوظة.",
     "saveFailed": "تعذر حفظ هذا العرض.",
-    "deleteFailed": "تعذر حذف هذا العرض."
+    "deleteFailed": "تعذر حذف هذا العرض.",
+    "helpOrganizations": "احفظ بحث المنظمات وفلتر البلد وافتحهما لاحقًا.",
+    "allCountries": "كل البلدان"
   },
   "entityLinks": {
     "title": "روابط",

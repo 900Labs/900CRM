@@ -180,6 +180,7 @@ fn canonicalize_filters_json(raw: &str) -> CrmResult<String> {
             "search"
             | "type"
             | "lifecycle"
+            | "country"
             | "custom_field_def_id"
             | "custom_field_query"
             | "sort_by"
