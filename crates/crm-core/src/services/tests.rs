@@ -12118,3 +12118,35 @@ fn saved_views_store_named_organization_filters() {
     drop(core);
     let _ = std::fs::remove_dir_all(path);
 }
+
+#[test]
+fn saved_views_store_named_deal_filters() {
+    let (mut core, path) = open_test_core();
+
+    let view = core
+        .create_saved_view(
+            "deal".to_string(),
+            "Clinic rollouts".to_string(),
+            r#"{"search":"clinic","custom_field_query":"solar"}"#.to_string(),
+        )
+        .expect("deal saved view should be created");
+    assert_eq!(view.entity_type, "deal");
+    assert!(view.filters_json.contains("clinic"));
+    assert!(view.filters_json.contains("solar"));
+
+    let listed = core
+        .list_saved_views("deal".to_string())
+        .expect("deal views should list");
+    assert_eq!(listed.len(), 1);
+    assert!(core
+        .list_saved_views("contact".to_string())
+        .expect("contact views stay separate")
+        .is_empty());
+    assert!(core
+        .list_saved_views("organization".to_string())
+        .expect("organization views stay separate")
+        .is_empty());
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}

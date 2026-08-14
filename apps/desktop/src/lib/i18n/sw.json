@@ -239,6 +239,7 @@
     "saveFailed": "Imeshindwa kuhifadhi mwonekano huu.",
     "deleteFailed": "Imeshindwa kufuta mwonekano huu.",
     "helpOrganizations": "Hifadhi utafutaji wa mashirika na kichujio cha nchi na uvifungue tena baadaye.",
+    "helpPipeline": "Hifadhi utafutaji wa bomba na kichujio cha uga maalum na uvifungue tena baadaye.",
     "allCountries": "Nchi zote"
   },
   "entityLinks": {
@@ -271,6 +272,7 @@
   "deals": {
     "title": "Mtiririko",
     "addDeal": "Ongeza Mkataba",
+    "search": "Tafuta mikataba…",
     "openDeal": "Fungua biashara",
     "backToPipeline": "Rudi kwenye bomba",
     "notFound": "Biashara hii haikupatikana.",

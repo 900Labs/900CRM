@@ -239,6 +239,7 @@
     "saveFailed": "Không lưu được khung nhìn này.",
     "deleteFailed": "Không xóa được khung nhìn này.",
     "helpOrganizations": "Giữ tìm kiếm tổ chức và bộ lọc quốc gia rồi mở lại sau.",
+    "helpPipeline": "Giữ tìm kiếm pipeline và bộ lọc trường tùy chỉnh rồi mở lại sau.",
     "allCountries": "Tất cả quốc gia"
   },
   "entityLinks": {
@@ -271,6 +272,7 @@
   "deals": {
     "title": "Pipeline",
     "addDeal": "Thêm cơ hội",
+    "search": "Tìm cơ hội…",
     "openDeal": "Mở giao dịch",
     "backToPipeline": "Quay lại pipeline",
     "notFound": "Không tìm thấy giao dịch này.",

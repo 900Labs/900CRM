@@ -60,6 +60,14 @@
   import DealDetailDrawer from '$lib/components/DealDetailDrawer.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
   import { navigateHash } from '$lib/utils/hashRouter';
+  import {
+    createSavedView,
+    deleteSavedView,
+    filtersMatch,
+    listSavedViews,
+    type ContactSavedViewFilters,
+    type SavedView,
+  } from '$lib/api/savedViews';
 
   let { dealId = null }: { dealId?: string | null } = $props();
 
@@ -95,6 +103,13 @@
   let pipelineBootstrapped = false;
   let pipelineBootstrapComplete = $state(false);
   let suppressNextCardClick = false;
+  let searchQuery = $state('');
+  let savedViews = $state<SavedView[]>([]);
+  let selectedViewId = $state('');
+  let viewName = $state('');
+  let viewsLoading = $state(false);
+  let viewsSaving = $state(false);
+  let viewsError = $state<string | null>(null);
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -111,6 +126,7 @@
         ensureRelationshipLookups(),
         loadCustomFieldDefinitions(),
         loadPipelineActivityContext(),
+        loadSavedViews(),
       ]);
       lastActivityRefreshVersion = activityStore.relationshipRefreshVersion;
       pipelineBootstrapComplete = true;
@@ -277,6 +293,7 @@
     if (selectedCustomFieldDefId && customFieldQuery.trim()) {
       await ensureCustomFieldValueIndex();
     }
+    syncSelectedView();
   }
 
   async function handleCustomFieldQueryInput(event: Event) {
@@ -284,11 +301,122 @@
     if (selectedCustomFieldDefId && customFieldQuery.trim()) {
       await ensureCustomFieldValueIndex();
     }
+    syncSelectedView();
   }
 
   function clearCustomFieldFilter() {
     selectedCustomFieldDefId = '';
     customFieldQuery = '';
+    syncSelectedView();
+  }
+
+  function collectCurrentFilters(): ContactSavedViewFilters {
+    return {
+      search: searchQuery.trim() || undefined,
+      customFieldDefId: selectedCustomFieldDefId || undefined,
+      customFieldQuery: customFieldQuery.trim() || undefined,
+    };
+  }
+
+  const currentViewFilters = $derived(collectCurrentFilters());
+  const selectedView = $derived(savedViews.find((view) => view.id === selectedViewId) ?? null);
+  const canSaveView = $derived(viewName.trim().length > 0 && !viewsSaving);
+
+  async function loadSavedViews(): Promise<void> {
+    viewsLoading = true;
+    viewsError = null;
+    try {
+      savedViews = await listSavedViews('deal');
+      if (selectedViewId && !savedViews.some((view) => view.id === selectedViewId)) {
+        selectedViewId = '';
+      }
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.loadFailed');
+    } finally {
+      viewsLoading = false;
+    }
+  }
+
+  async function applyView(view: SavedView): Promise<void> {
+    selectedViewId = view.id;
+    searchQuery = view.filters.search ?? '';
+    selectedCustomFieldDefId = view.filters.customFieldDefId ?? '';
+    customFieldQuery = view.filters.customFieldQuery ?? '';
+    if (selectedCustomFieldDefId && customFieldQuery.trim()) {
+      await ensureCustomFieldValueIndex();
+    }
+  }
+
+  function syncSelectedView(): void {
+    if (!selectedView || filtersMatch(selectedView.filters, currentViewFilters)) {
+      return;
+    }
+    selectedViewId = '';
+  }
+
+  async function handleSaveView(): Promise<void> {
+    const name = viewName.trim();
+    if (!name) {
+      return;
+    }
+    viewsSaving = true;
+    viewsError = null;
+    try {
+      const view = await createSavedView('deal', name, collectCurrentFilters());
+      savedViews = [...savedViews.filter((item) => item.id !== view.id), view]
+        .sort((left, right) => left.name.localeCompare(right.name));
+      selectedViewId = view.id;
+      viewName = '';
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.saveFailed');
+    } finally {
+      viewsSaving = false;
+    }
+  }
+
+  async function handleDeleteView(): Promise<void> {
+    if (!selectedView) {
+      return;
+    }
+    if (!window.confirm(t('savedViews.confirmDelete', { name: selectedView.name }))) {
+      return;
+    }
+    viewsSaving = true;
+    viewsError = null;
+    try {
+      await deleteSavedView(selectedView.id);
+      savedViews = savedViews.filter((view) => view.id !== selectedView.id);
+      selectedViewId = '';
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.deleteFailed');
+    } finally {
+      viewsSaving = false;
+    }
+  }
+
+  function handleViewChange(event: Event): void {
+    const id = (event.target as HTMLSelectElement).value;
+    if (!id) {
+      selectedViewId = '';
+      return;
+    }
+    const view = savedViews.find((item) => item.id === id);
+    if (view) {
+      void applyView(view);
+    }
+  }
+
+  function handleSearchInput(event: Event): void {
+    searchQuery = (event.target as HTMLInputElement).value;
+    syncSelectedView();
+  }
+
+  function matchesSearch(deal: Deal): boolean {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return true;
+    }
+    return deal.name.toLowerCase().includes(query);
   }
 
   function matchesCustomField(dealId: string): boolean {
@@ -309,7 +437,9 @@
   /** Column metadata derived from dealsByStage. */
   const columns = $derived(
     DEAL_STAGES.map((stage) => {
-      const deals = (dealStore.dealsByStage[stage] ?? []).filter((deal) => matchesCustomField(deal.id));
+      const deals = (dealStore.dealsByStage[stage] ?? []).filter(
+        (deal) => matchesSearch(deal) && matchesCustomField(deal.id),
+      );
       const currencyTotals = sumByCurrency(
         deals.map((deal) => ({ currency: deal.currency, value: deal.value }))
       );
@@ -600,6 +730,54 @@
     </div>
   </div>
 
+  <section class="saved-views" aria-labelledby="pipeline-saved-views-heading">
+    <div class="saved-views-copy">
+      <h2 class="saved-views-title" id="pipeline-saved-views-heading">{t('savedViews.title')}</h2>
+      <p class="saved-views-help">{t('savedViews.helpPipeline')}</p>
+    </div>
+    <div class="saved-views-controls">
+      <select
+        class="input saved-views-select"
+        value={selectedViewId}
+        onchange={handleViewChange}
+        aria-label={t('savedViews.selectLabel')}
+        disabled={viewsLoading || viewsSaving}
+      >
+        <option value="">{t('savedViews.none')}</option>
+        {#each savedViews as view (view.id)}
+          <option value={view.id}>{view.name}</option>
+        {/each}
+      </select>
+      <input
+        class="input saved-views-name"
+        type="text"
+        bind:value={viewName}
+        placeholder={t('savedViews.namePlaceholder')}
+        aria-label={t('savedViews.nameLabel')}
+        disabled={viewsSaving}
+      />
+      <button
+        class="btn btn-secondary btn-sm"
+        type="button"
+        onclick={() => void handleSaveView()}
+        disabled={!canSaveView}
+      >
+        {viewsSaving ? t('common.loading') : t('savedViews.save')}
+      </button>
+      <button
+        class="btn btn-ghost btn-sm"
+        type="button"
+        onclick={() => void handleDeleteView()}
+        disabled={!selectedView || viewsSaving}
+      >
+        {t('savedViews.delete')}
+      </button>
+    </div>
+    {#if viewsError}
+      <p class="saved-views-error" role="alert">{viewsError}</p>
+    {/if}
+  </section>
+
   {#if !dealStore.isLoading}
     <section
       class="pipeline-insights"
@@ -720,6 +898,14 @@
 
   <!-- Loading skeleton -->
   <div class="pipeline-filters" role="group" aria-label={t('common.customFieldFilter')}>
+    <input
+      class="input pipeline-filter-input selectable deal-search"
+      type="search"
+      value={searchQuery}
+      oninput={handleSearchInput}
+      placeholder={t('deals.search')}
+      aria-label={t('deals.search')}
+    />
     <span class="pipeline-filters-label">{t('common.customField')}:</span>
     <select
       class="input pipeline-filter-select"
@@ -1130,6 +1316,42 @@
     font-weight: var(--weight-semibold);
     color: var(--text-primary);
     white-space: nowrap;
+  }
+
+  .saved-views,
+  .saved-views-copy,
+  .saved-views-controls {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .saved-views {
+    justify-content: space-between;
+  }
+
+  .saved-views-title {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+  }
+
+  .saved-views-help,
+  .saved-views-error {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+  }
+
+  .saved-views-error {
+    color: var(--text-danger);
+    width: 100%;
+  }
+
+  .saved-views-select,
+  .saved-views-name {
+    min-width: 160px;
   }
 
   .pipeline-filters {
