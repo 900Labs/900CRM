@@ -174,6 +174,68 @@ test('creates a contact through the visible UI and shows it in Contacts and glob
   await assertNoConsoleErrors();
 });
 
+test('shows contact list health and the next follow-up', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/contacts');
+  await page.locator('.page-header').getByRole('button', { name: 'Add Contact' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add Contact' });
+  await dialog.getByLabel('First Name').fill('Zara');
+  await dialog.getByLabel('Last Name').fill('Boateng');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden();
+
+  await page.evaluate(async () => {
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (!invoke) {
+      throw new Error('Tauri smoke shim is not installed.');
+    }
+
+    const listed = await invoke('list_contacts', {
+      params: {
+        page: 1,
+        per_page: 50,
+        search_query: 'Zara',
+      },
+    }) as { contacts?: Array<{ id: string; first_name: string; last_name: string }> };
+    const contact = listed.contacts?.find((candidate) =>
+      candidate.first_name === 'Zara' && candidate.last_name === 'Boateng'
+    );
+    if (!contact) {
+      throw new Error('Seed contact was not created.');
+    }
+
+    await invoke('create_deal', {
+      title: 'Clinic kit',
+      value: 6400,
+      currency: 'USD',
+      stage: 'Proposal',
+      probability: 35,
+      expected_close: '',
+      contact_id: contact.id,
+      organization_id: '',
+      notes: '',
+    });
+
+    await invoke('create_activity', {
+      activity_type: 'task',
+      title: 'Past due clinic check-in',
+      description: '',
+      due_date: '2020-01-15',
+      contact_id: contact.id,
+      deal_id: '',
+    });
+  });
+
+  await loadHashRoute(page, '/contacts');
+  const row = page.locator('tr').filter({ hasText: 'Zara Boateng' });
+  await expect(row.getByText('Overdue')).toBeVisible();
+  await expect(row.getByText('Past due clinic check-in')).toBeVisible();
+
+  await assertNoConsoleErrors();
+});
+
 test('creates a lead, filters the lead list, and converts it to a customer', async ({
   page,
   assertNoConsoleErrors,

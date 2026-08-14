@@ -176,6 +176,8 @@
     "website": "वेबसाइट",
     "address": "पता",
     "created": "बनाया गया",
+    "health": "स्थिति",
+    "nextFollowUp": "अगला फॉलो-अप",
     "updated": "अंतिम अपडेट",
     "legacyTags": "पुराने टैग",
     "legacyNotes": "पुराने नोट्स",
