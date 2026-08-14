@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-14
+- Leads is a dedicated Workspace list of people with lifecycle lead. Converted
+  customers stay on Contacts. This uses the existing contact records.
 - Activities can save the current type, status, due-bucket, and custom-field
   filters as a named view and reopen that view later.
 - Pipeline can filter the board by attention: Needs Follow-Up, Stale, or

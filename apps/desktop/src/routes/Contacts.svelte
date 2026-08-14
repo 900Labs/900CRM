@@ -40,6 +40,9 @@
   import DataTable from '$lib/components/DataTable.svelte';
   import ImportExport from '$lib/components/ImportExport.svelte';
 
+  let { mode = 'contacts' }: { mode?: 'contacts' | 'leads' } = $props();
+  const isLeadsMode = $derived(mode === 'leads');
+
   // ── State ───────────────────────────────────────────────────────────────────
 
   let searchQuery = $state('');
@@ -141,6 +144,12 @@
 
   // ── Column definitions ─────────────────────────────────────────────────────
 
+  const listedViews = $derived(
+    isLeadsMode
+      ? savedViews.filter((view) => view.filters.lifecycle === 'lead')
+      : savedViews,
+  );
+
   const columns = $derived<Column<Contact>[]>([
     {
       key: 'name',
@@ -170,17 +179,16 @@
       sortable: true,
       render: (c) => t(`contacts.${(c as Contact).type}`),
     },
-    {
-      key: 'lifecycle',
-      label: t('contacts.lifecycle'),
-      sortable: true,
-      render: (c) => {
-        const contact = c as Contact;
-        return contact.type === 'person'
-          ? t(`contacts.lifecycle${contact.lifecycle === 'lead' ? 'Lead' : 'Customer'}`)
-          : '—';
-      },
-    },
+    ...(isLeadsMode
+      ? []
+      : [{
+          key: 'lifecycle',
+          label: t('contacts.lifecycle'),
+          sortable: true,
+          render: (c: Contact) => c.type === 'person'
+            ? t(`contacts.lifecycle${c.lifecycle === 'lead' ? 'Lead' : 'Customer'}`)
+            : '—',
+        }]),
     {
       key: 'health',
       label: t('contacts.health'),
@@ -199,13 +207,27 @@
     }
 
     contactsBootstrapped = true;
-    void Promise.all([
-      contactStore.loadContacts(),
-      contactStore.loadDuplicateCandidates().catch(() => undefined),
-      loadCustomFieldDefinitions(),
-      loadSavedViews(),
-      loadListInsights(),
-    ]);
+    if (mode === 'leads') {
+      lifecycleFilter = 'lead';
+    }
+    void (async () => {
+      await contactStore.setFilters({
+        search: searchQuery,
+        type: typeFilter || undefined,
+        lifecycle: mode === 'leads' ? 'lead' : lifecycleFilter || undefined,
+        customFieldDefId: selectedCustomFieldDefId || undefined,
+        customFieldQuery: customFieldQuery.trim() || undefined,
+        page: 1,
+      });
+      await Promise.all([
+        mode === 'leads'
+          ? Promise.resolve()
+          : contactStore.loadDuplicateCandidates().catch(() => undefined),
+        loadCustomFieldDefinitions(),
+        loadSavedViews(),
+        loadListInsights(),
+      ]);
+    })();
   });
 
   async function loadListInsights(): Promise<void> {
@@ -244,7 +266,7 @@
     return {
       search: searchQuery.trim() || undefined,
       type: toSavedType(typeFilter),
-      lifecycle: lifecycleFilter || undefined,
+      lifecycle: isLeadsMode ? 'lead' : lifecycleFilter || undefined,
       customFieldDefId: selectedCustomFieldDefId || undefined,
       customFieldQuery: customFieldQuery.trim() || undefined,
     };
@@ -269,7 +291,7 @@
     selectedViewId = view.id;
     searchQuery = view.filters.search ?? '';
     typeFilter = fromSavedType(view.filters.type);
-    lifecycleFilter = view.filters.lifecycle ?? '';
+    lifecycleFilter = isLeadsMode ? 'lead' : view.filters.lifecycle ?? '';
     selectedCustomFieldDefId = view.filters.customFieldDefId ?? '';
     customFieldQuery = view.filters.customFieldQuery ?? '';
     await contactStore.setFilters({
@@ -492,47 +514,65 @@
 <div class="page-content contacts-page">
   <!-- Header -->
   <div class="page-header">
-    <h1 class="page-title">{t('contacts.title')}</h1>
+    <div>
+      <h1 class="page-title">{isLeadsMode ? t('leads.title') : t('contacts.title')}</h1>
+      {#if isLeadsMode}
+        <p class="page-help">{t('leads.help')}</p>
+      {/if}
+    </div>
     <div class="toolbar">
-      <button
-        class="btn btn-primary btn-sm"
-        onclick={() => uiStore.openModal('addContact')}
-        type="button"
-      >
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-          <path d="M6 1v10M1 6h10"/>
-        </svg>
-        {t('contacts.addContact')}
-      </button>
-      <button
-        class="btn btn-secondary btn-sm"
-        onclick={() => uiStore.openModal('addContact', { lifecycle: 'lead' })}
-        type="button"
-      >
-        {t('contacts.addLead')}
-      </button>
-      <button
-        class="btn btn-secondary btn-sm"
-        onclick={() => showImportExport = true}
-        type="button"
-      >
-        {t('common.import')} / {t('common.export')}
-      </button>
-      <button
-        class="btn btn-secondary btn-sm"
-        onclick={refreshDuplicateCandidates}
-        type="button"
-        disabled={duplicateControlsDisabled}
-      >
-        {contactStore.duplicateCandidatesLoading ? t('contacts.duplicatesChecking') : t('contacts.duplicatesCheck')}
-      </button>
+      {#if isLeadsMode}
+        <button
+          class="btn btn-primary btn-sm"
+          onclick={() => uiStore.openModal('addContact', { lifecycle: 'lead' })}
+          type="button"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 1v10M1 6h10"/>
+          </svg>
+          {t('contacts.addLead')}
+        </button>
+      {:else}
+        <button
+          class="btn btn-primary btn-sm"
+          onclick={() => uiStore.openModal('addContact')}
+          type="button"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 1v10M1 6h10"/>
+          </svg>
+          {t('contacts.addContact')}
+        </button>
+        <button
+          class="btn btn-secondary btn-sm"
+          onclick={() => uiStore.openModal('addContact', { lifecycle: 'lead' })}
+          type="button"
+        >
+          {t('contacts.addLead')}
+        </button>
+        <button
+          class="btn btn-secondary btn-sm"
+          onclick={() => showImportExport = true}
+          type="button"
+        >
+          {t('common.import')} / {t('common.export')}
+        </button>
+        <button
+          class="btn btn-secondary btn-sm"
+          onclick={refreshDuplicateCandidates}
+          type="button"
+          disabled={duplicateControlsDisabled}
+        >
+          {contactStore.duplicateCandidatesLoading ? t('contacts.duplicatesChecking') : t('contacts.duplicatesCheck')}
+        </button>
+      {/if}
     </div>
   </div>
 
   <section class="saved-views" aria-labelledby="saved-views-heading">
     <div class="saved-views-copy">
       <h2 class="saved-views-title" id="saved-views-heading">{t('savedViews.title')}</h2>
-      <p class="saved-views-help">{t('savedViews.help')}</p>
+      <p class="saved-views-help">{isLeadsMode ? t('savedViews.helpLeads') : t('savedViews.help')}</p>
     </div>
     <div class="saved-views-controls">
       <select
@@ -543,7 +583,7 @@
         disabled={viewsLoading || viewsSaving}
       >
         <option value="">{t('savedViews.none')}</option>
-        {#each savedViews as view (view.id)}
+        {#each listedViews as view (view.id)}
           <option value={view.id}>{view.name}</option>
         {/each}
       </select>
@@ -586,46 +626,48 @@
       <input
         class="input filter-search selectable"
         type="search"
-        placeholder={t('contacts.search')}
+        placeholder={isLeadsMode ? t('leads.search') : t('contacts.search')}
         value={searchQuery}
         oninput={handleSearchInput}
-        aria-label={t('contacts.search')}
+        aria-label={isLeadsMode ? t('leads.search') : t('contacts.search')}
       />
     </div>
 
-    <div class="type-filters" role="group" aria-label={t('contacts.type')}>
-      {#each [
-        { value: '', label: t('common.all') },
-        { value: 'person', label: t('contacts.person') },
-        { value: 'org', label: t('contacts.org') },
-      ] as option (option.value)}
-        <button
-          class="filter-chip"
-          class:active={typeFilter === option.value}
-          onclick={() => handleTypeFilter(option.value as '' | 'person' | 'org')}
-          type="button"
-        >
-          {option.label}
-        </button>
-      {/each}
-    </div>
+    {#if !isLeadsMode}
+      <div class="type-filters" role="group" aria-label={t('contacts.type')}>
+        {#each [
+          { value: '', label: t('common.all') },
+          { value: 'person', label: t('contacts.person') },
+          { value: 'org', label: t('contacts.org') },
+        ] as option (option.value)}
+          <button
+            class="filter-chip"
+            class:active={typeFilter === option.value}
+            onclick={() => handleTypeFilter(option.value as '' | 'person' | 'org')}
+            type="button"
+          >
+            {option.label}
+          </button>
+        {/each}
+      </div>
 
-    <div class="type-filters" role="group" aria-label={t('contacts.lifecycle')}>
-      {#each [
-        { value: '', label: t('common.all') },
-        { value: 'lead', label: t('contacts.filterLeads') },
-        { value: 'customer', label: t('contacts.filterCustomers') },
-      ] as option (option.value)}
-        <button
-          class="filter-chip"
-          class:active={lifecycleFilter === option.value}
-          onclick={() => handleLifecycleFilter(option.value as '' | ContactLifecycle)}
-          type="button"
-        >
-          {option.label}
-        </button>
-      {/each}
-    </div>
+      <div class="type-filters" role="group" aria-label={t('contacts.lifecycle')}>
+        {#each [
+          { value: '', label: t('common.all') },
+          { value: 'lead', label: t('contacts.filterLeads') },
+          { value: 'customer', label: t('contacts.filterCustomers') },
+        ] as option (option.value)}
+          <button
+            class="filter-chip"
+            class:active={lifecycleFilter === option.value}
+            onclick={() => handleLifecycleFilter(option.value as '' | ContactLifecycle)}
+            type="button"
+          >
+            {option.label}
+          </button>
+        {/each}
+      </div>
+    {/if}
 
     <div class="custom-field-filter" role="group" aria-label={t('common.customFieldFilter')}>
       <select
@@ -661,7 +703,7 @@
     </div>
   </div>
 
-  {#if contactStore.duplicateCandidatesLoading || contactStore.duplicateCandidatesError || contactStore.duplicateCandidates.length > 0}
+  {#if !isLeadsMode && (contactStore.duplicateCandidatesLoading || contactStore.duplicateCandidatesError || contactStore.duplicateCandidates.length > 0)}
     <section class="duplicate-warning" aria-live="polite">
       {#if contactStore.duplicateCandidatesLoading}
         <div class="duplicate-status">
@@ -788,11 +830,11 @@
       total={contactStore.total}
       page={contactStore.page}
       pageSize={contactStore.pageSize}
-      emptyTitle={t('contacts.noContacts')}
-      emptyDescription={t('contacts.noContactsDesc')}
+      emptyTitle={isLeadsMode ? t('leads.noLeads') : t('contacts.noContacts')}
+      emptyDescription={isLeadsMode ? t('leads.noLeadsDesc') : t('contacts.noContactsDesc')}
       emptyIcon="contacts"
-      emptyActionLabel={t('contacts.addContact')}
-      onemptyaction={() => uiStore.openModal('addContact')}
+      emptyActionLabel={isLeadsMode ? t('contacts.addLead') : t('contacts.addContact')}
+      onemptyaction={() => uiStore.openModal('addContact', isLeadsMode ? { lifecycle: 'lead' } : undefined)}
       onrowclick={handleRowClick}
       onnextpage={() => contactStore.nextPage()}
       onprevpage={() => contactStore.prevPage()}
@@ -809,6 +851,12 @@
     flex-direction: column;
     gap: var(--space-6);
     height: 100%;
+  }
+
+  .page-help {
+    margin: var(--space-1) 0 0;
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
   }
 
   .toolbar {

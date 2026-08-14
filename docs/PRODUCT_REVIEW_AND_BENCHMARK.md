@@ -18,7 +18,7 @@ audit evidence, and a narrow optional MCP stdio boundary. That is meaningful.
 The weakness is the daily CRM experience. As of Sprint 108, the left navigation
 is visually grouped into:
 
-- Workspace: Dashboard, Contacts, Organizations, Pipeline, Activities, Reports
+- Workspace: Dashboard, Leads, Contacts, Organizations, Pipeline, Activities, Reports
 - Review: Pending Actions, Audit Log
 - Admin: Settings
 
@@ -45,7 +45,8 @@ real small business owner.
 | Area | Current state | Product issue |
 |---|---|---|
 | Dashboard | KPI cards, daily attention queue, activity feed, quick actions, first-run starter checklist, optional synthetic sample workspace | Useful morning start. The attention queue now lists overdue follow-ups, stuck deals, and waiting leads. Still no saved goals or personalized scoring. |
-| Contacts | Search, type/lifecycle filters, saved views, health and next follow-up, duplicate review, import/export, custom-field filtering, contact detail Customer 360 summary, relationship-aware activity timeline | The people list now shows health and the next follow-up. Lead/customer work is still one list. |
+| Contacts | Search, type/lifecycle filters, saved views, health and next follow-up, duplicate review, import/export, custom-field filtering, contact detail Customer 360 summary, relationship-aware activity timeline | The people list now shows health and the next follow-up. Daily lead work now lives on Leads. |
+| Leads | Dedicated Workspace list of people with lifecycle lead, health, next follow-up, and lead-only saved views | Convert stays on the person page. Customers stay on Contacts. |
 | Organizations | List with saved views, health, and next follow-up; create/edit, notes/tags, contact linking, account detail workspace with linked people/deals/activity and relationship-aware account timeline | Account list now shows health and the next follow-up. Still no owner field. |
 | Pipeline | Kanban by stage, search, attention filters, custom-field filter, saved views, deal cards, deal guidance drawer with weighted forecast, stale/overdue/follow-up status, linked activities, and a board-level forecast/stage-health overview | Stronger daily sales surface. Still needs true historical stage conversion summaries, deeper deal editing/detail routing, and stronger drag/drop confidence cues. |
 | Activities | Task/call/meeting/email follow-up workbench with due buckets, summary counts, quick snooze/reschedule, completion, filters, saved views, and relationship breadcrumbs | Much stronger daily work surface. Still needs a true calendar grid, reminders, recurrence, and optional external calendar sync. |
@@ -82,7 +83,7 @@ Scale: 0 = absent, 1 = foundation only, 2 = usable alpha, 3 = competitive.
 | Dashboard/reporting | 2 | 2 |
 | Search/navigation speed | 2 | 3 |
 | Import/export/backup | 3 | 3 |
-| Lead lifecycle | 0 | 2 |
+| Lead lifecycle | 2 | 2 |
 | Account/customer 360 view | 2 | 2 |
 | Calendar/follow-up workflow | 1 | 2 |
 | Email/communication history | 1 | 2 |

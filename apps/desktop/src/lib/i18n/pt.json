@@ -11,6 +11,7 @@
   },
   "nav": {
     "dashboard": "Painel",
+    "leads": "Leads",
     "contacts": "Contatos",
     "pipeline": "Pipeline",
     "activities": "Atividades",
@@ -153,6 +154,13 @@
       "loadFailed": "Não foi possível carregar o relatório de negócios parados."
     }
   },
+  "leads": {
+    "title": "Leads",
+    "help": "Pessoas à espera de trabalho. Clientes convertidos ficam em Contatos.",
+    "search": "Buscar leads…",
+    "noLeads": "Ainda não há leads",
+    "noLeadsDesc": "Adicione um lead para começar a trabalhar novas pessoas."
+  },
   "contacts": {
     "title": "Contatos",
     "addContact": "Adicionar contato",
@@ -248,6 +256,7 @@
   "savedViews": {
     "title": "Visualizações salvas",
     "help": "Guarde os filtros atuais de contatos e reabra depois.",
+    "helpLeads": "Guarde a busca e o filtro de campo personalizado dos leads e reabra depois.",
     "selectLabel": "Visualização salva",
     "none": "Nenhuma visualização salva",
     "nameLabel": "Nome da visualização",

@@ -11,6 +11,7 @@
   },
   "nav": {
     "dashboard": "Tableau de bord",
+    "leads": "Pistes",
     "contacts": "Contacts",
     "pipeline": "Pipeline",
     "activities": "Activités",
@@ -153,6 +154,13 @@
       "loadFailed": "Impossible de charger le rapport des affaires stagnantes."
     }
   },
+  "leads": {
+    "title": "Pistes",
+    "help": "Personnes en attente de suivi. Les clients convertis restent dans Contacts.",
+    "search": "Rechercher des pistes…",
+    "noLeads": "Aucune piste pour le moment",
+    "noLeadsDesc": "Ajoutez une piste pour commencer à travailler de nouvelles personnes."
+  },
   "contacts": {
     "title": "Contacts",
     "addContact": "Ajouter un contact",
@@ -248,6 +256,7 @@
   "savedViews": {
     "title": "Vues enregistrées",
     "help": "Conservez les filtres contacts actuels et rouvrez-les plus tard.",
+    "helpLeads": "Conservez la recherche et le filtre de champ personnalisé des pistes et rouvrez-les plus tard.",
     "selectLabel": "Vue enregistrée",
     "none": "Aucune vue enregistrée",
     "nameLabel": "Nom de la vue",

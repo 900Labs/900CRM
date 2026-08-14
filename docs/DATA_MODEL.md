@@ -40,6 +40,8 @@ Important fields include:
   `device_id`;
 - person lifecycle: `lifecycle`, either `lead` or `customer`. Existing rows
   default to `customer`. Organizations keep `customer` and cannot be leads.
+  The Leads workspace list is the same `contacts` table filtered to people
+  with `lifecycle = lead`. Converted people stay in Contacts as customers.
 
 Contacts are soft-deleted by setting `deleted_at`. Active list and search paths
 exclude soft-deleted contacts. Contact search uses the `contacts_fts` FTS5
