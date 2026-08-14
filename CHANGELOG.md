@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-14
+- Organizations list shows account health and the next follow-up using the same
+  local rules as Account 360.
 - Dashboard shows a daily attention queue for overdue follow-ups, open deals
   without a next step, and leads waiting to be worked. Each row opens the
   related record.

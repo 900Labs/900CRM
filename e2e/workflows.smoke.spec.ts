@@ -410,6 +410,67 @@ test('creates an organization through the visible UI and shows it in Organizatio
   await assertNoConsoleErrors();
 });
 
+test('shows organization list health and the next account follow-up', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/organizations');
+  await page.locator('.page-header').getByRole('button', { name: 'Add Organization' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add Organization' });
+  await dialog.getByLabel('Name').fill('Sahel Grid');
+  await dialog.getByLabel('City').fill('Niamey');
+  await dialog.getByLabel('Country').fill('Niger');
+  await dialog.getByRole('button', { name: 'Create Organization' }).click();
+  await expect(dialog).toBeHidden();
+
+  await page.evaluate(async () => {
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (!invoke) {
+      throw new Error('Tauri smoke shim is not installed.');
+    }
+
+    const organizations = await invoke('list_organizations') as Array<{ id: string; name: string }>;
+    const organization = organizations.find((candidate) => candidate.name === 'Sahel Grid');
+    if (!organization) {
+      throw new Error('Seed organization was not created.');
+    }
+
+    await invoke('create_deal', {
+      title: 'Grid expansion',
+      value: 18000,
+      currency: 'USD',
+      stage: 'Proposal',
+      probability: 40,
+      expected_close: '',
+      contact_id: '',
+      organization_id: organization.id,
+      notes: '',
+    });
+
+    const activity = await invoke('create_activity', {
+      activity_type: 'task',
+      title: 'Past due clinic check-in',
+      description: '',
+      due_date: '2020-01-15',
+      contact_id: '',
+      deal_id: '',
+    }) as { id: string };
+
+    await invoke('add_activity_link', {
+      activity_id: activity.id,
+      entity_type: 'organization',
+      entity_id: organization.id,
+    });
+  });
+
+  await loadHashRoute(page, '/organizations');
+  const row = page.locator('tr').filter({ hasText: 'Sahel Grid' });
+  await expect(row.getByText('Overdue')).toBeVisible();
+  await expect(row.getByText('Past due clinic check-in')).toBeVisible();
+
+  await assertNoConsoleErrors();
+});
+
 test('saves the current organization filters as a named view and applies it later', async ({
   page,
   assertNoConsoleErrors,

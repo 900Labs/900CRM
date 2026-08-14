@@ -737,6 +737,8 @@
     "phone": "Phone",
     "website": "Website",
     "location": "Location",
+    "health": "Health",
+    "nextFollowUp": "Next Follow-Up",
     "addressLine1": "Address Line 1",
     "addressLine2": "Address Line 2",
     "city": "City",
