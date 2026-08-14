@@ -3,13 +3,19 @@
    * Organizations.svelte - First-class organization list and command surface.
    */
 
-  import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
+  import { listActivities, type Activity } from '$lib/api/activities';
+  import { listDeals, type Deal } from '$lib/api/deals';
   import { organizationStore } from '$lib/stores/organizations';
   import { uiStore } from '$lib/stores/ui';
   import type { Organization } from '$lib/api/organizations';
   import { formatDate } from '$lib/utils/formatters';
   import { settingsStore } from '$lib/stores/settings';
+  import {
+    loadActivityLinkIndex,
+    type ActivityLinkIndex,
+  } from '$lib/utils/activityRelationships';
+  import { buildOrganizationListInsight } from '$lib/utils/organizationWorkspace';
   import {
     listCustomFieldDefinitions,
     listCustomFieldValues,
@@ -65,6 +71,11 @@
   let viewsLoading = $state(false);
   let viewsSaving = $state(false);
   let viewsError = $state<string | null>(null);
+  let insightDeals = $state<Deal[]>([]);
+  let insightActivities = $state<Activity[]>([]);
+  let insightLinkIndex = $state<ActivityLinkIndex>({});
+  let insightsLoading = $state(true);
+  let organizationsBootstrapped = false;
 
   const countryOptions = $derived(
     [...new Set(
@@ -84,13 +95,53 @@
     ),
   );
 
-  onMount(async () => {
-    await Promise.all([
+  const insightsById = $derived.by(() => {
+    const insights: Record<string, ReturnType<typeof buildOrganizationListInsight>> = {};
+    for (const organization of filteredOrganizations) {
+      insights[organization.id] = buildOrganizationListInsight({
+        organizationId: organization.id,
+        deals: insightDeals,
+        activities: insightActivities,
+        linkIndex: insightLinkIndex,
+        isLoading: insightsLoading,
+      });
+    }
+    return insights;
+  });
+
+  $effect(() => {
+    if (organizationsBootstrapped) {
+      return;
+    }
+
+    organizationsBootstrapped = true;
+    void Promise.all([
       organizationStore.loadOrganizations(),
       loadOrganizationCustomFieldDefinitions(),
       loadSavedViews(),
+      loadListInsights(),
     ]);
   });
+
+  async function loadListInsights(): Promise<void> {
+    insightsLoading = true;
+    try {
+      const [deals, activities] = await Promise.all([
+        listDeals({ sortBy: 'createdAt', sortDir: 'asc' }),
+        listActivities({ sortBy: 'dueDate', sortDir: 'asc', pageSize: 200 }),
+      ]);
+      insightLinkIndex = await loadActivityLinkIndex(activities.map((activity) => activity.id));
+      insightDeals = deals;
+      insightActivities = activities;
+    } catch (error) {
+      console.error('[Organizations] Failed to load account health:', error);
+      insightDeals = [];
+      insightActivities = [];
+      insightLinkIndex = {};
+    } finally {
+      insightsLoading = false;
+    }
+  }
 
   function emptyOrganizationForm(): OrganizationFormState {
     return {
@@ -538,7 +589,8 @@
             <th>{t('organizations.phone')}</th>
             <th>{t('organizations.website')}</th>
             <th>{t('organizations.location')}</th>
-            <th>{t('organizations.created')}</th>
+            <th>{t('organizations.health')}</th>
+            <th>{t('organizations.nextFollowUp')}</th>
             <th>{t('common.actions')}</th>
           </tr>
         </thead>
@@ -546,12 +598,12 @@
           {#if organizationStore.isLoading}
             {#each Array(6) as _, index (index)}
               <tr class="skeleton-row">
-                <td colspan="7"><div class="skeleton table-skeleton-cell"></div></td>
+                <td colspan="8"><div class="skeleton table-skeleton-cell"></div></td>
               </tr>
             {/each}
           {:else if filteredOrganizations.length === 0}
             <tr>
-              <td colspan="7" class="empty-cell">
+              <td colspan="8" class="empty-cell">
                 <div class="empty-state">
                   <h2>{t('organizations.noOrganizations')}</h2>
                   <p>{t('organizations.noOrganizationsDesc')}</p>
@@ -563,6 +615,7 @@
             </tr>
           {:else}
             {#each filteredOrganizations as organization (organization.id)}
+              {@const insight = insightsById[organization.id]}
               <tr>
                 <td>
                   <div class="organization-name-cell">
@@ -594,7 +647,25 @@
                   {/if}
                 </td>
                 <td>{organizationLocation(organization)}</td>
-                <td>{formatDate(organization.createdAt, settingsStore.dateFormat as 'MMM D, YYYY')}</td>
+                <td>
+                  <span class="health-badge health-{insight?.health.tone ?? 'neutral'}">
+                    {t(`organizations.workspace.health.${insight?.health.state ?? 'loading'}`)}
+                  </span>
+                </td>
+                <td>
+                  {#if insight?.nextActivity}
+                    <div class="next-follow-up">
+                      <span>{insight.nextActivity.subject}</span>
+                      <small>
+                        {insight.nextActivity.dueDate
+                          ? formatDate(insight.nextActivity.dueDate, settingsStore.dateFormat as 'MMM D, YYYY')
+                          : t('organizations.workspace.noDueDate')}
+                      </small>
+                    </div>
+                  {:else}
+                    {t('organizations.workspace.noneScheduled')}
+                  {/if}
+                </td>
                 <td>
                   <div class="row-actions">
                     <button class="btn btn-primary btn-sm" type="button" onclick={() => openOrganizationDetail(organization)}>
@@ -876,6 +947,51 @@
   .organization-name {
     color: var(--text-primary);
     font-weight: var(--weight-semibold);
+  }
+
+  .health-badge {
+    display: inline-flex;
+    padding: var(--space-1) var(--space-3);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: 9999px;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    white-space: nowrap;
+  }
+
+  .health-neutral {
+    color: var(--text-secondary);
+    background-color: var(--surface-raised);
+  }
+
+  .health-success {
+    color: #2d8659;
+    border-color: #bfe4cc;
+    background-color: #e8f5ec;
+  }
+
+  .health-warning {
+    color: #a84b2f;
+    border-color: #f4d1a1;
+    background-color: #fef3e2;
+  }
+
+  .health-danger {
+    color: #c0392b;
+    border-color: #f0b8b2;
+    background-color: #fff0f0;
+  }
+
+  .next-follow-up {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 140px;
+  }
+
+  .next-follow-up small {
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
   }
 
   .organization-name-button {

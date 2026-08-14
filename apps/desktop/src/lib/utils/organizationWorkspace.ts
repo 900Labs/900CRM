@@ -110,6 +110,46 @@ export function recentOrganizationActivity(activities: Activity[]): Activity | n
     .sort((left, right) => activityUpdatedTime(right) - activityUpdatedTime(left))[0] ?? null;
 }
 
+export interface OrganizationListInsight {
+  health: OrganizationHealth;
+  nextActivity: Activity | null;
+}
+
+export function buildOrganizationListInsight({
+  organizationId,
+  deals,
+  activities,
+  linkIndex,
+  isLoading,
+}: {
+  organizationId: string;
+  deals: Pick<Deal, 'organizationId' | 'stage'>[];
+  activities: Activity[];
+  linkIndex: Record<string, ActivityLink[]>;
+  isLoading: boolean;
+}): OrganizationListInsight {
+  const organizationActivities = filterOrganizationActivities(
+    activities,
+    linkIndex,
+    organizationId,
+  );
+  const pendingActivities = organizationActivities.filter(
+    (activity) => activity.status !== 'completed',
+  );
+  const nextActivity = nextOrganizationActivity(organizationActivities);
+
+  return {
+    health: deriveOrganizationHealth({
+      isLoading,
+      openDealCount: filterOrganizationDeals(deals, organizationId).filter(isOpenDeal).length,
+      pendingActivities,
+      overdueActivities: pendingActivities.filter((activity) => activity.status === 'overdue'),
+      nextActivity,
+    }),
+    nextActivity,
+  };
+}
+
 export function deriveOrganizationHealth({
   isLoading,
   openDealCount,

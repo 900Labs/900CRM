@@ -3,6 +3,7 @@ import type { Activity, ActivityLink } from '$lib/api/activities';
 import type { Contact } from '$lib/api/contacts';
 import type { Deal } from '$lib/api/deals';
 import {
+  buildOrganizationListInsight,
   deriveOrganizationHealth,
   filterOrganizationActivities,
   filterOrganizationContacts,
@@ -155,5 +156,45 @@ describe('organizationWorkspace utilities', () => {
         nextActivity: next,
       }),
     ).toEqual({ state: 'onTrack', tone: 'success', subject: 'Next call' });
+  });
+
+  it('builds list insights from open deals and linked account activity', () => {
+    const overdue = activity({
+      id: 'activity-overdue',
+      subject: 'Past due clinic check-in',
+      dueDate: '2026-06-01',
+      status: 'overdue',
+    });
+    const orgLink = link({
+      activityId: overdue.id,
+      entityType: 'organization',
+      entityId: 'org-1',
+    });
+
+    expect(
+      buildOrganizationListInsight({
+        organizationId: 'org-1',
+        deals: [deal({ organizationId: 'org-1', stage: 'proposal' })],
+        activities: [overdue, activity({ id: 'other', subject: 'Other account' })],
+        linkIndex: { [overdue.id]: [orgLink] },
+        isLoading: false,
+      }),
+    ).toMatchObject({
+      health: { state: 'overdue', tone: 'danger', subject: 'Past due clinic check-in' },
+      nextActivity: overdue,
+    });
+
+    expect(
+      buildOrganizationListInsight({
+        organizationId: 'org-2',
+        deals: [deal({ organizationId: 'org-2', stage: 'qualified' })],
+        activities: [overdue],
+        linkIndex: { [overdue.id]: [orgLink] },
+        isLoading: false,
+      }),
+    ).toMatchObject({
+      health: { state: 'needsFollowUp', tone: 'warning' },
+      nextActivity: null,
+    });
   });
 });

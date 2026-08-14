@@ -737,6 +737,8 @@
     "phone": "Điện thoại",
     "website": "Website",
     "location": "Vị trí",
+    "health": "Tình trạng",
+    "nextFollowUp": "Theo dõi tiếp theo",
     "addressLine1": "Địa chỉ dòng 1",
     "addressLine2": "Địa chỉ dòng 2",
     "city": "Thành phố",

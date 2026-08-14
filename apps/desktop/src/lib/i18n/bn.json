@@ -737,6 +737,8 @@
     "phone": "ফোন",
     "website": "ওয়েবসাইট",
     "location": "অবস্থান",
+    "health": "স্বাস্থ্য",
+    "nextFollowUp": "পরবর্তী ফলো-আপ",
     "addressLine1": "ঠিকানা লাইন ১",
     "addressLine2": "ঠিকানা লাইন ২",
     "city": "শহর",
