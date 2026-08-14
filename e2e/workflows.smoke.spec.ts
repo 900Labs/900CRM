@@ -75,6 +75,74 @@ test('loads the dashboard sample workspace and shows the follow-up on the dashbo
   await assertNoConsoleErrors();
 });
 
+test('shows a dashboard attention queue for overdue work, stuck deals, and waiting leads', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/');
+
+  await page.evaluate(async () => {
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (!invoke) {
+      throw new Error('Tauri smoke shim is not installed.');
+    }
+
+    await invoke('create_contact', {
+      contact_type: 'person',
+      first_name: 'Zuri',
+      last_name: 'Ndlovu',
+      org_name: '',
+      email: 'zuri@example.test',
+      phone: '',
+      address: '',
+      city: '',
+      country: '',
+      org_id: '',
+      notes: '',
+      lifecycle: 'lead',
+    });
+
+    await invoke('create_deal', {
+      title: 'Unworked Clinic Kit',
+      value: 4200,
+      currency: 'USD',
+      stage: 'Lead',
+      probability: 20,
+      expected_close: '',
+      contact_id: '',
+      organization_id: '',
+      notes: '',
+    });
+
+    await invoke('create_activity', {
+      activity_type: 'task',
+      title: 'Past due clinic check-in',
+      description: '',
+      due_date: '2020-01-15',
+      contact_id: '',
+      deal_id: '',
+    });
+  });
+
+  await loadHashRoute(page, '/');
+  const queue = page.getByTestId('dashboard-attention-strip');
+  await expect(queue.getByRole('heading', { name: 'Needs Attention' })).toBeVisible();
+  await expect(queue.getByRole('button', { name: /Past due clinic check-in/ })).toBeVisible();
+  await expect(queue.getByRole('button', { name: /Unworked Clinic Kit/ })).toBeVisible();
+  await expect(queue.getByRole('button', { name: /Zuri Ndlovu/ })).toBeVisible();
+
+  await queue.getByRole('button', { name: /Zuri Ndlovu/ }).click();
+  await expect(page).toHaveURL(/#\/contacts\//);
+  await expect(page.getByRole('heading', { name: 'Zuri Ndlovu' })).toBeVisible();
+
+  await loadHashRoute(page, '/');
+  await page.getByTestId('dashboard-attention-strip').getByRole('button', { name: /Unworked Clinic Kit/ }).click();
+  await expect(page).toHaveURL(/#\/deals\//);
+  await expect(page.getByRole('heading', { name: 'Unworked Clinic Kit' })).toBeVisible();
+
+  await assertNoConsoleErrors();
+});
+
 test('creates a contact through the visible UI and shows it in Contacts and global search', async ({
   page,
   assertNoConsoleErrors,

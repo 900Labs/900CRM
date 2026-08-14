@@ -60,12 +60,16 @@
     },
     "attention": {
       "title": "Cần chú ý",
-      "loading": "Đang kiểm tra theo dõi quá hạn và đến hạn hôm nay.",
-      "summary": "{overdue} quá hạn · {today} đến hạn hôm nay",
-      "listLabel": "Theo dõi cần chú ý",
+      "help": "Theo dõi quá hạn, cơ hội chưa có bước tiếp theo và lead đang chờ.",
+      "loading": "Đang kiểm tra theo dõi, cơ hội và lead cần bước tiếp theo.",
+      "summary": "{overdue} quá hạn · {today} đến hạn hôm nay · {deals} cơ hội chưa có bước tiếp theo · {leads} lead đang chờ",
+      "listLabel": "Việc cần chú ý",
       "overdue": "Quá hạn",
       "today": "Hôm nay",
-      "loadFailed": "Không thể tải phần theo dõi cần chú ý."
+      "dealNeedsFollowUp": "Chưa có bước tiếp theo",
+      "leadWaiting": "Lead đang chờ",
+      "empty": "Bạn đã xong việc. Không có mục quá hạn hoặc thiếu bước tiếp theo.",
+      "loadFailed": "Không thể tải hàng chờ cần chú ý."
     },
     "reports": {
       "title": "Báo cáo chuyển đổi và phễu",

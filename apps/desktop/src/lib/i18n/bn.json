@@ -59,13 +59,17 @@
       "dataAction": "ইমপোর্ট বা ব্যাকআপ"
     },
     "attention": {
-      "title": "Needs Attention",
-      "loading": "Checking overdue and due-today follow-ups.",
-      "summary": "{overdue} overdue · {today} due today",
-      "listLabel": "Follow-ups needing attention",
-      "overdue": "Overdue",
-      "today": "Today",
-      "loadFailed": "Follow-up attention could not be loaded."
+      "title": "মনোযোগ দরকার",
+      "help": "বিলম্বিত ফলো-আপ, পরবর্তী ধাপহীন ডিল এবং অপেক্ষমাণ লিড।",
+      "loading": "ফলো-আপ, ডিল ও লিড যাচাই করা হচ্ছে যেগুলোর পরবর্তী ধাপ দরকার।",
+      "summary": "{overdue} বিলম্বিত · {today} আজ বাকি · {deals} পরবর্তী ধাপহীন ডিল · {leads} অপেক্ষমাণ লিড",
+      "listLabel": "মনোযোগ দরকার এমন কাজ",
+      "overdue": "বিলম্বিত",
+      "today": "আজ",
+      "dealNeedsFollowUp": "পরবর্তী ধাপ নেই",
+      "leadWaiting": "অপেক্ষমাণ লিড",
+      "empty": "আপনি আপ টু ডেট। কিছুই বিলম্বিত নয় এবং কোনো পরবর্তী ধাপ বাকি নেই।",
+      "loadFailed": "মনোযোগের সারি লোড করা যায়নি।"
     },
     "reports": {
       "title": "কনভার্সন ও ফানেল রিপোর্ট",

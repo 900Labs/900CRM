@@ -60,12 +60,16 @@
     },
     "attention": {
       "title": "Inahitaji Kipaumbele",
-      "loading": "Inakagua ufuatiliaji uliochelewa na unaofikia muda leo.",
-      "summary": "{overdue} zimechelewa · {today} zinafikia muda leo",
-      "listLabel": "Ufuatiliaji unaothitaji kipaumbele",
+      "help": "Ufuatiliaji uliochelewa, mikataba bila hatua inayofuata, na viongozi wanaosubiri.",
+      "loading": "Inakagua ufuatiliaji, mikataba, na viongozi wanaohitaji hatua inayofuata.",
+      "summary": "{overdue} zimechelewa · {today} zinafikia muda leo · {deals} mikataba bila hatua inayofuata · {leads} viongozi wanaosubiri",
+      "listLabel": "Kazi inayohitaji kipaumbele",
       "overdue": "Zimechelewa",
       "today": "Leo",
-      "loadFailed": "Kipaumbele cha ufuatiliaji hakikuweza kupakiwa."
+      "dealNeedsFollowUp": "Hakuna hatua inayofuata",
+      "leadWaiting": "Kiongozi anayesubiri",
+      "empty": "Uko sawa. Hakuna kilichochelewa wala kinachokosa hatua inayofuata.",
+      "loadFailed": "Orodha ya kipaumbele haikuweza kupakiwa."
     },
     "reports": {
       "title": "Ripoti za ubadilishaji na faneli",

@@ -60,12 +60,16 @@
     },
     "attention": {
       "title": "Requiere atención",
-      "loading": "Comprobando seguimientos vencidos y que vencen hoy.",
-      "summary": "{overdue} vencidos · {today} vencen hoy",
-      "listLabel": "Seguimientos que requieren atención",
+      "help": "Seguimientos vencidos, negocios sin próximo paso y prospectos en espera.",
+      "loading": "Comprobando seguimientos, negocios y prospectos que necesitan un siguiente paso.",
+      "summary": "{overdue} vencidos · {today} vencen hoy · {deals} negocios sin próximo paso · {leads} prospectos en espera",
+      "listLabel": "Trabajo que requiere atención",
       "overdue": "Vencidos",
       "today": "Hoy",
-      "loadFailed": "No se pudo cargar la atención de seguimientos."
+      "dealNeedsFollowUp": "Sin próximo paso",
+      "leadWaiting": "Prospecto en espera",
+      "empty": "Estás al día. Nada está vencido ni falta un siguiente paso.",
+      "loadFailed": "No se pudo cargar la cola de atención."
     },
     "reports": {
       "title": "Informes de conversión y embudo",
