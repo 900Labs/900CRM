@@ -20,6 +20,14 @@
     type CustomFieldDefinition,
   } from '$lib/api/customFields';
   import { navigateHash } from '$lib/utils/hashRouter';
+  import {
+    createSavedView,
+    deleteSavedView,
+    filtersMatch,
+    listSavedViews,
+    type ContactSavedViewFilters,
+    type SavedView,
+  } from '$lib/api/savedViews';
   import DataTable from '$lib/components/DataTable.svelte';
   import ImportExport from '$lib/components/ImportExport.svelte';
 
@@ -38,6 +46,16 @@
   let customFieldsLoading = $state(true);
   let selectedDuplicateKey = $state('');
   let mergeDirection = $state<'suggested' | 'swapped'>('suggested');
+  let savedViews = $state<SavedView[]>([]);
+  let selectedViewId = $state('');
+  let viewName = $state('');
+  let viewsLoading = $state(false);
+  let viewsSaving = $state(false);
+  let viewsError = $state<string | null>(null);
+
+  const currentViewFilters = $derived(collectCurrentFilters());
+  const selectedView = $derived(savedViews.find((view) => view.id === selectedViewId) ?? null);
+  const canSaveView = $derived(viewName.trim().length > 0 && !viewsSaving);
 
   const selectedDuplicateCandidate = $derived(
     contactStore.duplicateCandidates.find((candidate) => duplicateCandidateKey(candidate) === selectedDuplicateKey)
@@ -135,8 +153,122 @@
       contactStore.loadContacts(),
       contactStore.loadDuplicateCandidates().catch(() => undefined),
       loadCustomFieldDefinitions(),
+      loadSavedViews(),
     ]);
   });
+
+  function toSavedType(type: '' | 'person' | 'org'): ContactSavedViewFilters['type'] {
+    if (type === 'person') return 'person';
+    if (type === 'org') return 'organization';
+    return undefined;
+  }
+
+  function fromSavedType(type: ContactSavedViewFilters['type']): '' | 'person' | 'org' {
+    if (type === 'person') return 'person';
+    if (type === 'organization') return 'org';
+    return '';
+  }
+
+  function collectCurrentFilters(): ContactSavedViewFilters {
+    return {
+      search: searchQuery.trim() || undefined,
+      type: toSavedType(typeFilter),
+      lifecycle: lifecycleFilter || undefined,
+      customFieldDefId: selectedCustomFieldDefId || undefined,
+      customFieldQuery: customFieldQuery.trim() || undefined,
+    };
+  }
+
+  async function loadSavedViews(): Promise<void> {
+    viewsLoading = true;
+    viewsError = null;
+    try {
+      savedViews = await listSavedViews('contact');
+      if (selectedViewId && !savedViews.some((view) => view.id === selectedViewId)) {
+        selectedViewId = '';
+      }
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.loadFailed');
+    } finally {
+      viewsLoading = false;
+    }
+  }
+
+  async function applyView(view: SavedView): Promise<void> {
+    selectedViewId = view.id;
+    searchQuery = view.filters.search ?? '';
+    typeFilter = fromSavedType(view.filters.type);
+    lifecycleFilter = view.filters.lifecycle ?? '';
+    selectedCustomFieldDefId = view.filters.customFieldDefId ?? '';
+    customFieldQuery = view.filters.customFieldQuery ?? '';
+    await contactStore.setFilters({
+      search: searchQuery,
+      type: typeFilter || undefined,
+      lifecycle: lifecycleFilter || undefined,
+      customFieldDefId: selectedCustomFieldDefId || undefined,
+      customFieldQuery: customFieldQuery.trim() || undefined,
+      page: 1,
+    });
+  }
+
+  function syncSelectedView(): void {
+    if (!selectedView || filtersMatch(selectedView.filters, currentViewFilters)) {
+      return;
+    }
+    selectedViewId = '';
+  }
+
+  async function handleSaveView(): Promise<void> {
+    const name = viewName.trim();
+    if (!name) {
+      return;
+    }
+    viewsSaving = true;
+    viewsError = null;
+    try {
+      const view = await createSavedView('contact', name, collectCurrentFilters());
+      savedViews = [...savedViews.filter((item) => item.id !== view.id), view]
+        .sort((left, right) => left.name.localeCompare(right.name));
+      selectedViewId = view.id;
+      viewName = '';
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.saveFailed');
+    } finally {
+      viewsSaving = false;
+    }
+  }
+
+  async function handleDeleteView(): Promise<void> {
+    if (!selectedView) {
+      return;
+    }
+    if (!window.confirm(t('savedViews.confirmDelete', { name: selectedView.name }))) {
+      return;
+    }
+    viewsSaving = true;
+    viewsError = null;
+    try {
+      await deleteSavedView(selectedView.id);
+      savedViews = savedViews.filter((view) => view.id !== selectedView.id);
+      selectedViewId = '';
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.deleteFailed');
+    } finally {
+      viewsSaving = false;
+    }
+  }
+
+  async function handleViewChange(event: Event): Promise<void> {
+    const id = (event.target as HTMLSelectElement).value;
+    if (!id) {
+      selectedViewId = '';
+      return;
+    }
+    const view = savedViews.find((item) => item.id === id);
+    if (view) {
+      await applyView(view);
+    }
+  }
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -152,6 +284,7 @@
         customFieldQuery: customFieldQuery.trim() || undefined,
         page: 1,
       });
+      syncSelectedView();
     }, 300);
   }
 
@@ -164,6 +297,7 @@
       customFieldQuery: customFieldQuery.trim() || undefined,
       page: 1,
     });
+    syncSelectedView();
   }
 
   async function handleLifecycleFilter(lifecycle: '' | ContactLifecycle) {
@@ -175,6 +309,7 @@
       customFieldQuery: customFieldQuery.trim() || undefined,
       page: 1,
     });
+    syncSelectedView();
   }
 
   function handleRowClick(row: unknown) {
@@ -212,6 +347,7 @@
       customFieldQuery: customFieldQuery.trim() || undefined,
       page: 1,
     });
+    syncSelectedView();
   }
 
   function handleCustomFieldDefinitionChange(event: Event) {
@@ -321,6 +457,54 @@
       </button>
     </div>
   </div>
+
+  <section class="saved-views" aria-labelledby="saved-views-heading">
+    <div class="saved-views-copy">
+      <h2 class="saved-views-title" id="saved-views-heading">{t('savedViews.title')}</h2>
+      <p class="saved-views-help">{t('savedViews.help')}</p>
+    </div>
+    <div class="saved-views-controls">
+      <select
+        class="input saved-views-select"
+        value={selectedViewId}
+        onchange={handleViewChange}
+        aria-label={t('savedViews.selectLabel')}
+        disabled={viewsLoading || viewsSaving}
+      >
+        <option value="">{t('savedViews.none')}</option>
+        {#each savedViews as view (view.id)}
+          <option value={view.id}>{view.name}</option>
+        {/each}
+      </select>
+      <input
+        class="input saved-views-name"
+        type="text"
+        bind:value={viewName}
+        placeholder={t('savedViews.namePlaceholder')}
+        aria-label={t('savedViews.nameLabel')}
+        disabled={viewsSaving}
+      />
+      <button
+        class="btn btn-secondary btn-sm"
+        type="button"
+        onclick={() => void handleSaveView()}
+        disabled={!canSaveView}
+      >
+        {viewsSaving ? t('common.loading') : t('savedViews.save')}
+      </button>
+      <button
+        class="btn btn-ghost btn-sm"
+        type="button"
+        onclick={() => void handleDeleteView()}
+        disabled={!selectedView || viewsSaving}
+      >
+        {t('savedViews.delete')}
+      </button>
+    </div>
+    {#if viewsError}
+      <p class="saved-views-error" role="alert">{viewsError}</p>
+    {/if}
+  </section>
 
   <!-- Filters -->
   <div class="contacts-filters">
@@ -527,6 +711,42 @@
     display: flex;
     gap: var(--space-3);
     align-items: center;
+  }
+
+  .saved-views,
+  .saved-views-copy,
+  .saved-views-controls {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .saved-views {
+    justify-content: space-between;
+  }
+
+  .saved-views-title {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+  }
+
+  .saved-views-help,
+  .saved-views-error {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+  }
+
+  .saved-views-error {
+    color: var(--text-danger);
+    width: 100%;
+  }
+
+  .saved-views-select,
+  .saved-views-name {
+    min-width: 160px;
   }
 
   .contacts-filters {

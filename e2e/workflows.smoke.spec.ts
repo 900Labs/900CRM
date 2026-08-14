@@ -141,6 +141,33 @@ test('creates a lead, filters the lead list, and converts it to a customer', asy
   await assertNoConsoleErrors();
 });
 
+test('saves the current contact filters as a named view and applies it later', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/contacts');
+  await page.locator('.page-header').getByRole('button', { name: 'Add Lead' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add Contact' });
+  await dialog.getByLabel('First Name').fill('Sana');
+  await dialog.getByLabel('Last Name').fill('Diallo');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden();
+
+  await page.getByRole('group', { name: 'Lifecycle' }).getByRole('button', { name: 'Leads' }).click();
+  await expect(page.getByText('Sana Diallo')).toBeVisible();
+
+  await page.getByLabel('View name').fill('New leads');
+  await page.getByRole('button', { name: 'Save view' }).click();
+  await expect(page.getByLabel('Saved view', { exact: true })).toHaveValue(/view-/);
+
+  await page.getByRole('group', { name: 'Lifecycle' }).getByRole('button', { name: 'All' }).click();
+  await page.getByLabel('Saved view', { exact: true }).selectOption({ label: 'New leads' });
+  await expect(page.getByRole('group', { name: 'Lifecycle' }).getByRole('button', { name: 'Leads' })).toHaveClass(/active/);
+  await expect(page.getByText('Sana Diallo')).toBeVisible();
+
+  await assertNoConsoleErrors();
+});
+
 test('saves a website bookmark on a contact workspace', async ({
   page,
   assertNoConsoleErrors,

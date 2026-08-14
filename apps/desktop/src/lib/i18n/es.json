@@ -225,6 +225,20 @@
     "saveFailed": "No se pudo guardar la nota",
     "deleteFailed": "No se pudo eliminar la nota"
   },
+  "savedViews": {
+    "title": "Vistas guardadas",
+    "help": "Guarda los filtros actuales de contactos y ábrelos más tarde.",
+    "selectLabel": "Vista guardada",
+    "none": "Ninguna vista guardada",
+    "nameLabel": "Nombre de la vista",
+    "namePlaceholder": "Nombre de esta vista",
+    "save": "Guardar vista",
+    "delete": "Eliminar vista",
+    "confirmDelete": "¿Eliminar la vista guardada “{name}”?",
+    "loadFailed": "No se pudieron cargar las vistas guardadas.",
+    "saveFailed": "No se pudo guardar esta vista.",
+    "deleteFailed": "No se pudo eliminar esta vista."
+  },
   "entityLinks": {
     "title": "Enlaces",
     "help": "Guarda un sitio web o una ruta de archivo local. 900CRM guarda la ubicación como texto y no copia ni sube el archivo.",

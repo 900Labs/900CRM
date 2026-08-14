@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-13
+- Contacts can save the current list filters as a named view and reopen
+  that view later.
 - Contacts, organizations, and deals can store website and local-file
   bookmarks. 900CRM saves the location as text and does not copy or upload
   the file.

@@ -225,6 +225,20 @@
     "saveFailed": "Failed to save note",
     "deleteFailed": "Failed to delete note"
   },
+  "savedViews": {
+    "title": "Saved views",
+    "help": "Keep the current contact filters and reopen them later.",
+    "selectLabel": "Saved view",
+    "none": "No saved view",
+    "nameLabel": "View name",
+    "namePlaceholder": "Name this view",
+    "save": "Save view",
+    "delete": "Delete view",
+    "confirmDelete": "Delete the saved view “{name}”?",
+    "loadFailed": "Could not load saved views.",
+    "saveFailed": "Could not save this view.",
+    "deleteFailed": "Could not delete this view."
+  },
   "entityLinks": {
     "title": "Links",
     "help": "Save a website or a local file path. 900CRM stores the location as text and does not copy or upload the file.",

@@ -225,6 +225,20 @@
     "saveFailed": "An kasa adana bayani",
     "deleteFailed": "An kasa share bayani"
   },
+  "savedViews": {
+    "title": "Ra'ayoyin da aka ajiye",
+    "help": "Ajiye tacewar lambobin yanzu kuma a sake buɗe su daga baya.",
+    "selectLabel": "Ra'ayi da aka ajiye",
+    "none": "Babu ra'ayi da aka ajiye",
+    "nameLabel": "Sunan ra'ayi",
+    "namePlaceholder": "Sanya wa wannan ra'ayi suna",
+    "save": "Ajiye ra'ayi",
+    "delete": "Share ra'ayi",
+    "confirmDelete": "A share ra'ayin da aka ajiye “{name}”?",
+    "loadFailed": "An kasa lodin ra'ayoyin da aka ajiye.",
+    "saveFailed": "An kasa adana wannan ra'ayi.",
+    "deleteFailed": "An kasa share wannan ra'ayi."
+  },
   "entityLinks": {
     "title": "Hanyoyi",
     "help": "Ajiye gidan yanar gizo ko hanyar fayil na gida. 900CRM yana adana wurin a matsayin rubutu kuma ba ya kwafi ko loda fayil.",
