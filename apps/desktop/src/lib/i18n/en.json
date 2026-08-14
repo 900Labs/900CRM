@@ -60,12 +60,16 @@
     },
     "attention": {
       "title": "Needs Attention",
-      "loading": "Checking overdue and due-today follow-ups.",
-      "summary": "{overdue} overdue · {today} due today",
-      "listLabel": "Follow-ups needing attention",
+      "help": "Overdue follow-ups, deals without a next step, and leads waiting to be worked.",
+      "loading": "Checking follow-ups, deals, and leads that need a next step.",
+      "summary": "{overdue} overdue · {today} due today · {deals} deals without a next step · {leads} waiting leads",
+      "listLabel": "Work needing attention",
       "overdue": "Overdue",
       "today": "Today",
-      "loadFailed": "Follow-up attention could not be loaded."
+      "dealNeedsFollowUp": "No next step",
+      "leadWaiting": "Waiting lead",
+      "empty": "You're caught up. Nothing is overdue or missing a next step.",
+      "loadFailed": "The attention queue could not be loaded."
     },
     "reports": {
       "title": "Conversion and Funnel Reports",

@@ -44,7 +44,7 @@ real small business owner.
 
 | Area | Current state | Product issue |
 |---|---|---|
-| Dashboard | KPI cards, activity feed, quick actions, first-run starter checklist, optional synthetic sample workspace | Useful start, but not yet a true command center. No saved goals, no "what needs attention" queue, and no personalized daily priority logic. |
+| Dashboard | KPI cards, daily attention queue, activity feed, quick actions, first-run starter checklist, optional synthetic sample workspace | Useful morning start. The attention queue now lists overdue follow-ups, stuck deals, and waiting leads. Still no saved goals or personalized scoring. |
 | Contacts | Search, type filter, duplicate review, import/export, custom-field filtering, contact detail Customer 360 summary, relationship-aware activity timeline | Contacts and lead/account work are blended. The detail view now has useful at-a-glance and timeline context, but there is no lead capture stage, saved segment, list view preset, files/links section, or deal-detail context. |
 | Organizations | List, create/edit, notes/tags, contact linking, account detail workspace with linked people/deals/activity and relationship-aware account timeline | Account detail is now useful, but list-level account management still lacks owner, health, next step, and saved account views. |
 | Pipeline | Kanban by stage, custom-field filter, deal cards, deal guidance drawer with weighted forecast, stale/overdue/follow-up status, linked activities, and a board-level forecast/stage-health overview | Stronger daily sales surface. Still needs true historical stage conversion summaries, deeper deal editing/detail routing, and stronger drag/drop confidence cues. |
@@ -246,9 +246,10 @@ These are ordered to improve perceived product value fastest.
    - Added a Pipeline stage-move prompt that drafts a follow-up only after a
      user moves an open deal with no linked next activity. Nothing is saved
      until the user reviews and saves the Add Activity modal.
-   - Added a Dashboard attention strip for overdue and due-today follow-ups
-     using the frontend local-day bucketing rules from the Activities
-     workbench.
+   - Added a Dashboard attention queue for overdue and due-today follow-ups,
+     open deals without a next step, and leads with no pending follow-up.
+     Each row opens the related record. The queue uses the frontend
+     local-day bucketing rules from the Activities workbench.
    - Added import wizard guidance that clarifies source/tag columns are not
      applied automatically to contacts and that tag links require local IDs.
    - Remaining work: saved automation rules, recurring reminders, full

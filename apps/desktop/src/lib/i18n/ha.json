@@ -59,13 +59,17 @@
       "dataAction": "Shigo ko Ajiya"
     },
     "attention": {
-      "title": "Needs Attention",
-      "loading": "Checking overdue and due-today follow-ups.",
-      "summary": "{overdue} overdue · {today} due today",
-      "listLabel": "Follow-ups needing attention",
-      "overdue": "Overdue",
-      "today": "Today",
-      "loadFailed": "Follow-up attention could not be loaded."
+      "title": "Na Bukatar Kulawa",
+      "help": "Bibiya da ta makara, yarjejeniyoyi ba tare da mataki na gaba ba, da jagororin da ke jira.",
+      "loading": "Ana duba bibiya, yarjejeniyoyi, da jagororin da suke bukatar mataki na gaba.",
+      "summary": "{overdue} sun makara · {today} na yau · {deals} yarjejeniyoyi ba tare da mataki na gaba ba · {leads} jagororin da ke jira",
+      "listLabel": "Aiki da ke bukatar kulawa",
+      "overdue": "Sun makara",
+      "today": "Yau",
+      "dealNeedsFollowUp": "Babu mataki na gaba",
+      "leadWaiting": "Jagora mai jira",
+      "empty": "Kun gama. Babu wanda ya makara ko wanda ba shi da mataki na gaba.",
+      "loadFailed": "An kasa lodin jerin kulawa."
     },
     "reports": {
       "title": "Rahotannin Juyawa da Tacewa",

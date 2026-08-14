@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-14
+- Dashboard shows a daily attention queue for overdue follow-ups, open deals
+  without a next step, and leads waiting to be worked. Each row opens the
+  related record.
 - Pipeline can save the current deal-name search and custom-field filter as a
   named view and reopen that view later.
 

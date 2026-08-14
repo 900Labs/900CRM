@@ -59,13 +59,17 @@
       "dataAction": "Importer ou sauvegarder"
     },
     "attention": {
-      "title": "Needs Attention",
-      "loading": "Checking overdue and due-today follow-ups.",
-      "summary": "{overdue} overdue · {today} due today",
-      "listLabel": "Follow-ups needing attention",
-      "overdue": "Overdue",
-      "today": "Today",
-      "loadFailed": "Follow-up attention could not be loaded."
+      "title": "À traiter",
+      "help": "Suivis en retard, affaires sans prochaine étape et prospects en attente.",
+      "loading": "Vérification des suivis, affaires et prospects qui nécessitent une prochaine étape.",
+      "summary": "{overdue} en retard · {today} pour aujourd’hui · {deals} affaires sans prochaine étape · {leads} prospects en attente",
+      "listLabel": "Travail à traiter",
+      "overdue": "En retard",
+      "today": "Aujourd’hui",
+      "dealNeedsFollowUp": "Pas de prochaine étape",
+      "leadWaiting": "Prospect en attente",
+      "empty": "Vous êtes à jour. Rien n’est en retard ni sans prochaine étape.",
+      "loadFailed": "Impossible de charger la file d’attention."
     },
     "reports": {
       "title": "Rapports de conversion et d'entonnoir",

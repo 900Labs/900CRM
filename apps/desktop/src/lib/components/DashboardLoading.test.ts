@@ -7,12 +7,16 @@ const {
   createActivityMock,
   getDashboardStatsMock,
   listActivitiesMock,
+  listContactsMock,
+  listDealsMock,
   loadUpcomingMock,
   openModalMock,
 } = vi.hoisted(() => ({
   createActivityMock: vi.fn(),
   getDashboardStatsMock: vi.fn(),
   listActivitiesMock: vi.fn(),
+  listContactsMock: vi.fn(),
+  listDealsMock: vi.fn(),
   loadUpcomingMock: vi.fn(),
   openModalMock: vi.fn(),
 }));
@@ -28,6 +32,14 @@ vi.mock('$lib/api/dashboard', () => ({
 vi.mock('$lib/api/activities', () => ({
   createActivity: createActivityMock,
   listActivities: listActivitiesMock,
+}));
+
+vi.mock('$lib/api/contacts', () => ({
+  listContacts: listContactsMock,
+}));
+
+vi.mock('$lib/api/deals', () => ({
+  listDeals: listDealsMock,
 }));
 
 vi.mock('$lib/stores/activities', () => ({
@@ -58,6 +70,10 @@ describe('Dashboard loading behavior', () => {
     getDashboardStatsMock.mockReset();
     listActivitiesMock.mockReset();
     listActivitiesMock.mockResolvedValue([]);
+    listContactsMock.mockReset();
+    listContactsMock.mockResolvedValue({ contacts: [], total: 0, page: 1, pageSize: 100 });
+    listDealsMock.mockReset();
+    listDealsMock.mockResolvedValue([]);
     loadUpcomingMock.mockReset();
     openModalMock.mockReset();
   });
@@ -129,8 +145,8 @@ describe('Dashboard loading behavior', () => {
     render(Dashboard);
 
     expect(await screen.findByText('dashboard.attention.title')).toBeTruthy();
-    expect(screen.getByText('Past due follow-up')).toBeTruthy();
-    expect(screen.getByText('Today follow-up')).toBeTruthy();
+    expect(await screen.findByText('Past due follow-up')).toBeTruthy();
+    expect(await screen.findByText('Today follow-up')).toBeTruthy();
     expect(screen.getByText('dashboard.attention.overdue')).toBeTruthy();
     expect(screen.getByText('dashboard.attention.today')).toBeTruthy();
   });

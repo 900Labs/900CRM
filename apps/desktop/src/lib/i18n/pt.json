@@ -60,12 +60,16 @@
     },
     "attention": {
       "title": "Precisa de atenção",
-      "loading": "Verificando acompanhamentos atrasados e que vencem hoje.",
-      "summary": "{overdue} atrasados · {today} vencem hoje",
-      "listLabel": "Acompanhamentos que precisam de atenção",
+      "help": "Acompanhamentos atrasados, negócios sem próximo passo e leads à espera.",
+      "loading": "Verificando acompanhamentos, negócios e leads que precisam de um próximo passo.",
+      "summary": "{overdue} atrasados · {today} vencem hoje · {deals} negócios sem próximo passo · {leads} leads à espera",
+      "listLabel": "Trabalho que precisa de atenção",
       "overdue": "Atrasados",
       "today": "Hoje",
-      "loadFailed": "Não foi possível carregar a atenção dos acompanhamentos."
+      "dealNeedsFollowUp": "Sem próximo passo",
+      "leadWaiting": "Lead à espera",
+      "empty": "Você está em dia. Nada está atrasado ou sem um próximo passo.",
+      "loadFailed": "Não foi possível carregar a fila de atenção."
     },
     "reports": {
       "title": "Relatórios de conversão e funil",

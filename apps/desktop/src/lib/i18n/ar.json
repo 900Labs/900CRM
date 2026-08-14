@@ -59,13 +59,17 @@
       "dataAction": "استيراد أو نسخ احتياطي"
     },
     "attention": {
-      "title": "Needs Attention",
-      "loading": "Checking overdue and due-today follow-ups.",
-      "summary": "{overdue} overdue · {today} due today",
-      "listLabel": "Follow-ups needing attention",
-      "overdue": "Overdue",
-      "today": "Today",
-      "loadFailed": "Follow-up attention could not be loaded."
+      "title": "يحتاج اهتمامًا",
+      "help": "متابعات متأخرة، وصفقات بلا خطوة تالية، وعملاء محتملون في الانتظار.",
+      "loading": "جارٍ التحقق من المتابعات والصفقات والعملاء المحتملين الذين يحتاجون خطوة تالية.",
+      "summary": "{overdue} متأخرة · {today} مستحقة اليوم · {deals} صفقات بلا خطوة تالية · {leads} عملاء محتملون في الانتظار",
+      "listLabel": "عمل يحتاج اهتمامًا",
+      "overdue": "متأخر",
+      "today": "اليوم",
+      "dealNeedsFollowUp": "لا توجد خطوة تالية",
+      "leadWaiting": "عميل محتمل في الانتظار",
+      "empty": "أنت محدّث. لا شيء متأخر أو بلا خطوة تالية.",
+      "loadFailed": "تعذر تحميل قائمة الاهتمام."
     },
     "reports": {
       "title": "تقارير التحويل والقمع",

@@ -1,6 +1,8 @@
 import type { Activity, ActivityType } from '$lib/api/activities';
+import type { Contact } from '$lib/api/contacts';
 import type { Deal, DealStage } from '$lib/api/deals';
 import { addLocalDays, buildActivityWorkbench } from '$lib/utils/activityWorkbench';
+import { contactDisplayName } from '$lib/utils/dealRelationships';
 import { isDealClosed, nextDealActivity } from '$lib/utils/pipelineGuidance';
 
 export interface SuggestedActivityDraft {
@@ -22,19 +24,32 @@ export interface DealStageFollowUpSuggestion {
   draft: SuggestedActivityDraft;
 }
 
+export type DashboardAttentionKind =
+  | 'overdue'
+  | 'today'
+  | 'dealNeedsFollowUp'
+  | 'leadWaiting';
+
 export interface DashboardAttentionItem {
   id: string;
-  subject: string;
-  dueDate: string | null;
-  bucket: 'overdue' | 'today';
+  kind: DashboardAttentionKind;
+  title: string;
+  href: string;
+  subject?: string;
+  dueDate?: string | null;
+  bucket?: 'overdue' | 'today';
 }
 
 export interface DashboardAttentionSummary {
   overdueCount: number;
   todayCount: number;
+  dealCount: number;
+  leadCount: number;
   totalCount: number;
   items: DashboardAttentionItem[];
 }
+
+export interface DashboardAttentionQueue extends DashboardAttentionSummary {}
 
 export const LOCAL_AUTOMATION_FOLLOW_UP_DAYS = 1;
 
@@ -92,26 +107,98 @@ export function buildDealStageFollowUpSuggestion({
   };
 }
 
+function activityHref(activity: Activity): string {
+  if (activity.dealId) {
+    return `/deals/${activity.dealId}`;
+  }
+
+  if (activity.contactId) {
+    return `/contacts/${activity.contactId}`;
+  }
+
+  return '/activities';
+}
+
+function hasPendingContactActivity(activities: Activity[], contactId: string): boolean {
+  return activities.some(
+    (activity) => activity.contactId === contactId && activity.status !== 'completed',
+  );
+}
+
+export function buildDashboardAttentionQueue({
+  activities,
+  deals = [],
+  leads = [],
+  now = new Date(),
+  limit = 8,
+}: {
+  activities: Activity[];
+  deals?: Deal[];
+  leads?: Contact[];
+  now?: Date;
+  limit?: number;
+}): DashboardAttentionQueue {
+  const workbench = buildActivityWorkbench(activities, now);
+  const overdue = workbench.buckets.find((bucket) => bucket.bucket === 'overdue')?.activities ?? [];
+  const today = workbench.buckets.find((bucket) => bucket.bucket === 'today')?.activities ?? [];
+  const overdueIds = new Set(overdue.map((activity) => activity.id));
+
+  const followUps: DashboardAttentionItem[] = [...overdue, ...today].map((activity) => {
+    const kind = overdueIds.has(activity.id) ? 'overdue' as const : 'today' as const;
+    return {
+      id: `activity:${activity.id}`,
+      kind,
+      title: activity.subject,
+      href: activityHref(activity),
+      subject: activity.subject,
+      dueDate: activity.dueDate,
+      bucket: kind,
+    };
+  });
+
+  const dealItems = deals
+    .filter((deal) => !isDealClosed(deal))
+    .filter((deal) => !nextDealActivity(
+      activities.filter((activity) => activity.dealId === deal.id),
+      now,
+    ))
+    .sort((left, right) => Date.parse(left.updatedAt) - Date.parse(right.updatedAt))
+    .map((deal) => ({
+      id: `deal:${deal.id}`,
+      kind: 'dealNeedsFollowUp' as const,
+      title: deal.name,
+      href: `/deals/${deal.id}`,
+    }));
+
+  const leadItems = leads
+    .filter((lead) => lead.type === 'person' && lead.lifecycle === 'lead')
+    .filter((lead) => !hasPendingContactActivity(activities, lead.id))
+    .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt))
+    .map((lead) => ({
+      id: `lead:${lead.id}`,
+      kind: 'leadWaiting' as const,
+      title: contactDisplayName(lead),
+      href: `/contacts/${lead.id}`,
+    }));
+
+  return {
+    overdueCount: workbench.summary.overdue,
+    todayCount: workbench.summary.today,
+    dealCount: dealItems.length,
+    leadCount: leadItems.length,
+    totalCount:
+      workbench.summary.overdue
+      + workbench.summary.today
+      + dealItems.length
+      + leadItems.length,
+    items: [...followUps, ...dealItems, ...leadItems].slice(0, limit),
+  };
+}
+
 export function buildDashboardAttentionSummary(
   activities: Activity[],
   now: Date = new Date(),
   limit = 4,
 ): DashboardAttentionSummary {
-  const workbench = buildActivityWorkbench(activities, now);
-  const overdue = workbench.buckets.find((bucket) => bucket.bucket === 'overdue')?.activities ?? [];
-  const today = workbench.buckets.find((bucket) => bucket.bucket === 'today')?.activities ?? [];
-  const overdueIds = new Set(overdue.map((activity) => activity.id));
-  const items = [...overdue, ...today].slice(0, limit).map((activity) => ({
-    id: activity.id,
-    subject: activity.subject,
-    dueDate: activity.dueDate,
-    bucket: overdueIds.has(activity.id) ? 'overdue' as const : 'today' as const,
-  }));
-
-  return {
-    overdueCount: workbench.summary.overdue,
-    todayCount: workbench.summary.today,
-    totalCount: workbench.summary.overdue + workbench.summary.today,
-    items,
-  };
+  return buildDashboardAttentionQueue({ activities, now, limit });
 }

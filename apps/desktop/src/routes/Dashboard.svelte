@@ -4,21 +4,29 @@
    *
    * Displays:
    *   - 4 KPI stat cards (total contacts, active deals, pipeline value, upcoming tasks)
+   *   - Daily needs-attention queue (overdue follow-ups, stuck deals, waiting leads)
    *   - Recent activity feed
    *   - Quick action buttons
    */
 
-  import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
   import { listActivities } from '$lib/api/activities';
   import type { Activity } from '$lib/api/activities';
+  import { listContacts } from '$lib/api/contacts';
+  import type { Contact } from '$lib/api/contacts';
   import { getDashboardStats } from '$lib/api/dashboard';
   import type { DashboardStats } from '$lib/api/dashboard';
+  import { listDeals } from '$lib/api/deals';
+  import type { Deal } from '$lib/api/deals';
   import { activityStore } from '$lib/stores/activities';
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
   import { formatCurrency } from '$lib/utils/formatters';
-  import { buildDashboardAttentionSummary } from '$lib/utils/localAutomation';
+  import { navigateHash } from '$lib/utils/hashRouter';
+  import {
+    buildDashboardAttentionQueue,
+    type DashboardAttentionItem,
+  } from '$lib/utils/localAutomation';
   import { buildDefaultSampleWorkspaceDeps, seedSampleWorkspace } from '$lib/utils/sampleWorkspace';
   import StatCard from '$lib/components/StatCard.svelte';
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
@@ -33,9 +41,11 @@
   let sampleMessage = $state<string | null>(null);
   let sampleError = $state<string | null>(null);
   let attentionActivities = $state<Activity[]>([]);
+  let attentionDeals = $state<Deal[]>([]);
+  let attentionLeads = $state<Contact[]>([]);
   let attentionLoading = $state(true);
   let attentionError = $state<string | null>(null);
-  let componentMounted = false;
+  let dashboardBootstrapped = false;
 
   const DASHBOARD_LOAD_TIMEOUT_MS = 8_000;
 
@@ -74,8 +84,20 @@
   const sampleDataAvailable = $derived(
     !sampleLoaded && !hasFirstRunContacts && !hasFirstRunDeals && !hasFirstRunActivities
   );
-  const attentionSummary = $derived(buildDashboardAttentionSummary(attentionActivities));
-  const showAttentionStrip = $derived(attentionLoading || attentionSummary.totalCount > 0 || Boolean(attentionError));
+  const attentionQueue = $derived(buildDashboardAttentionQueue({
+    activities: attentionActivities,
+    deals: attentionDeals,
+    leads: attentionLeads,
+  }));
+  const hasWorkspaceRecords = $derived(
+    sampleLoaded || hasFirstRunContacts || hasFirstRunDeals || hasFirstRunActivities,
+  );
+  const showAttentionQueue = $derived(
+    attentionLoading
+    || Boolean(attentionError)
+    || attentionQueue.totalCount > 0
+    || hasWorkspaceRecords,
+  );
 
   function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -102,14 +124,12 @@
 
     try {
       const dashStats = await withTimeout(getDashboardStats(), 'Dashboard stats');
-      if (!componentMounted) return;
       stats = dashStats;
     } catch (err) {
-      if (!componentMounted) return;
       error = t('errors.loadFailed');
       console.error('[Dashboard] Stats load error:', err);
     } finally {
-      if (componentMounted) statsLoading = false;
+      statsLoading = false;
     }
   }
 
@@ -121,7 +141,7 @@
     }
   }
 
-  async function loadAttentionActivities(): Promise<void> {
+  async function loadAttentionQueue(): Promise<void> {
     attentionLoading = true;
     attentionError = null;
 
@@ -130,22 +150,37 @@
         listActivities({ sortBy: 'dueDate', sortDir: 'asc', pageSize: 200 }),
         'Dashboard attention activities',
       );
-      if (!componentMounted) return;
       attentionActivities = activities;
+
+      const [deals, leadPage] = await Promise.all([
+        listDeals({ sortBy: 'createdAt', sortDir: 'asc' }),
+        listContacts({
+          type: 'person',
+          lifecycle: 'lead',
+          sortBy: 'createdAt',
+          sortDir: 'asc',
+          pageSize: 100,
+        }),
+      ]);
+      attentionDeals = deals;
+      attentionLeads = leadPage.contacts;
     } catch (err) {
-      if (!componentMounted) return;
       attentionError = t('dashboard.attention.loadFailed');
-      console.error('[Dashboard] Attention activity load error:', err);
+      console.error('[Dashboard] Attention queue load error:', err);
     } finally {
-      if (componentMounted) attentionLoading = false;
+      attentionLoading = false;
     }
+  }
+
+  function openAttentionItem(item: DashboardAttentionItem): void {
+    navigateHash(item.href);
   }
 
   async function refreshDashboard(): Promise<void> {
     await Promise.allSettled([
       loadStats(),
       loadUpcomingActivities(),
-      loadAttentionActivities(),
+      loadAttentionQueue(),
     ]);
   }
 
@@ -180,13 +215,13 @@
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
-  onMount(() => {
-    componentMounted = true;
-    void refreshDashboard();
+  $effect(() => {
+    if (dashboardBootstrapped) {
+      return;
+    }
 
-    return () => {
-      componentMounted = false;
-    };
+    dashboardBootstrapped = true;
+    void refreshDashboard();
   });
 </script>
 
@@ -322,7 +357,7 @@
     {/if}
 
     <!-- Content grid: activity feed + quick actions -->
-    {#if showAttentionStrip}
+    {#if showAttentionQueue}
       <section
         class="attention-strip"
         aria-labelledby="attention-strip-heading"
@@ -335,22 +370,34 @@
             <p>{t('dashboard.attention.loading')}</p>
           {:else if attentionError}
             <p>{attentionError}</p>
+          {:else if attentionQueue.totalCount === 0}
+            <p>{t('dashboard.attention.empty')}</p>
           {:else}
+            <p>{t('dashboard.attention.help')}</p>
             <p>
               {t('dashboard.attention.summary', {
-                overdue: attentionSummary.overdueCount,
-                today: attentionSummary.todayCount,
+                overdue: attentionQueue.overdueCount,
+                today: attentionQueue.todayCount,
+                deals: attentionQueue.dealCount,
+                leads: attentionQueue.leadCount,
               })}
             </p>
           {/if}
         </div>
 
-        {#if !attentionLoading && !attentionError && attentionSummary.items.length > 0}
+        {#if !attentionLoading && !attentionError && attentionQueue.items.length > 0}
           <ul class="attention-list" aria-label={t('dashboard.attention.listLabel')}>
-            {#each attentionSummary.items as item (item.id)}
-              <li class:overdue={item.bucket === 'overdue'}>
-                <span>{item.subject}</span>
-                <small>{t(`dashboard.attention.${item.bucket}`)}</small>
+            {#each attentionQueue.items as item (item.id)}
+              <li>
+                <button
+                  class="attention-item"
+                  class:overdue={item.kind === 'overdue'}
+                  type="button"
+                  onclick={() => openAttentionItem(item)}
+                >
+                  <span>{item.title}</span>
+                  <small>{t(`dashboard.attention.${item.kind}`)}</small>
+                </button>
               </li>
             {/each}
           </ul>
@@ -609,22 +656,36 @@
   }
 
   .attention-list li {
+    min-width: 0;
+  }
+
+  .attention-item {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     gap: var(--space-3);
+    width: 100%;
     min-width: 0;
     padding: var(--space-3);
     border: var(--border-width) solid var(--border-default);
     border-radius: var(--border-radius-sm);
     background: var(--surface-base);
+    color: inherit;
+    text-align: start;
+    cursor: pointer;
   }
 
-  .attention-list li.overdue {
+  .attention-item:hover,
+  .attention-item:focus-visible {
+    border-color: var(--color-primary);
+  }
+
+  .attention-item.overdue {
     border-color: var(--color-danger-200);
     background: var(--color-danger-50);
   }
 
-  .attention-list span {
+  .attention-item span {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -634,7 +695,7 @@
     color: var(--text-primary);
   }
 
-  .attention-list small {
+  .attention-item small {
     flex-shrink: 0;
     color: var(--text-secondary);
     font-size: var(--text-xs);
