@@ -259,7 +259,7 @@
     "saveFailed": "An kasa adana wannan ra'ayi.",
     "deleteFailed": "An kasa share wannan ra'ayi.",
     "helpOrganizations": "Ajiye binciken ƙungiyoyi da tacewar ƙasa kuma a sake buɗe su daga baya.",
-    "helpPipeline": "Ajiye binciken pipeline da tacewar filin al'ada kuma a sake buɗe su daga baya.",
+    "helpPipeline": "Ajiye binciken pipeline, tacewar kulawa da tacewar filin al'ada kuma a sake buɗe su daga baya.",
     "allCountries": "Duk ƙasashe"
   },
   "entityLinks": {
@@ -293,6 +293,8 @@
     "title": "Pipeline",
     "addDeal": "Kara Yarjejeniya",
     "search": "Nemo yarjejeniyoyi…",
+    "attentionFilter": "Kulawa",
+    "attentionAll": "Duka",
     "openDeal": "Buɗe yarjejeniya",
     "backToPipeline": "Koma pipeline",
     "notFound": "Ba a sami wannan yarjejeniyar ba.",

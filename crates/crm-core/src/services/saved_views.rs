@@ -184,7 +184,8 @@ fn canonicalize_filters_json(raw: &str) -> CrmResult<String> {
             | "custom_field_def_id"
             | "custom_field_query"
             | "sort_by"
-            | "sort_dir" => {}
+            | "sort_dir"
+            | "attention" => {}
             other => {
                 return Err(CrmError::InvalidInput(format!(
                     "Unsupported saved-view filter '{other}'"
@@ -214,6 +215,14 @@ fn canonicalize_filters_json(raw: &str) -> CrmResult<String> {
             "sort_dir" if text != "asc" && text != "desc" => {
                 return Err(CrmError::InvalidInput(
                     "Saved view sort_dir must be asc or desc".to_string(),
+                ));
+            }
+            "attention"
+                if text != "needsFollowUp" && text != "stale" && text != "overdue" =>
+            {
+                return Err(CrmError::InvalidInput(
+                    "Saved view attention must be needsFollowUp, stale, or overdue"
+                        .to_string(),
                 ));
             }
             "sort_by"

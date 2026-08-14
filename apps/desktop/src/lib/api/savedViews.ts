@@ -15,6 +15,7 @@ export interface ContactSavedViewFilters {
   customFieldQuery?: string;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
+  attention?: 'needsFollowUp' | 'stale' | 'overdue';
 }
 
 export interface SavedView<TFilters = ContactSavedViewFilters> {
@@ -44,6 +45,7 @@ interface BackendFilters {
   custom_field_query?: string;
   sort_by?: string;
   sort_dir?: 'asc' | 'desc';
+  attention?: 'needsFollowUp' | 'stale' | 'overdue';
 }
 
 function toBackendFilters(filters: ContactSavedViewFilters): BackendFilters {
@@ -56,6 +58,7 @@ function toBackendFilters(filters: ContactSavedViewFilters): BackendFilters {
     custom_field_query: filters.customFieldQuery?.trim() || undefined,
     sort_by: filters.sortBy,
     sort_dir: filters.sortDir,
+    attention: filters.attention,
   };
 }
 
@@ -70,6 +73,7 @@ function fromBackendFilters(raw: string): ContactSavedViewFilters {
     customFieldQuery: parsed.custom_field_query,
     sortBy: parsed.sort_by,
     sortDir: parsed.sort_dir,
+    attention: parsed.attention,
   };
 }
 

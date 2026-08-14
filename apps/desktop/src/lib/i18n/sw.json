@@ -259,7 +259,7 @@
     "saveFailed": "Imeshindwa kuhifadhi mwonekano huu.",
     "deleteFailed": "Imeshindwa kufuta mwonekano huu.",
     "helpOrganizations": "Hifadhi utafutaji wa mashirika na kichujio cha nchi na uvifungue tena baadaye.",
-    "helpPipeline": "Hifadhi utafutaji wa bomba na kichujio cha uga maalum na uvifungue tena baadaye.",
+    "helpPipeline": "Hifadhi utafutaji wa bomba, kichujio cha kipaumbele na kichujio cha uga maalum na uvifungue tena baadaye.",
     "allCountries": "Nchi zote"
   },
   "entityLinks": {
@@ -293,6 +293,8 @@
     "title": "Mtiririko",
     "addDeal": "Ongeza Mkataba",
     "search": "Tafuta mikataba…",
+    "attentionFilter": "Kipaumbele",
+    "attentionAll": "Zote",
     "openDeal": "Fungua biashara",
     "backToPipeline": "Rudi kwenye bomba",
     "notFound": "Biashara hii haikupatikana.",
