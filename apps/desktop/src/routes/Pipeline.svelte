@@ -104,6 +104,7 @@
   let pipelineBootstrapComplete = $state(false);
   let suppressNextCardClick = false;
   let searchQuery = $state('');
+  let attentionFilter = $state<'' | 'needsFollowUp' | 'stale' | 'overdue'>('');
   let savedViews = $state<SavedView[]>([]);
   let selectedViewId = $state('');
   let viewName = $state('');
@@ -315,6 +316,7 @@
       search: searchQuery.trim() || undefined,
       customFieldDefId: selectedCustomFieldDefId || undefined,
       customFieldQuery: customFieldQuery.trim() || undefined,
+      attention: attentionFilter || undefined,
     };
   }
 
@@ -342,6 +344,7 @@
     searchQuery = view.filters.search ?? '';
     selectedCustomFieldDefId = view.filters.customFieldDefId ?? '';
     customFieldQuery = view.filters.customFieldQuery ?? '';
+    attentionFilter = view.filters.attention ?? '';
     if (selectedCustomFieldDefId && customFieldQuery.trim()) {
       await ensureCustomFieldValueIndex();
     }
@@ -411,6 +414,11 @@
     syncSelectedView();
   }
 
+  function handleAttentionFilter(next: '' | 'needsFollowUp' | 'stale' | 'overdue'): void {
+    attentionFilter = next;
+    syncSelectedView();
+  }
+
   function matchesSearch(deal: Deal): boolean {
     const query = searchQuery.trim().toLowerCase();
     if (!query) {
@@ -432,20 +440,17 @@
     return rawValue.toLowerCase().includes(query);
   }
 
-  // ── Derived ─────────────────────────────────────────────────────────────────
+  function matchesAttention(deal: Deal): boolean {
+    if (!attentionFilter) {
+      return true;
+    }
+    if (!activityContextReady || activityContextError) {
+      return true;
+    }
+    return guidanceByDealId[deal.id]?.state === attentionFilter;
+  }
 
-  /** Column metadata derived from dealsByStage. */
-  const columns = $derived(
-    DEAL_STAGES.map((stage) => {
-      const deals = (dealStore.dealsByStage[stage] ?? []).filter(
-        (deal) => matchesSearch(deal) && matchesCustomField(deal.id),
-      );
-      const currencyTotals = sumByCurrency(
-        deals.map((deal) => ({ currency: deal.currency, value: deal.value }))
-      );
-      return { stage, deals, currencyTotals };
-    })
-  );
+  // ── Derived ─────────────────────────────────────────────────────────────────
 
   const allDeals = $derived.by(() =>
     DEAL_STAGES.flatMap((stage) => dealStore.dealsByStage[stage] ?? [])
@@ -462,8 +467,6 @@
       dealStore.selectDeal(deal);
     }
   });
-
-  const visibleDeals = $derived.by(() => columns.flatMap((column) => column.deals));
 
   const dealActivitiesById = $derived.by<Record<string, Activity[]>>(() => {
     if (!activityContextReady) {
@@ -519,6 +522,20 @@
       ])
     );
   });
+
+  const columns = $derived(
+    DEAL_STAGES.map((stage) => {
+      const deals = (dealStore.dealsByStage[stage] ?? []).filter(
+        (deal) => matchesSearch(deal) && matchesCustomField(deal.id) && matchesAttention(deal),
+      );
+      const currencyTotals = sumByCurrency(
+        deals.map((deal) => ({ currency: deal.currency, value: deal.value }))
+      );
+      return { stage, deals, currencyTotals };
+    })
+  );
+
+  const visibleDeals = $derived.by(() => columns.flatMap((column) => column.deals));
 
   const pipelineMetrics = $derived.by(() =>
     buildPipelineForecastMetrics({
@@ -906,6 +923,23 @@
       placeholder={t('deals.search')}
       aria-label={t('deals.search')}
     />
+    <div class="attention-filters" role="group" aria-label={t('deals.attentionFilter')}>
+      {#each [
+        { value: '', label: t('deals.attentionAll') },
+        { value: 'needsFollowUp', label: t('deals.guidance.needsFollowUp') },
+        { value: 'stale', label: t('deals.guidance.stale') },
+        { value: 'overdue', label: t('deals.guidance.overdue') },
+      ] as option (option.value)}
+        <button
+          class="filter-chip"
+          class:active={attentionFilter === option.value}
+          type="button"
+          onclick={() => handleAttentionFilter(option.value as '' | 'needsFollowUp' | 'stale' | 'overdue')}
+        >
+          {option.label}
+        </button>
+      {/each}
+    </div>
     <span class="pipeline-filters-label">{t('common.customField')}:</span>
     <select
       class="input pipeline-filter-select"
@@ -1365,6 +1399,29 @@
     font-size: var(--text-xs);
     font-weight: var(--weight-medium);
     color: var(--text-secondary);
+  }
+
+  .attention-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .filter-chip {
+    padding: var(--space-2) var(--space-4);
+    border-radius: 9999px;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+    background-color: transparent;
+    border: var(--border-width) solid var(--border-default);
+    cursor: pointer;
+  }
+
+  .filter-chip.active {
+    background-color: var(--surface-active);
+    color: var(--text-accent);
+    border-color: var(--color-primary-200);
   }
 
   .pipeline-filter-select {

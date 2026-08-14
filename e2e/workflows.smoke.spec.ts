@@ -602,6 +602,72 @@ test('saves the current pipeline filters as a named view and applies it later', 
   await assertNoConsoleErrors();
 });
 
+test('filters the pipeline board by deals that need a follow-up', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/pipeline');
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Deal' }).click();
+  const quietDialog = page.getByRole('dialog', { name: 'Add Deal' });
+  await quietDialog.getByLabel('Deal Name').fill('Needs Follow Clinic Kit');
+  await quietDialog.getByLabel('Value').fill('7200');
+  await quietDialog.getByRole('button', { name: 'Save' }).click();
+  await expect(quietDialog).toBeHidden();
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Deal' }).click();
+  const scheduledDialog = page.getByRole('dialog', { name: 'Add Deal' });
+  await scheduledDialog.getByLabel('Deal Name').fill('Scheduled Harbor Kit');
+  await scheduledDialog.getByLabel('Value').fill('4300');
+  await scheduledDialog.getByRole('button', { name: 'Save' }).click();
+  await expect(scheduledDialog).toBeHidden();
+
+  const laterDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  await page.evaluate(async (dueDate) => {
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (!invoke) {
+      throw new Error('Tauri smoke shim is not installed.');
+    }
+    const deals = await invoke('list_deals') as Array<{ id: string; title?: string }>;
+    const scheduled = deals.find((deal) => deal.title === 'Scheduled Harbor Kit');
+    if (!scheduled) {
+      throw new Error('Scheduled deal was not created.');
+    }
+    await invoke('create_activity', {
+      activity_type: 'task',
+      title: 'Harbor site visit',
+      description: '',
+      due_date: dueDate,
+      contact_id: '',
+      deal_id: scheduled.id,
+    });
+  }, laterDate);
+
+  await loadHashRoute(page, '/pipeline');
+  await expect(page.getByRole('button', { name: /Needs Follow Clinic Kit/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Scheduled Harbor Kit/ })).toBeVisible();
+
+  await page.getByRole('group', { name: 'Attention' }).getByRole('button', { name: 'Needs Follow-Up' }).click();
+  await expect(page.getByRole('button', { name: /Needs Follow Clinic Kit/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Scheduled Harbor Kit/ })).toHaveCount(0);
+
+  await page.getByLabel('View name').fill('Needs follow-up');
+  await page.getByRole('button', { name: 'Save view' }).click();
+  await expect(page.getByLabel('Saved view', { exact: true })).toHaveValue(/view-/);
+
+  await page.getByRole('group', { name: 'Attention' }).getByRole('button', { name: 'All' }).click();
+  await expect(page.getByRole('button', { name: /Scheduled Harbor Kit/ })).toBeVisible();
+
+  await page.getByLabel('Saved view', { exact: true }).selectOption({ label: 'Needs follow-up' });
+  await expect(page.getByRole('group', { name: 'Attention' }).getByRole('button', { name: 'Needs Follow-Up' })).toHaveClass(/active/);
+  await expect(page.getByRole('button', { name: /Needs Follow Clinic Kit/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Scheduled Harbor Kit/ })).toHaveCount(0);
+
+  await assertNoConsoleErrors();
+});
+
 test('shows an account 360 workspace for an organization with linked work', async ({
   page,
   assertNoConsoleErrors,

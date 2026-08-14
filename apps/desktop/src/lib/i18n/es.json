@@ -259,7 +259,7 @@
     "saveFailed": "No se pudo guardar esta vista.",
     "deleteFailed": "No se pudo eliminar esta vista.",
     "helpOrganizations": "Guarda la búsqueda y el filtro de país de las organizaciones y ábrelos más tarde.",
-    "helpPipeline": "Guarda la búsqueda del pipeline y el filtro de campo personalizado y ábrelos más tarde.",
+    "helpPipeline": "Guarda la búsqueda del pipeline, el filtro de atención y el filtro de campo personalizado y ábrelos más tarde.",
     "allCountries": "Todos los países"
   },
   "entityLinks": {
@@ -293,6 +293,8 @@
     "title": "Pipeline",
     "addDeal": "Agregar negocio",
     "search": "Buscar negocios…",
+    "attentionFilter": "Atención",
+    "attentionAll": "Todos",
     "openDeal": "Abrir negocio",
     "backToPipeline": "Volver al pipeline",
     "notFound": "No se encontró este negocio.",

@@ -104,4 +104,22 @@ describe('saved views API', () => {
       }),
     });
   });
+
+  it('maps deal attention filters', async () => {
+    invokeMock.mockResolvedValueOnce({
+      id: 'view-attention',
+      entity_type: 'deal',
+      name: 'Needs follow-up',
+      filters_json: '{"attention":"needsFollowUp"}',
+      created_at: '2026-08-14T10:00:00Z',
+      updated_at: '2026-08-14T10:00:00Z',
+    });
+
+    await expect(
+      createSavedView('deal', 'Needs follow-up', { attention: 'needsFollowUp' }),
+    ).resolves.toMatchObject({
+      entityType: 'deal',
+      filters: { attention: 'needsFollowUp' },
+    });
+  });
 });
