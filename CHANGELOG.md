@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-14
+- Activities can save the current type, status, due-bucket, and custom-field
+  filters as a named view and reopen that view later.
 - Pipeline can filter the board by attention: Needs Follow-Up, Stale, or
   Overdue. That filter can be saved with a named view.
 - Reports lists stale deals: open deals that have not changed in 14 days and

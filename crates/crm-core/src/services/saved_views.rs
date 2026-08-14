@@ -127,8 +127,9 @@ fn normalize_view_entity_type(entity_type: &str) -> CrmResult<&'static str> {
         "contact" => Ok("contact"),
         "organization" => Ok("organization"),
         "deal" => Ok("deal"),
+        "activity" => Ok("activity"),
         other => Err(CrmError::InvalidInput(format!(
-            "Unsupported saved-view entity_type '{other}'. Must be contact, organization, or deal"
+            "Unsupported saved-view entity_type '{other}'. Must be contact, organization, deal, or activity"
         ))),
     }
 }
@@ -185,7 +186,9 @@ fn canonicalize_filters_json(raw: &str) -> CrmResult<String> {
             | "custom_field_query"
             | "sort_by"
             | "sort_dir"
-            | "attention" => {}
+            | "attention"
+            | "status"
+            | "bucket" => {}
             other => {
                 return Err(CrmError::InvalidInput(format!(
                     "Unsupported saved-view filter '{other}'"
@@ -202,14 +205,36 @@ fn canonicalize_filters_json(raw: &str) -> CrmResult<String> {
         };
 
         match key.as_str() {
-            "type" if text != "person" && text != "organization" => {
+            "type"
+                if !matches!(
+                    text,
+                    "person" | "organization" | "task" | "call" | "meeting" | "email"
+                ) =>
+            {
                 return Err(CrmError::InvalidInput(
-                    "Saved view type must be person or organization".to_string(),
+                    "Saved view type must be person, organization, task, call, meeting, or email"
+                        .to_string(),
                 ));
             }
             "lifecycle" if text != "lead" && text != "customer" => {
                 return Err(CrmError::InvalidInput(
                     "Saved view lifecycle must be lead or customer".to_string(),
+                ));
+            }
+            "status" if !matches!(text, "pending" | "completed" | "overdue") => {
+                return Err(CrmError::InvalidInput(
+                    "Saved view status must be pending, completed, or overdue".to_string(),
+                ));
+            }
+            "bucket"
+                if !matches!(
+                    text,
+                    "overdue" | "today" | "thisWeek" | "later" | "unscheduled" | "completed"
+                ) =>
+            {
+                return Err(CrmError::InvalidInput(
+                    "Saved view bucket must be overdue, today, thisWeek, later, unscheduled, or completed"
+                        .to_string(),
                 ));
             }
             "sort_dir" if text != "asc" && text != "desc" => {

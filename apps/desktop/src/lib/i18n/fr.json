@@ -260,6 +260,7 @@
     "deleteFailed": "Impossible de supprimer cette vue.",
     "helpOrganizations": "Conservez la recherche et le filtre pays des organisations et rouvrez-les plus tard.",
     "helpPipeline": "Conservez la recherche du pipeline, le filtre d’attention et le filtre de champ personnalisé et rouvrez-les plus tard.",
+    "helpActivities": "Conservez les filtres de type, de statut, d’échéance et de champ personnalisé des activités et rouvrez-les plus tard.",
     "allCountries": "Tous les pays"
   },
   "entityLinks": {

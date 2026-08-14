@@ -12152,3 +12152,49 @@ fn saved_views_store_named_deal_filters() {
     drop(core);
     let _ = std::fs::remove_dir_all(path);
 }
+
+#[test]
+fn saved_views_store_named_activity_filters() {
+    let (mut core, path) = open_test_core();
+
+    let view = core
+        .create_saved_view(
+            "activity".to_string(),
+            "Overdue calls".to_string(),
+            r#"{"type":"call","status":"overdue","bucket":"today","custom_field_query":"clinic"}"#
+                .to_string(),
+        )
+        .expect("activity saved view should be created");
+    assert_eq!(view.entity_type, "activity");
+    assert!(view.filters_json.contains("call"));
+    assert!(view.filters_json.contains("overdue"));
+    assert!(view.filters_json.contains("today"));
+    assert!(view.filters_json.contains("clinic"));
+
+    let listed = core
+        .list_saved_views("activity".to_string())
+        .expect("activity views should list");
+    assert_eq!(listed.len(), 1);
+    assert!(core
+        .list_saved_views("contact".to_string())
+        .expect("contact views stay separate")
+        .is_empty());
+    assert!(core
+        .list_saved_views("organization".to_string())
+        .expect("organization views stay separate")
+        .is_empty());
+    assert!(core
+        .list_saved_views("deal".to_string())
+        .expect("deal views stay separate")
+        .is_empty());
+
+    let invalid = core.create_saved_view(
+        "activity".to_string(),
+        "Bad bucket".to_string(),
+        r#"{"bucket":"yesterday"}"#.to_string(),
+    );
+    assert!(matches!(invalid, Err(CrmError::InvalidInput(_))));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}

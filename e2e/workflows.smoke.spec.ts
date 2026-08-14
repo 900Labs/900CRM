@@ -1054,3 +1054,48 @@ test('creates an activity through the visible UI and shows it in Activities', as
 
   await assertNoConsoleErrors();
 });
+
+test('saves the current activity filters as a named view and applies it later', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/activities');
+  await expect(page.getByRole('heading', { name: 'Activities' })).toBeVisible();
+
+  const today = localDateInputValue();
+
+  await page.locator('.page-header').getByRole('button', { name: /^Add Activity$/ }).click();
+  const firstForm = page.getByRole('form', { name: 'Add Activity' });
+  await firstForm.getByLabel('Type').selectOption('task');
+  await firstForm.getByLabel('Subject').fill('Harbor grant paperwork task');
+  await firstForm.getByLabel('Due Date').fill(today);
+  await firstForm.getByRole('button', { name: 'Add', exact: true }).click();
+
+  await page.locator('.page-header').getByRole('button', { name: /^Add Activity$/ }).click();
+  const secondForm = page.getByRole('form', { name: 'Add Activity' });
+  await secondForm.getByLabel('Type').selectOption('call');
+  await secondForm.getByLabel('Subject').fill('Clinic site call with Amara');
+  await secondForm.getByLabel('Due Date').fill(today);
+  await secondForm.getByRole('button', { name: 'Add', exact: true }).click();
+
+  await expect(page.getByText('Harbor grant paperwork task')).toBeVisible();
+  await expect(page.getByText('Clinic site call with Amara')).toBeVisible();
+
+  await page.getByRole('group', { name: 'Type' }).getByRole('button', { name: 'Call' }).click();
+  await expect(page.getByText('Clinic site call with Amara')).toBeVisible();
+  await expect(page.getByText('Harbor grant paperwork task')).toHaveCount(0);
+
+  await page.getByLabel('View name').fill('Clinic calls');
+  await page.getByRole('button', { name: 'Save view' }).click();
+  await expect(page.getByLabel('Saved view', { exact: true })).toHaveValue(/view-/);
+
+  await page.getByRole('group', { name: 'Type' }).getByRole('button', { name: 'All', exact: true }).click();
+  await expect(page.getByText('Harbor grant paperwork task')).toBeVisible();
+
+  await page.getByLabel('Saved view', { exact: true }).selectOption({ label: 'Clinic calls' });
+  await expect(page.getByRole('group', { name: 'Type' }).getByRole('button', { name: 'Call' })).toHaveClass(/active/);
+  await expect(page.getByText('Clinic site call with Amara')).toBeVisible();
+  await expect(page.getByText('Harbor grant paperwork task')).toHaveCount(0);
+
+  await assertNoConsoleErrors();
+});
