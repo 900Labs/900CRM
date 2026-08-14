@@ -75,4 +75,33 @@ describe('saved views API', () => {
       filters: { country: 'Kenya', search: 'clinic' },
     });
   });
+
+  it('maps deal search and custom-field filters', async () => {
+    invokeMock.mockResolvedValueOnce({
+      id: 'view-deal',
+      entity_type: 'deal',
+      name: 'Clinic rollouts',
+      filters_json: '{"search":"clinic","custom_field_query":"solar"}',
+      created_at: '2026-08-14T10:00:00Z',
+      updated_at: '2026-08-14T10:00:00Z',
+    });
+
+    await expect(
+      createSavedView('deal', 'Clinic rollouts', {
+        search: 'clinic',
+        customFieldQuery: 'solar',
+      }),
+    ).resolves.toMatchObject({
+      entityType: 'deal',
+      filters: { search: 'clinic', customFieldQuery: 'solar' },
+    });
+    expect(invokeMock).toHaveBeenCalledWith('create_saved_view', {
+      entity_type: 'deal',
+      name: 'Clinic rollouts',
+      filters_json: JSON.stringify({
+        search: 'clinic',
+        custom_field_query: 'solar',
+      }),
+    });
+  });
 });

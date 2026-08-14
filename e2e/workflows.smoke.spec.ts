@@ -370,6 +370,47 @@ test('saves the current organization filters as a named view and applies it late
   await assertNoConsoleErrors();
 });
 
+test('saves the current pipeline filters as a named view and applies it later', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/pipeline');
+  await expect(page.getByRole('heading', { name: 'Pipeline' })).toBeVisible();
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Deal' }).click();
+  const firstDialog = page.getByRole('dialog', { name: 'Add Deal' });
+  await firstDialog.getByLabel('Deal Name').fill('Rift Clinic Electrification');
+  await firstDialog.getByLabel('Value').fill('18000');
+  await firstDialog.getByRole('button', { name: 'Save' }).click();
+  await expect(firstDialog).toBeHidden();
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Deal' }).click();
+  const secondDialog = page.getByRole('dialog', { name: 'Add Deal' });
+  await secondDialog.getByLabel('Deal Name').fill('Harbor Wind Maintenance');
+  await secondDialog.getByLabel('Value').fill('9400');
+  await secondDialog.getByRole('button', { name: 'Save' }).click();
+  await expect(secondDialog).toBeHidden();
+
+  const dealSearch = page.locator('.deal-search');
+  await dealSearch.fill('Rift Clinic');
+  await expect(page.getByRole('button', { name: /Rift Clinic Electrification/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Harbor Wind Maintenance/ })).toHaveCount(0);
+
+  await page.getByLabel('View name').fill('Clinic deals');
+  await page.getByRole('button', { name: 'Save view' }).click();
+  await expect(page.getByLabel('Saved view', { exact: true })).toHaveValue(/view-/);
+
+  await dealSearch.fill('');
+  await expect(page.getByRole('button', { name: /Harbor Wind Maintenance/ })).toBeVisible();
+
+  await page.getByLabel('Saved view', { exact: true }).selectOption({ label: 'Clinic deals' });
+  await expect(dealSearch).toHaveValue('Rift Clinic');
+  await expect(page.getByRole('button', { name: /Rift Clinic Electrification/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Harbor Wind Maintenance/ })).toHaveCount(0);
+
+  await assertNoConsoleErrors();
+});
+
 test('shows an account 360 workspace for an organization with linked work', async ({
   page,
   assertNoConsoleErrors,

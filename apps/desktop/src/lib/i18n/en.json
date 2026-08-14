@@ -229,6 +229,7 @@
     "title": "Saved views",
     "help": "Keep the current contact filters and reopen them later.",
     "helpOrganizations": "Keep the current organization search and country filter and reopen them later.",
+    "helpPipeline": "Keep the current pipeline search and custom-field filter and reopen them later.",
     "allCountries": "All countries",
     "selectLabel": "Saved view",
     "none": "No saved view",
@@ -271,6 +272,7 @@
   "deals": {
     "title": "Pipeline",
     "addDeal": "Add Deal",
+    "search": "Search deals…",
     "openDeal": "Open deal",
     "backToPipeline": "Back to pipeline",
     "notFound": "This deal could not be found.",

@@ -239,6 +239,7 @@
     "saveFailed": "Impossible d’enregistrer cette vue.",
     "deleteFailed": "Impossible de supprimer cette vue.",
     "helpOrganizations": "Conservez la recherche et le filtre pays des organisations et rouvrez-les plus tard.",
+    "helpPipeline": "Conservez la recherche du pipeline et le filtre de champ personnalisé et rouvrez-les plus tard.",
     "allCountries": "Tous les pays"
   },
   "entityLinks": {
@@ -271,6 +272,7 @@
   "deals": {
     "title": "Pipeline",
     "addDeal": "Ajouter une affaire",
+    "search": "Rechercher des affaires…",
     "openDeal": "Ouvrir l’affaire",
     "backToPipeline": "Retour au pipeline",
     "notFound": "Cette affaire est introuvable.",

@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added — 2026-08-14
+- Pipeline can save the current deal-name search and custom-field filter as a
+  named view and reopen that view later.
+
 ### Added — 2026-08-13
 - Organizations can save the current search and country filter as a named
   view and reopen that view later.
