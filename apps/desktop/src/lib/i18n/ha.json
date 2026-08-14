@@ -11,6 +11,7 @@
   },
   "nav": {
     "dashboard": "Allon Dubawa",
+    "leads": "Masu yiwuwar ciniki",
     "contacts": "Lambobi",
     "pipeline": "Pipeline",
     "activities": "Ayyuka",
@@ -153,6 +154,13 @@
       "loadFailed": "An kasa lodin rahoton yarjejeniyoyi masu tsayawa."
     }
   },
+  "leads": {
+    "title": "Masu yiwuwar ciniki",
+    "help": "Mutanen da ke jiran a yi aiki da su. Abokan ciniki da aka canza suna ci gaba a Lambobi.",
+    "search": "Nemo masu yiwuwar ciniki…",
+    "noLeads": "Babu masu yiwuwar ciniki tukuna",
+    "noLeadsDesc": "Kara mai yiwuwar ciniki don fara aiki da sabbin mutane."
+  },
   "contacts": {
     "title": "Lambobi",
     "addContact": "Kara Lamba",
@@ -248,6 +256,7 @@
   "savedViews": {
     "title": "Ra'ayoyin da aka ajiye",
     "help": "Ajiye tacewar lambobin yanzu kuma a sake buɗe su daga baya.",
+    "helpLeads": "Ajiye binciken masu yiwuwar ciniki da tacewar filin al'ada kuma a sake buɗe su daga baya.",
     "selectLabel": "Ra'ayi da aka ajiye",
     "none": "Babu ra'ayi da aka ajiye",
     "nameLabel": "Sunan ra'ayi",

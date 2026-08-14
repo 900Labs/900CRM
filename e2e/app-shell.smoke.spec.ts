@@ -17,6 +17,10 @@ test('renders the browser app shell and dashboard route', async ({ page, assertN
 });
 
 test('renders key hash routes without native Tauri dialogs', async ({ page, assertNoConsoleErrors }) => {
+  await loadHashRoute(page, '/leads');
+  await expect(page.getByRole('heading', { name: 'Leads', exact: true })).toBeVisible();
+  await expect(page.getByText('No leads yet')).toBeVisible();
+
   await loadHashRoute(page, '/contacts');
   await expect(page.getByRole('heading', { name: 'Contacts' })).toBeVisible();
   await expect(page.getByText('No contacts yet')).toBeVisible();
@@ -46,6 +50,9 @@ test('switches primary workspace routes from the sidebar', async ({ page, assert
   await page.goto('/');
 
   const navigation = page.getByRole('navigation', { name: 'Main navigation' });
+  await navigation.getByRole('link', { name: 'Leads' }).click();
+  await expect(page.getByRole('heading', { name: 'Leads', exact: true })).toBeVisible();
+
   await navigation.getByRole('link', { name: 'Contacts' }).click();
   await expect(page.getByRole('heading', { name: 'Contacts' })).toBeVisible();
 

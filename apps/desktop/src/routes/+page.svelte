@@ -33,6 +33,10 @@
     const clean = path.startsWith('/') ? path : `/${path}`;
     const normalized = clean.replace(/\/+$/, '') || '/';
 
+    if (normalized === '/leads') {
+      return emptyRoute('/leads');
+    }
+
     if (normalized === '/contacts') {
       return emptyRoute('/contacts');
     }
@@ -142,6 +146,8 @@
   <ContactDetail {contactId} />
 {:else if route === '/organizations/:id' && organizationId}
   <OrganizationDetail {organizationId} />
+{:else if route === '/leads'}
+  <Contacts mode="leads" />
 {:else if route === '/contacts'}
   <Contacts />
 {:else if route === '/organizations'}

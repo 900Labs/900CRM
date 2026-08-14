@@ -271,6 +271,50 @@ test('creates a lead, filters the lead list, and converts it to a customer', asy
   await assertNoConsoleErrors();
 });
 
+test('shows only leads on the Leads list and drops them after convert', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/leads');
+  await expect(page.getByRole('heading', { name: 'Leads', exact: true })).toBeVisible();
+  await expect(page.getByText('People waiting to be worked')).toBeVisible();
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Lead' }).click();
+  const leadDialog = page.getByRole('dialog', { name: 'Add Contact' });
+  await expect(leadDialog.getByLabel('Lifecycle')).toHaveValue('lead');
+  await leadDialog.getByLabel('First Name').fill('Amina');
+  await leadDialog.getByLabel('Last Name').fill('Leadstone');
+  await leadDialog.getByRole('button', { name: 'Save' }).click();
+  await expect(leadDialog).toBeHidden();
+  await expect(page.getByText('Amina Leadstone')).toBeVisible();
+
+  await loadHashRoute(page, '/contacts');
+  await page.locator('.page-header').getByRole('button', { name: 'Add Contact' }).click();
+  const customerDialog = page.getByRole('dialog', { name: 'Add Contact' });
+  await customerDialog.getByLabel('First Name').fill('Ibrahim');
+  await customerDialog.getByLabel('Last Name').fill('Customerstone');
+  await customerDialog.getByRole('button', { name: 'Save' }).click();
+  await expect(customerDialog).toBeHidden();
+
+  await loadHashRoute(page, '/leads');
+  await expect(page.getByText('Amina Leadstone')).toBeVisible();
+  await expect(page.getByText('Ibrahim Customerstone')).toHaveCount(0);
+
+  await page.getByText('Amina Leadstone').click();
+  await expect(page.getByRole('heading', { name: 'Amina Leadstone' })).toBeVisible();
+  await page.getByRole('button', { name: 'Convert to customer' }).click();
+
+  await loadHashRoute(page, '/leads');
+  await expect(page.getByText('Amina Leadstone')).toHaveCount(0);
+
+  await loadHashRoute(page, '/contacts');
+  await page.getByRole('group', { name: 'Lifecycle' }).getByRole('button', { name: 'Customers' }).click();
+  await expect(page.getByText('Amina Leadstone')).toBeVisible();
+  await expect(page.getByText('Ibrahim Customerstone')).toBeVisible();
+
+  await assertNoConsoleErrors();
+});
+
 test('saves the current contact filters as a named view and applies it later', async ({
   page,
   assertNoConsoleErrors,

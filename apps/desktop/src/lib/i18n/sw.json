@@ -11,6 +11,7 @@
   },
   "nav": {
     "dashboard": "Dashibodi",
+    "leads": "Wateja watarajiwa",
     "contacts": "Anwani",
     "pipeline": "Mtiririko",
     "activities": "Shughuli",
@@ -153,6 +154,13 @@
       "loadFailed": "Ripoti ya mikataba iliyotuama haikuweza kupakiwa."
     }
   },
+  "leads": {
+    "title": "Wateja watarajiwa",
+    "help": "Watu wanaosubiri kufanyiwa kazi. Wateja waliogeuzwa hubaki katika Anwani.",
+    "search": "Tafuta wateja watarajiwa…",
+    "noLeads": "Bado hakuna wateja watarajiwa",
+    "noLeadsDesc": "Ongeza mteja anayetarajiwa kuanza kufanya kazi na watu wapya."
+  },
   "contacts": {
     "title": "Anwani",
     "addContact": "Ongeza Anwani",
@@ -248,6 +256,7 @@
   "savedViews": {
     "title": "Mwonekano uliohifadhiwa",
     "help": "Hifadhi vichujio vya sasa vya anwani na uvifungue tena baadaye.",
+    "helpLeads": "Hifadhi utafutaji wa wateja watarajiwa na kichujio cha uga maalum na uvifungue tena baadaye.",
     "selectLabel": "Mwonekano uliohifadhiwa",
     "none": "Hakuna mwonekano uliohifadhiwa",
     "nameLabel": "Jina la mwonekano",
