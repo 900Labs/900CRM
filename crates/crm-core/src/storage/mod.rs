@@ -34,6 +34,7 @@ pub mod notes;
 pub mod organizations;
 pub mod proposed_actions;
 pub mod reporting;
+pub mod saved_views;
 pub mod search;
 pub mod settings;
 pub mod sync;

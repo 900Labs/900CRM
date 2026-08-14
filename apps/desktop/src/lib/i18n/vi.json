@@ -225,6 +225,20 @@
     "saveFailed": "Không lưu được ghi chú",
     "deleteFailed": "Không xóa được ghi chú"
   },
+  "savedViews": {
+    "title": "Khung nhìn đã lưu",
+    "help": "Giữ bộ lọc liên hệ hiện tại và mở lại sau.",
+    "selectLabel": "Khung nhìn đã lưu",
+    "none": "Không có khung nhìn đã lưu",
+    "nameLabel": "Tên khung nhìn",
+    "namePlaceholder": "Đặt tên khung nhìn này",
+    "save": "Lưu khung nhìn",
+    "delete": "Xóa khung nhìn",
+    "confirmDelete": "Xóa khung nhìn đã lưu “{name}”?",
+    "loadFailed": "Không tải được khung nhìn đã lưu.",
+    "saveFailed": "Không lưu được khung nhìn này.",
+    "deleteFailed": "Không xóa được khung nhìn này."
+  },
   "entityLinks": {
     "title": "Liên kết",
     "help": "Lưu một trang web hoặc đường dẫn tệp cục bộ. 900CRM lưu vị trí dạng văn bản và không sao chép hay tải tệp lên.",

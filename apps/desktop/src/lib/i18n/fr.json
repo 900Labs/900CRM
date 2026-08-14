@@ -225,6 +225,20 @@
     "saveFailed": "Échec de l’enregistrement de la note",
     "deleteFailed": "Échec de la suppression de la note"
   },
+  "savedViews": {
+    "title": "Vues enregistrées",
+    "help": "Conservez les filtres contacts actuels et rouvrez-les plus tard.",
+    "selectLabel": "Vue enregistrée",
+    "none": "Aucune vue enregistrée",
+    "nameLabel": "Nom de la vue",
+    "namePlaceholder": "Nommer cette vue",
+    "save": "Enregistrer la vue",
+    "delete": "Supprimer la vue",
+    "confirmDelete": "Supprimer la vue enregistrée « {name} » ?",
+    "loadFailed": "Impossible de charger les vues enregistrées.",
+    "saveFailed": "Impossible d’enregistrer cette vue.",
+    "deleteFailed": "Impossible de supprimer cette vue."
+  },
   "entityLinks": {
     "title": "Liens",
     "help": "Enregistrez un site web ou un chemin de fichier local. 900CRM stocke l’emplacement comme texte et ne copie ni n’envoie le fichier.",

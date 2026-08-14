@@ -225,6 +225,20 @@
     "saveFailed": "Falha ao salvar nota",
     "deleteFailed": "Falha ao excluir nota"
   },
+  "savedViews": {
+    "title": "Visualizações salvas",
+    "help": "Guarde os filtros atuais de contatos e reabra depois.",
+    "selectLabel": "Visualização salva",
+    "none": "Nenhuma visualização salva",
+    "nameLabel": "Nome da visualização",
+    "namePlaceholder": "Nomear esta visualização",
+    "save": "Salvar visualização",
+    "delete": "Excluir visualização",
+    "confirmDelete": "Excluir a visualização salva “{name}”?",
+    "loadFailed": "Não foi possível carregar as visualizações salvas.",
+    "saveFailed": "Não foi possível salvar esta visualização.",
+    "deleteFailed": "Não foi possível excluir esta visualização."
+  },
   "entityLinks": {
     "title": "Links",
     "help": "Salve um site ou um caminho de arquivo local. O 900CRM guarda o local como texto e não copia nem envia o arquivo.",

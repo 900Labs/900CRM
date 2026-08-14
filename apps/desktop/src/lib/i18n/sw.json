@@ -225,6 +225,20 @@
     "saveFailed": "Imeshindwa kuhifadhi dokezo",
     "deleteFailed": "Imeshindwa kufuta dokezo"
   },
+  "savedViews": {
+    "title": "Mwonekano uliohifadhiwa",
+    "help": "Hifadhi vichujio vya sasa vya anwani na uvifungue tena baadaye.",
+    "selectLabel": "Mwonekano uliohifadhiwa",
+    "none": "Hakuna mwonekano uliohifadhiwa",
+    "nameLabel": "Jina la mwonekano",
+    "namePlaceholder": "Ipe jina mwonekano huu",
+    "save": "Hifadhi mwonekano",
+    "delete": "Futa mwonekano",
+    "confirmDelete": "Futa mwonekano uliohifadhiwa “{name}”?",
+    "loadFailed": "Imeshindwa kupakia mwonekano uliohifadhiwa.",
+    "saveFailed": "Imeshindwa kuhifadhi mwonekano huu.",
+    "deleteFailed": "Imeshindwa kufuta mwonekano huu."
+  },
   "entityLinks": {
     "title": "Viungo",
     "help": "Hifadhi tovuti au njia ya faili ya ndani. 900CRM huhifadhi mahali kama maandishi na haikopi wala kupakia faili.",

@@ -15,7 +15,7 @@ future data access.
 - The desktop shell opens `900crm.db` in the platform app data directory.
 - SQLite runs in WAL mode with foreign keys enabled.
 - Schema state is tracked with `PRAGMA user_version`; the current schema version
-  is `12`.
+  is `13`.
 - Migrations are idempotent and run at startup through
   `crates/crm-core/src/storage/db.rs`.
 - Tauri command handlers and future optional integrations should call typed
@@ -121,6 +121,13 @@ or `deal`. Each row has `title`, `kind` (`url` or `path`), and `target`. A
 `url` must be `http://` or `https://`. A `path` is a local filesystem path
 stored as text. 900CRM does not copy, upload, or encrypt the referenced file.
 Moving a local file will break that bookmark. Links are soft-deleted.
+
+### Saved Views
+
+Named list filters live in `saved_views`. Each row has `entity_type`
+(`contact`, `organization`, or `deal`), a unique active `name` per type, and
+`filters_json`. The first UI is the Contacts list: search, person/organization
+type, lifecycle, and custom-field filters. Views are soft-deleted.
 
 ### Tags
 

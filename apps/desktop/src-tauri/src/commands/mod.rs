@@ -22,6 +22,7 @@ pub mod note_commands;
 pub mod organization_commands;
 pub(crate) mod path_guard;
 pub mod report_commands;
+pub mod saved_view_commands;
 pub mod search_commands;
 pub mod settings_commands;
 pub mod sync_commands;

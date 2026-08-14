@@ -185,9 +185,21 @@ async function installTauriShim(page: Page) {
       activities: [] as BackendActivity[],
       activityLinks: [] as BackendActivityLink[],
       entityLinks: [] as BackendEntityLink[],
+      savedViews: [] as Array<{
+        id: string;
+        entity_type: string;
+        name: string;
+        filters_json: string;
+        created_at: string;
+        updated_at: string;
+        deleted_at: string | null;
+      }>,
     };
     if (!Array.isArray(state.entityLinks)) {
       state.entityLinks = [];
+    }
+    if (!Array.isArray(state.savedViews)) {
+      state.savedViews = [];
     }
 
     function persistState(): void {
@@ -827,6 +839,46 @@ async function installTauriShim(page: Page) {
             return;
           case 'update_entity_link':
             throw new Error('update_entity_link is not used in browser smoke tests');
+          case 'list_saved_views': {
+            const entityType = stringArg(args, 'entity_type');
+            return state.savedViews.filter((view) => !view.deleted_at && view.entity_type === entityType);
+          }
+          case 'create_saved_view': {
+            const name = stringArg(args, 'name').trim();
+            const entityType = stringArg(args, 'entity_type');
+            if (!name) {
+              throw new Error('Saved view name is required');
+            }
+            if (state.savedViews.some((view) =>
+              !view.deleted_at
+              && view.entity_type === entityType
+              && view.name.toLowerCase() === name.toLowerCase()
+            )) {
+              throw new Error(`A saved view named '${name}' already exists`);
+            }
+            const view = {
+              id: nextId('view'),
+              entity_type: entityType,
+              name,
+              filters_json: stringArg(args, 'filters_json') || '{}',
+              created_at: timestamp,
+              updated_at: timestamp,
+              deleted_at: null,
+            };
+            state.savedViews.push(view);
+            persistState();
+            return view;
+          }
+          case 'delete_saved_view': {
+            const id = stringArg(args, 'id');
+            const view = state.savedViews.find((candidate) => candidate.id === id);
+            if (!view) {
+              throw new Error(`Saved view not found: ${id}`);
+            }
+            view.deleted_at = timestamp;
+            persistState();
+            return;
+          }
           case 'get_contact': {
             const id = stringArg(args, 'id');
             const contact = state.contacts.find((candidate) => candidate.id === id && !candidate.deleted_at);

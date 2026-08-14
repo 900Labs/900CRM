@@ -11873,6 +11873,7 @@ fn migration_v2_creates_required_readiness_tables() {
         "external_client_permissions",
         "proposed_actions",
         "entity_links",
+        "saved_views",
     ] {
         let sql = format!(
             "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '{}'",
@@ -12040,6 +12041,51 @@ fn entity_links_store_http_urls_and_local_paths_without_copying_files() {
         .expect("remaining links should list");
     assert_eq!(remaining.len(), 1);
     assert_eq!(remaining[0].id, file.id);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn saved_views_store_named_contact_filters() {
+    let (mut core, path) = open_test_core();
+
+    let created = core.create_saved_view(
+        "contact".to_string(),
+        " New leads ".to_string(),
+        r#"{"lifecycle":"lead","search":"","unknown":"nope"}"#.to_string(),
+    );
+    assert!(created.is_err());
+
+    let view = core
+        .create_saved_view(
+            "contact".to_string(),
+            " New leads ".to_string(),
+            r#"{"lifecycle":"lead","search":"  "}"#.to_string(),
+        )
+        .expect("saved view should be created");
+    assert_eq!(view.name, "New leads");
+    assert_eq!(view.filters_json, r#"{"lifecycle":"lead"}"#);
+
+    let duplicate = core.create_saved_view(
+        "contact".to_string(),
+        "new leads".to_string(),
+        r#"{"lifecycle":"customer"}"#.to_string(),
+    );
+    assert!(matches!(duplicate, Err(CrmError::InvalidInput(_))));
+
+    let listed = core
+        .list_saved_views("contact".to_string())
+        .expect("saved views should list");
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].id, view.id);
+
+    core.delete_saved_view(&view.id)
+        .expect("saved view should delete");
+    let remaining = core
+        .list_saved_views("contact".to_string())
+        .expect("empty saved views should list");
+    assert!(remaining.is_empty());
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);

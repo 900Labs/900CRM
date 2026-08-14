@@ -74,6 +74,7 @@ mod migration_readiness;
 mod notes_tags;
 mod organizations;
 mod proposed_actions;
+mod saved_views;
 mod search;
 mod settings;
 

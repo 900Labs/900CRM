@@ -43,7 +43,7 @@ use rusqlite::{params, Connection};
 use crate::utils::errors::{CrmError, CrmResult};
 
 /// The current schema version. Increment whenever a new migration is added.
-const CURRENT_SCHEMA_VERSION: u32 = 12;
+const CURRENT_SCHEMA_VERSION: u32 = 13;
 const DATABASE_FILENAME: &str = "900crm.db";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -253,6 +253,10 @@ impl Database {
 
         if current_version < 12 {
             self.migrate_v12_entity_links()?;
+        }
+
+        if current_version < 13 {
+            self.migrate_v13_saved_views()?;
         }
 
         self.conn.execute_batch(&format!(
@@ -1472,6 +1476,32 @@ impl Database {
         )?;
 
         log::info!("Migration v12 entity links complete");
+        Ok(())
+    }
+
+    fn migrate_v13_saved_views(&mut self) -> CrmResult<()> {
+        log::info!("Running database migration v13 saved views");
+
+        self.conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS saved_views (
+                id           TEXT PRIMARY KEY NOT NULL,
+                entity_type  TEXT NOT NULL,
+                name         TEXT NOT NULL,
+                filters_json TEXT NOT NULL,
+                created_at   TEXT NOT NULL,
+                updated_at   TEXT NOT NULL,
+                deleted_at   TEXT,
+                device_id    TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_saved_views_entity
+                ON saved_views (entity_type, name)
+                WHERE deleted_at IS NULL;
+            "#,
+        )?;
+
+        log::info!("Migration v13 saved views complete");
         Ok(())
     }
 
