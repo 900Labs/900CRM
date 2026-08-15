@@ -128,8 +128,9 @@ fn normalize_view_entity_type(entity_type: &str) -> CrmResult<&'static str> {
         "organization" => Ok("organization"),
         "deal" => Ok("deal"),
         "activity" => Ok("activity"),
+        "report" => Ok("report"),
         other => Err(CrmError::InvalidInput(format!(
-            "Unsupported saved-view entity_type '{other}'. Must be contact, organization, deal, or activity"
+            "Unsupported saved-view entity_type '{other}'. Must be contact, organization, deal, activity, or report"
         ))),
     }
 }
@@ -188,7 +189,8 @@ fn canonicalize_filters_json(raw: &str) -> CrmResult<String> {
             | "sort_dir"
             | "attention"
             | "status"
-            | "bucket" => {}
+            | "bucket"
+            | "focus" => {}
             other => {
                 return Err(CrmError::InvalidInput(format!(
                     "Unsupported saved-view filter '{other}'"
@@ -245,6 +247,11 @@ fn canonicalize_filters_json(raw: &str) -> CrmResult<String> {
             "attention" if text != "needsFollowUp" && text != "stale" && text != "overdue" => {
                 return Err(CrmError::InvalidInput(
                     "Saved view attention must be needsFollowUp, stale, or overdue".to_string(),
+                ));
+            }
+            "focus" if !matches!(text, "pipeline" | "activity" | "stale") => {
+                return Err(CrmError::InvalidInput(
+                    "Saved view focus must be pipeline, activity, or stale".to_string(),
                 ));
             }
             "sort_by"

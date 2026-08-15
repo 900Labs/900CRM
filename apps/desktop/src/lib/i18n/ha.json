@@ -96,6 +96,11 @@
     "loading": "Ana loda bayanan rahoto...",
     "generatedAt": "An samar {value}",
     "notAvailable": "babu",
+    "focus": "Mayar da hankali",
+    "focusAll": "Duka",
+    "focusPipeline": "Pipeline",
+    "focusActivity": "Ayyuka",
+    "focusStale": "Yarjejeniyoyi masu tsayawa",
     "pipeline": {
       "title": "Bayanin pipeline",
       "description": "Yawan deals, rabon nasara, rarraba matakai na yanzu, da rabon funnel na yanzu.",
@@ -270,6 +275,7 @@
     "helpOrganizations": "Ajiye binciken ƙungiyoyi da tacewar ƙasa kuma a sake buɗe su daga baya.",
     "helpPipeline": "Ajiye binciken pipeline, tacewar kulawa da tacewar filin al'ada kuma a sake buɗe su daga baya.",
     "helpActivities": "Ajiye tacewar nau'in aiki, hali, lokaci da filin al'ada kuma a sake buɗe su daga baya.",
+    "helpReports": "Ajiye mayar da hankali na rahoto kuma a sake buɗe shi daga baya.",
     "allCountries": "Duk ƙasashe"
   },
   "entityLinks": {

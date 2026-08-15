@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added — 2026-08-15
+- Reports can save the current focus — Pipeline, Activities, or Stale Deals —
+  as a named view and reopen that view later.
+
 ### Added — 2026-08-14
 - Leads is a dedicated Workspace list of people with lifecycle lead. Converted
   customers stay on Contacts. This uses the existing contact records.

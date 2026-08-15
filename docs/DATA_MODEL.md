@@ -127,12 +127,13 @@ Moving a local file will break that bookmark. Links are soft-deleted.
 ### Saved Views
 
 Named list filters live in `saved_views`. Each row has `entity_type`
-(`contact`, `organization`, `deal`, or `activity`), a unique active `name` per type, and
+(`contact`, `organization`, `deal`, `activity`, or `report`), a unique active `name` per type, and
 `filters_json`. The Contacts list can save search, person/organization type, lifecycle, and
 custom-field filters. The Organizations list can save search and country. The Pipeline
 board can save deal-name search, attention (needs follow-up, stale, or overdue),
 and custom-field filters. Activities can save type, status, due bucket, and
-custom-field filters. Views are soft-deleted.
+custom-field filters. Reports can save focus (`pipeline`, `activity`, or
+`stale`). Views are soft-deleted.
 
 ### Tags
 

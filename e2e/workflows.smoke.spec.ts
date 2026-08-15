@@ -1051,6 +1051,36 @@ test('lists a stale deal on Reports and opens the deal page', async ({
   await assertNoConsoleErrors();
 });
 
+test('saves the current report focus as a named view and applies it later', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/reports');
+  await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pipeline Overview' })).toBeVisible();
+  await expect(page.getByTestId('stale-deal-report')).toBeVisible();
+
+  await page.getByRole('group', { name: 'Focus' }).getByRole('button', { name: 'Stale Deals' }).click();
+  await expect(page.getByRole('group', { name: 'Focus' }).getByRole('button', { name: 'Stale Deals' })).toHaveClass(/active/);
+  await expect(page.getByTestId('stale-deal-report')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pipeline Overview' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Activity Overview' })).toHaveCount(0);
+
+  await page.getByLabel('View name').fill('Stale deals');
+  await page.getByRole('button', { name: 'Save view' }).click();
+  await expect(page.getByLabel('Saved view', { exact: true })).toHaveValue(/view-/);
+
+  await page.getByRole('group', { name: 'Focus' }).getByRole('button', { name: 'All', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Pipeline Overview' })).toBeVisible();
+
+  await page.getByLabel('Saved view', { exact: true }).selectOption({ label: 'Stale deals' });
+  await expect(page.getByRole('group', { name: 'Focus' }).getByRole('button', { name: 'Stale Deals' })).toHaveClass(/active/);
+  await expect(page.getByTestId('stale-deal-report')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pipeline Overview' })).toHaveCount(0);
+
+  await assertNoConsoleErrors();
+});
+
 test('creates an activity through the visible UI and shows it in Activities', async ({
   page,
   assertNoConsoleErrors,

@@ -12198,3 +12198,41 @@ fn saved_views_store_named_activity_filters() {
     drop(core);
     let _ = std::fs::remove_dir_all(path);
 }
+
+#[test]
+fn saved_views_store_named_report_focus() {
+    let (mut core, path) = open_test_core();
+
+    let view = core
+        .create_saved_view(
+            "report".to_string(),
+            "Stale deals".to_string(),
+            r#"{"focus":"stale"}"#.to_string(),
+        )
+        .expect("report saved view should be created");
+    assert_eq!(view.entity_type, "report");
+    assert!(view.filters_json.contains("stale"));
+
+    let listed = core
+        .list_saved_views("report".to_string())
+        .expect("report views should list");
+    assert_eq!(listed.len(), 1);
+    assert!(core
+        .list_saved_views("deal".to_string())
+        .expect("deal views stay separate")
+        .is_empty());
+    assert!(core
+        .list_saved_views("activity".to_string())
+        .expect("activity views stay separate")
+        .is_empty());
+
+    let invalid = core.create_saved_view(
+        "report".to_string(),
+        "Bad focus".to_string(),
+        r#"{"focus":"forecast"}"#.to_string(),
+    );
+    assert!(matches!(invalid, Err(CrmError::InvalidInput(_))));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}

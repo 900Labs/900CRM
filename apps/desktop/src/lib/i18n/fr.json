@@ -96,6 +96,11 @@
     "loading": "Chargement des données du rapport...",
     "generatedAt": "Généré {value}",
     "notAvailable": "non disponible",
+    "focus": "Focus",
+    "focusAll": "Tout",
+    "focusPipeline": "Pipeline",
+    "focusActivity": "Activités",
+    "focusStale": "Affaires stagnantes",
     "pipeline": {
       "title": "Vue du pipeline",
       "description": "Nombre d'affaires, taux de gain, répartition actuelle par étape et ratios d'entonnoir actuels.",
@@ -270,6 +275,7 @@
     "helpOrganizations": "Conservez la recherche et le filtre pays des organisations et rouvrez-les plus tard.",
     "helpPipeline": "Conservez la recherche du pipeline, le filtre d’attention et le filtre de champ personnalisé et rouvrez-les plus tard.",
     "helpActivities": "Conservez les filtres de type, de statut, d’échéance et de champ personnalisé des activités et rouvrez-les plus tard.",
+    "helpReports": "Conservez le focus actuel des rapports et rouvrez-le plus tard.",
     "allCountries": "Tous les pays"
   },
   "entityLinks": {

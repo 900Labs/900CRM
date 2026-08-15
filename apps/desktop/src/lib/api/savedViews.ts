@@ -4,7 +4,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 
-export type SavedViewEntityType = 'contact' | 'organization' | 'deal' | 'activity';
+export type SavedViewEntityType = 'contact' | 'organization' | 'deal' | 'activity' | 'report';
 
 export interface ContactSavedViewFilters {
   search?: string;
@@ -18,6 +18,7 @@ export interface ContactSavedViewFilters {
   attention?: 'needsFollowUp' | 'stale' | 'overdue';
   status?: 'pending' | 'completed' | 'overdue';
   bucket?: 'overdue' | 'today' | 'thisWeek' | 'later' | 'unscheduled' | 'completed';
+  focus?: 'pipeline' | 'activity' | 'stale';
 }
 
 export interface SavedView<TFilters = ContactSavedViewFilters> {
@@ -50,6 +51,7 @@ interface BackendFilters {
   attention?: 'needsFollowUp' | 'stale' | 'overdue';
   status?: 'pending' | 'completed' | 'overdue';
   bucket?: 'overdue' | 'today' | 'thisWeek' | 'later' | 'unscheduled' | 'completed';
+  focus?: 'pipeline' | 'activity' | 'stale';
 }
 
 function toBackendFilters(filters: ContactSavedViewFilters): BackendFilters {
@@ -65,6 +67,7 @@ function toBackendFilters(filters: ContactSavedViewFilters): BackendFilters {
     attention: filters.attention,
     status: filters.status,
     bucket: filters.bucket,
+    focus: filters.focus,
   };
 }
 
@@ -82,6 +85,7 @@ function fromBackendFilters(raw: string): ContactSavedViewFilters {
     attention: parsed.attention,
     status: parsed.status,
     bucket: parsed.bucket,
+    focus: parsed.focus,
   };
 }
 
