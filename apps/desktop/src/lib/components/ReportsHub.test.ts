@@ -47,6 +47,13 @@ vi.mock('$lib/stores/settings', () => ({
   },
 }));
 
+vi.mock('$lib/api/savedViews', () => ({
+  listSavedViews: vi.fn().mockResolvedValue([]),
+  createSavedView: vi.fn(),
+  deleteSavedView: vi.fn(),
+  filtersMatch: () => true,
+}));
+
 import Reports from '../../routes/Reports.svelte';
 
 describe('Reports route', () => {

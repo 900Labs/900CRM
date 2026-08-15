@@ -153,4 +153,27 @@ describe('saved views API', () => {
       }),
     });
   });
+
+  it('maps report focus filters', async () => {
+    invokeMock.mockResolvedValueOnce({
+      id: 'view-report',
+      entity_type: 'report',
+      name: 'Stale deals',
+      filters_json: '{"focus":"stale"}',
+      created_at: '2026-08-15T10:00:00Z',
+      updated_at: '2026-08-15T10:00:00Z',
+    });
+
+    await expect(
+      createSavedView('report', 'Stale deals', { focus: 'stale' }),
+    ).resolves.toMatchObject({
+      entityType: 'report',
+      filters: { focus: 'stale' },
+    });
+    expect(invokeMock).toHaveBeenCalledWith('create_saved_view', {
+      entity_type: 'report',
+      name: 'Stale deals',
+      filters_json: JSON.stringify({ focus: 'stale' }),
+    });
+  });
 });

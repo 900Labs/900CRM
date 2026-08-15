@@ -50,7 +50,7 @@ real small business owner.
 | Organizations | List with saved views, health, and next follow-up; create/edit, notes/tags, contact linking, account detail workspace with linked people/deals/activity and relationship-aware account timeline | Account list now shows health and the next follow-up. Still no owner field. |
 | Pipeline | Kanban by stage, search, attention filters, custom-field filter, saved views, deal cards, deal guidance drawer with weighted forecast, stale/overdue/follow-up status, linked activities, and a board-level forecast/stage-health overview | Stronger daily sales surface. Still needs true historical stage conversion summaries, deeper deal editing/detail routing, and stronger drag/drop confidence cues. |
 | Activities | Task/call/meeting/email follow-up workbench with due buckets, summary counts, quick snooze/reschedule, completion, filters, saved views, and relationship breadcrumbs | Much stronger daily work surface. Still needs a true calendar grid, reminders, recurrence, and optional external calendar sync. |
-| Reports | Dedicated Workspace route for current pipeline and activity health, current-stage funnel ratios, due buckets, activity type mix, and a clickable stale-deal list | Usable alpha reporting with a stale-deal list. Still needs saved filters, source/owner dimensions, exportable snapshots, and true historical conversion after stage history exists. |
+| Reports | Dedicated Workspace route for current pipeline and activity health, current-stage funnel ratios, due buckets, activity type mix, a clickable stale-deal list, and saved focus views | Usable alpha reporting with a stale-deal list and named focus views. Still needs source/owner dimensions, exportable snapshots, and true historical conversion after stage history exists. |
 | Audit Log | Read-only table grouped under Review | Good trust feature, now visually separated from daily work. Later, it may still move deeper into Admin once Review counts are more prominent. |
 | Pending Actions | Review queue for proposed actions grouped under Review | Important for MCP/external-client safety. The next improvement is to show high-priority pending counts without making this a daily-work screen. |
 | Settings | Locale/theme/date/currency, backup/restore, import/export, email, integrations, section jump bar | Still dense, but now easier to scan. Later work should split Data Management, Integrations, Appearance, and Admin/Safety into clearer settings sections or pages. |
@@ -163,8 +163,8 @@ stage-transition analytics.
 
 Recommended outcome: keep Reports focused on current operational health until
 the data model stores stage-transition history and richer report dimensions
-such as owner/source are available. Then add saved filters, exportable snapshots,
-and historical conversion reporting.
+such as owner/source are available. Named focus views are in place. Then add
+exportable snapshots and historical conversion reporting.
 
 ### 6. Admin/safety items crowd primary navigation
 
@@ -241,9 +241,11 @@ These are ordered to improve perceived product value fastest.
    - Added current pipeline win rate, open/closed counts, current stage
      distribution, current-stage funnel ratios, activity completion, overdue
      rate, due buckets, and activity type mix.
-   - Remaining work: saved filters, source/owner
-     breakdown where supported, exportable report snapshots, and true
-     historical conversion only after stage history exists.
+   - Added named saved views for report focus: Pipeline, Activities, or
+     Stale Deals.
+   - Remaining work: source/owner breakdown where supported, exportable
+     report snapshots, and true historical conversion only after stage
+     history exists.
 
 7. **Local Automation Lite** - explicit local suggestions completed
    - Added a Pipeline stage-move prompt that drafts a follow-up only after a

@@ -96,6 +96,11 @@
     "loading": "Đang tải dữ liệu báo cáo...",
     "generatedAt": "Tạo lúc {value}",
     "notAvailable": "không có",
+    "focus": "Tiêu điểm",
+    "focusAll": "Tất cả",
+    "focusPipeline": "Pipeline",
+    "focusActivity": "Hoạt động",
+    "focusStale": "Giao dịch trì trệ",
     "pipeline": {
       "title": "Tổng quan pipeline",
       "description": "Số lượng giao dịch, tỷ lệ thắng, phân bổ giai đoạn hiện tại và tỷ lệ phễu hiện tại.",
@@ -270,6 +275,7 @@
     "helpOrganizations": "Giữ tìm kiếm tổ chức và bộ lọc quốc gia rồi mở lại sau.",
     "helpPipeline": "Giữ tìm kiếm pipeline, bộ lọc chú ý và bộ lọc trường tùy chỉnh rồi mở lại sau.",
     "helpActivities": "Giữ bộ lọc loại, trạng thái, hạn và trường tùy chỉnh của hoạt động rồi mở lại sau.",
+    "helpReports": "Giữ tiêu điểm báo cáo hiện tại rồi mở lại sau.",
     "allCountries": "Tất cả quốc gia"
   },
   "entityLinks": {

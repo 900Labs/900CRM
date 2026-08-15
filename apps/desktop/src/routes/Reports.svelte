@@ -16,6 +16,14 @@
     type PipelineStageMetric,
     type StageTransitionMetric,
   } from '$lib/api/reports';
+  import {
+    createSavedView,
+    deleteSavedView,
+    filtersMatch,
+    listSavedViews,
+    type ContactSavedViewFilters,
+    type SavedView,
+  } from '$lib/api/savedViews';
   import { settingsStore } from '$lib/stores/settings';
   import { navigateHash } from '$lib/utils/hashRouter';
   import {
@@ -38,6 +46,14 @@
   let staleLoading = $state(true);
   let staleError = $state<string | null>(null);
   let reportsBootstrapped = false;
+  type ReportFocus = '' | 'pipeline' | 'activity' | 'stale';
+  let reportFocus = $state<ReportFocus>('');
+  let savedViews = $state<SavedView[]>([]);
+  let selectedViewId = $state('');
+  let viewName = $state('');
+  let viewsLoading = $state(false);
+  let viewsSaving = $state(false);
+  let viewsError = $state<string | null>(null);
 
   const REPORT_LOAD_TIMEOUT_MS = 8_000;
 
@@ -79,6 +95,13 @@
   const showActivityEmpty = $derived(
     !activityLoading && !activityError && activityReport !== null && activityReport.total_activities === 0
   );
+
+  const currentViewFilters = $derived(collectCurrentFilters());
+  const selectedView = $derived(savedViews.find((view) => view.id === selectedViewId) ?? null);
+  const canSaveView = $derived(viewName.trim().length > 0 && !viewsSaving);
+  const showPipelineSection = $derived(!reportFocus || reportFocus === 'pipeline');
+  const showActivitySection = $derived(!reportFocus || reportFocus === 'activity');
+  const showStaleSection = $derived(!reportFocus || reportFocus === 'stale');
 
   function hasStageMetricData(metric: PipelineStageMetric): boolean {
     return metric.count > 0 || metric.stage_share > 0;
@@ -219,13 +242,107 @@
     ]);
   }
 
+  function asReportFocus(value: string | undefined): ReportFocus {
+    return value === 'pipeline' || value === 'activity' || value === 'stale' ? value : '';
+  }
+
+  function collectCurrentFilters(): ContactSavedViewFilters {
+    return {
+      focus: reportFocus || undefined,
+    };
+  }
+
+  async function loadSavedViews(): Promise<void> {
+    viewsLoading = true;
+    viewsError = null;
+    try {
+      savedViews = await listSavedViews('report');
+      if (selectedViewId && !savedViews.some((view) => view.id === selectedViewId)) {
+        selectedViewId = '';
+      }
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.loadFailed');
+    } finally {
+      viewsLoading = false;
+    }
+  }
+
+  function applyView(view: SavedView): void {
+    selectedViewId = view.id;
+    reportFocus = asReportFocus(view.filters.focus);
+  }
+
+  function syncSelectedView(): void {
+    if (!selectedView || filtersMatch(selectedView.filters, currentViewFilters)) {
+      return;
+    }
+    selectedViewId = '';
+  }
+
+  async function handleSaveView(): Promise<void> {
+    const name = viewName.trim();
+    if (!name) {
+      return;
+    }
+    viewsSaving = true;
+    viewsError = null;
+    try {
+      const view = await createSavedView('report', name, collectCurrentFilters());
+      savedViews = [...savedViews.filter((item) => item.id !== view.id), view]
+        .sort((left, right) => left.name.localeCompare(right.name));
+      selectedViewId = view.id;
+      viewName = '';
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.saveFailed');
+    } finally {
+      viewsSaving = false;
+    }
+  }
+
+  async function handleDeleteView(): Promise<void> {
+    if (!selectedView) {
+      return;
+    }
+    if (!window.confirm(t('savedViews.confirmDelete', { name: selectedView.name }))) {
+      return;
+    }
+    viewsSaving = true;
+    viewsError = null;
+    try {
+      await deleteSavedView(selectedView.id);
+      savedViews = savedViews.filter((view) => view.id !== selectedView.id);
+      selectedViewId = '';
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : t('savedViews.deleteFailed');
+    } finally {
+      viewsSaving = false;
+    }
+  }
+
+  function handleViewChange(event: Event): void {
+    const id = (event.target as HTMLSelectElement).value;
+    if (!id) {
+      selectedViewId = '';
+      return;
+    }
+    const view = savedViews.find((item) => item.id === id);
+    if (view) {
+      applyView(view);
+    }
+  }
+
+  function handleReportFocus(next: ReportFocus): void {
+    reportFocus = next;
+    syncSelectedView();
+  }
+
   $effect(() => {
     if (reportsBootstrapped) {
       return;
     }
 
     reportsBootstrapped = true;
-    void loadReports();
+    void Promise.all([loadReports(), loadSavedViews()]);
   });
 </script>
 
@@ -237,6 +354,90 @@
     </div>
     <button class="btn btn-secondary btn-sm" disabled={reportsLoading} onclick={loadReports} type="button">
       {reportsLoading ? t('reports.refreshing') : t('reports.refresh')}
+    </button>
+  </div>
+
+  <section class="saved-views" aria-labelledby="reports-saved-views-heading">
+    <div class="saved-views-copy">
+      <h2 class="saved-views-title" id="reports-saved-views-heading">{t('savedViews.title')}</h2>
+      <p class="saved-views-help">{t('savedViews.helpReports')}</p>
+    </div>
+    <div class="saved-views-controls">
+      <select
+        class="input saved-views-select"
+        value={selectedViewId}
+        onchange={handleViewChange}
+        aria-label={t('savedViews.selectLabel')}
+        disabled={viewsLoading || viewsSaving}
+      >
+        <option value="">{t('savedViews.none')}</option>
+        {#each savedViews as view (view.id)}
+          <option value={view.id}>{view.name}</option>
+        {/each}
+      </select>
+      <input
+        class="input saved-views-name"
+        type="text"
+        bind:value={viewName}
+        placeholder={t('savedViews.namePlaceholder')}
+        aria-label={t('savedViews.nameLabel')}
+        disabled={viewsSaving}
+      />
+      <button
+        class="btn btn-secondary btn-sm"
+        type="button"
+        onclick={() => void handleSaveView()}
+        disabled={!canSaveView}
+      >
+        {viewsSaving ? t('common.loading') : t('savedViews.save')}
+      </button>
+      <button
+        class="btn btn-ghost btn-sm"
+        type="button"
+        onclick={() => void handleDeleteView()}
+        disabled={!selectedView || viewsSaving}
+      >
+        {t('savedViews.delete')}
+      </button>
+    </div>
+    {#if viewsError}
+      <p class="saved-views-error" role="alert">{viewsError}</p>
+    {/if}
+  </section>
+
+  <div class="report-focus" role="group" aria-label={t('reports.focus')}>
+    <span class="report-focus-label">{t('reports.focus')}:</span>
+    <button
+      class="filter-chip"
+      class:active={!reportFocus}
+      type="button"
+      onclick={() => handleReportFocus('')}
+    >
+      {t('reports.focusAll')}
+    </button>
+    <button
+      class="filter-chip"
+      class:active={reportFocus === 'pipeline'}
+      type="button"
+      onclick={() => handleReportFocus('pipeline')}
+    >
+      {t('reports.focusPipeline')}
+    </button>
+    <button
+      class="filter-chip"
+      class:active={reportFocus === 'activity'}
+      type="button"
+      onclick={() => handleReportFocus('activity')}
+    >
+      {t('reports.focusActivity')}
+    </button>
+    <button
+      class="filter-chip"
+      class:active={reportFocus === 'stale'}
+      type="button"
+      onclick={() => handleReportFocus('stale')}
+    >
+      {t('reports.focusStale')}
     </button>
   </div>
 
@@ -271,7 +472,8 @@
   </section>
 
   <div class="reports-grid">
-    <section class="card report-section" aria-labelledby="pipeline-report-heading">
+    {#if showPipelineSection}
+    <section class="card report-section" aria-labelledby="pipeline-report-heading" data-testid="pipeline-report">
       <div class="report-section-header">
         <div>
           <h2 class="section-title" id="pipeline-report-heading">{t('reports.pipeline.title')}</h2>
@@ -344,8 +546,10 @@
         </div>
       {/if}
     </section>
+    {/if}
 
-    <section class="card report-section" aria-labelledby="activity-report-heading">
+    {#if showActivitySection}
+    <section class="card report-section" aria-labelledby="activity-report-heading" data-testid="activity-report">
       <div class="report-section-header">
         <div>
           <h2 class="section-title" id="activity-report-heading">{t('reports.activity.title')}</h2>
@@ -412,8 +616,10 @@
         </div>
       {/if}
     </section>
+    {/if}
   </div>
 
+  {#if showStaleSection}
   <section
     class="card report-section stale-report"
     aria-labelledby="stale-report-heading"
@@ -465,6 +671,7 @@
       </div>
     {/if}
   </section>
+  {/if}
 </div>
 
 <style>
@@ -485,6 +692,66 @@
     color: var(--text-secondary);
     font-size: var(--text-sm);
     line-height: 1.5;
+  }
+
+  .saved-views,
+  .saved-views-copy,
+  .saved-views-controls,
+  .report-focus {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .saved-views {
+    justify-content: space-between;
+  }
+
+  .saved-views-title {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+  }
+
+  .saved-views-help,
+  .saved-views-error {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+  }
+
+  .saved-views-error {
+    color: var(--text-danger);
+    width: 100%;
+  }
+
+  .saved-views-select,
+  .saved-views-name {
+    min-width: 160px;
+  }
+
+  .report-focus-label {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+  }
+
+  .filter-chip {
+    padding: var(--space-1) var(--space-3);
+    border-radius: 9999px;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+    background-color: transparent;
+    border: var(--border-width) solid var(--border-default);
+    cursor: pointer;
+  }
+
+  .filter-chip.active {
+    background-color: var(--surface-active);
+    color: var(--text-accent);
+    border-color: var(--color-primary-200);
   }
 
   .report-kpi-grid {

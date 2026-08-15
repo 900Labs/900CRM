@@ -96,6 +96,11 @@
     "loading": "Cargando datos del informe...",
     "generatedAt": "Generado {value}",
     "notAvailable": "no disponible",
+    "focus": "Enfoque",
+    "focusAll": "Todos",
+    "focusPipeline": "Pipeline",
+    "focusActivity": "Actividades",
+    "focusStale": "Negocios estancados",
     "pipeline": {
       "title": "Resumen del pipeline",
       "description": "Conteos de oportunidades, tasa de ganadas, distribución actual por etapa y ratios actuales del embudo.",
@@ -270,6 +275,7 @@
     "helpOrganizations": "Guarda la búsqueda y el filtro de país de las organizaciones y ábrelos más tarde.",
     "helpPipeline": "Guarda la búsqueda del pipeline, el filtro de atención y el filtro de campo personalizado y ábrelos más tarde.",
     "helpActivities": "Guarda los filtros de tipo, estado, vencimiento y campo personalizado de las actividades y ábrelos más tarde.",
+    "helpReports": "Guarda el enfoque actual de informes y ábrelo más tarde.",
     "allCountries": "Todos los países"
   },
   "entityLinks": {
