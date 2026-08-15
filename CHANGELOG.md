@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-15
+- Empty Leads, Pipeline, Activities, and Reports pages now say what to do
+  first: add a lead, add a deal, schedule a follow-up, or add a deal so
+  reports can fill in.
 - Reports can save the current focus — Pipeline, Activities, or Stale Deals —
   as a named view and reopen that view later.
 

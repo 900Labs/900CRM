@@ -103,8 +103,8 @@ blank-dashboard problem, but competitors still go further with starter
 pipelines, product tours, guided imports, and richer empty states across every
 primary module.
 
-Recommended outcome: extend first-run guidance into module empty states,
-import/backup prompts, and customer/deal workspace guidance without adding
+Recommended outcome: module empty states now tell the user the next action.
+Still add import/backup prompts and customer/deal workspace guidance without
 marketing-style tours.
 
 ### 2. Customer workspaces now cover contacts and accounts, but still need attached context
@@ -199,8 +199,10 @@ These are ordered to improve perceived product value fastest.
    - Added a first-run checklist and optional synthetic sample CRM dataset.
    - Guides users through first contact or organization, first deal, and first
      follow-up from the dashboard.
-   - Remaining work: module-specific empty states, guided import/backup prompts,
-     and richer onboarding inside customer/deal workspaces.
+   - Added first-action empty states on Leads, Pipeline, Activities, and
+     Reports so a blank module says what to do next.
+   - Remaining work: guided import/backup prompts, and richer onboarding
+     inside customer/deal workspaces.
 
 3. **Customer 360 Workspaces** - contact/account summaries and timeline
    breadcrumbs completed

@@ -96,6 +96,9 @@
     "loading": "Inapakia data ya ripoti...",
     "generatedAt": "Imetengenezwa {value}",
     "notAvailable": "haipatikani",
+    "emptyWorkspaceTitle": "Bado hakuna data ya ripoti",
+    "emptyWorkspaceDesc": "Ripoti hujazwa baada ya kuongeza mikataba na ufuatiliaji. Anza na mkataba, kisha panga hatua inayofuata.",
+    "emptyWorkspaceAction": "Ongeza Mkataba",
     "focus": "Mkazo",
     "focusAll": "Zote",
     "focusPipeline": "Bomba",
@@ -164,7 +167,7 @@
     "help": "Watu wanaosubiri kufanyiwa kazi. Wateja waliogeuzwa hubaki katika Anwani.",
     "search": "Tafuta wateja watarajiwa…",
     "noLeads": "Bado hakuna wateja watarajiwa",
-    "noLeadsDesc": "Ongeza mteja anayetarajiwa kuanza kufanya kazi na watu wapya."
+    "noLeadsDesc": "Ongeza mtu unayetaka kumfanyia kazi. Mgeuze kwenye ukurasa wake; anabaki katika Anwani kama mteja."
   },
   "contacts": {
     "title": "Anwani",
@@ -330,6 +333,8 @@
     "contact": "Anwani",
     "noDeals": "Hakuna mikataba katika hatua hii",
     "noDealsDesc": "Buruta mikataba hapa au ongeza mpya.",
+    "emptyBoardTitle": "Bado hakuna mikataba",
+    "emptyBoardDesc": "Ongeza mkataba kuanza ubao. Hatua hubaki tupu hadi uwe na kitu cha kuhamisha.",
     "stages": {
       "lead": "Kiongozi",
       "qualified": "Amehitimu",
@@ -417,7 +422,9 @@
     "overdue": "Imechelewa",
     "upcoming": "Inakuja",
     "noActivities": "Hakuna shughuli bado",
-    "noActivitiesDesc": "Panga shughuli yako ya kwanza.",
+    "noActivitiesDesc": "Ongeza kazi, simu, mkutano au barua pepe ili kazi iliyochelewa na ya leo iwe na mahali.",
+    "noMatchingTitle": "Hakuna shughuli zinazolingana",
+    "noMatchingDesc": "Futa kichujio cha aina, hali, muda au uga maalum ili kuona kazi zaidi.",
     "workbenchEyebrow": "Kituo cha Ufuatiliaji",
     "workbenchTitle": "Jukwaa la Kazi Zilizofikia Muda",
     "workbenchSummary": "Muhtasari wa muda wa shughuli",

@@ -96,6 +96,9 @@
     "loading": "Loading report data...",
     "generatedAt": "Generated {value}",
     "notAvailable": "not available",
+    "emptyWorkspaceTitle": "No report data yet",
+    "emptyWorkspaceDesc": "Reports fill in after you add deals and follow-ups. Start with a deal, then schedule the next step.",
+    "emptyWorkspaceAction": "Add Deal",
     "focus": "Focus",
     "focusAll": "All",
     "focusPipeline": "Pipeline",
@@ -164,7 +167,7 @@
     "help": "People waiting to be worked. Converted customers stay on Contacts.",
     "search": "Search leads…",
     "noLeads": "No leads yet",
-    "noLeadsDesc": "Add a lead to start working new people."
+    "noLeadsDesc": "Add a person you want to work. Convert them on the person page; they stay on Contacts as a customer."
   },
   "contacts": {
     "title": "Contacts",
@@ -330,6 +333,8 @@
     "contact": "Contact",
     "noDeals": "No deals in this stage",
     "noDealsDesc": "Drag deals here or add a new one.",
+    "emptyBoardTitle": "No deals yet",
+    "emptyBoardDesc": "Add a deal to start the board. Stages stay empty until you have something to move.",
     "stages": {
       "lead": "Lead",
       "qualified": "Qualified",
@@ -417,7 +422,9 @@
     "overdue": "Overdue",
     "upcoming": "Upcoming",
     "noActivities": "No activities yet",
-    "noActivitiesDesc": "Schedule your first activity.",
+    "noActivitiesDesc": "Add a task, call, meeting, or email so overdue and due-today work has a place.",
+    "noMatchingTitle": "No matching activities",
+    "noMatchingDesc": "Clear the type, status, due-bucket, or custom-field filter to see more work.",
     "workbenchEyebrow": "Follow-up Center",
     "workbenchTitle": "Due Workbench",
     "workbenchSummary": "Activity due summary",

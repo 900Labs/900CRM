@@ -494,6 +494,21 @@
     visibleBuckets.reduce((sum, bucket) => sum + bucket.activities.length, 0)
   );
 
+  const hasActiveActivityFilters = $derived(
+    Boolean(
+      typeFilter
+      || statusFilter
+      || bucketFilter
+      || selectedCustomFieldDefId
+      || customFieldQuery.trim(),
+    )
+  );
+  const isFirstRunEmpty = $derived(
+    !activityStore.isLoading
+    && activityStore.activities.length === 0
+    && !hasActiveActivityFilters
+  );
+
   function bucketLabel(bucket: ActivityDueBucket): string {
     return t(`activities.buckets.${bucket}`);
   }
@@ -874,8 +889,8 @@
     {:else if visibleActivityCount === 0}
       <EmptyState
         icon="activities"
-        title={t('activities.noActivities')}
-        description={t('activities.noActivitiesDesc')}
+        title={isFirstRunEmpty ? t('activities.noActivities') : t('activities.noMatchingTitle')}
+        description={isFirstRunEmpty ? t('activities.noActivitiesDesc') : t('activities.noMatchingDesc')}
         actionLabel={t('activities.addActivity')}
         onaction={() => uiStore.openModal('addActivity')}
       />

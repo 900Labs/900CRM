@@ -96,6 +96,9 @@
     "loading": "Cargando datos del informe...",
     "generatedAt": "Generado {value}",
     "notAvailable": "no disponible",
+    "emptyWorkspaceTitle": "Aún no hay datos de informes",
+    "emptyWorkspaceDesc": "Los informes se llenan cuando hay negocios y seguimientos. Empieza con un negocio y luego programa el siguiente paso.",
+    "emptyWorkspaceAction": "Agregar negocio",
     "focus": "Enfoque",
     "focusAll": "Todos",
     "focusPipeline": "Pipeline",
@@ -164,7 +167,7 @@
     "help": "Personas pendientes de trabajar. Los clientes convertidos se quedan en Contactos.",
     "search": "Buscar leads…",
     "noLeads": "Aún no hay leads",
-    "noLeadsDesc": "Añade un lead para empezar a trabajar con personas nuevas."
+    "noLeadsDesc": "Añade a la persona que quieres trabajar. Conviértela en la ficha; se queda en Contactos como cliente."
   },
   "contacts": {
     "title": "Contactos",
@@ -330,6 +333,8 @@
     "contact": "Contacto",
     "noDeals": "Sin negocios en esta etapa",
     "noDealsDesc": "Arrastra negocios aquí o agrega uno nuevo.",
+    "emptyBoardTitle": "Aún no hay negocios",
+    "emptyBoardDesc": "Añade un negocio para empezar el tablero. Las etapas quedan vacías hasta que tengas algo que mover.",
     "stages": {
       "lead": "Prospecto",
       "qualified": "Calificado",
@@ -417,7 +422,9 @@
     "overdue": "Vencido",
     "upcoming": "Próximo",
     "noActivities": "Aún no hay actividades",
-    "noActivitiesDesc": "Programa tu primera actividad.",
+    "noActivitiesDesc": "Añade una tarea, llamada, reunión o email para que el trabajo vencido y de hoy tenga un sitio.",
+    "noMatchingTitle": "No hay actividades coincidentes",
+    "noMatchingDesc": "Limpia el filtro de tipo, estado, vencimiento o campo personalizado para ver más trabajo.",
     "workbenchEyebrow": "Centro de seguimiento",
     "workbenchTitle": "Banco de vencimientos",
     "workbenchSummary": "Resumen de vencimiento de actividades",

@@ -120,6 +120,42 @@ describe('Reports route', () => {
     expect(screen.getByText('66.7% / 2/3')).toBeTruthy();
   });
 
+  it('tells a first-run user how to fill empty reports', async () => {
+    getPipelineConversionReportMock.mockResolvedValueOnce({
+      generated_at: '2026-08-15T12:00:00Z',
+      total_deals: 0,
+      open_deals: 0,
+      closed_won: 0,
+      closed_lost: 0,
+      overall_win_rate: 0,
+      stage_metrics: [],
+      transition_metrics: [],
+    });
+    getActivityFunnelReportMock.mockResolvedValueOnce({
+      generated_at: '2026-08-15T12:00:00Z',
+      total_activities: 0,
+      completed_activities: 0,
+      pending_activities: 0,
+      overdue_activities: 0,
+      completion_rate: 0,
+      overdue_rate: 0,
+      by_type: [],
+      due_buckets: {
+        overdue: 0,
+        due_today: 0,
+        due_next_7_days: 0,
+        due_later: 0,
+        no_due_date: 0,
+      },
+    });
+
+    render(Reports);
+
+    expect(await screen.findByText('reports.emptyWorkspaceTitle')).toBeTruthy();
+    expect(screen.getByText('reports.emptyWorkspaceDesc')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'reports.emptyWorkspaceAction' })).toBeTruthy();
+  });
+
   it('keeps activity data visible when the pipeline report fails', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     getPipelineConversionReportMock.mockRejectedValueOnce(new Error('pipeline unavailable'));

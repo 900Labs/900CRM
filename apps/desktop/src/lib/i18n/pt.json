@@ -96,6 +96,9 @@
     "loading": "Carregando dados do relatório...",
     "generatedAt": "Gerado {value}",
     "notAvailable": "indisponível",
+    "emptyWorkspaceTitle": "Ainda não há dados de relatórios",
+    "emptyWorkspaceDesc": "Os relatórios preenchem depois de negócios e acompanhamentos. Comece com um negócio e depois agende o próximo passo.",
+    "emptyWorkspaceAction": "Adicionar negócio",
     "focus": "Foco",
     "focusAll": "Todos",
     "focusPipeline": "Pipeline",
@@ -164,7 +167,7 @@
     "help": "Pessoas à espera de trabalho. Clientes convertidos ficam em Contatos.",
     "search": "Buscar leads…",
     "noLeads": "Ainda não há leads",
-    "noLeadsDesc": "Adicione um lead para começar a trabalhar novas pessoas."
+    "noLeadsDesc": "Adicione a pessoa que você quer trabalhar. Converta na página dela; ela fica em Contatos como cliente."
   },
   "contacts": {
     "title": "Contatos",
@@ -330,6 +333,8 @@
     "contact": "Contato",
     "noDeals": "Sem negócios nesta etapa",
     "noDealsDesc": "Arraste negócios para cá ou adicione um novo.",
+    "emptyBoardTitle": "Ainda não há negócios",
+    "emptyBoardDesc": "Adicione um negócio para começar o quadro. As etapas ficam vazias até haver o que mover.",
     "stages": {
       "lead": "Lead",
       "qualified": "Qualificado",
@@ -417,7 +422,9 @@
     "overdue": "Atrasada",
     "upcoming": "Próxima",
     "noActivities": "Ainda não há atividades",
-    "noActivitiesDesc": "Agende sua primeira atividade.",
+    "noActivitiesDesc": "Adicione uma tarefa, ligação, reunião ou e-mail para o trabalho atrasado e de hoje ter um lugar.",
+    "noMatchingTitle": "Nenhuma atividade correspondente",
+    "noMatchingDesc": "Limpe o filtro de tipo, estado, prazo ou campo personalizado para ver mais trabalho.",
     "workbenchEyebrow": "Central de acompanhamento",
     "workbenchTitle": "Bancada de vencimentos",
     "workbenchSummary": "Resumo de vencimento de atividades",
