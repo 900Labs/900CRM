@@ -96,6 +96,9 @@
     "loading": "Đang tải dữ liệu báo cáo...",
     "generatedAt": "Tạo lúc {value}",
     "notAvailable": "không có",
+    "emptyWorkspaceTitle": "Chưa có dữ liệu báo cáo",
+    "emptyWorkspaceDesc": "Báo cáo được điền sau khi bạn thêm giao dịch và theo dõi. Bắt đầu bằng một giao dịch, rồi lên lịch bước tiếp theo.",
+    "emptyWorkspaceAction": "Thêm giao dịch",
     "focus": "Tiêu điểm",
     "focusAll": "Tất cả",
     "focusPipeline": "Pipeline",
@@ -164,7 +167,7 @@
     "help": "Người đang chờ được làm việc. Khách hàng đã chuyển đổi vẫn ở Liên hệ.",
     "search": "Tìm khách tiềm năng…",
     "noLeads": "Chưa có khách tiềm năng",
-    "noLeadsDesc": "Thêm một khách tiềm năng để bắt đầu làm việc với người mới."
+    "noLeadsDesc": "Thêm người bạn muốn làm việc. Chuyển đổi trên trang của họ; họ vẫn ở Liên hệ với tư cách khách hàng."
   },
   "contacts": {
     "title": "Liên hệ",
@@ -330,6 +333,8 @@
     "contact": "Liên hệ",
     "noDeals": "Không có cơ hội ở giai đoạn này",
     "noDealsDesc": "Kéo cơ hội vào đây hoặc thêm mới.",
+    "emptyBoardTitle": "Chưa có giao dịch",
+    "emptyBoardDesc": "Thêm một giao dịch để bắt đầu bảng. Các giai đoạn vẫn trống cho đến khi bạn có thứ để chuyển.",
     "stages": {
       "lead": "Tiềm năng",
       "qualified": "Đủ điều kiện",
@@ -417,7 +422,9 @@
     "overdue": "Quá hạn",
     "upcoming": "Sắp tới",
     "noActivities": "Chưa có hoạt động",
-    "noActivitiesDesc": "Lên lịch hoạt động đầu tiên của bạn.",
+    "noActivitiesDesc": "Thêm việc, cuộc gọi, cuộc họp hoặc email để công việc quá hạn và đến hạn hôm nay có chỗ.",
+    "noMatchingTitle": "Không có hoạt động khớp",
+    "noMatchingDesc": "Xóa bộ lọc loại, trạng thái, hạn hoặc trường tùy chỉnh để xem thêm việc.",
     "workbenchEyebrow": "Trung tâm theo dõi",
     "workbenchTitle": "Bàn làm việc đến hạn",
     "workbenchSummary": "Tóm tắt hoạt động đến hạn",

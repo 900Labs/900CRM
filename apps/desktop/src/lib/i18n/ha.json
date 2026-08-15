@@ -96,6 +96,9 @@
     "loading": "Ana loda bayanan rahoto...",
     "generatedAt": "An samar {value}",
     "notAvailable": "babu",
+    "emptyWorkspaceTitle": "Babu bayanan rahoto tukuna",
+    "emptyWorkspaceDesc": "Rahotanni suna cika bayan ka kara yarjejeniya da bibiya. Fara da yarjejeniya, sa'an nan ka tsara mataki na gaba.",
+    "emptyWorkspaceAction": "Kara Yarjejeniya",
     "focus": "Mayar da hankali",
     "focusAll": "Duka",
     "focusPipeline": "Pipeline",
@@ -164,7 +167,7 @@
     "help": "Mutanen da ke jiran a yi aiki da su. Abokan ciniki da aka canza suna ci gaba a Lambobi.",
     "search": "Nemo masu yiwuwar ciniki…",
     "noLeads": "Babu masu yiwuwar ciniki tukuna",
-    "noLeadsDesc": "Kara mai yiwuwar ciniki don fara aiki da sabbin mutane."
+    "noLeadsDesc": "Kara mutumin da kake so ka yi aiki da shi. Canza shi a shafinsa; ya zauna a Lambobi a matsayin abokin ciniki."
   },
   "contacts": {
     "title": "Lambobi",
@@ -330,6 +333,8 @@
     "contact": "Lamba",
     "noDeals": "Babu yarjejeniya a wannan mataki",
     "noDealsDesc": "Ja yarjejeniya zuwa nan ko kara sabuwa.",
+    "emptyBoardTitle": "Babu yarjejeniya tukuna",
+    "emptyBoardDesc": "Kara yarjejeniya don fara allo. Matakai suna ci gaba da zama fanko har sai kana da abin da za ka motsa.",
     "stages": {
       "lead": "Jagora",
       "qualified": "Cancanta",
@@ -417,7 +422,9 @@
     "overdue": "An Wuce Lokaci",
     "upcoming": "Masu Zuwa",
     "noActivities": "Babu ayyuka tukuna",
-    "noActivitiesDesc": "Tsara aikin ka na farko.",
+    "noActivitiesDesc": "Kara aiki, kira, taro ko imel don aikin da ya makara da na yau ya sami wuri.",
+    "noMatchingTitle": "Babu ayyukan da suka dace",
+    "noMatchingDesc": "Share tacewar nau'i, hali, lokaci ko filin al'ada don ganin ƙarin aiki.",
     "workbenchEyebrow": "Cibiyar Bibiya",
     "workbenchTitle": "Teburin Ayyukan Lokaci",
     "workbenchSummary": "Takaitaccen ayyukan lokaci",

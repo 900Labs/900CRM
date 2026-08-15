@@ -20,6 +20,7 @@ test('renders key hash routes without native Tauri dialogs', async ({ page, asse
   await loadHashRoute(page, '/leads');
   await expect(page.getByRole('heading', { name: 'Leads', exact: true })).toBeVisible();
   await expect(page.getByText('No leads yet')).toBeVisible();
+  await expect(page.getByText('Convert them on the person page')).toBeVisible();
 
   await loadHashRoute(page, '/contacts');
   await expect(page.getByRole('heading', { name: 'Contacts' })).toBeVisible();
@@ -28,11 +29,19 @@ test('renders key hash routes without native Tauri dialogs', async ({ page, asse
   await loadHashRoute(page, '/pipeline');
   await expect(page.getByRole('heading', { name: 'Pipeline' })).toBeVisible();
   await expect(page.getByText('Lead').first()).toBeVisible();
+  await expect(page.getByTestId('pipeline-first-run')).toBeVisible();
+  await expect(page.getByText('Add a deal to start the board')).toBeVisible();
+
+  await loadHashRoute(page, '/activities');
+  await expect(page.getByRole('heading', { name: 'Activities' })).toBeVisible();
+  await expect(page.getByText('No activities yet')).toBeVisible();
+  await expect(page.getByText('Add a task, call, meeting, or email')).toBeVisible();
 
   await loadHashRoute(page, '/reports');
   await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
-  await expect(page.getByText('Pipeline Overview')).toBeVisible();
-  await expect(page.getByText('Activity Overview')).toBeVisible();
+  await expect(page.getByTestId('reports-first-run')).toBeVisible();
+  await expect(page.getByText('No report data yet')).toBeVisible();
+  await expect(page.getByText('Reports fill in after you add deals')).toBeVisible();
 
   await loadHashRoute(page, '/settings');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();

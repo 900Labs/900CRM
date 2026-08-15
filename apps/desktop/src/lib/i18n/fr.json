@@ -96,6 +96,9 @@
     "loading": "Chargement des données du rapport...",
     "generatedAt": "Généré {value}",
     "notAvailable": "non disponible",
+    "emptyWorkspaceTitle": "Pas encore de données de rapports",
+    "emptyWorkspaceDesc": "Les rapports se remplissent après les affaires et les suivis. Commencez par une affaire, puis planifiez l’étape suivante.",
+    "emptyWorkspaceAction": "Ajouter une affaire",
     "focus": "Focus",
     "focusAll": "Tout",
     "focusPipeline": "Pipeline",
@@ -164,7 +167,7 @@
     "help": "Personnes en attente de suivi. Les clients convertis restent dans Contacts.",
     "search": "Rechercher des pistes…",
     "noLeads": "Aucune piste pour le moment",
-    "noLeadsDesc": "Ajoutez une piste pour commencer à travailler de nouvelles personnes."
+    "noLeadsDesc": "Ajoutez une personne à travailler. Convertissez-la depuis sa fiche ; elle reste dans Contacts comme client."
   },
   "contacts": {
     "title": "Contacts",
@@ -330,6 +333,8 @@
     "contact": "Contact",
     "noDeals": "Aucune affaire à cette étape",
     "noDealsDesc": "Faites glisser des affaires ici ou ajoutez-en une nouvelle.",
+    "emptyBoardTitle": "Aucune affaire pour le moment",
+    "emptyBoardDesc": "Ajoutez une affaire pour démarrer le tableau. Les étapes restent vides tant que vous n’avez rien à déplacer.",
     "stages": {
       "lead": "Prospect",
       "qualified": "Qualifié",
@@ -417,7 +422,9 @@
     "overdue": "En retard",
     "upcoming": "À venir",
     "noActivities": "Aucune activité pour l'instant",
-    "noActivitiesDesc": "Planifiez votre première activité.",
+    "noActivitiesDesc": "Ajoutez une tâche, un appel, une réunion ou un e-mail pour que le travail en retard et dû aujourd’hui ait une place.",
+    "noMatchingTitle": "Aucune activité correspondante",
+    "noMatchingDesc": "Effacez le filtre de type, de statut, d’échéance ou de champ personnalisé pour voir plus de travail.",
     "workbenchEyebrow": "Centre de relance",
     "workbenchTitle": "Échéancier",
     "workbenchSummary": "Résumé des échéances d'activité",

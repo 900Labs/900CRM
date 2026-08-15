@@ -25,7 +25,9 @@
     type SavedView,
   } from '$lib/api/savedViews';
   import { settingsStore } from '$lib/stores/settings';
+  import { uiStore } from '$lib/stores/ui';
   import { navigateHash } from '$lib/utils/hashRouter';
+  import EmptyState from '$lib/components/EmptyState.svelte';
   import {
     loadActivityLinkIndex,
     type ActivityLinkIndex,
@@ -102,6 +104,16 @@
   const showPipelineSection = $derived(!reportFocus || reportFocus === 'pipeline');
   const showActivitySection = $derived(!reportFocus || reportFocus === 'activity');
   const showStaleSection = $derived(!reportFocus || reportFocus === 'stale');
+  const showWorkspaceEmpty = $derived(
+    !pipelineLoading
+    && !activityLoading
+    && !staleLoading
+    && !pipelineError
+    && !activityError
+    && !staleError
+    && (pipelineReport?.total_deals ?? 0) === 0
+    && (activityReport?.total_activities ?? 0) === 0
+  );
 
   function hasStageMetricData(metric: PipelineStageMetric): boolean {
     return metric.count > 0 || metric.stage_share > 0;
@@ -470,6 +482,18 @@
       </small>
     </article>
   </section>
+
+  {#if showWorkspaceEmpty}
+    <div data-testid="reports-first-run">
+      <EmptyState
+        icon="deals"
+        title={t('reports.emptyWorkspaceTitle')}
+        description={t('reports.emptyWorkspaceDesc')}
+        actionLabel={t('reports.emptyWorkspaceAction')}
+        onaction={() => uiStore.openModal('addDeal')}
+      />
+    </div>
+  {/if}
 
   <div class="reports-grid">
     {#if showPipelineSection}

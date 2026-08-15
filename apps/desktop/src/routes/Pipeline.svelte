@@ -795,6 +795,18 @@
     {/if}
   </section>
 
+  {#if !dealStore.isLoading && allDeals.length === 0}
+    <div class="pipeline-first-run" data-testid="pipeline-first-run">
+      <EmptyState
+        icon="deals"
+        title={t('deals.emptyBoardTitle')}
+        description={t('deals.emptyBoardDesc')}
+        actionLabel={t('deals.addDeal')}
+        onaction={() => openAddDeal('lead')}
+      />
+    </div>
+  {/if}
+
   {#if !dealStore.isLoading}
     <section
       class="pipeline-insights"
@@ -1350,6 +1362,10 @@
     font-weight: var(--weight-semibold);
     color: var(--text-primary);
     white-space: nowrap;
+  }
+
+  .pipeline-first-run {
+    padding: var(--space-6) 0;
   }
 
   .saved-views,
