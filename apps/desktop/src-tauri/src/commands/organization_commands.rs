@@ -3,7 +3,7 @@ use tauri::State;
 
 use crate::{commands::lock_core, AppState};
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 #[allow(clippy::too_many_arguments)]
 pub async fn create_organization(
     state: State<'_, AppState>,
@@ -36,7 +36,7 @@ pub async fn create_organization(
     .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_organization(
     state: State<'_, AppState>,
     id: String,
@@ -45,13 +45,13 @@ pub async fn get_organization(
     core.get_organization(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_organizations(state: State<'_, AppState>) -> Result<Vec<Organization>, String> {
     let core = lock_core(&state)?;
     core.list_organizations().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 #[allow(clippy::too_many_arguments)]
 pub async fn update_organization(
     state: State<'_, AppState>,
@@ -86,13 +86,13 @@ pub async fn update_organization(
     .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn delete_organization(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let mut core = lock_core(&state)?;
     core.delete_organization(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn link_contact_to_organization(
     state: State<'_, AppState>,
     contact_id: String,

@@ -3,7 +3,7 @@ use tauri::State;
 
 use crate::{commands::lock_core, AppState};
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn create_tag(
     state: State<'_, AppState>,
     name: String,
@@ -13,19 +13,19 @@ pub async fn create_tag(
     core.create_tag(name, color).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_tag(state: State<'_, AppState>, id: String) -> Result<Tag, String> {
     let core = lock_core(&state)?;
     core.get_tag(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_tags(state: State<'_, AppState>) -> Result<Vec<Tag>, String> {
     let core = lock_core(&state)?;
     core.list_tags().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn update_tag(
     state: State<'_, AppState>,
     id: String,
@@ -55,13 +55,13 @@ pub(crate) fn color_update_from_args(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn delete_tag(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let mut core = lock_core(&state)?;
     core.delete_tag(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn apply_tag_to_entity(
     state: State<'_, AppState>,
     entity_type: String,
@@ -73,7 +73,7 @@ pub async fn apply_tag_to_entity(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn remove_tag_from_entity(
     state: State<'_, AppState>,
     entity_type: String,
@@ -85,7 +85,7 @@ pub async fn remove_tag_from_entity(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_tags_for_entity(
     state: State<'_, AppState>,
     entity_type: String,

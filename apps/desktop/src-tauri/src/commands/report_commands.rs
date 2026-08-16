@@ -6,7 +6,7 @@ use crm_core::storage::reporting::{ActivityFunnelReport, PipelineConversionRepor
 
 use crate::AppState;
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_pipeline_conversion_report(
     state: State<'_, AppState>,
 ) -> Result<PipelineConversionReport, String> {
@@ -15,7 +15,7 @@ pub async fn get_pipeline_conversion_report(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_activity_funnel_report(
     state: State<'_, AppState>,
 ) -> Result<ActivityFunnelReport, String> {

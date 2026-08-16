@@ -6,7 +6,7 @@ use crate::{commands::lock_core, AppState};
 const DEFAULT_AUDIT_LOG_LIMIT: u32 = 100;
 const MAX_AUDIT_LOG_LIMIT: u32 = 500;
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_recent_audit_log(
     state: State<'_, AppState>,
     limit: Option<u32>,
@@ -16,7 +16,7 @@ pub async fn list_recent_audit_log(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_pending_proposed_actions(
     state: State<'_, AppState>,
 ) -> Result<Vec<ProposedAction>, String> {
@@ -25,7 +25,7 @@ pub async fn list_pending_proposed_actions(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn approve_proposed_action(
     state: State<'_, AppState>,
     id: String,
@@ -34,7 +34,7 @@ pub async fn approve_proposed_action(
     core.approve_proposed_action(id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn reject_proposed_action(
     state: State<'_, AppState>,
     id: String,

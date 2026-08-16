@@ -6,7 +6,7 @@ use crate::{commands::lock_core, AppState};
 const DEFAULT_GLOBAL_SEARCH_LIMIT: u32 = 30;
 const MAX_GLOBAL_SEARCH_LIMIT: u32 = 100;
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn global_search(
     state: State<'_, AppState>,
     query: String,

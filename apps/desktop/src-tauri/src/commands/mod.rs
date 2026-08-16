@@ -1,3 +1,9 @@
+//! Desktop IPC commands.
+//!
+//! Command arguments keep Rust `snake_case` names on the JavaScript side
+//! (`rename_all = "snake_case"`). Tauri's default camelCase conversion does not
+//! match the existing frontend invoke payloads.
+
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
 use std::sync::MutexGuard;

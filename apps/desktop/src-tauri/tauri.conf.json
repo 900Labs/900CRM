@@ -49,7 +49,6 @@
   "plugins": {
     "fs": {},
     "shell": { "open": true },
-    "notification": {},
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUyQzQwOTE3MUM1OUJGQUQKUldTdHYxa2NGd25FVW1YNmtCak1IeXhsM2puOFh1YmRCbjUyVTR2Q0w2S2t4RmMyaTljeERuaFoK",
       "endpoints": ["https://github.com/900Labs/900CRM/releases/latest/download/latest.json"]

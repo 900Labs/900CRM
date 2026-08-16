@@ -5,7 +5,7 @@ use crate::AppState;
 
 // Preserve the existing field-level IPC command shape for frontend callers.
 #[allow(clippy::too_many_arguments)]
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn create_deal(
     state: State<'_, AppState>,
     title: String,
@@ -33,7 +33,7 @@ pub async fn create_deal(
     .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_deal(state: State<'_, AppState>, id: String) -> Result<Deal, String> {
     let core = super::lock_core(&state)?;
     core.get_deal(&id).map_err(|e| e.to_string())
@@ -42,7 +42,7 @@ pub async fn get_deal(state: State<'_, AppState>, id: String) -> Result<Deal, St
 /// List deals. When `limit` is `None`, all deals are returned (legacy callers
 /// like the pipeline board). When `Some`, the result is windowed by
 /// `offset`/`limit` (clamped to `MAX_LIST_DEALS_LIMIT`) to bound the IPC payload.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_deals(
     state: State<'_, AppState>,
     limit: Option<u32>,
@@ -67,7 +67,7 @@ fn list_deals_limit(limit: Option<u32>) -> Option<u32> {
     limit.map(|value| value.clamp(1, MAX_LIST_DEALS_LIMIT))
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_deals_by_stage(
     state: State<'_, AppState>,
     stage: String,
@@ -78,7 +78,7 @@ pub async fn list_deals_by_stage(
 
 // Preserve the existing field-level IPC command shape for frontend callers.
 #[allow(clippy::too_many_arguments)]
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn update_deal(
     state: State<'_, AppState>,
     id: String,
@@ -128,7 +128,7 @@ pub(crate) fn nullable_update_from_args(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn move_deal_stage(
     state: State<'_, AppState>,
     id: String,
@@ -140,13 +140,13 @@ pub async fn move_deal_stage(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn delete_deal(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let mut core = super::lock_core(&state)?;
     core.delete_deal(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn link_deal_to_organization(
     state: State<'_, AppState>,
     deal_id: String,
@@ -157,7 +157,7 @@ pub async fn link_deal_to_organization(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn add_deal_contact(
     state: State<'_, AppState>,
     deal_id: String,
@@ -170,7 +170,7 @@ pub async fn add_deal_contact(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn remove_deal_contact(
     state: State<'_, AppState>,
     deal_id: String,
@@ -181,7 +181,7 @@ pub async fn remove_deal_contact(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_deal_contacts(
     state: State<'_, AppState>,
     deal_id: String,
@@ -190,7 +190,7 @@ pub async fn list_deal_contacts(
     core.list_deal_contacts(&deal_id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_pipeline_summary(
     state: State<'_, AppState>,
 ) -> Result<Vec<PipelineSummary>, String> {

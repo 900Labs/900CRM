@@ -7,7 +7,7 @@ const DEFAULT_UPCOMING_ACTIVITIES_LIMIT: u32 = 10;
 const MAX_UPCOMING_ACTIVITIES_LIMIT: u32 = 200;
 const MAX_LIST_ACTIVITIES_LIMIT: u32 = 500;
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn create_activity(
     state: State<'_, AppState>,
     activity_type: String,
@@ -29,7 +29,7 @@ pub async fn create_activity(
     .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_activity(state: State<'_, AppState>, id: String) -> Result<Activity, String> {
     let core = super::lock_core(&state)?;
     core.get_activity(&id).map_err(|e| e.to_string())
@@ -38,7 +38,7 @@ pub async fn get_activity(state: State<'_, AppState>, id: String) -> Result<Acti
 /// List activities. When `limit` is `None`, all activities are returned (legacy
 /// callers). When `Some`, the result is windowed by `offset`/`limit` (clamped to
 /// `MAX_LIST_ACTIVITIES_LIMIT`) to bound the IPC payload.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_activities(
     state: State<'_, AppState>,
     limit: Option<u32>,
@@ -61,7 +61,7 @@ fn list_activities_limit(limit: Option<u32>) -> Option<u32> {
     limit.map(|value| value.clamp(1, MAX_LIST_ACTIVITIES_LIMIT))
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_activities_for_contact(
     state: State<'_, AppState>,
     contact_id: String,
@@ -71,7 +71,7 @@ pub async fn list_activities_for_contact(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_activities_for_deal(
     state: State<'_, AppState>,
     deal_id: String,
@@ -81,7 +81,7 @@ pub async fn list_activities_for_deal(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_upcoming_activities(
     state: State<'_, AppState>,
     limit: Option<u32>,
@@ -91,7 +91,7 @@ pub async fn list_upcoming_activities(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn mark_activity_complete(
     state: State<'_, AppState>,
     id: String,
@@ -100,7 +100,7 @@ pub async fn mark_activity_complete(
     core.mark_activity_complete(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn mark_activity_incomplete(
     state: State<'_, AppState>,
     id: String,
@@ -112,7 +112,7 @@ pub async fn mark_activity_incomplete(
 
 // Preserve the existing field-level IPC command shape for frontend callers.
 #[allow(clippy::too_many_arguments)]
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn update_activity(
     state: State<'_, AppState>,
     id: String,
@@ -164,13 +164,13 @@ fn upcoming_activities_limit(limit: Option<u32>) -> u32 {
         .clamp(1, MAX_UPCOMING_ACTIVITIES_LIMIT)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn delete_activity(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let mut core = super::lock_core(&state)?;
     core.delete_activity(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_activity_links(
     state: State<'_, AppState>,
     activity_id: String,
@@ -180,7 +180,7 @@ pub async fn list_activity_links(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn add_activity_link(
     state: State<'_, AppState>,
     activity_id: String,
@@ -192,7 +192,7 @@ pub async fn add_activity_link(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn remove_activity_link(
     state: State<'_, AppState>,
     activity_id: String,

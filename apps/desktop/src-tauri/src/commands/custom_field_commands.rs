@@ -5,7 +5,7 @@ use tauri::State;
 
 use crate::AppState;
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_custom_field_defs(
     state: State<'_, AppState>,
     entity_type: Option<String>,
@@ -15,7 +15,7 @@ pub async fn list_custom_field_defs(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn create_custom_field_def(
     state: State<'_, AppState>,
     entity_type: String,
@@ -35,7 +35,7 @@ pub async fn create_custom_field_def(
     .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn update_custom_field_def(
     state: State<'_, AppState>,
     id: String,
@@ -49,13 +49,13 @@ pub async fn update_custom_field_def(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn delete_custom_field_def(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let mut core = super::lock_core(&state)?;
     core.delete_custom_field_def(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn set_custom_field_value(
     state: State<'_, AppState>,
     field_def_id: String,
@@ -67,7 +67,7 @@ pub async fn set_custom_field_value(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_custom_field_values(
     state: State<'_, AppState>,
     entity_type: String,
@@ -78,7 +78,7 @@ pub async fn list_custom_field_values(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_custom_field_values_for_type(
     state: State<'_, AppState>,
     entity_type: String,

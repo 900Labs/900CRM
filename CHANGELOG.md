@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed — 2026-08-15
+- Desktop launch no longer aborts when the notification plugin reads an empty
+  config object.
+- Saved views, contact/lead create, and notes/tags now reach the backend. Tauri
+  was expecting camelCase argument names while the app sends snake_case.
+
 ### Added — 2026-08-15
 - Empty Leads, Pipeline, Activities, and Reports pages now say what to do
   first: add a lead, add a deal, schedule a follow-up, or add a deal so

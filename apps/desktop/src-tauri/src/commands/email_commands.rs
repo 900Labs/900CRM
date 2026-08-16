@@ -53,7 +53,7 @@ pub struct EmailConnectionTestResult {
 /// - verifies DNS resolution + TCP connect
 /// - attempts a best-effort protocol probe on plaintext ports
 /// - does not perform credential login or full TLS negotiation
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn test_email_server_connection(
     request: EmailConnectionTestRequest,
 ) -> Result<EmailConnectionTestResult, String> {

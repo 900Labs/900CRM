@@ -3,7 +3,7 @@ use tauri::State;
 
 use crate::{commands::lock_core, AppState};
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn create_entity_link(
     state: State<'_, AppState>,
     entity_type: String,
@@ -17,7 +17,7 @@ pub async fn create_entity_link(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_entity_links(
     state: State<'_, AppState>,
     entity_type: String,
@@ -28,7 +28,7 @@ pub async fn list_entity_links(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn update_entity_link(
     state: State<'_, AppState>,
     id: String,
@@ -41,7 +41,7 @@ pub async fn update_entity_link(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn delete_entity_link(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let mut core = lock_core(&state)?;
     core.delete_entity_link(&id).map_err(|e| e.to_string())
