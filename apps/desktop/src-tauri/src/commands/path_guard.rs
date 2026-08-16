@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn rejects_secret_path_fragments() {
-        assert!(reject_if_secret(&PathBuf::from("/Users/me/.ssh/id_rsa")).is_err());
+        assert!(reject_if_secret(&PathBuf::from("/tmp/home/.ssh/id_rsa")).is_err());
         assert!(reject_if_secret(&PathBuf::from("/tmp/safe-import.csv")).is_ok());
     }
 
