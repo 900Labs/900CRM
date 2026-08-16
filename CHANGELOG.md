@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed — 2026-08-16
+- Settings is now three panes: Appearance, Data, and Integrations. Backup
+  and email no longer sit on the same long page.
+
 ### Fixed — 2026-08-15
 - Desktop launch no longer aborts when the notification plugin reads an empty
   config object.

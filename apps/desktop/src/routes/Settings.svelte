@@ -2,23 +2,16 @@
   /**
    * Settings.svelte — Application settings page for 900CRM.
    *
-   * Sections:
-   *   1. Language — pick from available locales (shows nativeName)
-   *   2. Currency — ISO 4217 selector
-   *   3. Theme — light / dark / system
-   *   4. Date format — 4 preset formats
-   *   5. Sync — enable/disable toggle + server URL
-   *   6. Email integration — optional IMAP/SMTP endpoint settings
-   *   7. Notifications — desktop reminder preferences
-   *   8. About — 900 Labs mission statement
-   *   9. Data management — export all, import data
+   * Three panes:
+   *   Appearance — language, currency, theme, date format, reminders, about
+   *   Data — import/export and local backup/restore
+   *   Integrations — sync honesty, optional email probe, external clients
    *
    * Each setting auto-saves via settingsStore.updateSetting().
    * No separate Save button needed — changes apply immediately.
    */
 
-  import { onMount } from 'svelte';
-  import { t } from '$lib/i18n';
+  import { t, type TranslationKeys } from '$lib/i18n';
   import { settingsStore } from '$lib/stores/settings';
   import { availableLocales } from '$lib/i18n';
   import { uiStore } from '$lib/stores/ui';
@@ -46,10 +39,12 @@
   type DateFormat  = 'YYYY-MM-DD' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'MMM D, YYYY';
   type ExternalClientActivationMode = EditableExternalClientPermissionMode;
 
+  type SettingsPane = 'appearance' | 'data' | 'integrations';
+
   interface SettingsShortcut {
-    id: string;
-    labelKey: string;
-    targetId: string;
+    id: SettingsPane;
+    labelKey: TranslationKeys;
+    helpKey: TranslationKeys;
   }
 
   // ── Constants ────────────────────────────────────────────────────────────────
@@ -95,13 +90,9 @@
   ];
 
   const SETTINGS_SHORTCUTS: SettingsShortcut[] = [
-    { id: 'preferences', labelKey: 'settings.sectionPreferences', targetId: 'lang-heading' },
-    { id: 'sync', labelKey: 'settings.sectionSync', targetId: 'sync-heading' },
-    { id: 'email', labelKey: 'settings.sectionEmail', targetId: 'email-heading' },
-    { id: 'notifications', labelKey: 'settings.sectionNotifications', targetId: 'notifications-heading' },
-    { id: 'integrations', labelKey: 'settings.sectionIntegrations', targetId: 'integrations-heading' },
-    { id: 'data', labelKey: 'settings.sectionData', targetId: 'data-heading' },
-    { id: 'about', labelKey: 'settings.sectionAbout', targetId: 'about-heading' },
+    { id: 'appearance', labelKey: 'settings.sectionAppearance', helpKey: 'settings.paneAppearanceHelp' },
+    { id: 'data', labelKey: 'settings.sectionData', helpKey: 'settings.paneDataHelp' },
+    { id: 'integrations', labelKey: 'settings.sectionIntegrations', helpKey: 'settings.paneIntegrationsHelp' },
   ];
 
   // ── State ────────────────────────────────────────────────────────────────────
@@ -146,11 +137,18 @@
   let externalClientActivationSaving = $state<Record<string, boolean>>({});
   let externalClientActivationMessages = $state<Record<string, string>>({});
   let externalClientActivationErrors = $state<Record<string, string>>({});
+  let activePane = $state<SettingsPane>('appearance');
+  let settingsBootstrapped = false;
+  let integrationsLoaded = false;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
-  onMount(() => {
+  $effect(() => {
+    if (settingsBootstrapped) {
+      return;
+    }
 
+    settingsBootstrapped = true;
     reminderLeadMinutesLocal = String(settingsStore.reminderLeadMinutes);
     smtpHostLocal = settingsStore.smtpHost;
     smtpPortLocal = String(settingsStore.smtpPort);
@@ -159,6 +157,14 @@
     imapHostLocal = settingsStore.imapHost;
     imapPortLocal = String(settingsStore.imapPort);
     imapUsernameLocal = settingsStore.imapUsername;
+  });
+
+  $effect(() => {
+    if (activePane !== 'integrations' || integrationsLoaded) {
+      return;
+    }
+
+    integrationsLoaded = true;
     void loadExternalClients();
   });
 
@@ -179,10 +185,33 @@
     }
   }
 
-  function scrollToSettingsSection(targetId: string) {
-    document.getElementById(targetId)?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
+  function selectSettingsPane(pane: SettingsPane) {
+    activePane = pane;
+  }
+
+  function handleSettingsTabKeydown(event: KeyboardEvent) {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft' && event.key !== 'Home' && event.key !== 'End') {
+      return;
+    }
+
+    const panes = SETTINGS_SHORTCUTS.map((shortcut) => shortcut.id);
+    const current = panes.indexOf(activePane);
+    let next = current;
+
+    if (event.key === 'ArrowRight') {
+      next = (current + 1) % panes.length;
+    } else if (event.key === 'ArrowLeft') {
+      next = (current - 1 + panes.length) % panes.length;
+    } else if (event.key === 'Home') {
+      next = 0;
+    } else {
+      next = panes.length - 1;
+    }
+
+    event.preventDefault();
+    selectSettingsPane(panes[next]);
+    queueMicrotask(() => {
+      document.getElementById(`settings-tab-${panes[next]}`)?.focus();
     });
   }
 
@@ -648,23 +677,44 @@
     <h1 class="page-title">{t('settings.title')}</h1>
   </div>
 
-  <div class="settings-section-nav" aria-label={t('settings.sectionNavLabel')}>
+  <div
+    class="settings-section-nav"
+    role="tablist"
+    aria-label={t('settings.sectionNavLabel')}
+  >
     {#each SETTINGS_SHORTCUTS as shortcut (shortcut.id)}
       <button
         class="settings-section-nav-button"
+        class:settings-section-nav-button--active={activePane === shortcut.id}
         type="button"
-        onclick={() => scrollToSettingsSection(shortcut.targetId)}
+        role="tab"
+        id="settings-tab-{shortcut.id}"
+        aria-selected={activePane === shortcut.id}
+        aria-controls="settings-pane-{shortcut.id}"
+        tabindex={activePane === shortcut.id ? 0 : -1}
+        onclick={() => selectSettingsPane(shortcut.id)}
+        onkeydown={handleSettingsTabKeydown}
       >
         {t(shortcut.labelKey)}
       </button>
     {/each}
   </div>
+  <p class="settings-pane-help">
+    {t(SETTINGS_SHORTCUTS.find((shortcut) => shortcut.id === activePane)?.helpKey ?? 'settings.paneAppearanceHelp')}
+  </p>
 
-  <div class="settings-grid">
+  <div
+    class="settings-grid"
+    class:settings-grid--single={activePane === 'data'}
+    id="settings-pane-{activePane}"
+    role="tabpanel"
+    aria-labelledby="settings-tab-{activePane}"
+  >
 
-    <!-- ── LEFT: app settings ───────────────────────────────────────────────── -->
+    <!-- ── LEFT: pane body ──────────────────────────────────────────────────── -->
     <div class="settings-main">
 
+      {#if activePane === 'appearance'}
       <!-- Language -->
       <section class="card settings-section" aria-labelledby="lang-heading">
         <div class="card-header">
@@ -814,6 +864,67 @@
         </div>
       </section>
 
+      <!-- Notification reminders -->
+      <section class="card settings-section" aria-labelledby="notifications-heading">
+        <div class="card-header">
+          <h2 class="section-title" id="notifications-heading">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 01-6 0"/>
+            </svg>
+            {t('settings.notifications')}
+          </h2>
+          {#if savingKey === 'notificationsEnabled' || savingKey === 'reminderLeadMinutes'}
+            <span class="saving-indicator" aria-live="polite">{t('common.loading')}</span>
+          {/if}
+        </div>
+        <div class="card-body sync-body">
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <span class="toggle-label">{t('settings.notificationsEnabled')}</span>
+              <span class="toggle-desc">
+                {settingsStore.notificationsEnabled
+                  ? t('common.success')
+                  : t('common.none')}
+              </span>
+            </div>
+            <button
+              class="toggle-switch"
+              class:toggle-switch--on={settingsStore.notificationsEnabled}
+              onclick={handleNotificationsToggle}
+              role="switch"
+              aria-checked={settingsStore.notificationsEnabled}
+              aria-label={t('settings.notificationsEnabled')}
+              type="button"
+            >
+              <span class="toggle-thumb"></span>
+            </button>
+          </div>
+
+          {#if settingsStore.notificationsEnabled}
+            <div class="field-row sync-url-row">
+              <label class="field-label" for="reminder-lead-minutes">{t('settings.reminderLeadMinutes')}</label>
+              <div class="sync-url-input-wrap">
+                <input
+                  id="reminder-lead-minutes"
+                  class="input"
+                  type="number"
+                  min="1"
+                  max="1440"
+                  step="1"
+                  value={reminderLeadMinutesLocal}
+                  oninput={handleReminderLeadInput}
+                  onblur={handleReminderLeadCommit}
+                  onkeydown={handleReminderLeadKeydown}
+                />
+              </div>
+              <span class="field-hint">{t('settings.reminderLeadHint')}</span>
+            </div>
+          {/if}
+        </div>
+      </section>
+      {/if}
+
+      {#if activePane === 'integrations'}
       <!-- Sync configuration -->
       <section class="card settings-section" aria-labelledby="sync-heading">
         <div class="card-header">
@@ -997,70 +1108,143 @@
           {/if}
         </div>
       </section>
+      {/if}
 
-      <!-- Notification reminders -->
-      <section class="card settings-section" aria-labelledby="notifications-heading">
+      {#if activePane === 'data'}
+      <!-- Data management -->
+      <section class="card settings-section" aria-labelledby="data-heading">
         <div class="card-header">
-          <h2 class="section-title" id="notifications-heading">
+          <h2 class="section-title" id="data-heading">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-              <path d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 01-6 0"/>
+              <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
             </svg>
-            {t('settings.notifications')}
+            {t('settings.dataManagement')}
           </h2>
-          {#if savingKey === 'notificationsEnabled' || savingKey === 'reminderLeadMinutes'}
-            <span class="saving-indicator" aria-live="polite">{t('common.loading')}</span>
-          {/if}
         </div>
-        <div class="card-body sync-body">
-          <div class="toggle-row">
-            <div class="toggle-info">
-              <span class="toggle-label">{t('settings.notificationsEnabled')}</span>
-              <span class="toggle-desc">
-                {settingsStore.notificationsEnabled
-                  ? t('common.success')
-                  : t('common.none')}
-              </span>
+        <div class="card-body data-body">
+          <div class="data-action">
+            <div class="data-action-info">
+              <span class="data-action-label">{t('settings.exportAll')}</span>
+              <span class="data-action-desc">{t('export.title')}</span>
+              <span class="data-action-warning">{t('settings.exportUnencryptedWarning')}</span>
             </div>
             <button
-              class="toggle-switch"
-              class:toggle-switch--on={settingsStore.notificationsEnabled}
-              onclick={handleNotificationsToggle}
-              role="switch"
-              aria-checked={settingsStore.notificationsEnabled}
-              aria-label={t('settings.notificationsEnabled')}
+              class="btn btn-secondary btn-sm"
+              onclick={handleExportAll}
               type="button"
             >
-              <span class="toggle-thumb"></span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+              </svg>
+              {t('settings.exportAll')}
             </button>
           </div>
 
-          {#if settingsStore.notificationsEnabled}
-            <div class="field-row sync-url-row">
-              <label class="field-label" for="reminder-lead-minutes">{t('settings.reminderLeadMinutes')}</label>
-              <div class="sync-url-input-wrap">
-                <input
-                  id="reminder-lead-minutes"
-                  class="input"
-                  type="number"
-                  min="1"
-                  max="1440"
-                  step="1"
-                  value={reminderLeadMinutesLocal}
-                  oninput={handleReminderLeadInput}
-                  onblur={handleReminderLeadCommit}
-                  onkeydown={handleReminderLeadKeydown}
-                />
-              </div>
-              <span class="field-hint">{t('settings.reminderLeadHint')}</span>
+          <div class="data-action">
+            <div class="data-action-info">
+              <span class="data-action-label">{t('settings.importData')}</span>
+              <span class="data-action-desc">{t('import.title')}</span>
             </div>
-          {/if}
+            <button
+              class="btn btn-secondary btn-sm"
+              onclick={handleImportData}
+              type="button"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+              </svg>
+              {t('settings.importData')}
+            </button>
+          </div>
+
+          <div class="backup-panel" aria-live="polite">
+            <div class="backup-panel-header">
+              <div class="data-action-info">
+                <span class="data-action-label">{t('settings.backupRestore')}</span>
+                <span class="data-action-desc">{t('settings.backupRestoreDesc')}</span>
+                <span class="data-action-warning">{t('settings.backupUnencryptedWarning')}</span>
+              </div>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick={handleChooseBackupFolder}
+                type="button"
+                disabled={backupBusy !== null}
+              >
+                {backupBusy === 'select' ? t('common.loading') : t('settings.backupChooseFolder')}
+              </button>
+            </div>
+
+            <div class="backup-folder">
+              <span class="field-label">{t('settings.backupSelectedFolder')}</span>
+              <span class="backup-path">{backupDirLocal || t('settings.backupNoFolder')}</span>
+            </div>
+
+            <div class="backup-actions">
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick={handleCreateBackup}
+                type="button"
+                disabled={!backupDirLocal || backupBusy !== null}
+                title={t('settings.backupCreateDesc')}
+              >
+                {backupBusy === 'create' ? t('common.loading') : t('settings.backupCreate')}
+              </button>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick={handleValidateBackup}
+                type="button"
+                disabled={!backupDirLocal || backupBusy !== null}
+                title={t('settings.backupValidateDesc')}
+              >
+                {backupBusy === 'validate' ? t('common.loading') : t('settings.backupValidate')}
+              </button>
+              <button
+                class="btn btn-secondary btn-sm btn-danger-soft"
+                onclick={handleRestoreBackup}
+                type="button"
+                disabled={!selectedBackupIsValidated() || backupBusy !== null}
+                title={t('settings.backupRestoreActionDesc')}
+              >
+                {backupBusy === 'restore' ? t('common.loading') : t('settings.backupRestoreAction')}
+              </button>
+            </div>
+
+            {#if lastBackupValidation}
+              <dl class="backup-metadata" aria-label={t('settings.backupMetadata')}>
+                <div>
+                  <dt>{t('settings.backupCreatedAt')}</dt>
+                  <dd>{lastBackupValidation.metadata.created_at}</dd>
+                </div>
+                <div>
+                  <dt>{t('settings.backupSchemaVersion')}</dt>
+                  <dd>{lastBackupValidation.metadata.schema_version}</dd>
+                </div>
+                <div>
+                  <dt>{t('settings.backupAppVersion')}</dt>
+                  <dd>{lastBackupValidation.metadata.app_version}</dd>
+                </div>
+                <div>
+                  <dt>{t('settings.backupDeviceId')}</dt>
+                  <dd>{lastBackupValidation.metadata.device_id}</dd>
+                </div>
+              </dl>
+            {/if}
+
+            {#if backupMessage}
+              <p class="backup-status backup-status--success">{backupMessage}</p>
+            {/if}
+            {#if backupError}
+              <p class="backup-status backup-status--error">{backupError}</p>
+            {/if}
+          </div>
         </div>
       </section>
+      {/if}
     </div>
 
-    <!-- ── RIGHT: about + data management ─────────────────────────────────── -->
-    <div class="settings-sidebar">
-
+    {#if activePane === 'appearance'}
+    <aside class="settings-sidebar">
       <!-- About / Mission -->
       <section class="card settings-section settings-about" aria-labelledby="about-heading">
         <div class="card-header">
@@ -1108,7 +1292,11 @@
           </div>
         </div>
       </section>
+    </aside>
+    {/if}
 
+    {#if activePane === 'integrations'}
+    <aside class="settings-sidebar">
       <!-- Integrations -->
       <section class="card settings-section" aria-labelledby="integrations-heading">
         <div class="card-header">
@@ -1258,137 +1446,8 @@
           {/if}
         </div>
       </section>
-
-      <!-- Data management -->
-      <section class="card settings-section" aria-labelledby="data-heading">
-        <div class="card-header">
-          <h2 class="section-title" id="data-heading">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-              <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-            </svg>
-            {t('settings.dataManagement')}
-          </h2>
-        </div>
-        <div class="card-body data-body">
-          <div class="data-action">
-            <div class="data-action-info">
-              <span class="data-action-label">{t('settings.exportAll')}</span>
-              <span class="data-action-desc">{t('export.title')}</span>
-              <span class="data-action-warning">{t('settings.exportUnencryptedWarning')}</span>
-            </div>
-            <button
-              class="btn btn-secondary btn-sm"
-              onclick={handleExportAll}
-              type="button"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-              </svg>
-              {t('settings.exportAll')}
-            </button>
-          </div>
-
-          <div class="data-action">
-            <div class="data-action-info">
-              <span class="data-action-label">{t('settings.importData')}</span>
-              <span class="data-action-desc">{t('import.title')}</span>
-            </div>
-            <button
-              class="btn btn-secondary btn-sm"
-              onclick={handleImportData}
-              type="button"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-              </svg>
-              {t('settings.importData')}
-            </button>
-          </div>
-
-          <div class="backup-panel" aria-live="polite">
-            <div class="backup-panel-header">
-              <div class="data-action-info">
-                <span class="data-action-label">{t('settings.backupRestore')}</span>
-                <span class="data-action-desc">{t('settings.backupRestoreDesc')}</span>
-                <span class="data-action-warning">{t('settings.backupUnencryptedWarning')}</span>
-              </div>
-              <button
-                class="btn btn-secondary btn-sm"
-                onclick={handleChooseBackupFolder}
-                type="button"
-                disabled={backupBusy !== null}
-              >
-                {backupBusy === 'select' ? t('common.loading') : t('settings.backupChooseFolder')}
-              </button>
-            </div>
-
-            <div class="backup-folder">
-              <span class="field-label">{t('settings.backupSelectedFolder')}</span>
-              <span class="backup-path">{backupDirLocal || t('settings.backupNoFolder')}</span>
-            </div>
-
-            <div class="backup-actions">
-              <button
-                class="btn btn-secondary btn-sm"
-                onclick={handleCreateBackup}
-                type="button"
-                disabled={!backupDirLocal || backupBusy !== null}
-                title={t('settings.backupCreateDesc')}
-              >
-                {backupBusy === 'create' ? t('common.loading') : t('settings.backupCreate')}
-              </button>
-              <button
-                class="btn btn-secondary btn-sm"
-                onclick={handleValidateBackup}
-                type="button"
-                disabled={!backupDirLocal || backupBusy !== null}
-                title={t('settings.backupValidateDesc')}
-              >
-                {backupBusy === 'validate' ? t('common.loading') : t('settings.backupValidate')}
-              </button>
-              <button
-                class="btn btn-secondary btn-sm btn-danger-soft"
-                onclick={handleRestoreBackup}
-                type="button"
-                disabled={!selectedBackupIsValidated() || backupBusy !== null}
-                title={t('settings.backupRestoreActionDesc')}
-              >
-                {backupBusy === 'restore' ? t('common.loading') : t('settings.backupRestoreAction')}
-              </button>
-            </div>
-
-            {#if lastBackupValidation}
-              <dl class="backup-metadata" aria-label={t('settings.backupMetadata')}>
-                <div>
-                  <dt>{t('settings.backupCreatedAt')}</dt>
-                  <dd>{lastBackupValidation.metadata.created_at}</dd>
-                </div>
-                <div>
-                  <dt>{t('settings.backupSchemaVersion')}</dt>
-                  <dd>{lastBackupValidation.metadata.schema_version}</dd>
-                </div>
-                <div>
-                  <dt>{t('settings.backupAppVersion')}</dt>
-                  <dd>{lastBackupValidation.metadata.app_version}</dd>
-                </div>
-                <div>
-                  <dt>{t('settings.backupDeviceId')}</dt>
-                  <dd>{lastBackupValidation.metadata.device_id}</dd>
-                </div>
-              </dl>
-            {/if}
-
-            {#if backupMessage}
-              <p class="backup-status backup-status--success">{backupMessage}</p>
-            {/if}
-            {#if backupError}
-              <p class="backup-status backup-status--error">{backupError}</p>
-            {/if}
-          </div>
-        </div>
-      </section>
-    </div>
+    </aside>
+    {/if}
   </div>
 </div>
 
@@ -1400,7 +1459,7 @@
   .settings-page {
     display: flex;
     flex-direction: column;
-    gap: var(--space-6);
+    gap: var(--space-4);
   }
 
   .settings-page .page-header {
@@ -1412,7 +1471,6 @@
     align-items: center;
     flex-wrap: wrap;
     gap: var(--space-2);
-    margin-block-start: calc(-1 * var(--space-3));
   }
 
   .settings-section-nav-button {
@@ -1440,6 +1498,26 @@
     color: var(--text-primary);
   }
 
+  .settings-section-nav-button:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  .settings-section-nav-button--active,
+  .settings-section-nav-button--active:hover {
+    border-color: var(--color-primary);
+    background-color: var(--surface-active);
+    color: var(--text-accent);
+  }
+
+  .settings-pane-help {
+    margin: 0;
+    max-width: 52rem;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+  }
+
   /* ── Two-column grid ─────────────────────────────────────────────────────── */
 
   .settings-grid {
@@ -1447,6 +1525,14 @@
     grid-template-columns: 1fr 300px;
     gap: var(--space-6);
     align-items: start;
+  }
+
+  .settings-grid--single {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-grid--single .settings-main {
+    max-width: 44rem;
   }
 
   @media (max-width: 900px) {

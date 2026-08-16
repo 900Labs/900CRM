@@ -97,6 +97,25 @@ describe('Settings unencrypted file warnings', () => {
     }
   });
 
+  it('keeps pane labels and help copy available in every locale', () => {
+    const localeFiles = readdirSync(i18nDir)
+      .filter((file) => file.endsWith('.json'))
+      .sort();
+
+    for (const localeFile of localeFiles) {
+      const settings = readLocaleSettings(localeFile);
+
+      expect(typeof settings.sectionAppearance).toBe('string');
+      expect(settings.sectionAppearance.length).toBeGreaterThan(0);
+      expect(typeof settings.paneAppearanceHelp).toBe('string');
+      expect(settings.paneAppearanceHelp.length).toBeGreaterThan(0);
+      expect(typeof settings.paneDataHelp).toBe('string');
+      expect(settings.paneDataHelp.length).toBeGreaterThan(0);
+      expect(typeof settings.paneIntegrationsHelp).toBe('string');
+      expect(settings.paneIntegrationsHelp.length).toBeGreaterThan(0);
+    }
+  });
+
   it('places warnings before the Settings export and backup actions', () => {
     const source = readFileSync(settingsSourcePath, 'utf8');
 

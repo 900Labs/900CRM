@@ -45,12 +45,22 @@ test('renders key hash routes without native Tauri dialogs', async ({ page, asse
 
   await loadHashRoute(page, '/settings');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Preferences' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Integrations' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Data', exact: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Appearance' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Data' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Integrations' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Language' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
+  await expect(page.getByText('Backup & Restore')).toHaveCount(0);
+  await expect(page.getByText('Not available yet')).toHaveCount(0);
+
+  await page.getByRole('tab', { name: 'Data' }).click();
   await expect(page.getByText('Backup & Restore')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Language' })).toHaveCount(0);
+
+  await page.getByRole('tab', { name: 'Integrations' }).click();
   await expect(page.getByText('Not available yet')).toBeVisible();
   await expect(page.getByText('Multi-device sync is not implemented')).toBeVisible();
+  await expect(page.getByText('Backup & Restore')).toHaveCount(0);
 
   await assertNoConsoleErrors();
 });

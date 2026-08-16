@@ -53,7 +53,7 @@ real small business owner.
 | Reports | Dedicated Workspace route for current pipeline and activity health, current-stage funnel ratios, due buckets, activity type mix, a clickable stale-deal list, and saved focus views | Usable alpha reporting with a stale-deal list and named focus views. Still needs source/owner dimensions, exportable snapshots, and true historical conversion after stage history exists. |
 | Audit Log | Read-only table grouped under Review | Good trust feature, now visually separated from daily work. Later, it may still move deeper into Admin once Review counts are more prominent. |
 | Pending Actions | Review queue for proposed actions grouped under Review | Important for MCP/external-client safety. The next improvement is to show high-priority pending counts without making this a daily-work screen. |
-| Settings | Locale/theme/date/currency, backup/restore, import/export, email, integrations, section jump bar | Still dense, but now easier to scan. Later work should split Data Management, Integrations, Appearance, and Admin/Safety into clearer settings sections or pages. |
+| Settings | Appearance, Data, and Integrations panes for locale/theme, backup/import, and email/clients | Split into three panes. Email stays a reachability probe; sync stays honestly unavailable. |
 
 ## What Comparable CRMs Emphasize
 
@@ -174,14 +174,14 @@ CRM work for most users. They make the app feel technical.
 Recommended outcome: group these under a Review/Admin section, or show them
 only when counts require attention.
 
-### 7. Settings is overloaded
+### 7. Settings is overloaded — improved
 
-Settings contains appearance, locale, date/currency, backup, import/export,
-email, and external clients. This should be a settings shell with sections, or
-separate Data Management and Integrations pages.
+Settings is now a three-pane shell: Appearance (locale, theme, date, currency,
+reminders, about), Data (import/export and backup/restore), and Integrations
+(sync honesty, email probe, external clients).
 
-Recommended outcome: split Settings into Appearance, Data Management,
-Integrations, Email, and Admin/Safety sections.
+Remaining: email is still a probe, not a mailbox; there is no Admin/Safety
+pane; update checks stay hidden until a signed public release.
 
 ## Recommended Product-Depth Sprints
 
