@@ -13,7 +13,7 @@
 
   import '../app.css';
   import { onMount } from 'svelte';
-  import { t, isLocaleReady } from '$lib/i18n';
+  import { t, isLocaleReady, isRtl } from '$lib/i18n';
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
   import Toast from '$lib/components/Toast.svelte';
@@ -261,7 +261,7 @@
       <button
         class="nav-link"
         onclick={() => uiStore.toggleSidebar()}
-        aria-label={uiStore.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-label={uiStore.sidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
         type="button"
         style="width: 100%;"
       >
@@ -273,14 +273,14 @@
           stroke="currentColor"
           stroke-width="1.75"
           stroke-linecap="round"
-          class="nav-icon"
+          class="nav-icon sidebar-collapse-icon"
           aria-hidden="true"
-          style="transform: rotate({uiStore.sidebarCollapsed ? 0 : 180}deg); transition: transform var(--duration-normal) var(--ease-out);"
+          style="transform: rotate({uiStore.sidebarCollapsed === isRtl() ? 180 : 0}deg); transition: transform var(--duration-normal) var(--ease-out);"
         >
           <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
         </svg>
         {#if !uiStore.sidebarCollapsed}
-          <span class="nav-label">Collapse</span>
+          <span class="nav-label">{t('nav.collapse')}</span>
         {/if}
       </button>
     </div>

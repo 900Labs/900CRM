@@ -217,6 +217,14 @@ async function installTauriShim(page: Page) {
       return typeof value === 'string' ? value : fallback;
     }
 
+    function stringArrayArg(args: InvokeArgs, key: string): string[] {
+      const value = args?.[key];
+      if (!Array.isArray(value)) {
+        return [];
+      }
+      return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+    }
+
     function nullableStringArg(args: InvokeArgs, key: string): string | null {
       const value = stringArg(args, key).trim();
       return value.length > 0 ? value : null;
@@ -578,6 +586,30 @@ async function installTauriShim(page: Page) {
       return state.activityLinks.filter((link) => link.activity_id === activityId && !link.deleted_at);
     }
 
+    function listActivitiesForDeals(args: InvokeArgs): BackendActivity[] {
+      const dealIds = new Set(stringArrayArg(args, 'deal_ids'));
+      if (dealIds.size === 0) {
+        return [];
+      }
+      const linkedActivityIds = new Set(
+        state.activityLinks
+          .filter((link) => link.entity_type === 'deal' && dealIds.has(link.entity_id) && !link.deleted_at)
+          .map((link) => link.activity_id),
+      );
+      return state.activities.filter(
+        (activity) =>
+          (activity.deal_id && dealIds.has(activity.deal_id)) || linkedActivityIds.has(activity.id),
+      );
+    }
+
+    function listActivityLinksForActivities(args: InvokeArgs): BackendActivityLink[] {
+      const activityIds = new Set(stringArrayArg(args, 'activity_ids'));
+      if (activityIds.size === 0) {
+        return [];
+      }
+      return state.activityLinks.filter((link) => activityIds.has(link.activity_id) && !link.deleted_at);
+    }
+
     function globalSearch(args: InvokeArgs): BackendGlobalSearchResult[] {
       const query = stringArg(args, 'query').toLowerCase();
       const limit = numberArg(args, 'limit', 8);
@@ -918,6 +950,10 @@ async function installTauriShim(page: Page) {
             return [];
           case 'list_activities':
             return state.activities;
+          case 'list_activities_for_deals':
+            return listActivitiesForDeals(args);
+          case 'list_activity_links_for_activities':
+            return listActivityLinksForActivities(args);
           case 'create_activity':
             return createActivity(args);
           case 'update_activity':
@@ -940,6 +976,10 @@ async function installTauriShim(page: Page) {
             return addActivityLink(args);
           case 'global_search':
             return globalSearch(args);
+          case 'read_import_text':
+            return '';
+          case 'validate_open_path':
+            return stringArg(args, 'file_path');
           default:
             if (Object.prototype.hasOwnProperty.call(staticResponses, cmd)) {
               return staticResponses[cmd];

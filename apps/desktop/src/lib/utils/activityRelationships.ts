@@ -1,5 +1,5 @@
 import type { Activity, ActivityLink } from '$lib/api/activities';
-import { addActivityLink, listActivityLinks } from '$lib/api/activities';
+import { addActivityLink, listActivityLinksForActivities } from '$lib/api/activities';
 import type { Contact } from '$lib/api/contacts';
 import { listContacts } from '$lib/api/contacts';
 import type { Deal } from '$lib/api/deals';
@@ -228,14 +228,19 @@ export async function loadActivityRelationshipLookups(): Promise<ActivityRelatio
 
 export async function loadActivityLinkIndex(activityIds: string[]): Promise<ActivityLinkIndex> {
   const uniqueActivityIds = uniqueIds(activityIds);
-  const entries = await Promise.all(
-    uniqueActivityIds.map(async (activityId) => [
-      activityId,
-      await listActivityLinks(activityId),
-    ] as const)
+  const links = await listActivityLinksForActivities(uniqueActivityIds);
+  const index: ActivityLinkIndex = Object.fromEntries(
+    uniqueActivityIds.map((activityId) => [activityId, [] as ActivityLink[]]),
   );
 
-  return Object.fromEntries(entries);
+  for (const link of links) {
+    if (!index[link.activityId]) {
+      index[link.activityId] = [];
+    }
+    index[link.activityId].push(link);
+  }
+
+  return index;
 }
 
 export async function addSelectedActivityLinks(

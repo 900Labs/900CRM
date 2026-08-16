@@ -55,12 +55,23 @@ test('renders key hash routes without native Tauri dialogs', async ({ page, asse
 
   await page.getByRole('tab', { name: 'Data' }).click();
   await expect(page.getByText('Backup & Restore')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Restore Backup' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Language' })).toHaveCount(0);
 
   await page.getByRole('tab', { name: 'Integrations' }).click();
   await expect(page.getByText('Not available yet')).toBeVisible();
   await expect(page.getByText('Multi-device sync is not implemented')).toBeVisible();
   await expect(page.getByText('Backup & Restore')).toHaveCount(0);
+
+  await assertNoConsoleErrors();
+});
+
+test('renders review routes without console errors', async ({ page, assertNoConsoleErrors }) => {
+  await loadHashRoute(page, '/audit-log');
+  await expect(page.getByRole('heading', { name: 'Audit Log' })).toBeVisible();
+
+  await loadHashRoute(page, '/pending-actions');
+  await expect(page.getByRole('heading', { name: 'Pending Actions' })).toBeVisible();
 
   await assertNoConsoleErrors();
 });

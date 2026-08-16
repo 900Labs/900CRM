@@ -120,6 +120,19 @@ export async function createSavedView(
   return mapView(view);
 }
 
+export async function updateSavedView(
+  id: string,
+  name: string,
+  filters: ContactSavedViewFilters,
+): Promise<SavedView> {
+  const view = await invoke<BackendSavedView>('update_saved_view', {
+    id,
+    name: name.trim(),
+    filters_json: JSON.stringify(toBackendFilters(filters)),
+  });
+  return mapView(view);
+}
+
 export async function deleteSavedView(id: string): Promise<void> {
   await invoke<void>('delete_saved_view', { id });
 }

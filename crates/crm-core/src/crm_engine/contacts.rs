@@ -313,24 +313,23 @@ pub fn merge_contacts(
     };
 
     let now = crate::utils::datetime::now_iso8601();
-    let tx = conn.unchecked_transaction()?;
 
-    tx.execute(
+    conn.execute(
         "UPDATE deals SET contact_id = ?1 WHERE contact_id = ?2",
         params![target_id, source_id],
     )?;
 
-    tx.execute(
+    conn.execute(
         "UPDATE activities SET contact_id = ?1 WHERE contact_id = ?2",
         params![target_id, source_id],
     )?;
 
-    tx.execute(
+    conn.execute(
         "UPDATE notes SET entity_id = ?1 WHERE entity_type = 'contact' AND entity_id = ?2",
         params![target_id, source_id],
     )?;
 
-    tx.execute(
+    conn.execute(
         r#"
         DELETE FROM custom_field_values
         WHERE entity_id = ?2
@@ -341,7 +340,7 @@ pub fn merge_contacts(
         "#,
         params![target_id, source_id],
     )?;
-    tx.execute(
+    conn.execute(
         r#"
         UPDATE custom_field_values
         SET entity_id = ?1
@@ -351,7 +350,7 @@ pub fn merge_contacts(
         params![target_id, source_id],
     )?;
 
-    tx.execute(
+    conn.execute(
         r#"
         UPDATE deal_contacts
         SET deleted_at = ?3
@@ -364,12 +363,12 @@ pub fn merge_contacts(
         "#,
         params![target_id, source_id, now],
     )?;
-    tx.execute(
+    conn.execute(
         "UPDATE deal_contacts SET contact_id = ?1 WHERE contact_id = ?2",
         params![target_id, source_id],
     )?;
 
-    tx.execute(
+    conn.execute(
         r#"
         UPDATE activity_links
         SET deleted_at = ?3
@@ -383,12 +382,12 @@ pub fn merge_contacts(
         "#,
         params![target_id, source_id, now],
     )?;
-    tx.execute(
+    conn.execute(
         "UPDATE activity_links SET entity_id = ?1 WHERE entity_type = 'contact' AND entity_id = ?2",
         params![target_id, source_id],
     )?;
 
-    tx.execute(
+    conn.execute(
         r#"
         DELETE FROM entity_tags
         WHERE entity_type = 'contact'
@@ -400,12 +399,12 @@ pub fn merge_contacts(
         "#,
         params![target_id, source_id],
     )?;
-    tx.execute(
+    conn.execute(
         "UPDATE entity_tags SET entity_id = ?1 WHERE entity_type = 'contact' AND entity_id = ?2",
         params![target_id, source_id],
     )?;
 
-    tx.execute(
+    conn.execute(
         r#"
         UPDATE tag_links
         SET deleted_at = ?3
@@ -419,17 +418,15 @@ pub fn merge_contacts(
         "#,
         params![target_id, source_id, now],
     )?;
-    tx.execute(
+    conn.execute(
         "UPDATE tag_links SET entity_id = ?1 WHERE entity_type = 'contact' AND entity_id = ?2",
         params![target_id, source_id],
     )?;
 
-    tx.execute(
+    conn.execute(
         "UPDATE contacts SET org_id = ?1, updated_at = ?3 WHERE org_id = ?2",
         params![target_id, source_id, now],
     )?;
-
-    tx.commit()?;
 
     // Soft-delete the source contact.
     contacts::soft_delete_contact(conn, source_id)?;

@@ -20,6 +20,9 @@
     "organizations": "संगठन",
     "auditLog": "ऑडिट लॉग",
     "pendingActions": "लंबित कार्रवाइयाँ",
+    "collapse": "संक्षिप्त करें",
+    "expandSidebar": "साइडबार फैलाएँ",
+    "collapseSidebar": "साइडबार संक्षिप्त करें",
     "sections": {
       "workspace": "वर्कस्पेस",
       "review": "समीक्षा",

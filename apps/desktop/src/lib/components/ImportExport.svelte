@@ -7,6 +7,7 @@
   import { parseCSV, applyMapping } from '$lib/utils/csv';
   import type { ParseCSVResult, ColumnMapping } from '$lib/utils/csv';
   import { restoreLocalBackupToAppData, validateLocalBackup } from '$lib/api/backup';
+  import { reloadWorkspaceAfterDataReplace } from '$lib/stores/reloadWorkspace';
   import { listCustomFieldDefinitions, type CustomFieldDefinition } from '$lib/api/customFields';
   import {
     getImportFieldOptions,
@@ -257,8 +258,8 @@
         return;
       }
 
-      const { readTextFile } = await import('@tauri-apps/plugin-fs');
-      const text = await readTextFile(selected);
+      const { invoke } = await import('@tauri-apps/api/core');
+      const text = await invoke<string>('read_import_text', { file_path: selected });
       loadSelectedCsv(text, selected, selected, 'desktop', customFields);
     } catch {
       if (isCsvImport) {
@@ -764,6 +765,7 @@
       }
 
       const result = await restoreLocalBackupToAppData(validation.backup_dir, true);
+      await reloadWorkspaceAfterDataReplace();
       const message = t('import.preImportBackupRestored', { path: result.database_path });
       importRestoreMessage = message;
       uiStore.toastSuccess(message);

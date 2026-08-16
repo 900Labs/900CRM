@@ -107,7 +107,7 @@ pub fn search_contacts_full_text(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn search_contacts_fallback(
@@ -141,7 +141,7 @@ pub fn search_contacts_fallback(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn search_deals_text(
@@ -177,7 +177,7 @@ pub fn search_deals_text(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn search_deals(
@@ -220,7 +220,7 @@ fn search_deals_full_text(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn search_activities(
@@ -262,7 +262,7 @@ fn search_activities_full_text(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn search_activities_text(
@@ -298,7 +298,7 @@ pub fn search_activities_text(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn search_organizations(
@@ -342,7 +342,7 @@ fn search_organizations_full_text(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn search_organizations_text(
@@ -391,7 +391,7 @@ pub fn search_organizations_text(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn search_notes(
@@ -436,7 +436,7 @@ fn search_notes_full_text(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn search_notes_text(
@@ -473,7 +473,7 @@ pub fn search_notes_text(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn search_tags(conn: &Connection, query: &str, limit: i64) -> CrmResult<Vec<TagSearchRecord>> {
@@ -510,7 +510,7 @@ fn search_tags_full_text(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn search_tags_text(
@@ -544,5 +544,5 @@ pub fn search_tags_text(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }

@@ -8,6 +8,32 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed — 2026-08-16
+- After a restore, the app reloads the local database so restored data
+  appears without a manual restart.
+- Creating a lead now writes in one step so a failed create cannot leave a
+  half-written person.
+- Pipeline follow-up guidance loads activities for the deals on the board
+  instead of stopping at the first 500 rows, and the custom-field index
+  reloads after deal data changes.
+- Database row errors that were previously hidden now surface instead of
+  failing silently.
+- Import rejects unsafe paths and symlink escapes so files stay in the
+  intended location. Desktop import reads and local-file bookmarks now
+  go through that same Rust path check.
+- Passwords and similar secrets are no longer written into application
+  logs.
+- In-app update checks stay unavailable until signed public releases
+  exist.
+- Docs now cite schema version 13, describe the audit log as
+  application-append-only (not a WORM store), and treat Arabic RTL as
+  direction-enabled with layout polish still in progress.
+- Contact merge has a regression test so related records stay with the
+  surviving person.
+- Sidebar collapse labels are translated, leftover English in Arabic,
+  Bengali, French, and Hausa is reduced, and rust-cross CI now runs
+  `cargo test --workspace`.
+
 ### Changed — 2026-08-16
 - Settings is now three panes: Appearance, Data, and Integrations. Backup
   and email no longer sit on the same long page.

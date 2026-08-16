@@ -12,6 +12,7 @@ import {
   listContacts,
   listContactDuplicateCandidates,
   mergeContacts,
+  restoreContact,
   setContactLifecycle,
 } from './contacts';
 
@@ -126,6 +127,24 @@ describe('contacts API', () => {
       params: expect.objectContaining({
         filter_lifecycle: 'lead',
       }),
+    });
+  });
+
+  it('maps restoreContact to the dedicated command', async () => {
+    invokeMock.mockResolvedValueOnce({
+      ...backendContact,
+      deleted_at: null,
+    });
+
+    await expect(restoreContact('contact-target')).resolves.toMatchObject({
+      id: 'contact-target',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      email: 'ada@example.com',
+      deletedAt: null,
+    });
+    expect(invokeMock).toHaveBeenCalledWith('restore_contact', {
+      id: 'contact-target',
     });
   });
 

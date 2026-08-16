@@ -137,7 +137,7 @@ pub fn get_notes_for_entity(
     )?;
 
     let rows = stmt.query_map(params![entity_type, entity_id], row_to_note)?;
-    let notes: Vec<Note> = rows.filter_map(|r| r.ok()).collect();
+    let notes: Vec<Note> = rows.collect::<Result<Vec<_>, _>>()?;
 
     log::debug!(
         "get_notes_for_entity {}:{}: {} results",
@@ -165,7 +165,7 @@ pub fn list_active_notes(conn: &Connection) -> CrmResult<Vec<Note>> {
     )?;
 
     let rows = stmt.query_map([], row_to_note)?;
-    let notes: Vec<Note> = rows.filter_map(|r| r.ok()).collect();
+    let notes: Vec<Note> = rows.collect::<Result<Vec<_>, _>>()?;
 
     log::debug!("list_active_notes: {} results", notes.len());
     Ok(notes)

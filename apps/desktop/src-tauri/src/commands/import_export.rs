@@ -29,6 +29,23 @@ pub struct ImportWithBackupResult {
 }
 
 #[tauri::command(rename_all = "snake_case")]
+pub async fn read_import_text(file_path: String) -> Result<String, String> {
+    let file_path = match super::path_guard::validate_import_path(&file_path) {
+        Ok(p) => p,
+        Err(msg) => return Err(msg),
+    };
+    let path = file_path.to_string_lossy().to_string();
+    enforce_size_limit(&path)?;
+    std::fs::read_to_string(&file_path).map_err(|err| format!("Unable to read import file: {err}"))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn validate_open_path(file_path: String) -> Result<String, String> {
+    super::path_guard::validate_import_path(&file_path)
+        .map(|path| path.to_string_lossy().to_string())
+}
+
+#[tauri::command(rename_all = "snake_case")]
 pub async fn rollback_completed_import(
     state: State<'_, AppState>,
     rollback_plan: ImportRollbackPlan,

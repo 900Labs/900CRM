@@ -203,18 +203,42 @@ pub fn get_deal(conn: &Connection, id: &str) -> CrmResult<Deal> {
 ///
 /// Returns [`CrmError::Database`] on SQL failure.
 pub fn list_deals(conn: &Connection) -> CrmResult<Vec<Deal>> {
-    let mut stmt = conn.prepare(
+    list_deals_windowed(conn, None, 0)
+}
+
+/// Lists active deals, optionally windowed in SQL.
+pub fn list_deals_windowed(
+    conn: &Connection,
+    limit: Option<u32>,
+    offset: u32,
+) -> CrmResult<Vec<Deal>> {
+    let sql = if limit.is_some() {
         r#"
         SELECT id, title, value, currency, stage, probability, expected_close,
                contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id
         FROM deals
         WHERE deleted_at IS NULL
         ORDER BY created_at DESC
-        "#,
-    )?;
+        LIMIT ?1 OFFSET ?2
+        "#
+    } else {
+        r#"
+        SELECT id, title, value, currency, stage, probability, expected_close,
+               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id
+        FROM deals
+        WHERE deleted_at IS NULL
+        ORDER BY created_at DESC
+        "#
+    };
 
-    let rows = stmt.query_map([], row_to_deal)?;
-    let deals: Vec<Deal> = rows.filter_map(|r| r.ok()).collect();
+    let mut stmt = conn.prepare(sql)?;
+    let deals = if let Some(limit) = limit {
+        let rows = stmt.query_map(params![limit as i64, offset as i64], row_to_deal)?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    } else {
+        let rows = stmt.query_map([], row_to_deal)?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
 
     log::debug!("list_deals: {} results", deals.len());
     Ok(deals)
@@ -237,7 +261,7 @@ pub fn list_deals_by_stage(conn: &Connection, stage: &str) -> CrmResult<Vec<Deal
     )?;
 
     let rows = stmt.query_map(params![stage], row_to_deal)?;
-    let deals: Vec<Deal> = rows.filter_map(|r| r.ok()).collect();
+    let deals = rows.collect::<Result<Vec<_>, _>>()?;
 
     log::debug!(
         "list_deals_by_stage stage={}: {} results",
@@ -545,7 +569,7 @@ pub fn get_pipeline_summary(conn: &Connection) -> CrmResult<Vec<PipelineSummary>
         })
     })?;
 
-    let summaries: Vec<PipelineSummary> = rows.filter_map(|r| r.ok()).collect();
+    let summaries = rows.collect::<Result<Vec<_>, _>>()?;
     log::debug!("get_pipeline_summary: {} stages", summaries.len());
     Ok(summaries)
 }

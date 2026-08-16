@@ -49,16 +49,9 @@ pub async fn list_deals(
     offset: Option<u32>,
 ) -> Result<Vec<Deal>, String> {
     let core = super::lock_core(&state)?;
-    let mut deals = core.list_deals().map_err(|e| e.to_string())?;
-    if let Some(clamped) = list_deals_limit(limit) {
-        let skip = offset.unwrap_or(0) as usize;
-        deals = deals
-            .into_iter()
-            .skip(skip)
-            .take(clamped as usize)
-            .collect();
-    }
-    Ok(deals)
+    let window = list_deals_limit(limit);
+    core.list_deals_windowed(window, offset.unwrap_or(0))
+        .map_err(|e| e.to_string())
 }
 
 const MAX_LIST_DEALS_LIMIT: u32 = 500;

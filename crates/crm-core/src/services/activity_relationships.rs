@@ -13,6 +13,13 @@ impl CrmCore {
         storage::activities::list_activity_links(&self.db.conn, activity_id)
     }
 
+    pub fn list_activity_links_for_activities(
+        &self,
+        activity_ids: Vec<String>,
+    ) -> CrmResult<Vec<ActivityLink>> {
+        storage::activities::list_activity_links_for_activities(&self.db.conn, &activity_ids)
+    }
+
     pub fn add_activity_link(
         &mut self,
         activity_id: &str,

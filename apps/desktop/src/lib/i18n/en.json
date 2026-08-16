@@ -20,6 +20,9 @@
     "organizations": "Organizations",
     "auditLog": "Audit Log",
     "pendingActions": "Pending Actions",
+    "collapse": "Collapse",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
     "sections": {
       "workspace": "Workspace",
       "review": "Review",

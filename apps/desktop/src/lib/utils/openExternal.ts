@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
 import { validateUrl } from './validators';
 
@@ -47,5 +48,6 @@ export async function openLocalPath(raw: string): Promise<void> {
     throw new Error('File path is invalid');
   }
 
-  await open(value);
+  const validated = await invoke<string>('validate_open_path', { file_path: value });
+  await open(validated);
 }

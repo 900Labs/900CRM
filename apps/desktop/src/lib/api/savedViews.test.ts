@@ -8,7 +8,7 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: invokeMock,
 }));
 
-import { createSavedView, filtersMatch, listSavedViews } from './savedViews';
+import { createSavedView, filtersMatch, listSavedViews, updateSavedView } from './savedViews';
 
 describe('saved views API', () => {
   beforeEach(() => {
@@ -51,6 +51,33 @@ describe('saved views API', () => {
     await expect(listSavedViews('contact')).resolves.toEqual([
       expect.objectContaining({ id: 'view-1', filters: { lifecycle: 'lead' } }),
     ]);
+  });
+
+  it('maps update payloads', async () => {
+    invokeMock.mockResolvedValueOnce({
+      id: 'view-1',
+      entity_type: 'contact',
+      name: 'Active leads',
+      filters_json: '{"lifecycle":"lead","search":"clinic"}',
+      created_at: '2026-08-13T10:00:00Z',
+      updated_at: '2026-08-16T10:00:00Z',
+    });
+
+    await expect(
+      updateSavedView('view-1', ' Active leads ', { lifecycle: 'lead', search: 'clinic' }),
+    ).resolves.toMatchObject({
+      id: 'view-1',
+      name: 'Active leads',
+      filters: { lifecycle: 'lead', search: 'clinic' },
+    });
+    expect(invokeMock).toHaveBeenCalledWith('update_saved_view', {
+      id: 'view-1',
+      name: 'Active leads',
+      filters_json: JSON.stringify({
+        search: 'clinic',
+        lifecycle: 'lead',
+      }),
+    });
   });
 
   it('compares filter snapshots without empty values', () => {

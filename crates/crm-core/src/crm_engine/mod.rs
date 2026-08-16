@@ -18,8 +18,10 @@
 //! # CrmEngine
 //!
 //! The [`CrmEngine`] struct holds no mutable state itself (all state lives in
-//! the `Database`). It is stored in `AppState` under a `Mutex` for consistency
-//! with the rest of the architecture.
+//! the `Database`). Desktop `AppState` stores `Mutex<Option<CrmCore>>`.
+//! [`crate::CrmCore`] owns the engine and the database together. Command
+//! handlers lock that single optional core slot; there is no separate
+//! `engine` lock and no dual-lock order.
 //!
 //! # Storage boundary
 //!
@@ -39,17 +41,9 @@ pub mod search;
 /// The CRM business logic engine.
 ///
 /// `CrmEngine` is a stateless orchestrator — all persistent state lives in
-/// the `Database`. It is stored in [`crate::AppState`] behind a `Mutex` so
-/// command handlers can obtain it via `state.engine.lock()`.
-///
-/// # Locking Order
-///
-/// When both `engine` and `db` locks are needed, always acquire `engine` first:
-///
-/// ```rust,ignore
-/// let _engine = state.engine.lock().unwrap();
-/// let db = state.db.lock().unwrap();
-/// ```
+/// the `Database`. It is owned by [`crate::CrmCore`]. The desktop shell
+/// stores that core in `AppState` as `Mutex<Option<CrmCore>>`. Command
+/// handlers obtain it through that lock rather than `state.engine`.
 #[derive(Debug)]
 pub struct CrmEngine {
     /// The default pipeline stage definitions in order.
@@ -62,8 +56,8 @@ pub struct CrmEngine {
 impl CrmEngine {
     /// Creates a new `CrmEngine` with the default pipeline stage configuration.
     ///
-    /// This is called once at application startup in [`crate::run`] and stored
-    /// in `AppState`.
+    /// This is called from [`crate::CrmCore::open`] when the desktop core is
+    /// constructed.
     ///
     /// # Example
     ///

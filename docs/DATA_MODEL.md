@@ -1,6 +1,7 @@
 # Data Model
 
 Date: 2026-06-25
+Last updated: 2026-08-16
 
 This document describes the current 900CRM local data model as implemented in
 `crates/crm-core` and exposed through the desktop app. It is a public baseline
@@ -228,6 +229,12 @@ review. The export includes every existing `audit_log` row with `id`,
 and then `id` ascending. Audit log import is intentionally unsupported, and the
 export path does not record a new audit row.
 
+The audit log is application-append-only: normal CRM actions insert new rows
+and the app does not offer an edit or delete UI. It is not tamper-evident and
+is not a compliance WORM store. Anyone with OS-user access to the SQLite file,
+or a confirmed restore from a backup, can replace or rewrite history. That is
+intentional for a single-user local CRM.
+
 ### Sync Changelog
 
 `sync_changelog` is an append-only mutation log with entity type, entity ID,
@@ -329,6 +336,9 @@ Current migration history:
 | 8 | Activity relationship foundation with `activity_links`. |
 | 9 | External-client permission uniqueness cleanup and unique index. |
 | 10 | Global search FTS5 parity for organizations, deals, activities, notes, and tags with active-row backfill and maintenance triggers. |
+| 11 | Person contact lifecycle (`lead` or `customer`) on `contacts`. |
+| 12 | `entity_links` for website and local-file bookmarks on contacts, organizations, and deals. |
+| 13 | `saved_views` for named list filters on contacts, organizations, deals, activities, and reports. |
 
 ## Legacy And Compatibility Caveats
 

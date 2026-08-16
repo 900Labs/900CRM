@@ -45,16 +45,19 @@ pub async fn list_activities(
     offset: Option<u32>,
 ) -> Result<Vec<Activity>, String> {
     let core = super::lock_core(&state)?;
-    let mut activities = core.list_activities().map_err(|e| e.to_string())?;
-    if let Some(clamped) = list_activities_limit(limit) {
-        let skip = offset.unwrap_or(0) as usize;
-        activities = activities
-            .into_iter()
-            .skip(skip)
-            .take(clamped as usize)
-            .collect();
-    }
-    Ok(activities)
+    let window = list_activities_limit(limit);
+    core.list_activities_windowed(window, offset.unwrap_or(0))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn list_activities_for_deals(
+    state: State<'_, AppState>,
+    deal_ids: Vec<String>,
+) -> Result<Vec<Activity>, String> {
+    let core = super::lock_core(&state)?;
+    core.list_activities_for_deal_ids(deal_ids)
+        .map_err(|e| e.to_string())
 }
 
 fn list_activities_limit(limit: Option<u32>) -> Option<u32> {
@@ -177,6 +180,16 @@ pub async fn list_activity_links(
 ) -> Result<Vec<ActivityLink>, String> {
     let core = super::lock_core(&state)?;
     core.list_activity_links(&activity_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn list_activity_links_for_activities(
+    state: State<'_, AppState>,
+    activity_ids: Vec<String>,
+) -> Result<Vec<ActivityLink>, String> {
+    let core = super::lock_core(&state)?;
+    core.list_activity_links_for_activities(activity_ids)
         .map_err(|e| e.to_string())
 }
 

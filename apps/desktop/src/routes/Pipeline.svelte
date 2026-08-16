@@ -15,10 +15,9 @@
   import { activityStore } from '$lib/stores/activities';
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
-  import { listActivities, type Activity } from '$lib/api/activities';
+  import { listActivitiesForDeals, type Activity } from '$lib/api/activities';
   import type { Contact } from '$lib/api/contacts';
-  import type { Deal, DealStage } from '$lib/api/deals';
-  import { DEAL_STAGES } from '$lib/api/deals';
+  import { DEAL_STAGES, listDeals, type Deal, type DealStage } from '$lib/api/deals';
   import type { Organization } from '$lib/api/organizations';
   import {
     filterActivitiesByRelationship,
@@ -228,11 +227,8 @@
     activityContextReady = false;
     activityContextError = null;
     try {
-      const activities = await listActivities({
-        sortBy: 'dueDate',
-        sortDir: 'asc',
-        pageSize: 500,
-      });
+      const deals = await listDeals();
+      const activities = await listActivitiesForDeals(deals.map((deal) => deal.id));
       const linkIndex = await loadActivityLinkIndex(activities.map((activity) => activity.id));
 
       allActivities = activities;
@@ -263,8 +259,6 @@
   }
 
   async function ensureCustomFieldValueIndex() {
-    if (Object.keys(customFieldValueIndex).length > 0) return;
-
     customFieldValuesLoading = true;
     customFieldFilterError = null;
     try {
