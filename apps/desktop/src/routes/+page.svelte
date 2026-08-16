@@ -81,7 +81,7 @@
       return emptyRoute('/reports');
     }
 
-    if (normalized === '/settings') {
+    if (normalized === '/settings' || normalized.startsWith('/settings/')) {
       return emptyRoute('/settings');
     }
 

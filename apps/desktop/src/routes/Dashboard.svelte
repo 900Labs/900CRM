@@ -184,8 +184,8 @@
     ]);
   }
 
-  function openDataSettings(): void {
-    window.location.hash = '#/settings';
+  function openDataSettings(openImport: boolean): void {
+    navigateHash(openImport ? '/settings/data/import' : '/settings/data');
   }
 
   async function loadSampleWorkspace(): Promise<void> {
@@ -349,9 +349,21 @@
           <button class="btn btn-secondary btn-sm" onclick={() => uiStore.openModal('addActivity')} type="button">
             {t('dashboard.firstRun.followUpAction')}
           </button>
-          <button class="btn btn-ghost btn-sm" onclick={openDataSettings} type="button">
-            {t('dashboard.firstRun.dataAction')}
-          </button>
+        </div>
+
+        <div class="first-run-data" data-testid="first-run-data">
+          <div>
+            <span>{t('dashboard.firstRun.dataTitle')}</span>
+            <small>{t('dashboard.firstRun.dataHint')}</small>
+          </div>
+          <div class="first-run-data-actions">
+            <button class="btn btn-secondary btn-sm" onclick={() => openDataSettings(true)} type="button">
+              {t('dashboard.firstRun.importAction')}
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick={() => openDataSettings(false)} type="button">
+              {t('dashboard.firstRun.backupAction')}
+            </button>
+          </div>
         </div>
       </section>
     {/if}
@@ -605,6 +617,40 @@
     flex-wrap: wrap;
   }
 
+  .first-run-data {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--border-radius-md);
+    background: var(--surface-default);
+  }
+
+  .first-run-data span {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--text-primary);
+  }
+
+  .first-run-data small {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  .first-run-data-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    flex-shrink: 0;
+  }
+
   .attention-strip {
     display: grid;
     grid-template-columns: minmax(0, 0.9fr) minmax(260px, 1.1fr);
@@ -708,6 +754,10 @@
 
     .first-run-panel {
       grid-template-columns: 1fr;
+    }
+
+    .first-run-data {
+      flex-direction: column;
     }
 
     .attention-strip {

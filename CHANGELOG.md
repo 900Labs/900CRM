@@ -8,6 +8,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added — 2026-08-17
+- An empty Dashboard now asks if you already have customers. Import data
+  opens the import wizard. Make a backup opens Settings → Data. Both
+  stay local and unencrypted.
+
 ### Fixed — 2026-08-16
 - After a restore, the app reloads the local database so restored data
   appears without a manual restart.

@@ -60,7 +60,11 @@
       "contactAction": "Ajouter un contact",
       "dealAction": "Ajouter une affaire",
       "followUpAction": "Ajouter une relance",
-      "dataAction": "Importer ou sauvegarder"
+      "dataAction": "Importer ou sauvegarder",
+      "dataTitle": "Vous avez déjà des clients ?",
+      "dataHint": "Importez un CSV de personnes, d’entreprises ou d’affaires. Ou copiez cet espace de travail dans un dossier de cet appareil. Les fichiers restent locaux et ne sont pas chiffrés.",
+      "importAction": "Importer des données",
+      "backupAction": "Créer une sauvegarde"
     },
     "attention": {
       "title": "À traiter",
@@ -478,6 +482,8 @@
     "sectionAbout": "À propos",
     "paneAppearanceHelp": "Langue, thème, dates, devise et rappels de bureau.",
     "paneDataHelp": "Export, import et sauvegarde locale de cet espace de travail.",
+    "dataGuidanceTitle": "Commencez par un import ou une sauvegarde locale",
+    "dataGuidance": "Importez un CSV de personnes, d’entreprises ou d’affaires. Ou copiez tout l’espace de travail dans un dossier de votre choix. Les deux restent sur cet appareil.",
     "paneIntegrationsHelp": "Disponibilité de la synchro, sonde e-mail facultative et clients externes.",
     "language": "Langue",
     "currency": "Devise",

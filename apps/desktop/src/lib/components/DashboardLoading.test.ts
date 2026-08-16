@@ -150,4 +150,23 @@ describe('Dashboard loading behavior', () => {
     expect(screen.getByText('dashboard.attention.overdue')).toBeTruthy();
     expect(screen.getByText('dashboard.attention.today')).toBeTruthy();
   });
+
+  it('points an empty workspace at import and backup', async () => {
+    getDashboardStatsMock.mockResolvedValueOnce({
+      activeDeals: 0,
+      overdueActivities: 0,
+      pipelineValue: 0,
+      pipelineValueByCurrency: [],
+      totalContacts: 0,
+      upcomingTasks: 0,
+    });
+    loadUpcomingMock.mockResolvedValueOnce(undefined);
+
+    render(Dashboard);
+
+    expect(await screen.findByTestId('first-run-data')).toBeTruthy();
+    expect(screen.getByText('dashboard.firstRun.dataTitle')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'dashboard.firstRun.importAction' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'dashboard.firstRun.backupAction' })).toBeTruthy();
+  });
 });

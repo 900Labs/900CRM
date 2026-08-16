@@ -105,8 +105,9 @@ pipelines, product tours, guided imports, and richer empty states across every
 primary module.
 
 Recommended outcome: module empty states now tell the user the next action.
-Still add import/backup prompts and customer/deal workspace guidance without
-marketing-style tours.
+The Dashboard first-run panel now also points at import and a local backup.
+Remaining: richer customer/deal workspace guidance without marketing-style
+tours.
 
 ### 2. Customer workspaces now cover contacts and accounts, but still need attached context
 
@@ -205,8 +206,7 @@ These are ordered to improve perceived product value fastest.
      follow-up from the dashboard.
    - Added first-action empty states on Leads, Pipeline, Activities, and
      Reports so a blank module says what to do next.
-   - Remaining work: guided import/backup prompts, and richer onboarding
-     inside customer/deal workspaces.
+   - Remaining work: richer onboarding inside customer/deal workspaces.
 
 3. **Customer 360 Workspaces** - contact/account summaries and timeline
    breadcrumbs completed
