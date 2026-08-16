@@ -10,7 +10,7 @@ use tauri::State;
 
 use crate::AppState;
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn create_local_backup(
     state: State<'_, AppState>,
     backup_dir: String,
@@ -24,7 +24,7 @@ pub async fn create_local_backup(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn validate_local_backup(
     state: State<'_, AppState>,
     backup_dir: String,
@@ -38,7 +38,7 @@ pub async fn validate_local_backup(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn restore_local_backup_to_app_data(
     state: State<'_, AppState>,
     backup_dir: String,

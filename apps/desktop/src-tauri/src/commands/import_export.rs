@@ -28,7 +28,7 @@ pub struct ImportWithBackupResult {
     pub backup: LocalBackup,
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn rollback_completed_import(
     state: State<'_, AppState>,
     rollback_plan: ImportRollbackPlan,
@@ -38,7 +38,7 @@ pub async fn rollback_completed_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_contacts_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -55,7 +55,7 @@ pub async fn import_contacts_csv(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_contacts_csv_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -77,7 +77,7 @@ pub async fn import_contacts_csv_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_contacts_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -94,7 +94,7 @@ pub async fn import_contacts_json(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_contacts_json_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -116,7 +116,7 @@ pub async fn import_contacts_json_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preview_contacts_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -131,7 +131,7 @@ pub async fn preview_contacts_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_contacts_csv_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -146,7 +146,7 @@ pub async fn preflight_contacts_csv_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_contacts_csv_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -162,7 +162,7 @@ pub async fn preflight_contacts_csv_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_contacts_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -177,7 +177,7 @@ pub async fn preflight_contacts_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_contacts_json_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -193,7 +193,7 @@ pub async fn preflight_contacts_json_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_contacts_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -207,7 +207,7 @@ pub async fn export_contacts_csv(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_contacts_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -221,7 +221,7 @@ pub async fn export_contacts_json(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_audit_log_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -235,7 +235,7 @@ pub async fn export_audit_log_csv(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_audit_log_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -249,7 +249,7 @@ pub async fn export_audit_log_json(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_proposed_actions_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -263,7 +263,7 @@ pub async fn export_proposed_actions_csv(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_proposed_actions_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -277,7 +277,7 @@ pub async fn export_proposed_actions_json(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_external_clients_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -291,7 +291,7 @@ pub async fn export_external_clients_csv(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_external_clients_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -305,7 +305,7 @@ pub async fn export_external_clients_json(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_external_client_permissions_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -319,7 +319,7 @@ pub async fn export_external_client_permissions_csv(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_external_client_permissions_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -333,7 +333,7 @@ pub async fn export_external_client_permissions_json(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_deals_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -350,7 +350,7 @@ pub async fn import_deals_csv(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_deals_csv_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -372,7 +372,7 @@ pub async fn import_deals_csv_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_deals_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -389,7 +389,7 @@ pub async fn import_deals_json(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_deals_json_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -411,7 +411,7 @@ pub async fn import_deals_json_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preview_deals_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -426,7 +426,7 @@ pub async fn preview_deals_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_deals_csv_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -441,7 +441,7 @@ pub async fn preflight_deals_csv_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_deals_csv_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -457,7 +457,7 @@ pub async fn preflight_deals_csv_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_deals_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -472,7 +472,7 @@ pub async fn preflight_deals_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_deals_json_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -488,7 +488,7 @@ pub async fn preflight_deals_json_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_deals_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -501,7 +501,7 @@ pub async fn export_deals_csv(
     core.export_deals_csv(&file_path).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_deals_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -515,7 +515,7 @@ pub async fn export_deals_json(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_activities_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -532,7 +532,7 @@ pub async fn import_activities_csv(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_activities_csv_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -554,7 +554,7 @@ pub async fn import_activities_csv_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_activities_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -571,7 +571,7 @@ pub async fn import_activities_json(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_activities_json_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -593,7 +593,7 @@ pub async fn import_activities_json_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preview_activities_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -608,7 +608,7 @@ pub async fn preview_activities_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_activities_csv_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -623,7 +623,7 @@ pub async fn preflight_activities_csv_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_activities_csv_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -639,7 +639,7 @@ pub async fn preflight_activities_csv_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_activities_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -654,7 +654,7 @@ pub async fn preflight_activities_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_activities_json_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -670,7 +670,7 @@ pub async fn preflight_activities_json_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_activities_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -684,7 +684,7 @@ pub async fn export_activities_csv(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_activities_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -698,7 +698,7 @@ pub async fn export_activities_json(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_notes_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -715,7 +715,7 @@ pub async fn import_notes_csv(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_notes_csv_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -737,7 +737,7 @@ pub async fn import_notes_csv_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_notes_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -754,7 +754,7 @@ pub async fn import_notes_json(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_notes_json_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -776,7 +776,7 @@ pub async fn import_notes_json_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preview_notes_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -791,7 +791,7 @@ pub async fn preview_notes_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_notes_csv_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -806,7 +806,7 @@ pub async fn preflight_notes_csv_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_notes_csv_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -822,7 +822,7 @@ pub async fn preflight_notes_csv_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_notes_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -837,7 +837,7 @@ pub async fn preflight_notes_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_notes_json_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -853,7 +853,7 @@ pub async fn preflight_notes_json_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_notes_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -866,7 +866,7 @@ pub async fn export_notes_csv(
     core.export_notes_csv(&file_path).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_notes_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -880,7 +880,7 @@ pub async fn export_notes_json(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_tag_definitions_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -897,7 +897,7 @@ pub async fn import_tag_definitions_csv(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_tag_definitions_csv_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -919,7 +919,7 @@ pub async fn import_tag_definitions_csv_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_tag_definitions_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -936,7 +936,7 @@ pub async fn import_tag_definitions_json(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_tag_definitions_json_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -958,7 +958,7 @@ pub async fn import_tag_definitions_json_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preview_tag_definitions_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -973,7 +973,7 @@ pub async fn preview_tag_definitions_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_tag_definitions_csv_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -988,7 +988,7 @@ pub async fn preflight_tag_definitions_csv_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_tag_definitions_csv_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1004,7 +1004,7 @@ pub async fn preflight_tag_definitions_csv_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_tag_definitions_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -1019,7 +1019,7 @@ pub async fn preflight_tag_definitions_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_tag_definitions_json_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1035,7 +1035,7 @@ pub async fn preflight_tag_definitions_json_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_tag_definitions_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -1049,7 +1049,7 @@ pub async fn export_tag_definitions_csv(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_tag_definitions_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -1063,7 +1063,7 @@ pub async fn export_tag_definitions_json(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_custom_field_definitions_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -1083,7 +1083,7 @@ pub async fn import_custom_field_definitions_csv(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_custom_field_definitions_csv_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1105,7 +1105,7 @@ pub async fn import_custom_field_definitions_csv_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_custom_field_definitions_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -1125,7 +1125,7 @@ pub async fn import_custom_field_definitions_json(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_custom_field_definitions_json_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1147,7 +1147,7 @@ pub async fn import_custom_field_definitions_json_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preview_custom_field_definitions_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -1162,7 +1162,7 @@ pub async fn preview_custom_field_definitions_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_custom_field_definitions_csv_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -1177,7 +1177,7 @@ pub async fn preflight_custom_field_definitions_csv_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_custom_field_definitions_csv_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1193,7 +1193,7 @@ pub async fn preflight_custom_field_definitions_csv_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_custom_field_definitions_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -1208,7 +1208,7 @@ pub async fn preflight_custom_field_definitions_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_custom_field_definitions_json_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1224,7 +1224,7 @@ pub async fn preflight_custom_field_definitions_json_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_custom_field_definitions_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -1238,7 +1238,7 @@ pub async fn export_custom_field_definitions_csv(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_custom_field_definitions_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -1252,7 +1252,7 @@ pub async fn export_custom_field_definitions_json(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_tag_links_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -1269,7 +1269,7 @@ pub async fn import_tag_links_csv(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_tag_links_csv_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1291,7 +1291,7 @@ pub async fn import_tag_links_csv_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_tag_links_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -1308,7 +1308,7 @@ pub async fn import_tag_links_json(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_tag_links_json_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1330,7 +1330,7 @@ pub async fn import_tag_links_json_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preview_tag_links_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -1345,7 +1345,7 @@ pub async fn preview_tag_links_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_tag_links_csv_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -1360,7 +1360,7 @@ pub async fn preflight_tag_links_csv_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_tag_links_csv_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1376,7 +1376,7 @@ pub async fn preflight_tag_links_csv_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_tag_links_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -1391,7 +1391,7 @@ pub async fn preflight_tag_links_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_tag_links_json_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1407,7 +1407,7 @@ pub async fn preflight_tag_links_json_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_tag_links_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -1421,7 +1421,7 @@ pub async fn export_tag_links_csv(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_tag_links_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -1435,7 +1435,7 @@ pub async fn export_tag_links_json(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_organizations_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -1452,7 +1452,7 @@ pub async fn import_organizations_csv(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_organizations_csv_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1474,7 +1474,7 @@ pub async fn import_organizations_csv_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_organizations_json(
     state: State<'_, AppState>,
     file_path: String,
@@ -1491,7 +1491,7 @@ pub async fn import_organizations_json(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_organizations_json_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1513,7 +1513,7 @@ pub async fn import_organizations_json_with_mapping(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preview_organizations_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -1528,7 +1528,7 @@ pub async fn preview_organizations_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_organizations_csv_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -1543,7 +1543,7 @@ pub async fn preflight_organizations_csv_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_organizations_csv_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1559,7 +1559,7 @@ pub async fn preflight_organizations_csv_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_organizations_json_import(
     state: State<'_, AppState>,
     file_path: String,
@@ -1574,7 +1574,7 @@ pub async fn preflight_organizations_json_import(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preflight_organizations_json_import_with_mapping(
     state: State<'_, AppState>,
     file_path: String,
@@ -1590,7 +1590,7 @@ pub async fn preflight_organizations_json_import_with_mapping(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_organizations_csv(
     state: State<'_, AppState>,
     file_path: String,
@@ -1604,7 +1604,7 @@ pub async fn export_organizations_csv(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn export_organizations_json(
     state: State<'_, AppState>,
     file_path: String,

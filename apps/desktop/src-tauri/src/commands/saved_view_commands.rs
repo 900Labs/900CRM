@@ -3,7 +3,7 @@ use tauri::State;
 
 use crate::{commands::lock_core, AppState};
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn create_saved_view(
     state: State<'_, AppState>,
     entity_type: String,
@@ -15,7 +15,7 @@ pub async fn create_saved_view(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_saved_views(
     state: State<'_, AppState>,
     entity_type: String,
@@ -25,7 +25,7 @@ pub async fn list_saved_views(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn update_saved_view(
     state: State<'_, AppState>,
     id: String,
@@ -37,7 +37,7 @@ pub async fn update_saved_view(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn delete_saved_view(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let mut core = lock_core(&state)?;
     core.delete_saved_view(&id).map_err(|e| e.to_string())

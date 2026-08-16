@@ -8,7 +8,7 @@ use tauri::State;
 
 use crate::{commands::lock_core, AppState};
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_external_clients(
     state: State<'_, AppState>,
 ) -> Result<Vec<ExternalClient>, String> {
@@ -16,7 +16,7 @@ pub async fn list_external_clients(
     core.list_external_clients().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn create_external_client_placeholder(
     state: State<'_, AppState>,
     name: String,
@@ -27,7 +27,7 @@ pub async fn create_external_client_placeholder(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn update_external_client_activation(
     state: State<'_, AppState>,
     client_id: String,
@@ -39,7 +39,7 @@ pub async fn update_external_client_activation(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_external_client_permissions(
     state: State<'_, AppState>,
     client_id: String,
@@ -49,7 +49,7 @@ pub async fn list_external_client_permissions(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn upsert_external_client_tool_permission(
     state: State<'_, AppState>,
     client_id: String,
@@ -69,7 +69,7 @@ pub async fn upsert_external_client_tool_permission(
     .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn evaluate_external_client_tool_read_permission(
     state: State<'_, AppState>,
     client_id: String,
@@ -80,7 +80,7 @@ pub async fn evaluate_external_client_tool_read_permission(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn evaluate_external_client_draft_permission(
     state: State<'_, AppState>,
     client_id: String,
