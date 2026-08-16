@@ -12,7 +12,7 @@
 //!
 //! Activities support the same soft-delete pattern as contacts and deals.
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, params_from_iter, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 use crate::utils::{
@@ -257,18 +257,42 @@ pub fn get_activity(conn: &Connection, id: &str) -> CrmResult<Activity> {
 ///
 /// Returns [`CrmError::Database`] on SQL failure.
 pub fn list_activities(conn: &Connection) -> CrmResult<Vec<Activity>> {
-    let mut stmt = conn.prepare(
+    list_activities_windowed(conn, None, 0)
+}
+
+/// Lists active activities, optionally windowed in SQL.
+pub fn list_activities_windowed(
+    conn: &Connection,
+    limit: Option<u32>,
+    offset: u32,
+) -> CrmResult<Vec<Activity>> {
+    let sql = if limit.is_some() {
         r#"
         SELECT id, activity_type, title, description, due_date, completed,
                contact_id, deal_id, created_at, updated_at, deleted_at, device_id
         FROM activities
         WHERE deleted_at IS NULL
         ORDER BY due_date ASC NULLS LAST, created_at DESC
-        "#,
-    )?;
+        LIMIT ?1 OFFSET ?2
+        "#
+    } else {
+        r#"
+        SELECT id, activity_type, title, description, due_date, completed,
+               contact_id, deal_id, created_at, updated_at, deleted_at, device_id
+        FROM activities
+        WHERE deleted_at IS NULL
+        ORDER BY due_date ASC NULLS LAST, created_at DESC
+        "#
+    };
 
-    let rows = stmt.query_map([], row_to_activity)?;
-    let activities: Vec<Activity> = rows.filter_map(|r| r.ok()).collect();
+    let mut stmt = conn.prepare(sql)?;
+    let activities = if let Some(limit) = limit {
+        let rows = stmt.query_map(params![limit as i64, offset as i64], row_to_activity)?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    } else {
+        let rows = stmt.query_map([], row_to_activity)?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
 
     log::debug!("list_activities: {} results", activities.len());
     Ok(activities)
@@ -294,7 +318,7 @@ pub fn list_activities_for_contact(
     )?;
 
     let rows = stmt.query_map(params![contact_id], row_to_activity)?;
-    let activities: Vec<Activity> = rows.filter_map(|r| r.ok()).collect();
+    let activities = rows.collect::<Result<Vec<_>, _>>()?;
 
     log::debug!(
         "list_activities_for_contact contact_id={}: {} results",
@@ -321,7 +345,7 @@ pub fn list_activities_for_deal(conn: &Connection, deal_id: &str) -> CrmResult<V
     )?;
 
     let rows = stmt.query_map(params![deal_id], row_to_activity)?;
-    let activities: Vec<Activity> = rows.filter_map(|r| r.ok()).collect();
+    let activities = rows.collect::<Result<Vec<_>, _>>()?;
 
     log::debug!(
         "list_activities_for_deal deal_id={}: {} results",
@@ -329,6 +353,74 @@ pub fn list_activities_for_deal(conn: &Connection, deal_id: &str) -> CrmResult<V
         activities.len()
     );
     Ok(activities)
+}
+
+/// Lists active activities linked to any of the given deals (legacy deal_id or
+/// activity_links).
+pub fn list_activities_for_deal_ids(
+    conn: &Connection,
+    deal_ids: &[String],
+) -> CrmResult<Vec<Activity>> {
+    if deal_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let placeholders = deal_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+    let sql = format!(
+        r#"
+        SELECT id, activity_type, title, description, due_date, completed,
+               contact_id, deal_id, created_at, updated_at, deleted_at, device_id
+        FROM activities
+        WHERE deleted_at IS NULL
+          AND (
+            deal_id IN ({placeholders})
+            OR id IN (
+              SELECT activity_id FROM activity_links
+              WHERE deleted_at IS NULL
+                AND entity_type = 'deal'
+                AND entity_id IN ({placeholders})
+            )
+          )
+        ORDER BY due_date ASC NULLS LAST, created_at DESC
+        "#
+    );
+    let mut values: Vec<&str> = deal_ids.iter().map(String::as_str).collect();
+    values.extend(deal_ids.iter().map(String::as_str));
+
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params_from_iter(values), row_to_activity)?;
+    let activities = rows.collect::<Result<Vec<_>, _>>()?;
+    Ok(activities)
+}
+
+/// Lists active links for many activities in one query.
+pub fn list_activity_links_for_activities(
+    conn: &Connection,
+    activity_ids: &[String],
+) -> CrmResult<Vec<ActivityLink>> {
+    if activity_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let placeholders = activity_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(", ");
+    let sql = format!(
+        r#"
+        SELECT id, activity_id, entity_type, entity_id, created_at, deleted_at, device_id
+        FROM activity_links
+        WHERE deleted_at IS NULL AND activity_id IN ({placeholders})
+        ORDER BY created_at ASC, id ASC
+        "#
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(
+        params_from_iter(activity_ids.iter().map(String::as_str)),
+        row_to_activity_link,
+    )?;
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 /// Lists upcoming (incomplete, future due date) activities.
@@ -355,7 +447,7 @@ pub fn list_upcoming_activities(conn: &Connection, limit: u32) -> CrmResult<Vec<
     )?;
 
     let rows = stmt.query_map(params![now, limit as i64], row_to_activity)?;
-    let activities: Vec<Activity> = rows.filter_map(|r| r.ok()).collect();
+    let activities = rows.collect::<Result<Vec<_>, _>>()?;
 
     log::debug!("list_upcoming_activities: {} results", activities.len());
     Ok(activities)
@@ -384,7 +476,7 @@ pub fn list_overdue_activities(conn: &Connection) -> CrmResult<Vec<Activity>> {
     )?;
 
     let rows = stmt.query_map(params![now], row_to_activity)?;
-    let activities: Vec<Activity> = rows.filter_map(|r| r.ok()).collect();
+    let activities = rows.collect::<Result<Vec<_>, _>>()?;
 
     log::debug!("list_overdue_activities: {} results", activities.len());
     Ok(activities)

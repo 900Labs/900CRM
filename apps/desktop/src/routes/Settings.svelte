@@ -22,6 +22,7 @@
     validateLocalBackup,
     type LocalBackupValidation,
   } from '$lib/api/backup';
+  import { reloadWorkspaceAfterDataReplace } from '$lib/stores/reloadWorkspace';
   import {
     createExternalClientPlaceholder,
     listExternalClients,
@@ -658,6 +659,7 @@
       }
 
       const result = await restoreLocalBackupToAppData(validation.backup_dir, true);
+      await reloadWorkspaceAfterDataReplace();
       backupMessage = t('settings.backupRestored', { path: result.database_path });
       uiStore.toastSuccess(t('settings.backupRestored', { path: result.database_path }));
     } catch (err) {

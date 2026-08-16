@@ -8,6 +8,7 @@
 //!
 //! - `record_change` must be called after every successful mutation.
 //! - `get_changes_since` is used by the sync engine to fetch changes to push.
+//! - Pending means `synced_at IS NULL` once that column is used.
 //! - `mark_changes_synced` and `clear_old_changes` keep the table manageable.
 //!
 //! # Sync Strategy
@@ -151,7 +152,7 @@ pub fn get_changes_since(
         row_to_sync_change(row)
     })?;
 
-    let changes: Vec<SyncChange> = rows.filter_map(|r| r.ok()).collect();
+    let changes = rows.collect::<Result<Vec<_>, _>>()?;
 
     log::debug!(
         "get_changes_since since={}: {} changes",
@@ -161,9 +162,7 @@ pub fn get_changes_since(
     Ok(changes)
 }
 
-/// Returns all pending (un-synced) changelog entries.
-///
-/// Returns all rows ordered by `timestamp ASC, id ASC`.
+/// Returns changelog entries that have not been marked synced.
 ///
 /// # Errors
 ///
@@ -173,15 +172,26 @@ pub fn get_all_pending_changes(conn: &Connection) -> CrmResult<Vec<SyncChange>> 
         r#"
         SELECT id, entity_type, entity_id, field_name, old_value, new_value, timestamp, device_id
         FROM sync_changelog
+        WHERE synced_at IS NULL
         ORDER BY timestamp ASC, id ASC
         "#,
     )?;
 
     let rows = stmt.query_map([], row_to_sync_change)?;
-    let changes: Vec<SyncChange> = rows.filter_map(|r| r.ok()).collect();
+    let changes = rows.collect::<Result<Vec<_>, _>>()?;
 
     log::debug!("get_all_pending_changes: {} entries", changes.len());
     Ok(changes)
+}
+
+/// Marks pending changelog rows as synced.
+pub fn mark_changes_synced(conn: &Connection) -> CrmResult<u64> {
+    let now = now_iso8601();
+    let changed = conn.execute(
+        "UPDATE sync_changelog SET synced_at = ?1 WHERE synced_at IS NULL",
+        params![now],
+    )?;
+    Ok(changed as u64)
 }
 
 /// Permanently deletes changelog entries older than `before_timestamp`.
@@ -198,7 +208,7 @@ pub fn get_all_pending_changes(conn: &Connection) -> CrmResult<Vec<SyncChange>> 
 /// Returns [`CrmError::Database`] on SQL failure.
 pub fn clear_old_changes(conn: &Connection, before_timestamp: &str) -> CrmResult<u64> {
     let deleted = conn.execute(
-        "DELETE FROM sync_changelog WHERE timestamp < ?1",
+        "DELETE FROM sync_changelog WHERE timestamp < ?1 AND synced_at IS NOT NULL",
         params![before_timestamp],
     )?;
 

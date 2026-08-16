@@ -101,6 +101,8 @@ All CRM data — contacts, deals, activities, settings — is stored in a SQLite
 
 No data is ever written outside of the application data directory and files the user explicitly exports.
 
+The application audit log is append-only from the app's point of view: normal CRM actions insert new rows and there is no edit or delete UI. It is not tamper-evident and is not a compliance WORM store. Anyone with OS-user access to the SQLite file, or a confirmed restore from a backup, can replace or rewrite history. That is intentional for a single-user local CRM.
+
 ### Process Isolation
 
 Tauri's two-process model provides a security boundary:

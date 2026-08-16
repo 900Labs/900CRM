@@ -8,7 +8,8 @@ const {
   dealFixture,
   dealStoreMock,
   emptyStagesFixture,
-  listActivitiesMock,
+  listActivitiesForDealsMock,
+  listDealsMock,
   loadActivityLinkIndexMock,
   loadActivityRelationshipLookupsMock,
   loadDealRelationshipLookupsMock,
@@ -59,7 +60,8 @@ const {
       moveDealStage: moveDealStageMock,
       selectDeal: selectDealMock,
     },
-    listActivitiesMock: vi.fn(),
+    listActivitiesForDealsMock: vi.fn(),
+    listDealsMock: vi.fn(),
     loadActivityLinkIndexMock: vi.fn(),
     loadActivityRelationshipLookupsMock: vi.fn(),
     loadDealRelationshipLookupsMock: vi.fn(),
@@ -92,12 +94,15 @@ vi.mock('$lib/i18n', () => ({
 }));
 
 vi.mock('$lib/api/activities', () => ({
-  listActivities: listActivitiesMock,
+  listActivitiesForDeals: listActivitiesForDealsMock,
 }));
 
 vi.mock('$lib/api/deals', async (importOriginal) => {
   const actual = await importOriginal<typeof import('$lib/api/deals')>();
-  return actual;
+  return {
+    ...actual,
+    listDeals: listDealsMock,
+  };
 });
 
 vi.mock('$lib/api/customFields', () => ({
@@ -176,8 +181,10 @@ describe('Pipeline local automation prompt', () => {
     });
     openModalMock.mockReset();
     selectDealMock.mockReset();
-    listActivitiesMock.mockReset();
-    listActivitiesMock.mockResolvedValue([]);
+    listActivitiesForDealsMock.mockReset();
+    listActivitiesForDealsMock.mockResolvedValue([]);
+    listDealsMock.mockReset();
+    listDealsMock.mockResolvedValue([deal]);
     loadActivityLinkIndexMock.mockReset();
     loadActivityLinkIndexMock.mockResolvedValue({});
     loadActivityRelationshipLookupsMock.mockReset();
@@ -194,7 +201,10 @@ describe('Pipeline local automation prompt', () => {
     const { container } = render(Pipeline);
 
     await screen.findByRole('button', { name: /Automation rollout/ });
-    await waitFor(() => expect(listActivitiesMock).toHaveBeenCalled());
+    await waitFor(() => {
+      expect(listDealsMock).toHaveBeenCalled();
+      expect(listActivitiesForDealsMock).toHaveBeenCalledWith(['deal-automation']);
+    });
 
     const card = screen.getByRole('button', { name: /Automation rollout/ });
     const qualifiedColumn = container.querySelector('[aria-label="deals.stages.qualified"]');

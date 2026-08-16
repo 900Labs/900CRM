@@ -26,6 +26,39 @@ impl CrmCore {
         org_id: Option<String>,
         notes: Option<String>,
     ) -> CrmResult<Contact> {
+        self.create_contact_with_lifecycle(
+            contact_type,
+            first_name,
+            last_name,
+            org_name,
+            email,
+            phone,
+            address,
+            city,
+            country,
+            org_id,
+            notes,
+            None,
+        )
+    }
+
+    /// Creates a contact and optionally sets lifecycle in the same transaction.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_contact_with_lifecycle(
+        &mut self,
+        contact_type: Option<String>,
+        first_name: Option<String>,
+        last_name: Option<String>,
+        org_name: Option<String>,
+        email: Option<String>,
+        phone: Option<String>,
+        address: Option<String>,
+        city: Option<String>,
+        country: Option<String>,
+        org_id: Option<String>,
+        notes: Option<String>,
+        lifecycle: Option<String>,
+    ) -> CrmResult<Contact> {
         let input = contact_engine::ContactInput {
             contact_type: contact_type.clone(),
             first_name: first_name.clone(),
@@ -58,6 +91,15 @@ impl CrmCore {
             notes.as_deref().unwrap_or(""),
             &device_id,
         )?;
+        let contact = if let Some(lifecycle) = lifecycle.filter(|value| !value.trim().is_empty()) {
+            if lifecycle != contact.lifecycle {
+                storage::contacts::set_contact_lifecycle(&tx, &contact.id, &lifecycle)?
+            } else {
+                contact
+            }
+        } else {
+            contact
+        };
         storage::sync::record_change(
             &tx,
             "contact",

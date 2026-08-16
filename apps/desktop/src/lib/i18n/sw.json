@@ -20,6 +20,9 @@
     "organizations": "Mashirika",
     "auditLog": "Kumbukumbu za Ukaguzi",
     "pendingActions": "Vitendo Vinavyosubiri",
+    "collapse": "Kunja",
+    "expandSidebar": "Panua upau wa kando",
+    "collapseSidebar": "Kunja upau wa kando",
     "sections": {
       "workspace": "Nafasi ya Kazi",
       "review": "Kagua",

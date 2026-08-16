@@ -24,32 +24,21 @@ pub async fn create_contact(
     lifecycle: Option<String>,
 ) -> Result<Contact, String> {
     let mut core = lock_core(&state)?;
-    let contact = core
-        .create_contact(
-            contact_type,
-            first_name,
-            last_name,
-            org_name,
-            email,
-            phone,
-            address,
-            city,
-            country,
-            org_id,
-            notes,
-        )
-        .map_err(|e| e.to_string())?;
-
-    let Some(lifecycle) = lifecycle.filter(|value| !value.trim().is_empty()) else {
-        return Ok(contact);
-    };
-
-    if lifecycle == contact.lifecycle {
-        return Ok(contact);
-    }
-
-    core.set_contact_lifecycle(&contact.id, &lifecycle)
-        .map_err(|e| e.to_string())
+    core.create_contact_with_lifecycle(
+        contact_type,
+        first_name,
+        last_name,
+        org_name,
+        email,
+        phone,
+        address,
+        city,
+        country,
+        org_id,
+        notes,
+        lifecycle,
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command(rename_all = "snake_case")]

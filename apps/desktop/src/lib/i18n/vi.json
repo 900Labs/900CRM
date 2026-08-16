@@ -20,6 +20,9 @@
     "organizations": "Tổ chức",
     "auditLog": "Nhật ký kiểm toán",
     "pendingActions": "Hành động chờ xử lý",
+    "collapse": "Thu gọn",
+    "expandSidebar": "Mở rộng thanh bên",
+    "collapseSidebar": "Thu gọn thanh bên",
     "sections": {
       "workspace": "Không gian làm việc",
       "review": "Duyệt",

@@ -259,6 +259,18 @@ export async function listActivities(params: ListActivitiesParams = {}): Promise
   return mapped;
 }
 
+export async function listActivitiesForDeals(dealIds: string[]): Promise<Activity[]> {
+  const uniqueIds = Array.from(new Set(dealIds.map((id) => id.trim()).filter(Boolean)));
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  const activities = await invoke<BackendActivity[]>('list_activities_for_deals', {
+    deal_ids: uniqueIds,
+  });
+  return activities.map(mapActivity);
+}
+
 export async function listUpcoming(): Promise<Activity[]> {
   const activities = await invoke<BackendActivity[]>('list_upcoming_activities', {
     limit: 10,
@@ -309,6 +321,20 @@ export async function deleteActivity(id: string): Promise<void> {
 export async function listActivityLinks(activityId: string): Promise<ActivityLink[]> {
   const links = await invoke<BackendActivityLink[]>('list_activity_links', {
     activity_id: activityId.trim(),
+  });
+  return links.map(mapActivityLink);
+}
+
+export async function listActivityLinksForActivities(
+  activityIds: string[],
+): Promise<ActivityLink[]> {
+  const uniqueIds = Array.from(new Set(activityIds.map((id) => id.trim()).filter(Boolean)));
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  const links = await invoke<BackendActivityLink[]>('list_activity_links_for_activities', {
+    activity_ids: uniqueIds,
   });
   return links.map(mapActivityLink);
 }

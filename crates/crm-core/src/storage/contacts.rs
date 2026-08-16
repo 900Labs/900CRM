@@ -422,7 +422,7 @@ pub fn list_contacts(
         ],
         row_to_contact,
     )?;
-    let contacts: Vec<Contact> = rows.filter_map(|r| r.ok()).collect();
+    let contacts: Vec<Contact> = rows.collect::<Result<Vec<_>, _>>()?;
 
     log::debug!(
         "list_contacts: page={}, per_page={}, total={}",
@@ -735,7 +735,7 @@ pub fn search_contacts(conn: &Connection, query: &str) -> CrmResult<Vec<Contact>
     )?;
 
     let rows = stmt.query_map(params![fts_query], row_to_contact)?;
-    let contacts: Vec<Contact> = rows.filter_map(|r| r.ok()).collect();
+    let contacts: Vec<Contact> = rows.collect::<Result<Vec<_>, _>>()?;
 
     log::debug!(
         "search_contacts query='{}' results={}",
@@ -758,7 +758,7 @@ pub fn find_active_contacts_by_email(conn: &Connection, email: &str) -> CrmResul
     )?;
 
     let rows = stmt.query_map(params![email], row_to_contact)?;
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 /// Finds active contacts with a phone number matching exactly after trimming.
@@ -774,7 +774,7 @@ pub fn find_active_contacts_by_phone(conn: &Connection, phone: &str) -> CrmResul
     )?;
 
     let rows = stmt.query_map(params![phone], row_to_contact)?;
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 /// Finds active contact duplicate pairs by exact trimmed email or phone matches.
@@ -905,7 +905,7 @@ pub fn find_active_contacts_by_name(
     )?;
 
     let rows = stmt.query_map(params![first_name, last_name], row_to_contact)?;
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1019,7 +1019,7 @@ fn search_contacts_paged(
         ],
         row_to_contact,
     )?;
-    let contacts: Vec<Contact> = rows.filter_map(|r| r.ok()).collect();
+    let contacts: Vec<Contact> = rows.collect::<Result<Vec<_>, _>>()?;
 
     Ok(ContactListResult {
         contacts,

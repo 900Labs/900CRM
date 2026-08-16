@@ -12,6 +12,7 @@ const {
   rollbackCompletedImportMock,
   restoreLocalBackupToAppDataMock,
   validateLocalBackupMock,
+  reloadWorkspaceAfterDataReplaceMock,
 } = vi.hoisted(
   () => ({
     importJsonWithMappingMock: vi.fn(),
@@ -22,6 +23,7 @@ const {
     rollbackCompletedImportMock: vi.fn(),
     restoreLocalBackupToAppDataMock: vi.fn(),
     validateLocalBackupMock: vi.fn(),
+    reloadWorkspaceAfterDataReplaceMock: vi.fn(),
   }),
 );
 
@@ -49,6 +51,10 @@ vi.mock("$lib/api/backup", () => ({
 
 vi.mock("$lib/api/customFields", () => ({
   listCustomFieldDefinitions: listCustomFieldDefinitionsMock,
+}));
+
+vi.mock("$lib/stores/reloadWorkspace", () => ({
+  reloadWorkspaceAfterDataReplace: reloadWorkspaceAfterDataReplaceMock,
 }));
 
 import ImportExport from "./ImportExport.svelte";
@@ -189,6 +195,8 @@ describe("ImportExport component", () => {
     rollbackCompletedImportMock.mockReset();
     restoreLocalBackupToAppDataMock.mockReset();
     validateLocalBackupMock.mockReset();
+    reloadWorkspaceAfterDataReplaceMock.mockReset();
+    reloadWorkspaceAfterDataReplaceMock.mockResolvedValue(undefined);
   });
 
   it("shows audit log as export-only entity", async () => {
@@ -1185,6 +1193,7 @@ describe("ImportExport component", () => {
       expect(validateLocalBackupMock).toHaveBeenCalledWith(backupPath);
     });
     expect(restoreLocalBackupToAppDataMock).toHaveBeenCalledWith(backupPath, true);
+    expect(reloadWorkspaceAfterDataReplaceMock).toHaveBeenCalled();
     expect(screen.getByText("Pre-import backup restored to /app-data/900crm.db")).toBeTruthy();
   });
 

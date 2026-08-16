@@ -74,7 +74,7 @@ pub fn list_definitions(
         )?;
 
         let rows = stmt.query_map(params![entity_type], row_to_definition)?;
-        return Ok(rows.filter_map(|r| r.ok()).collect());
+        return Ok(rows.collect::<Result<Vec<_>, _>>()?);
     }
 
     let mut stmt = conn.prepare(
@@ -86,7 +86,7 @@ pub fn list_definitions(
     )?;
 
     let rows = stmt.query_map([], row_to_definition)?;
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn get_definition(conn: &Connection, id: &str) -> CrmResult<CustomFieldDefinition> {
@@ -360,7 +360,7 @@ pub fn list_values_for_entity(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn list_values_for_entity_type(
@@ -393,7 +393,7 @@ pub fn list_values_for_entity_type(
         })
     })?;
 
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 pub fn delete_value_for_entity_field(

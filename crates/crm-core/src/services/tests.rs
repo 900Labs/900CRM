@@ -11967,6 +11967,41 @@ fn contact_lifecycle_defaults_to_customer_and_can_convert_a_lead() {
 }
 
 #[test]
+fn create_contact_with_lifecycle_writes_lead_in_one_step() {
+    let (mut core, path) = open_test_core();
+
+    let lead = core
+        .create_contact_with_lifecycle(
+            Some("person".to_string()),
+            Some("Amara".to_string()),
+            Some("Lead".to_string()),
+            None,
+            Some("amara.lead@example.test".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("lead".to_string()),
+        )
+        .expect("lead should be created in one transaction");
+    assert_eq!(lead.lifecycle, "lead");
+
+    let listed = core
+        .list_contacts(Some(crate::storage::contacts::ContactListParams {
+            filter_lifecycle: Some("lead".to_string()),
+            ..Default::default()
+        }))
+        .expect("lead list should load");
+    assert_eq!(listed.total, 1);
+    assert_eq!(listed.contacts[0].id, lead.id);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn entity_links_store_http_urls_and_local_paths_without_copying_files() {
     let (mut core, path) = open_test_core();
 
@@ -12232,6 +12267,159 @@ fn saved_views_store_named_report_focus() {
         r#"{"focus":"forecast"}"#.to_string(),
     );
     assert!(matches!(invalid, Err(CrmError::InvalidInput(_))));
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn merge_contacts_reassigns_related_records_and_soft_deletes_source() {
+    let (mut core, path) = open_test_core();
+
+    let target = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            Some("Target".to_string()),
+            None,
+            Some("ada.target@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("target contact should be created");
+    let source = core
+        .create_contact(
+            Some("person".to_string()),
+            Some("Ada".to_string()),
+            Some("Source".to_string()),
+            None,
+            Some("ada.source@example.com".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("source contact should be created");
+
+    let deal = core
+        .create_deal(
+            "Clinic expansion".to_string(),
+            Some(2500.0),
+            None,
+            Some("Proposal".to_string()),
+            None,
+            None,
+            Some(source.id.clone()),
+            None,
+            None,
+        )
+        .expect("deal should be created");
+    let activity = core
+        .create_activity(
+            "task".to_string(),
+            "Follow up".to_string(),
+            None,
+            None,
+            Some(source.id.clone()),
+            None,
+        )
+        .expect("activity should be created");
+    let note = core
+        .create_note(
+            "contact".to_string(),
+            source.id.clone(),
+            "Source onboarding note".to_string(),
+        )
+        .expect("note should be created");
+    let tag = core
+        .create_tag("Clinic Priority".to_string(), None)
+        .expect("tag should be created");
+    core.apply_tag_to_entity("contact".to_string(), source.id.clone(), tag.id.clone())
+        .expect("tag should apply to source");
+    let field = core
+        .create_custom_field_def(
+            "contact".to_string(),
+            "VIP Tier".to_string(),
+            "text".to_string(),
+            None,
+            Some(0),
+        )
+        .expect("contact custom field should be created");
+    core.set_custom_field_value(field.id.clone(), source.id.clone(), "Gold".to_string())
+        .expect("source custom field value should be set");
+
+    let merged = core
+        .merge_contacts(&target.id, &source.id)
+        .expect("contacts should merge");
+    assert_eq!(merged.id, target.id);
+
+    assert!(matches!(
+        core.get_contact(&source.id),
+        Err(CrmError::NotFound(_))
+    ));
+    let listed = core
+        .list_contacts(None)
+        .expect("active contacts should list");
+    assert_eq!(listed.total, 1);
+    assert_eq!(listed.contacts.len(), 1);
+    assert_eq!(listed.contacts[0].id, target.id);
+
+    let reassigned_deal = core.get_deal(&deal.id).expect("deal should load");
+    assert_eq!(
+        reassigned_deal.contact_id.as_deref(),
+        Some(target.id.as_str())
+    );
+
+    let reassigned_activity = core
+        .get_activity(&activity.id)
+        .expect("activity should load");
+    assert_eq!(
+        reassigned_activity.contact_id.as_deref(),
+        Some(target.id.as_str())
+    );
+
+    let reassigned_note = core.get_note(&note.id).expect("note should load");
+    assert_eq!(reassigned_note.entity_id, target.id);
+
+    let target_tags = core
+        .list_tags_for_entity("contact".to_string(), target.id.clone())
+        .expect("target tags should list");
+    assert_eq!(target_tags.len(), 1);
+    assert_eq!(target_tags[0].id, tag.id);
+    let tag_link_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM tag_links WHERE entity_type = 'contact' AND entity_id = ?1 AND tag_id = ?2 AND deleted_at IS NULL",
+            params![target.id, tag.id],
+            |row| row.get(0),
+        )
+        .expect("target tag link count should query");
+    assert_eq!(tag_link_count, 1);
+    let source_tag_link_count: i64 = core
+        .db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM tag_links WHERE entity_type = 'contact' AND entity_id = ?1 AND deleted_at IS NULL",
+            params![source.id],
+            |row| row.get(0),
+        )
+        .expect("source tag link count should query");
+    assert_eq!(source_tag_link_count, 0);
+
+    let custom_values = core
+        .list_custom_field_values_for_type("contact")
+        .expect("custom field values should list");
+    assert_eq!(custom_values.len(), 1);
+    assert_eq!(custom_values[0].entity_id, target.id);
+    assert_eq!(custom_values[0].field_def_id, field.id);
+    assert_eq!(custom_values[0].value, "Gold");
 
     drop(core);
     let _ = std::fs::remove_dir_all(path);

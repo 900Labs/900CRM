@@ -11,7 +11,9 @@ vi.mock('@tauri-apps/api/core', () => ({
 import {
   addActivityLink,
   listActivities,
+  listActivitiesForDeals,
   listActivityLinks,
+  listActivityLinksForActivities,
   removeActivityLink,
   updateActivity,
 } from './activities';
@@ -156,6 +158,46 @@ describe('activity API', () => {
     expect(args).not.toHaveProperty('reset_due_date');
     expect(args).not.toHaveProperty('reset_contact_id');
     expect(args).not.toHaveProperty('reset_deal_id');
+  });
+
+  it('maps listActivitiesForDeals to the batch command', async () => {
+    invokeMock.mockResolvedValueOnce([backendActivity]);
+
+    await expect(listActivitiesForDeals([' deal-1 ', 'deal-1', ''])).resolves.toMatchObject([
+      { id: 'activity-1', dealId: 'deal-1' },
+    ]);
+    expect(invokeMock).toHaveBeenCalledWith('list_activities_for_deals', {
+      deal_ids: ['deal-1'],
+    });
+
+    invokeMock.mockReset();
+    await expect(listActivitiesForDeals(['', '  '])).resolves.toEqual([]);
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it('maps listActivityLinksForActivities to the batch command', async () => {
+    invokeMock.mockResolvedValueOnce([backendActivityLink]);
+
+    await expect(
+      listActivityLinksForActivities([' activity-1 ', 'activity-1', '']),
+    ).resolves.toEqual([
+      {
+        id: 'activity-link-1',
+        activityId: 'activity-1',
+        entityType: 'organization',
+        entityId: 'org-1',
+        createdAt: '2026-06-24T08:30:00Z',
+        deletedAt: null,
+        deviceId: 'device-1',
+      },
+    ]);
+    expect(invokeMock).toHaveBeenCalledWith('list_activity_links_for_activities', {
+      activity_ids: ['activity-1'],
+    });
+
+    invokeMock.mockReset();
+    await expect(listActivityLinksForActivities([])).resolves.toEqual([]);
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 
   it('maps activity link wrappers to Tauri commands', async () => {

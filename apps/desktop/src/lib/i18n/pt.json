@@ -20,6 +20,9 @@
     "organizations": "Organizações",
     "auditLog": "Registro de auditoria",
     "pendingActions": "Ações pendentes",
+    "collapse": "Recolher",
+    "expandSidebar": "Expandir barra lateral",
+    "collapseSidebar": "Recolher barra lateral",
     "sections": {
       "workspace": "Espaço de trabalho",
       "review": "Revisão",

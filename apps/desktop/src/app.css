@@ -1366,7 +1366,42 @@ hr {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   23. REDUCED MOTION
+   23. RTL OVERRIDES
+   Physical left/right leftovers that logical properties cannot express.
+   Document direction is set on <html> via [dir="rtl"].
+   ───────────────────────────────────────────────────────────────────────────── */
+
+[dir="rtl"] .nav-section-label,
+[dir="rtl"] .nav-label {
+  text-align: start;
+}
+
+[dir="rtl"] .sidebar-footer .nav-link {
+  justify-content: flex-start;
+}
+
+[dir="rtl"] .sidebar-collapse-icon {
+  transform-origin: center center;
+}
+
+[dir="rtl"] .select {
+  padding-block: var(--space-3);
+  padding-inline-start: var(--space-4);
+  padding-inline-end: var(--space-10);
+  background-position: left var(--space-4) center;
+}
+
+[dir="rtl"] .toast {
+  animation-name: slide-in-inline-start;
+}
+
+@keyframes slide-in-inline-start {
+  from { transform: translateX(calc(-100% - var(--space-8))); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   24. REDUCED MOTION
    ───────────────────────────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {

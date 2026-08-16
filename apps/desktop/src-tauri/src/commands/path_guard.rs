@@ -25,8 +25,9 @@ const SECRET_DENYLIST: &[&str] = &[
 /// secrets or overwriting system files via the import/export/backup commands. It does
 /// not restrict which user directories may be used (legitimate imports from USB drives,
 /// external volumes, and arbitrary user folders remain supported) but blocks known
-/// secret/credential locations anywhere on the path. Symlink traversal past these checks
-/// remains a documented residual risk; the primary trust boundary is the OS file dialog.
+/// secret/credential locations anywhere on the path. Existing paths are canonicalized
+/// so symlink targets are re-checked against the denylist. The primary trust boundary
+/// remains the OS file dialog.
 pub fn validate_import_path(raw: &str) -> Result<PathBuf, String> {
     validate(raw)
 }
@@ -57,7 +58,38 @@ fn validate(raw: &str) -> Result<PathBuf, String> {
         .ok_or_else(|| "Path escapes its root directory and is not allowed".to_string())?;
 
     reject_if_secret(&normalized)?;
-    Ok(normalized)
+    resolve_existing_path(normalized)
+}
+
+fn resolve_existing_path(normalized: PathBuf) -> Result<PathBuf, String> {
+    if !normalized.exists() {
+        if let Some(parent) = normalized.parent() {
+            if parent.exists() {
+                let canonical_parent = std::fs::canonicalize(parent).map_err(|err| {
+                    format!("Unable to resolve path '{}': {}", parent.display(), err)
+                })?;
+                reject_if_secret(&canonical_parent)?;
+                if let Some(name) = normalized.file_name() {
+                    return Ok(canonical_parent.join(name));
+                }
+            }
+        }
+        return Ok(normalized);
+    }
+
+    let metadata = std::fs::symlink_metadata(&normalized)
+        .map_err(|err| format!("Unable to inspect path '{}': {}", normalized.display(), err))?;
+    if metadata.file_type().is_symlink() {
+        return Err(format!(
+            "Symbolic links are not allowed: {}",
+            normalized.display()
+        ));
+    }
+
+    let canonical = std::fs::canonicalize(&normalized)
+        .map_err(|err| format!("Unable to resolve path '{}': {}", normalized.display(), err))?;
+    reject_if_secret(&canonical)?;
+    Ok(canonical)
 }
 
 fn lexical_normalize(absolute: &Path) -> Option<PathBuf> {
@@ -119,5 +151,48 @@ fn home_dir() -> Option<PathBuf> {
     #[cfg(not(any(unix, windows)))]
     {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{reject_if_secret, resolve_existing_path, validate};
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("900crm-path-guard-{}-{}", name, std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("temp dir");
+        dir
+    }
+
+    #[test]
+    fn rejects_secret_path_fragments() {
+        assert!(reject_if_secret(&PathBuf::from("/tmp/home/.ssh/id_rsa")).is_err());
+        assert!(reject_if_secret(&PathBuf::from("/tmp/safe-import.csv")).is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_empty_and_parent_escape() {
+        assert!(validate("").is_err());
+        assert!(validate("/tmp/../..").is_err());
+    }
+
+    #[test]
+    fn resolve_existing_path_rejects_symlink_to_secret() {
+        let dir = temp_dir("symlink");
+        let target = dir.join("id_rsa");
+        fs::write(&target, "secret").expect("write target");
+        let link = dir.join("import.csv");
+        #[cfg(unix)]
+        {
+            let _ = fs::remove_file(&link);
+            std::os::unix::fs::symlink(&target, &link).expect("symlink");
+            let err = resolve_existing_path(link).expect_err("symlink should fail");
+            assert!(err.contains("Symbolic links") || err.contains("sensitive"));
+        }
+        let _ = fs::remove_dir_all(&dir);
     }
 }

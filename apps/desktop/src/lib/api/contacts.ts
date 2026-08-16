@@ -239,6 +239,11 @@ export async function deleteContact(id: string): Promise<void> {
   await invoke<void>('delete_contact', { id });
 }
 
+export async function restoreContact(id: string): Promise<Contact> {
+  const contact = await invoke<BackendContact>('restore_contact', { id });
+  return mapContact(contact);
+}
+
 export async function searchContacts(query: string): Promise<Contact[]> {
   const contacts = await invoke<BackendContact[]>('search_contacts', { query });
   return contacts.map(mapContact);

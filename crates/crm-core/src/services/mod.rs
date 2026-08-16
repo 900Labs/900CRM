@@ -257,6 +257,10 @@ impl CrmCore {
         storage::deals::list_deals(&self.db.conn)
     }
 
+    pub fn list_deals_windowed(&self, limit: Option<u32>, offset: u32) -> CrmResult<Vec<Deal>> {
+        storage::deals::list_deals_windowed(&self.db.conn, limit, offset)
+    }
+
     pub fn list_deals_by_stage(&self, stage: &str) -> CrmResult<Vec<Deal>> {
         storage::deals::list_deals_by_stage(&self.db.conn, stage)
     }
@@ -401,6 +405,18 @@ impl CrmCore {
 
     pub fn list_activities(&self) -> CrmResult<Vec<Activity>> {
         storage::activities::list_activities(&self.db.conn)
+    }
+
+    pub fn list_activities_windowed(
+        &self,
+        limit: Option<u32>,
+        offset: u32,
+    ) -> CrmResult<Vec<Activity>> {
+        storage::activities::list_activities_windowed(&self.db.conn, limit, offset)
+    }
+
+    pub fn list_activities_for_deal_ids(&self, deal_ids: Vec<String>) -> CrmResult<Vec<Activity>> {
+        storage::activities::list_activities_for_deal_ids(&self.db.conn, &deal_ids)
     }
 
     pub fn list_activities_for_contact(&self, contact_id: &str) -> CrmResult<Vec<Activity>> {
@@ -884,40 +900,7 @@ impl CrmCore {
     }
 
     pub fn trigger_sync(&self) -> CrmResult<SyncStatus> {
-        let pending_changes = storage::sync::get_all_pending_changes(&self.db.conn)?.len() as u32;
-        let sync_enabled = storage::settings::get_setting(&self.db.conn, "sync_enabled")?
-            .map(|s| s.value)
-            .unwrap_or_else(|| "false".to_string());
-        let sync_url = storage::settings::get_setting(&self.db.conn, "sync_url")?
-            .map(|s| s.value)
-            .unwrap_or_default();
-
-        if !parse_bool(Some(sync_enabled.as_str())) {
-            return Ok(SyncStatus {
-                state: "idle".to_string(),
-                last_sync_at: None,
-                error_message: None,
-                pending_changes,
-            });
-        }
-
-        if sync_url.trim().is_empty() {
-            return Ok(SyncStatus {
-                state: "error".to_string(),
-                last_sync_at: None,
-                error_message: Some("Sync URL is not configured.".to_string()),
-                pending_changes,
-            });
-        }
-
-        Ok(SyncStatus {
-            state: "not_implemented".to_string(),
-            last_sync_at: None,
-            error_message: Some(
-                "Multi-device sync transport is not implemented yet. Local changes are recorded to the changelog for future sync.".to_string(),
-            ),
-            pending_changes,
-        })
+        self.get_sync_status()
     }
 
     pub fn import_contacts_csv(&mut self, file_path: &str) -> CrmResult<ImportResult> {

@@ -117,7 +117,11 @@ pub fn set_setting(conn: &Connection, key: &str, value: &str) -> CrmResult<Setti
         params![key, value, now],
     )?;
 
-    log::debug!("set_setting key={} value={}", key, value);
+    if key.ends_with("password") {
+        log::debug!("set_setting key={} value=[redacted]", key);
+    } else {
+        log::debug!("set_setting key={} value={}", key, value);
+    }
 
     Ok(Setting {
         key: key.to_string(),
@@ -142,7 +146,7 @@ pub fn get_all_settings(conn: &Connection) -> CrmResult<Vec<Setting>> {
         })
     })?;
 
-    let settings: Vec<Setting> = rows.filter_map(|r| r.ok()).collect();
+    let settings: Vec<Setting> = rows.collect::<Result<Vec<_>, _>>()?;
     log::debug!("get_all_settings: {} keys", settings.len());
     Ok(settings)
 }
