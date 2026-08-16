@@ -44,7 +44,7 @@
     "firstRun": {
       "eyebrow": "Starter",
       "title": "Start your workspace",
-      "subtitle": "Create the first records that make the dashboard useful, or load a small synthetic workspace to see the core CRM flow.",
+      "subtitle": "Create the first records that make the dashboard useful, import an existing list, or load a small sample workspace.",
       "checklistLabel": "Starter checklist",
       "actionsLabel": "Starter actions",
       "addContact": "Add a contact or organization",
@@ -60,7 +60,11 @@
       "contactAction": "Add Contact",
       "dealAction": "Add Deal",
       "followUpAction": "Add Follow-Up",
-      "dataAction": "Import or Backup"
+      "dataAction": "Import or Backup",
+      "dataTitle": "Already have customers?",
+      "dataHint": "Import a CSV of people, companies, or deals. Or copy this workspace to a folder on this device. Files stay local and are not encrypted.",
+      "importAction": "Import data",
+      "backupAction": "Make a backup"
     },
     "attention": {
       "title": "Needs Attention",
@@ -478,6 +482,8 @@
     "sectionAbout": "About",
     "paneAppearanceHelp": "Language, theme, dates, currency, and desktop reminders.",
     "paneDataHelp": "Export, import, and local backup for this workspace.",
+    "dataGuidanceTitle": "Start with import or a local backup",
+    "dataGuidance": "Import a CSV of people, companies, or deals. Or copy the whole workspace to a folder you choose. Both stay on this device.",
     "paneIntegrationsHelp": "Sync honesty, optional email probe, and external clients.",
     "language": "Language",
     "currency": "Currency",

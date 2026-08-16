@@ -60,7 +60,11 @@
       "contactAction": "Kara Lamba",
       "dealAction": "Kara Yarjejeniya",
       "followUpAction": "Kara Bibiya",
-      "dataAction": "Shigo ko Ajiya"
+      "dataAction": "Shigo ko Ajiya",
+      "dataTitle": "Kana da abokan ciniki tuni?",
+      "dataHint": "Shigo da CSV na mutane, kamfanoni, ko yarjejeniya. Ko kwafi wannan wurin aiki zuwa folder a wannan na'ura. Fayiloli suna nan a gida, ba su da ɓoye.",
+      "importAction": "Shigo da bayanai",
+      "backupAction": "Yi ajiya"
     },
     "attention": {
       "title": "Na Bukatar Kulawa",
@@ -478,6 +482,8 @@
     "sectionAbout": "Game da",
     "paneAppearanceHelp": "Harshe, jigo, kwanan wata, kudi, da tunatarwa na kwamfuta.",
     "paneDataHelp": "Fitarwa, shigo da, da ajiyar gida na wannan wurin aiki.",
+    "dataGuidanceTitle": "Fara da shigowa ko ajiyar gida",
+    "dataGuidance": "Shigo da CSV na mutane, kamfanoni, ko yarjejeniya. Ko kwafi duk wurin aiki zuwa folder da ka zaɓa. Dukansu suna nan a wannan na'ura.",
     "paneIntegrationsHelp": "Yanayin sync, gwajin imel na zaɓi, da abokan ciniki na waje.",
     "language": "Harshe",
     "currency": "Kudin Kasar",

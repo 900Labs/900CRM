@@ -60,7 +60,11 @@
       "contactAction": "Adicionar contato",
       "dealAction": "Adicionar negócio",
       "followUpAction": "Adicionar acompanhamento",
-      "dataAction": "Importar ou backup"
+      "dataAction": "Importar ou backup",
+      "dataTitle": "Já tem clientes?",
+      "dataHint": "Importe um CSV de pessoas, empresas ou negócios. Ou copie este espaço de trabalho para uma pasta neste dispositivo. Os arquivos ficam locais e não são criptografados.",
+      "importAction": "Importar dados",
+      "backupAction": "Fazer um backup"
     },
     "attention": {
       "title": "Precisa de atenção",
@@ -478,6 +482,8 @@
     "sectionAbout": "Sobre",
     "paneAppearanceHelp": "Idioma, tema, datas, moeda e lembretes da área de trabalho.",
     "paneDataHelp": "Exportar, importar e backup local deste espaço de trabalho.",
+    "dataGuidanceTitle": "Comece com importação ou um backup local",
+    "dataGuidance": "Importe um CSV de pessoas, empresas ou negócios. Ou copie o espaço de trabalho inteiro para uma pasta que você escolher. Os dois ficam neste dispositivo.",
     "paneIntegrationsHelp": "Disponibilidade de sincronização, sonda de e-mail opcional e clientes externos.",
     "language": "Idioma",
     "currency": "Moeda",

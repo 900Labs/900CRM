@@ -113,6 +113,10 @@ describe('Settings unencrypted file warnings', () => {
       expect(settings.paneDataHelp.length).toBeGreaterThan(0);
       expect(typeof settings.paneIntegrationsHelp).toBe('string');
       expect(settings.paneIntegrationsHelp.length).toBeGreaterThan(0);
+      expect(typeof settings.dataGuidanceTitle).toBe('string');
+      expect(settings.dataGuidanceTitle.length).toBeGreaterThan(0);
+      expect(typeof settings.dataGuidance).toBe('string');
+      expect(settings.dataGuidance.length).toBeGreaterThan(0);
     }
   });
 

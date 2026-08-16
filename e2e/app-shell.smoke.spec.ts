@@ -12,6 +12,9 @@ test('renders the browser app shell and dashboard route', async ({ page, assertN
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   await expect(page.getByText('Total Contacts')).toBeVisible();
   await expect(navigation.getByRole('link', { name: 'Reports' })).toBeVisible();
+  await expect(page.getByTestId('first-run-data')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Import data' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Make a backup' })).toBeVisible();
 
   await assertNoConsoleErrors();
 });
@@ -63,6 +66,11 @@ test('renders key hash routes without native Tauri dialogs', async ({ page, asse
   await expect(page.getByText('Multi-device sync is not implemented')).toBeVisible();
   await expect(page.getByText('Backup & Restore')).toHaveCount(0);
 
+  await loadHashRoute(page, '/settings/data');
+  await expect(page.getByTestId('settings-data-guidance')).toBeVisible();
+  await expect(page.getByText('Backup & Restore')).toBeVisible();
+  await expect(page.getByText('Start with import or a local backup')).toBeVisible();
+
   await assertNoConsoleErrors();
 });
 
@@ -72,6 +80,28 @@ test('renders review routes without console errors', async ({ page, assertNoCons
 
   await loadHashRoute(page, '/pending-actions');
   await expect(page.getByRole('heading', { name: 'Pending Actions' })).toBeVisible();
+
+  await assertNoConsoleErrors();
+});
+
+test('opens Settings Data from the dashboard first-run import and backup prompts', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await page.goto('/');
+  await expect(page.getByTestId('first-run-data')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Make a backup' }).click();
+  await expect(page.getByRole('tab', { name: 'Data' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('settings-data-guidance')).toBeVisible();
+  await expect(page.getByText('Backup & Restore')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose Folder' })).toBeVisible();
+
+  await loadHashRoute(page, '/');
+  await page.getByRole('button', { name: 'Import data' }).click();
+  await expect(page.getByRole('tab', { name: 'Data' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByText('Import / Export')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose File', exact: true })).toBeVisible();
 
   await assertNoConsoleErrors();
 });

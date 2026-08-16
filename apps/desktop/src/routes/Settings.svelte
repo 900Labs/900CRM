@@ -31,6 +31,8 @@
     type ExternalClient,
   } from '$lib/api/externalClients';
   import { testEmailServerConnection } from '$lib/api/email';
+  import { currentHashPath, navigateHash } from '$lib/utils/hashRouter';
+  import { parseSettingsHash, settingsPathForPane } from '$lib/utils/settingsHash';
   import ExternalClientPermissions from '$lib/components/ExternalClientPermissions.svelte';
   import ImportExport from '$lib/components/ImportExport.svelte';
 
@@ -160,6 +162,17 @@
     imapUsernameLocal = settingsStore.imapUsername;
   });
 
+  let settingsHashBound = false;
+  $effect(() => {
+    if (settingsHashBound || typeof window === 'undefined') {
+      return;
+    }
+
+    settingsHashBound = true;
+    applySettingsHash(currentHashPath());
+    window.addEventListener('hashchange', () => applySettingsHash(currentHashPath()));
+  });
+
   $effect(() => {
     if (activePane !== 'integrations' || integrationsLoaded) {
       return;
@@ -186,8 +199,24 @@
     }
   }
 
+  function applySettingsHash(path: string) {
+    const parsed = parseSettingsHash(path);
+    activePane = parsed.pane;
+
+    if (parsed.openImport) {
+      showImportExport = true;
+      if (currentHashPath().replace(/\/+$/, '') !== settingsPathForPane('data')) {
+        navigateHash(settingsPathForPane('data'));
+      }
+    }
+  }
+
   function selectSettingsPane(pane: SettingsPane) {
     activePane = pane;
+    const nextPath = settingsPathForPane(pane);
+    if (currentHashPath().replace(/\/+$/, '') !== nextPath) {
+      navigateHash(nextPath);
+    }
   }
 
   function handleSettingsTabKeydown(event: KeyboardEvent) {
@@ -1125,6 +1154,11 @@
           </h2>
         </div>
         <div class="card-body data-body">
+          <div class="data-guidance" data-testid="settings-data-guidance">
+            <span class="data-action-label">{t('settings.dataGuidanceTitle')}</span>
+            <span class="data-action-desc">{t('settings.dataGuidance')}</span>
+            <span class="data-action-warning">{t('settings.backupUnencryptedWarning')}</span>
+          </div>
           <div class="data-action">
             <div class="data-action-info">
               <span class="data-action-label">{t('settings.exportAll')}</span>
@@ -1927,6 +1961,16 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
+  }
+
+  .data-guidance {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    border: var(--border-width) solid var(--border-default);
+    background-color: var(--surface-raised);
   }
 
   .data-action {

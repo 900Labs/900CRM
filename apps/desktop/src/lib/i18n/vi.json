@@ -60,7 +60,11 @@
       "contactAction": "Thêm liên hệ",
       "dealAction": "Thêm cơ hội",
       "followUpAction": "Thêm theo dõi",
-      "dataAction": "Nhập hoặc sao lưu"
+      "dataAction": "Nhập hoặc sao lưu",
+      "dataTitle": "Đã có khách hàng?",
+      "dataHint": "Nhập CSV danh sách người, công ty hoặc giao dịch. Hoặc sao chép không gian làm việc này vào một thư mục trên thiết bị. Tệp ở lại máy và không được mã hóa.",
+      "importAction": "Nhập dữ liệu",
+      "backupAction": "Tạo bản sao lưu"
     },
     "attention": {
       "title": "Cần chú ý",
@@ -478,6 +482,8 @@
     "sectionAbout": "Giới thiệu",
     "paneAppearanceHelp": "Ngôn ngữ, giao diện, ngày tháng, tiền tệ và nhắc nhở trên máy tính.",
     "paneDataHelp": "Xuất, nhập và sao lưu cục bộ cho không gian làm việc này.",
+    "dataGuidanceTitle": "Bắt đầu với nhập hoặc sao lưu cục bộ",
+    "dataGuidance": "Nhập CSV danh sách người, công ty hoặc giao dịch. Hoặc sao chép cả không gian làm việc vào thư mục bạn chọn. Cả hai đều ở lại thiết bị này.",
     "paneIntegrationsHelp": "Tình trạng đồng bộ, kiểm tra email tùy chọn và máy khách bên ngoài.",
     "language": "Ngôn ngữ",
     "currency": "Tiền tệ",
