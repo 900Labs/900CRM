@@ -77,13 +77,8 @@ fn resolve_existing_path(normalized: PathBuf) -> Result<PathBuf, String> {
         return Ok(normalized);
     }
 
-    let metadata = std::fs::symlink_metadata(&normalized).map_err(|err| {
-        format!(
-            "Unable to inspect path '{}': {}",
-            normalized.display(),
-            err
-        )
-    })?;
+    let metadata = std::fs::symlink_metadata(&normalized)
+        .map_err(|err| format!("Unable to inspect path '{}': {}", normalized.display(), err))?;
     if metadata.file_type().is_symlink() {
         return Err(format!(
             "Symbolic links are not allowed: {}",
@@ -91,13 +86,8 @@ fn resolve_existing_path(normalized: PathBuf) -> Result<PathBuf, String> {
         ));
     }
 
-    let canonical = std::fs::canonicalize(&normalized).map_err(|err| {
-        format!(
-            "Unable to resolve path '{}': {}",
-            normalized.display(),
-            err
-        )
-    })?;
+    let canonical = std::fs::canonicalize(&normalized)
+        .map_err(|err| format!("Unable to resolve path '{}': {}", normalized.display(), err))?;
     reject_if_secret(&canonical)?;
     Ok(canonical)
 }
@@ -171,11 +161,8 @@ mod tests {
     use std::path::PathBuf;
 
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "900crm-path-guard-{}-{}",
-            name,
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("900crm-path-guard-{}-{}", name, std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("temp dir");
         dir
