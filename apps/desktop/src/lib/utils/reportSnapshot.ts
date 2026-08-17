@@ -112,6 +112,7 @@ export function buildReportSnapshotRows({
     for (const row of stale.rows) {
       rows.push(
         { section: 'stale_deal', name: row.name, field: 'stage', value: row.stage },
+        { section: 'stale_deal', name: row.name, field: 'owner', value: row.owner ?? '' },
         { section: 'stale_deal', name: row.name, field: 'quiet_days', value: countValue(row.stageAgeDays) },
         { section: 'stale_deal', name: row.name, field: 'next_step', value: row.nextActivitySubject ?? '' },
       );

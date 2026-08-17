@@ -103,6 +103,12 @@
     </div>
   {/if}
 
+  {#if deal.owner}
+    <div class="deal-meta">
+      <span>{t('common.owner')}: {deal.owner}</span>
+    </div>
+  {/if}
+
   <!-- Organization -->
   {#if organizationName}
     <div class="deal-meta">
