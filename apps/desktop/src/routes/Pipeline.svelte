@@ -6,7 +6,7 @@
    * component. Each column shows deal count and total value. Add deal
    * button per column triggers addDeal modal with the stage pre-selected.
    *
-   * Drag-and-drop is handled inside KanbanBoard via native HTML5 drag API.
+   * Drag-and-drop uses the native HTML5 drag API on this board.
    * Stage moves call dealStore.moveDealStage() with optimistic updates.
    */
 
@@ -55,6 +55,7 @@
     type StageForecastMetric,
     type StageFocus,
   } from '$lib/utils/pipelineMetrics';
+  import { isLeavingDropTarget, pipelineDropKind } from '$lib/utils/pipelineDrag';
   import DealCard from '$lib/components/DealCard.svelte';
   import DealDetailDrawer from '$lib/components/DealDetailDrawer.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
@@ -75,8 +76,12 @@
   /** ID of the deal being dragged. */
   let draggingId = $state<string | null>(null);
 
+  /** Stage the dragged deal started in. */
+  let draggingFromStage = $state<DealStage | null>(null);
+
   /** Stage column currently being dragged over. */
   let dragOverStage = $state<DealStage | null>(null);
+  let moveAnnouncement = $state('');
   let customFieldDefinitions = $state<CustomFieldDefinition[]>([]);
   let selectedCustomFieldDefId = $state('');
   let customFieldQuery = $state('');
@@ -151,13 +156,18 @@
 
   // ── Drag & drop handlers ────────────────────────────────────────────────────
 
-  function handleDragStart(dealId: string, _stage: DealStage) {
+  function handleDragStart(dealId: string, stage: DealStage, event?: DragEvent) {
     draggingId = dealId;
-    suppressNextCardClick = true;
+    draggingFromStage = stage;
+    if (event?.dataTransfer) {
+      event.dataTransfer.setData('text/plain', dealId);
+      event.dataTransfer.effectAllowed = 'move';
+    }
   }
 
   function handleDragEnd() {
     draggingId = null;
+    draggingFromStage = null;
     dragOverStage = null;
     setTimeout(() => {
       suppressNextCardClick = false;
@@ -166,24 +176,45 @@
 
   function handleDragOver(event: DragEvent, stage: DealStage) {
     event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = draggingFromStage === stage ? 'none' : 'move';
+    }
     dragOverStage = stage;
   }
 
-  function handleDragLeave() {
-    dragOverStage = null;
+  function handleDragLeave(event: DragEvent) {
+    if (isLeavingDropTarget(event)) {
+      dragOverStage = null;
+    }
   }
 
   async function handleDrop(event: DragEvent, toStage: DealStage) {
     event.preventDefault();
+    const fromStage = draggingFromStage;
+    const id = draggingId ?? event.dataTransfer?.getData('text/plain')?.trim() ?? '';
     dragOverStage = null;
-    if (!draggingId) return;
-    const id = draggingId;
-    const movingDeal = allDeals.find((deal) => deal.id === id);
     draggingId = null;
+    draggingFromStage = null;
+    if (!id || !fromStage || fromStage === toStage) {
+      return;
+    }
+
+    suppressNextCardClick = true;
+    setTimeout(() => {
+      suppressNextCardClick = false;
+    }, 0);
+
+    const movingDeal = allDeals.find((deal) => deal.id === id);
     if (!movingDeal) return;
-    const fromStage = movingDeal.stage;
+
     await dealStore.moveDealStage(id, toStage);
+
+    const announcement = t('deals.board.moved', {
+      deal: movingDeal.name,
+      stage: t(`deals.stages.${toStage}`),
+    });
+    moveAnnouncement = announcement;
+    uiStore.toastSuccess(announcement);
 
     const suggestion = buildDealStageFollowUpSuggestion({
       deal: { ...movingDeal, stage: toStage },
@@ -1039,17 +1070,30 @@
 
   {:else}
     <!-- ── Kanban board ─────────────────────────────────────────────────────── -->
-    <div class="kanban-board" role="region" aria-label={t('deals.title')}>
+    <div
+      class="kanban-board"
+      class:kanban-board--dragging={Boolean(draggingId)}
+      role="region"
+      aria-label={t('deals.title')}
+    >
+      <div class="visually-hidden" aria-live="polite" aria-label={t('deals.board.liveRegion')}>
+        {moveAnnouncement}
+      </div>
       {#each columns as col (col.stage)}
-        {@const isOver = dragOverStage === col.stage}
+        {@const dropKind = pipelineDropKind(draggingFromStage, dragOverStage)}
+        {@const isTarget = dropKind === 'target' && dragOverStage === col.stage}
+        {@const isSource = dropKind === 'source' && dragOverStage === col.stage}
         <div
           class="kanban-column"
-          class:kanban-column--drag-over={isOver}
+          class:kanban-column--drop-target={isTarget}
+          class:kanban-column--drop-source={isSource && dragOverStage === col.stage}
+          data-testid={`pipeline-column-${col.stage}`}
           ondragover={(e) => handleDragOver(e, col.stage)}
           ondragleave={handleDragLeave}
           ondrop={(e) => handleDrop(e, col.stage)}
           role="list"
           aria-label={t(`deals.stages.${col.stage}`)}
+          aria-dropeffect={draggingId && draggingFromStage !== col.stage ? 'move' : 'none'}
         >
           <!-- Column header -->
           <div class="col-header" style="--stage-color: {stageColors[col.stage]}">
@@ -1088,9 +1132,22 @@
 
           <!-- Deal cards -->
           <div class="col-cards">
+            {#if isTarget}
+              <p class="col-drop-hint" data-testid={`pipeline-drop-hint-${col.stage}`}>
+                {t('deals.board.dropToStage', { stage: t(`deals.stages.${col.stage}`) })}
+              </p>
+            {:else if isSource && dragOverStage === col.stage}
+              <p class="col-drop-hint col-drop-hint--source">
+                {t('deals.board.alreadyInStage', { stage: t(`deals.stages.${col.stage}`) })}
+              </p>
+            {/if}
             {#if col.deals.length === 0}
               <div class="col-empty" aria-label={t('deals.noDeals')}>
-                <p class="col-empty-text">{t('deals.noDeals')}</p>
+                <p class="col-empty-text">
+                  {isTarget
+                    ? t('deals.board.dropToStage', { stage: t(`deals.stages.${col.stage}`) })
+                    : t('deals.noDeals')}
+                </p>
               </div>
             {:else}
               {#each col.deals as deal (deal.id)}
@@ -1103,9 +1160,6 @@
                 <div
                   class="card-wrapper"
                   class:card-wrapper--dragging={draggingId === deal.id}
-                  draggable="true"
-                  ondragstart={() => handleDragStart(deal.id, col.stage)}
-                  ondragend={handleDragEnd}
                   role="listitem"
                 >
                   <DealCard
@@ -1115,6 +1169,8 @@
                     guidanceLabel={guidanceBadge?.label ?? t('deals.guidance.loading')}
                     guidanceTone={guidanceBadge?.tone ?? 'neutral'}
                     onclick={openDealDrawer}
+                    ondragstart={(event) => handleDragStart(deal.id, col.stage, event)}
+                    ondragend={handleDragEnd}
                   />
                 </div>
               {/each}
@@ -1500,6 +1556,18 @@
     flex-shrink: 0;
   }
 
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   /* ── Board ───────────────────────────────────────────────────────────────── */
 
   .kanban-board {
@@ -1546,9 +1614,20 @@
                 background-color var(--duration-fast) var(--ease-out);
   }
 
-  .kanban-column--drag-over {
+  .kanban-board--dragging .kanban-column {
+    border-color: var(--border-default);
+  }
+
+  .kanban-column--drop-target {
     border-color: var(--color-primary);
     background-color: var(--surface-active);
+    box-shadow: inset 0 0 0 1px var(--color-primary);
+  }
+
+  .kanban-column--drop-source {
+    border-style: dashed;
+    border-color: var(--border-default);
+    background-color: var(--surface-raised);
   }
 
   /* ── Column header ───────────────────────────────────────────────────────── */
@@ -1661,6 +1740,24 @@
     gap: var(--space-3);
     flex: 1;
     min-height: 80px;
+  }
+
+  .col-drop-hint {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border: 1px dashed var(--color-primary);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-default);
+    color: var(--text-accent, var(--color-primary));
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    text-align: center;
+  }
+
+  .col-drop-hint--source {
+    border-color: var(--border-default);
+    color: var(--text-secondary);
+    font-weight: var(--weight-medium);
   }
 
   .card-wrapper {

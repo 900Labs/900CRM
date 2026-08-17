@@ -370,6 +370,12 @@
     "contact": "Contacto",
     "noDeals": "Sin negocios en esta etapa",
     "noDealsDesc": "Arrastra negocios aquí o agrega uno nuevo.",
+    "board": {
+      "dropToStage": "Suelta para mover a {stage}",
+      "alreadyInStage": "Ya está en {stage}",
+      "moved": "Se movió {deal} a {stage}",
+      "liveRegion": "Cambios de etapa del pipeline"
+    },
     "emptyBoardTitle": "Aún no hay negocios",
     "emptyBoardDesc": "Añade un negocio para empezar el tablero. Las etapas quedan vacías hasta que tengas algo que mover.",
     "stages": {

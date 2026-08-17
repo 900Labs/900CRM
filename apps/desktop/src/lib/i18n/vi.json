@@ -370,6 +370,12 @@
     "contact": "Liên hệ",
     "noDeals": "Không có cơ hội ở giai đoạn này",
     "noDealsDesc": "Kéo cơ hội vào đây hoặc thêm mới.",
+    "board": {
+      "dropToStage": "Thả để chuyển sang {stage}",
+      "alreadyInStage": "Đã ở {stage}",
+      "moved": "Đã chuyển {deal} sang {stage}",
+      "liveRegion": "Di chuyển giai đoạn pipeline"
+    },
     "emptyBoardTitle": "Chưa có giao dịch",
     "emptyBoardDesc": "Thêm một giao dịch để bắt đầu bảng. Các giai đoạn vẫn trống cho đến khi bạn có thứ để chuyển.",
     "stages": {

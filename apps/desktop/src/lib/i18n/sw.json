@@ -370,6 +370,12 @@
     "contact": "Anwani",
     "noDeals": "Hakuna mikataba katika hatua hii",
     "noDealsDesc": "Buruta mikataba hapa au ongeza mpya.",
+    "board": {
+      "dropToStage": "Dondosha ili uhamishe hadi {stage}",
+      "alreadyInStage": "Tayari iko katika {stage}",
+      "moved": "{deal} imehamishwa hadi {stage}",
+      "liveRegion": "Mabadiliko ya hatua ya bomba"
+    },
     "emptyBoardTitle": "Bado hakuna mikataba",
     "emptyBoardDesc": "Ongeza mkataba kuanza ubao. Hatua hubaki tupu hadi uwe na kitu cha kuhamisha.",
     "stages": {

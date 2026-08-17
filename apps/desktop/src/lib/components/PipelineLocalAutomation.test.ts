@@ -89,6 +89,15 @@ vi.mock('$lib/i18n', () => ({
     if (key === 'localAutomation.pipeline.description') {
       return `${params?.deal} moved to ${params?.stage}`;
     }
+    if (key === 'deals.board.moved') {
+      return `Moved ${params?.deal} to ${params?.stage}`;
+    }
+    if (key === 'deals.board.dropToStage') {
+      return `Drop to move to ${params?.stage}`;
+    }
+    if (key === 'deals.board.alreadyInStage') {
+      return `Already in ${params?.stage}`;
+    }
     return key;
   },
 }));
@@ -125,6 +134,7 @@ vi.mock('$lib/stores/ui', () => ({
     activeModal: null,
     openModal: openModalMock,
     toastError: vi.fn(),
+    toastSuccess: vi.fn(),
   },
 }));
 
@@ -225,5 +235,33 @@ describe('Pipeline local automation prompt', () => {
       subject: 'Follow up on Automation rollout',
       type: 'task',
     }));
+  });
+
+  it('highlights another stage as a drop target and ignores a same-stage drop', async () => {
+    const { container } = render(Pipeline);
+
+    await screen.findByRole('button', { name: /Automation rollout/ });
+    await waitFor(() => {
+      expect(listDealsMock).toHaveBeenCalled();
+    });
+
+    const card = screen.getByRole('button', { name: /Automation rollout/ });
+    await fireEvent.dragStart(card, { dataTransfer: dragData() });
+
+    const qualifiedColumn = container.querySelector('[data-testid="pipeline-column-qualified"]');
+    const leadColumn = container.querySelector('[data-testid="pipeline-column-lead"]');
+    expect(qualifiedColumn).toBeTruthy();
+    expect(leadColumn).toBeTruthy();
+
+    await fireEvent.dragOver(qualifiedColumn as Element, { dataTransfer: dragData() });
+    expect((qualifiedColumn as HTMLElement).className).toContain('kanban-column--drop-target');
+    expect(screen.getByTestId('pipeline-drop-hint-qualified').textContent).toContain('Drop to move to');
+
+    await fireEvent.dragOver(leadColumn as Element, { dataTransfer: dragData() });
+    expect((leadColumn as HTMLElement).className).toContain('kanban-column--drop-source');
+
+    moveDealStageMock.mockClear();
+    await fireEvent.drop(leadColumn as Element, { dataTransfer: dragData() });
+    expect(moveDealStageMock).not.toHaveBeenCalled();
   });
 });

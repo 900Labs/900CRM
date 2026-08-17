@@ -370,6 +370,12 @@
     "contact": "Contact",
     "noDeals": "No deals in this stage",
     "noDealsDesc": "Drag deals here or add a new one.",
+    "board": {
+      "dropToStage": "Drop to move to {stage}",
+      "alreadyInStage": "Already in {stage}",
+      "moved": "Moved {deal} to {stage}",
+      "liveRegion": "Pipeline stage moves"
+    },
     "emptyBoardTitle": "No deals yet",
     "emptyBoardDesc": "Add a deal to start the board. Stages stay empty until you have something to move.",
     "stages": {
