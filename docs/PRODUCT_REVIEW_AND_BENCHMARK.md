@@ -1,7 +1,7 @@
 # Product Review and Competitive Benchmark
 
 Date: 2026-07-08
-Last updated: 2026-08-16
+Last updated: 2026-08-17
 Branch: `codex/reports-hub`
 
 This document is a product-depth review of 900CRM's current menu surface and a
@@ -46,10 +46,10 @@ real small business owner.
 | Area | Current state | Product issue |
 |---|---|---|
 | Dashboard | KPI cards, daily attention queue, activity feed, quick actions, first-run starter checklist, optional synthetic sample workspace | Useful morning start. The attention queue now lists overdue follow-ups, stuck deals, and waiting leads. Still no saved goals or personalized scoring. |
-| Contacts | Search, type/lifecycle filters, saved views, health and next follow-up, duplicate review, import/export, custom-field filtering, contact detail Customer 360 summary, relationship-aware activity timeline | The people list now shows health and the next follow-up. Daily lead work now lives on Leads. |
-| Leads | Dedicated Workspace list of people with lifecycle lead, health, next follow-up, and lead-only saved views | Convert stays on the person page. Customers stay on Contacts. |
-| Organizations | List with saved views, health, and next follow-up; create/edit, notes/tags, contact linking, account detail workspace with linked people/deals/activity and relationship-aware account timeline | Account list now shows health and the next follow-up. Still no owner field. |
-| Pipeline | Kanban by stage, search, attention filters, custom-field filter, saved views, deal cards, deal guidance drawer with weighted forecast, stale/overdue/follow-up status, linked activities, a board-level forecast/stage-health overview, and deal workspace `#/deals/:id` | Stronger daily sales surface. Still needs true historical stage conversion summaries and stronger drag/drop confidence cues. |
+| Contacts | Search, type/lifecycle filters, saved views, health and next follow-up, duplicate review, import/export, custom-field filtering, contact detail Customer 360 summary with a Next step strip, relationship-aware activity timeline | The people list now shows health and the next follow-up. The person page primary action matches overdue, convert, or schedule. Daily lead work now lives on Leads. |
+| Leads | Dedicated Workspace list of people with lifecycle lead, health, next follow-up, and lead-only saved views | Convert stays on the person page and is the Next step when nothing is overdue. Customers stay on Contacts. |
+| Organizations | List with saved views, health, and next follow-up; create/edit, notes/tags, contact linking, account detail workspace with a Next step strip, linked people/deals/activity and relationship-aware account timeline | Account list now shows health and the next follow-up. Still no owner field. |
+| Pipeline | Kanban by stage, search, attention filters, custom-field filter, saved views, deal cards, deal guidance drawer with weighted forecast, stale/overdue/follow-up status, linked activities, a board-level forecast/stage-health overview, and deal workspace `#/deals/:id` with a Next step strip | Stronger daily sales surface. Still needs true historical stage conversion summaries and stronger drag/drop confidence cues. |
 | Activities | Task/call/meeting/email follow-up workbench with due buckets, week and month calendars, summary counts, quick snooze/reschedule, completion, filters, saved views, relationship breadcrumbs, and in-app reminder notifications | Week and month views are calendars of existing follow-ups. Still no due times, recurrence, or external calendar sync. |
 | Reports | Dedicated Workspace route for current pipeline and activity health, current-stage funnel ratios, due buckets, activity type mix, a clickable stale-deal list, and saved focus views | Usable alpha reporting with a stale-deal list and named focus views. Still needs source/owner dimensions, exportable snapshots, and true historical conversion after stage history exists. |
 | Audit Log | Read-only table grouped under Review | Good trust feature, now visually separated from daily work. Later, it may still move deeper into Admin once Review counts are more prominent. |
@@ -124,7 +124,9 @@ the deal workspace at `#/deals/:id` (`DealDetail.svelte`, 2026-08-13) are in
 place. The product still needs next-action guidance across more workflows.
 
 Recommended outcome: richer contact and organization detail workspaces before
-adding unrelated modules.
+adding unrelated modules. Contact, deal, and account pages now have a Next
+step strip so the primary button matches overdue work, lead conversion,
+a missing follow-up, or a missing expected close date.
 
 ### 3. Pipeline guidance and current-stage metrics are started, but deal workflows are not deep enough yet
 
@@ -206,7 +208,9 @@ These are ordered to improve perceived product value fastest.
      follow-up from the dashboard.
    - Added first-action empty states on Leads, Pipeline, Activities, and
      Reports so a blank module says what to do next.
-   - Remaining work: richer onboarding inside customer/deal workspaces.
+   - Remaining work: richer onboarding inside customer/deal workspaces is
+     started; those pages now name the next action instead of always
+     offering Add Follow-Up.
 
 3. **Customer 360 Workspaces** - contact/account summaries and timeline
    breadcrumbs completed

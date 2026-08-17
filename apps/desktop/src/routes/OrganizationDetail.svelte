@@ -39,9 +39,14 @@
   import { navigateHash } from '$lib/utils/hashRouter';
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
+  import NextStepCard from '$lib/components/NextStepCard.svelte';
   import EntityNotesPanel from '$lib/components/EntityNotesPanel.svelte';
   import EntityLinksPanel from '$lib/components/EntityLinksPanel.svelte';
   import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
+  import {
+    deriveRecordNextStep,
+    shouldShowSecondaryFollowUp,
+  } from '$lib/utils/recordNextStep';
 
   const { organizationId }: { organizationId: string } = $props();
 
@@ -55,6 +60,7 @@
     deals: [],
   });
   let isLoading = $state(true);
+  let isSaving = $state(false);
   let contactsLoading = $state(false);
   let activitiesLoading = $state(false);
   let loadError = $state<string | null>(null);
@@ -122,6 +128,16 @@
       overdueActivities,
       nextActivity,
     })
+  );
+
+  const nextStep = $derived(
+    deriveRecordNextStep({
+      recordKind: 'organization',
+      isLoading: isLoading || dealStore.isLoading || activitiesLoading,
+      openDealCount,
+      overdueActivities,
+      nextActivity,
+    }),
   );
 
   const accountLocation = $derived(
@@ -317,6 +333,25 @@
     uiStore.openModal('addActivity', { organizationId: organization.id });
   }
 
+  async function handleNextStep() {
+    if (nextStep.action === 'complete' && nextStep.activityId) {
+      isSaving = true;
+      try {
+        await activityStore.markComplete(nextStep.activityId);
+        await loadOrganizationActivities(organizationId);
+      } catch (err) {
+        console.error('[OrganizationDetail] Complete next step error:', err);
+      } finally {
+        isSaving = false;
+      }
+      return;
+    }
+
+    if (nextStep.action === 'addFollowUp') {
+      openOrganizationActivityModal();
+    }
+  }
+
   function handleBack() {
     navigateHash('/organizations');
   }
@@ -378,9 +413,11 @@
         <button class="btn btn-secondary btn-sm" type="button" onclick={openOrganizationDealModal}>
           {t('deals.addDeal')}
         </button>
-        <button class="btn btn-primary btn-sm" type="button" onclick={openOrganizationActivityModal}>
-          {t('organizations.workspace.addFollowUp')}
-        </button>
+        {#if shouldShowSecondaryFollowUp(nextStep)}
+          <button class="btn btn-secondary btn-sm" type="button" onclick={openOrganizationActivityModal}>
+            {t('organizations.workspace.addFollowUp')}
+          </button>
+        {/if}
       </div>
     </div>
 
@@ -398,6 +435,8 @@
       </div>
 
       <p class="workspace-summary">{healthDetail()}</p>
+
+      <NextStepCard step={nextStep} busy={isSaving} onaction={handleNextStep} />
 
       <div class="workspace-metrics" role="list">
         <div class="workspace-metric" role="listitem">
@@ -423,9 +462,11 @@
         <button class="btn btn-secondary btn-sm" type="button" onclick={openOrganizationDealModal}>
           {t('deals.addDeal')}
         </button>
-        <button class="btn btn-primary btn-sm" type="button" onclick={openOrganizationActivityModal}>
-          {t('organizations.workspace.addFollowUp')}
-        </button>
+        {#if shouldShowSecondaryFollowUp(nextStep)}
+          <button class="btn btn-secondary btn-sm" type="button" onclick={openOrganizationActivityModal}>
+            {t('organizations.workspace.addFollowUp')}
+          </button>
+        {/if}
       </div>
     </section>
 

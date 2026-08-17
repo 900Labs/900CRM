@@ -50,8 +50,13 @@
   import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
+  import NextStepCard from '$lib/components/NextStepCard.svelte';
   import Modal from '$lib/components/Modal.svelte';
   import CustomFieldInputs from '$lib/components/CustomFieldInputs.svelte';
+  import {
+    deriveRecordNextStep,
+    shouldShowSecondaryFollowUp,
+  } from '$lib/utils/recordNextStep';
 
   // ── Props ───────────────────────────────────────────────────────────────────
 
@@ -217,6 +222,17 @@
       detail: t('contacts.workspace.healthNurtureDetail'),
     };
   });
+
+  const nextStep = $derived(
+    deriveRecordNextStep({
+      recordKind: 'contact',
+      isLoading: dealsLoading || activitiesLoading,
+      isLead: contact?.type === 'person' && contact.lifecycle === 'lead',
+      openDealCount,
+      overdueActivities,
+      nextActivity,
+    }),
+  );
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -541,6 +557,30 @@
     navigateHash(`/deals/${entity.id}`);
   }
 
+  async function handleNextStep() {
+    if (nextStep.action === 'complete' && nextStep.activityId) {
+      isSaving = true;
+      try {
+        await activityStore.markComplete(nextStep.activityId);
+        await loadContactTimeline(contactId);
+      } catch (err) {
+        console.error('[ContactDetail] Complete next step error:', err);
+      } finally {
+        isSaving = false;
+      }
+      return;
+    }
+
+    if (nextStep.action === 'convert') {
+      await handleConvertToCustomer();
+      return;
+    }
+
+    if (nextStep.action === 'addFollowUp') {
+      openContactActivityModal();
+    }
+  }
+
   async function handleConvertToCustomer() {
     if (!contact || contact.lifecycle !== 'lead') {
       return;
@@ -719,6 +759,8 @@
 
       <p class="workspace-summary">{customerHealth.detail}</p>
 
+      <NextStepCard step={nextStep} busy={isSaving} onaction={handleNextStep} />
+
       <div class="workspace-metrics" role="list">
         <div class="workspace-metric" role="listitem">
           <span class="workspace-metric-label">{t('contacts.workspace.openDeals')}</span>
@@ -747,12 +789,14 @@
           </svg>
           {t('deals.addDeal')}
         </button>
-        <button class="btn btn-primary btn-sm" onclick={openContactActivityModal} type="button">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-            <path d="M12 5v14M5 12h14"/>
-          </svg>
-          {t('contacts.workspace.addFollowUp')}
-        </button>
+        {#if shouldShowSecondaryFollowUp(nextStep)}
+          <button class="btn btn-secondary btn-sm" onclick={openContactActivityModal} type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            {t('contacts.workspace.addFollowUp')}
+          </button>
+        {/if}
       </div>
     </section>
 

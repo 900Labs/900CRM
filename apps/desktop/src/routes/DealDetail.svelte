@@ -41,10 +41,15 @@
   import { navigateHash } from '$lib/utils/hashRouter';
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
+  import NextStepCard from '$lib/components/NextStepCard.svelte';
   import EntityNotesPanel from '$lib/components/EntityNotesPanel.svelte';
   import EntityLinksPanel from '$lib/components/EntityLinksPanel.svelte';
   import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
   import Modal from '$lib/components/Modal.svelte';
+  import {
+    deriveRecordNextStep,
+    shouldShowSecondaryFollowUp,
+  } from '$lib/utils/recordNextStep';
 
   const { dealId }: { dealId: string } = $props();
 
@@ -115,7 +120,22 @@
   });
 
   const guidanceTone = $derived(guidance?.tone ?? 'neutral');
-  const showPrimaryFollowUp = $derived(deal?.stage !== 'closedWon' && deal?.stage !== 'closedLost');
+  const nextStep = $derived(
+    deriveRecordNextStep({
+      recordKind: 'deal',
+      isLoading: !deal || activitiesLoading,
+      unavailable: Boolean(activityContextError),
+      isClosedWon: deal?.stage === 'closedWon',
+      isClosedLost: deal?.stage === 'closedLost',
+      overdueActivities:
+        guidance?.state === 'overdue' && guidance.nextActivity
+          ? [guidance.nextActivity]
+          : [],
+      nextActivity: guidance?.nextActivity ?? null,
+      expectedCloseDate: deal?.expectedCloseDate ?? null,
+      isStale: guidance?.state === 'stale',
+    }),
+  );
 
   $effect(() => {
     if (!dealId || loadedDealId === dealId) {
@@ -304,6 +324,39 @@
     });
   }
 
+  function focusExpectedClose() {
+    const input = document.getElementById('deal-close');
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+    input.focus();
+    input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  async function handleNextStep() {
+    if (nextStep.action === 'complete' && nextStep.activityId) {
+      isSaving = true;
+      try {
+        await activityStore.markComplete(nextStep.activityId);
+        await loadActivities();
+      } catch (err) {
+        console.error('[DealDetail] Complete next step error:', err);
+      } finally {
+        isSaving = false;
+      }
+      return;
+    }
+
+    if (nextStep.action === 'addFollowUp') {
+      openFollowUp();
+      return;
+    }
+
+    if (nextStep.action === 'setExpectedClose') {
+      focusExpectedClose();
+    }
+  }
+
   function handleActivityEntityNavigate(entity: { type: 'contact' | 'organization' | 'deal'; id: string }) {
     if (entity.type === 'contact') {
       navigateHash(`/contacts/${entity.id}`);
@@ -372,6 +425,7 @@
         <span class="health-badge health-{guidanceTone}">{guidanceLabel()}</span>
       </div>
       <p class="workspace-summary">{guidanceDetail()}</p>
+      <NextStepCard step={nextStep} busy={isSaving} onaction={handleNextStep} />
       <div class="workspace-metrics" role="list">
         <div class="workspace-metric" role="listitem">
           <span class="workspace-metric-label">{t('deals.value')}</span>
@@ -391,8 +445,8 @@
         </div>
       </div>
       <div class="workspace-actions" aria-label={t('deals.workspace.actionsLabel')}>
-        {#if showPrimaryFollowUp}
-          <button class="btn btn-primary btn-sm" type="button" onclick={openFollowUp}>
+        {#if shouldShowSecondaryFollowUp(nextStep)}
+          <button class="btn btn-secondary btn-sm" type="button" onclick={openFollowUp}>
             {t('deals.guidance.addFollowUp')}
           </button>
         {/if}

@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-17
+- Contact, deal, and account workspaces show a Next step strip. The
+  primary button matches the real next action: complete an overdue
+  follow-up, convert a lead, add a follow-up, or set a deal close date.
 - The Review sidebar shows how many proposed actions are waiting, so
   Pending Actions is visible only when there is something to decide.
 - Activities Month shows the same follow-ups on a Monday-aligned month
