@@ -50,7 +50,7 @@ real small business owner.
 | Leads | Dedicated Workspace list of people with lifecycle lead, health, next follow-up, and lead-only saved views | Convert stays on the person page. Customers stay on Contacts. |
 | Organizations | List with saved views, health, and next follow-up; create/edit, notes/tags, contact linking, account detail workspace with linked people/deals/activity and relationship-aware account timeline | Account list now shows health and the next follow-up. Still no owner field. |
 | Pipeline | Kanban by stage, search, attention filters, custom-field filter, saved views, deal cards, deal guidance drawer with weighted forecast, stale/overdue/follow-up status, linked activities, a board-level forecast/stage-health overview, and deal workspace `#/deals/:id` | Stronger daily sales surface. Still needs true historical stage conversion summaries and stronger drag/drop confidence cues. |
-| Activities | Task/call/meeting/email follow-up workbench with due buckets, a Monday–Sunday week grid, summary counts, quick snooze/reschedule, completion, filters, saved views, relationship breadcrumbs, and in-app reminder notifications | Week view is a calendar of existing follow-ups. Still no due times, recurrence, or external calendar sync. |
+| Activities | Task/call/meeting/email follow-up workbench with due buckets, week and month calendars, summary counts, quick snooze/reschedule, completion, filters, saved views, relationship breadcrumbs, and in-app reminder notifications | Week and month views are calendars of existing follow-ups. Still no due times, recurrence, or external calendar sync. |
 | Reports | Dedicated Workspace route for current pipeline and activity health, current-stage funnel ratios, due buckets, activity type mix, a clickable stale-deal list, and saved focus views | Usable alpha reporting with a stale-deal list and named focus views. Still needs source/owner dimensions, exportable snapshots, and true historical conversion after stage history exists. |
 | Audit Log | Read-only table grouped under Review | Good trust feature, now visually separated from daily work. Later, it may still move deeper into Admin once Review counts are more prominent. |
 | Pending Actions | Review queue for proposed actions grouped under Review | Important for MCP/external-client safety. The next improvement is to show high-priority pending counts without making this a daily-work screen. |
@@ -150,11 +150,11 @@ the route now groups work into Overdue, Today, This Week, Later,
 Unscheduled, and Completed buckets, shows priority counts, and allows quick
 snooze/reschedule/complete actions while preserving relationship context.
 This closes the first daily-work gap. In-app reminder polling
-(`activityReminders.ts`) is shipped. Activities also has a Monday–Sunday
-week grid of those same follow-ups. Users who plan heavily by time still
-need due times, recurrence, and optional external calendar sync.
+(`activityReminders.ts`) is shipped. Activities also has Monday–Sunday
+week and month grids of those same follow-ups. Users who plan heavily by
+time still need due times, recurrence, and optional external calendar sync.
 
-Recommended outcome: keep the week grid as the planning layer until due
+Recommended outcome: keep week and month as the planning layer until due
 times or recurrence are justified.
 
 ### 5. Reports now have a home, but they are still operational snapshots
@@ -240,7 +240,7 @@ These are ordered to improve perceived product value fastest.
    - Added named saved views for type, status, due-bucket, and custom-field
      filters.
    - Remaining work: due times, recurrence, and optional external calendar
-     sync. Reminders and a week grid are shipped.
+     sync. Reminders, week, and month grids are shipped.
 
 6. **Reports Hub** - first dedicated route completed
    - Moved dashboard reports into a Reports page under Workspace navigation.

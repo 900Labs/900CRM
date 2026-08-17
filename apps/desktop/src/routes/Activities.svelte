@@ -43,6 +43,11 @@
     startOfWeek,
   } from '$lib/utils/activityWeek';
   import {
+    buildActivityMonth,
+    shiftMonth,
+    startOfMonth,
+  } from '$lib/utils/activityMonth';
+  import {
     addSelectedActivityLinks,
     deriveActivityRelationshipLabels,
     loadActivityLinkIndex,
@@ -82,9 +87,10 @@
   let viewsError = $state<string | null>(null);
   let activitiesBootstrapped = false;
   let activitiesHashBound = false;
-  type ActivityLayout = 'list' | 'week';
+  type ActivityLayout = 'list' | 'week' | 'month';
   let viewMode = $state<ActivityLayout>('list');
   let weekStart = $state<Date>(startOfWeek(new Date()));
+  let monthStart = $state<Date>(startOfMonth(new Date()));
   let weekDragOverDate = $state<string | null>(null);
 
   // Quick-add form
@@ -145,7 +151,13 @@
 
   function applyActivitiesHash(path: string) {
     const clean = path.replace(/^#/, '').replace(/\/+$/, '') || '/';
-    viewMode = clean === '/activities/week' ? 'week' : 'list';
+    if (clean === '/activities/week') {
+      viewMode = 'week';
+    } else if (clean === '/activities/month') {
+      viewMode = 'month';
+    } else {
+      viewMode = 'list';
+    }
   }
 
   function selectViewMode(mode: ActivityLayout) {
@@ -153,7 +165,14 @@
     if (mode === 'week') {
       weekStart = startOfWeek(new Date());
     }
-    const nextPath = mode === 'week' ? '/activities/week' : '/activities';
+    if (mode === 'month') {
+      monthStart = startOfMonth(new Date());
+    }
+    const nextPath = mode === 'week'
+      ? '/activities/week'
+      : mode === 'month'
+        ? '/activities/month'
+        : '/activities';
     if (currentHashPath().replace(/\/+$/, '') !== nextPath) {
       navigateHash(nextPath);
     }
@@ -161,6 +180,10 @@
 
   function moveWeek(weeks: number) {
     weekStart = weeks === 0 ? startOfWeek(new Date()) : shiftWeek(weekStart, weeks);
+  }
+
+  function moveMonth(months: number) {
+    monthStart = months === 0 ? startOfMonth(new Date()) : shiftMonth(monthStart, months);
   }
 
   function addFollowUpOnDay(date: string) {
@@ -565,6 +588,8 @@
 
   const workbench = $derived(buildActivityWorkbench(filteredActivities));
   const week = $derived(buildActivityWeek(filteredActivities, weekStart));
+  const month = $derived(buildActivityMonth(filteredActivities, monthStart));
+  const isCalendarView = $derived(viewMode === 'week' || viewMode === 'month');
 
   function formatWeekday(dateKey: string): string {
     const [year, month, day] = dateKey.split('-').map(Number);
@@ -578,6 +603,17 @@
     return new Intl.DateTimeFormat(settingsStore.language, { day: 'numeric', month: 'short' }).format(
       new Date(year, month - 1, day),
     );
+  }
+
+  function formatMonthTitle(dateKey: string): string {
+    const [year, month] = dateKey.split('-').map(Number);
+    return new Intl.DateTimeFormat(settingsStore.language, { month: 'long', year: 'numeric' }).format(
+      new Date(year, month - 1, 1),
+    );
+  }
+
+  function weekdayHeadings(): string[] {
+    return (month.weeks[0] ?? week.days).map((day) => formatWeekday(day.date));
   }
 
   const visibleBuckets = $derived(
@@ -637,6 +673,16 @@
           onclick={() => selectViewMode('week')}
         >
           {t('activities.viewWeek')}
+        </button>
+        <button
+          class="layout-toggle-button"
+          class:layout-toggle-button--active={viewMode === 'month'}
+          type="button"
+          role="tab"
+          aria-selected={viewMode === 'month'}
+          onclick={() => selectViewMode('month')}
+        >
+          {t('activities.viewMonth')}
         </button>
       </div>
       <button
@@ -1003,6 +1049,19 @@
         {formatDate(week.weekEnd, settingsStore.dateFormat as 'MMM D, YYYY')}
       </strong>
     </section>
+  {:else if viewMode === 'month'}
+    <section class="week-toolbar" aria-label={t('activities.monthNav')}>
+      <button class="btn btn-ghost btn-sm" type="button" onclick={() => moveMonth(-1)}>
+        {t('activities.previousMonth')}
+      </button>
+      <button class="btn btn-secondary btn-sm" type="button" onclick={() => moveMonth(0)}>
+        {t('activities.thisMonthNav')}
+      </button>
+      <button class="btn btn-ghost btn-sm" type="button" onclick={() => moveMonth(1)}>
+        {t('activities.nextMonth')}
+      </button>
+      <strong class="week-range">{formatMonthTitle(month.monthStart)}</strong>
+    </section>
   {/if}
 
   <!-- Activity workbench list -->
@@ -1021,7 +1080,7 @@
         {/each}
       </ul>
 
-    {:else if (viewMode === 'list' && visibleActivityCount === 0) || (viewMode === 'week' && filteredActivities.length === 0 && hasActiveActivityFilters)}
+    {:else if (viewMode === 'list' && visibleActivityCount === 0) || (isCalendarView && filteredActivities.length === 0 && hasActiveActivityFilters)}
       <EmptyState
         icon="activities"
         title={isFirstRunEmpty ? t('activities.noActivities') : t('activities.noMatchingTitle')}
@@ -1112,6 +1171,117 @@
           {:else}
             <ul class="week-day-list">
               {#each week.unscheduled as activity (activity.id)}
+                <li>
+                  <article
+                    class="week-card"
+                    draggable={true}
+                    ondragstart={(event) => handleWeekDragStart(activity.id, event)}
+                  >
+                    <span class="week-card-type">{t(`activities.${activity.type}`)}</span>
+                    <strong class="week-card-subject">{activity.subject}</strong>
+                    <button
+                      class="btn-complete"
+                      onclick={() => handleToggleComplete(activity)}
+                      type="button"
+                      aria-label={t('activities.markComplete')}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9"/>
+                      </svg>
+                    </button>
+                  </article>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </aside>
+      </div>
+
+    {:else if viewMode === 'month'}
+      <div class="week-layout" data-testid="activity-month">
+        <div class="month-board">
+          <div class="month-weekdays" aria-hidden="true">
+            {#each weekdayHeadings() as heading, index (index)}
+              <span>{heading}</span>
+            {/each}
+          </div>
+          <div class="month-grid" aria-label={t('activities.viewMonth')}>
+            {#each month.weeks as monthWeek, weekIndex (weekIndex)}
+              {#each monthWeek as day (day.date)}
+                {@const extraCount = Math.max(0, day.activities.length - 3)}
+                <div
+                  class="month-day"
+                  class:month-day--outside={!day.inMonth}
+                  class:week-day--today={day.isToday}
+                  class:week-day--drop={weekDragOverDate === day.date}
+                  role="group"
+                  aria-label={formatWeekDayLabel(day.date)}
+                  ondragover={(event) => handleWeekDragOver(day.date, event)}
+                  ondragleave={() => handleWeekDragLeave(day.date)}
+                  ondrop={(event) => void handleWeekDrop(day.date, event)}
+                >
+                  <header class="week-day-header">
+                    <span class="month-day-number">{day.date.slice(8)}</span>
+                    <button
+                      class="btn btn-ghost btn-sm"
+                      type="button"
+                      onclick={() => addFollowUpOnDay(day.date)}
+                      aria-label={t('activities.addOnDay', { date: formatWeekDayLabel(day.date) })}
+                    >
+                      +
+                    </button>
+                  </header>
+                  <ul class="week-day-list">
+                    {#each day.activities.slice(0, 3) as activity (activity.id)}
+                      <li>
+                        <article
+                          class="week-card month-card"
+                          class:week-card--completed={activity.status === 'completed'}
+                          class:week-card--overdue={activity.status === 'overdue'}
+                          draggable={activity.status !== 'completed'}
+                          ondragstart={(event) => handleWeekDragStart(activity.id, event)}
+                        >
+                          <strong class="week-card-subject">{activity.subject}</strong>
+                          <button
+                            class="btn-complete"
+                            class:btn-complete--done={activity.status === 'completed'}
+                            onclick={() => handleToggleComplete(activity)}
+                            type="button"
+                            aria-label={activity.status === 'completed'
+                              ? t('activities.markIncomplete')
+                              : t('activities.markComplete')}
+                          >
+                            {#if activity.status === 'completed'}
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                            {:else}
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                                <circle cx="12" cy="12" r="9"/>
+                              </svg>
+                            {/if}
+                          </button>
+                        </article>
+                      </li>
+                    {/each}
+                  </ul>
+                  {#if extraCount > 0}
+                    <p class="month-more">{t('activities.monthMore', { count: extraCount })}</p>
+                  {/if}
+                </div>
+              {/each}
+            {/each}
+          </div>
+        </div>
+
+        <aside class="week-unscheduled" aria-labelledby="month-unscheduled-heading">
+          <h2 id="month-unscheduled-heading">{t('activities.buckets.unscheduled')}</h2>
+          <p>{t('activities.unscheduledHelp')}</p>
+          {#if month.unscheduled.length === 0}
+            <p class="week-day-empty">{t('activities.noDueDate')}</p>
+          {:else}
+            <ul class="week-day-list">
+              {#each month.unscheduled as activity (activity.id)}
                 <li>
                   <article
                     class="week-card"
@@ -1454,9 +1624,68 @@
     align-self: center;
   }
 
+  .month-board {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .month-weekdays,
+  .month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--space-1);
+  }
+
+  .month-weekdays span {
+    padding: 0 var(--space-1);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--text-secondary);
+    text-transform: capitalize;
+  }
+
+  .month-day {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-height: 112px;
+    padding: var(--space-1);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-sm);
+    background: var(--surface-default);
+  }
+
+  .month-day--outside {
+    opacity: 0.55;
+  }
+
+  .month-day-number {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .month-card {
+    padding: 4px var(--space-1);
+  }
+
+  .month-card .week-card-subject {
+    font-size: 11px;
+  }
+
+  .month-more {
+    margin: 0;
+    font-size: 10px;
+    color: var(--text-secondary);
+  }
+
   @media (max-width: 900px) {
     .week-layout,
-    .week-grid {
+    .week-grid,
+    .month-weekdays,
+    .month-grid {
       grid-template-columns: 1fr;
     }
   }
