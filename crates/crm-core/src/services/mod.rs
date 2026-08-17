@@ -265,6 +265,10 @@ impl CrmCore {
         storage::deals::list_deals_by_stage(&self.db.conn, stage)
     }
 
+    pub fn set_deal_owner(&mut self, id: &str, owner: Option<&str>) -> CrmResult<Deal> {
+        storage::deals::set_deal_owner(&self.db.conn, id, owner)
+    }
+
     // Preserve the existing field-level service API used by Tauri command wiring.
     #[allow(clippy::too_many_arguments)]
     pub fn update_deal(
@@ -1209,7 +1213,7 @@ impl CrmCore {
         {
             self.update_contact(
                 contact_id, None, first_name, last_name, org_name, email, phone, address, city,
-                country, notes,
+                country, notes, None,
             )?
         } else {
             existing.clone()
@@ -1358,6 +1362,7 @@ impl CrmCore {
             sort_dir: "asc".to_string(),
             filter_type: None,
             filter_lifecycle: None,
+            filter_owner: None,
             search_query: None,
             custom_field_def_id: None,
             custom_field_query: None,

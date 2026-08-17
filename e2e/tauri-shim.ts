@@ -72,6 +72,7 @@ async function installTauriShim(page: Page) {
       organization_id: string | null;
       notes: string;
       lifecycle: string;
+      owner: string | null;
       created_at: string;
       updated_at: string;
       deleted_at: string | null;
@@ -91,6 +92,7 @@ async function installTauriShim(page: Page) {
       postal_code: string | null;
       source: string | null;
       description: string | null;
+      owner: string | null;
       created_at: string;
       updated_at: string;
       deleted_at: string | null;
@@ -108,6 +110,7 @@ async function installTauriShim(page: Page) {
       contact_id: string | null;
       organization_id: string | null;
       notes: string;
+      owner: string | null;
       created_at: string;
       updated_at: string;
     };
@@ -252,6 +255,7 @@ async function installTauriShim(page: Page) {
       const perPage = typeof params.per_page === 'number' ? params.per_page : 50;
       const filterType = typeof params.filter_type === 'string' ? params.filter_type : undefined;
       const filterLifecycle = typeof params.filter_lifecycle === 'string' ? params.filter_lifecycle : undefined;
+      const filterOwner = typeof params.filter_owner === 'string' ? params.filter_owner.trim().toLowerCase() : '';
       const searchQuery = typeof params.search_query === 'string' ? params.search_query : undefined;
 
       let contacts = state.contacts.filter((contact) => !contact.deleted_at);
@@ -260,6 +264,9 @@ async function installTauriShim(page: Page) {
       }
       if (filterLifecycle) {
         contacts = contacts.filter((contact) => (contact.lifecycle || 'customer') === filterLifecycle);
+      }
+      if (filterOwner) {
+        contacts = contacts.filter((contact) => (contact.owner ?? '').trim().toLowerCase() === filterOwner);
       }
       contacts = contacts.filter((contact) =>
         matchesText(
@@ -303,6 +310,7 @@ async function installTauriShim(page: Page) {
         organization_id: organizationId,
         notes: stringArg(args, 'notes'),
         lifecycle: stringArg(args, 'lifecycle') === 'lead' ? 'lead' : 'customer',
+        owner: nullableStringArg(args, 'owner'),
         created_at: timestamp,
         updated_at: timestamp,
         deleted_at: null,
@@ -351,6 +359,7 @@ async function installTauriShim(page: Page) {
         postal_code: nullableStringArg(args, 'postal_code'),
         source: 'manual',
         description: nullableStringArg(args, 'description'),
+        owner: nullableStringArg(args, 'owner'),
         created_at: timestamp,
         updated_at: timestamp,
         deleted_at: null,
@@ -373,6 +382,7 @@ async function installTauriShim(page: Page) {
         contact_id: nullableStringArg(args, 'contact_id'),
         organization_id: nullableStringArg(args, 'organization_id'),
         notes: stringArg(args, 'notes'),
+        owner: nullableStringArg(args, 'owner'),
         created_at: timestamp,
         updated_at: timestamp,
       };
@@ -421,6 +431,11 @@ async function installTauriShim(page: Page) {
       if (Object.prototype.hasOwnProperty.call(args ?? {}, 'notes')) {
         deal.notes = stringArg(args, 'notes');
       }
+      if (args?.reset_owner === true) {
+        deal.owner = null;
+      } else if (Object.prototype.hasOwnProperty.call(args ?? {}, 'owner')) {
+        deal.owner = nullableStringArg(args, 'owner');
+      }
       deal.updated_at = timestamp;
       persistState();
       return deal;
@@ -441,6 +456,40 @@ async function installTauriShim(page: Page) {
       const id = stringArg(args, 'id');
       state.deals = state.deals.filter((deal) => deal.id !== id);
       persistState();
+    }
+
+    function updateContact(args: InvokeArgs): BackendContact {
+      const id = stringArg(args, 'id');
+      const contact = state.contacts.find((candidate) => candidate.id === id && !candidate.deleted_at);
+      if (!contact) {
+        throw new Error(`Contact not found: ${id}`);
+      }
+      if (Object.prototype.hasOwnProperty.call(args ?? {}, 'first_name')) {
+        contact.first_name = stringArg(args, 'first_name');
+      }
+      if (Object.prototype.hasOwnProperty.call(args ?? {}, 'last_name')) {
+        contact.last_name = stringArg(args, 'last_name');
+      }
+      if (Object.prototype.hasOwnProperty.call(args ?? {}, 'email')) {
+        contact.email = stringArg(args, 'email');
+      }
+      if (Object.prototype.hasOwnProperty.call(args ?? {}, 'phone')) {
+        contact.phone = stringArg(args, 'phone');
+      }
+      if (Object.prototype.hasOwnProperty.call(args ?? {}, 'org_name')) {
+        contact.org_name = stringArg(args, 'org_name');
+      }
+      if (Object.prototype.hasOwnProperty.call(args ?? {}, 'notes')) {
+        contact.notes = stringArg(args, 'notes');
+      }
+      if (args?.reset_owner === true) {
+        contact.owner = null;
+      } else if (Object.prototype.hasOwnProperty.call(args ?? {}, 'owner')) {
+        contact.owner = nullableStringArg(args, 'owner');
+      }
+      contact.updated_at = timestamp;
+      persistState();
+      return contact;
     }
 
     function setContactLifecycle(args: InvokeArgs): BackendContact {
@@ -860,6 +909,8 @@ async function installTauriShim(page: Page) {
             return listContacts(args);
           case 'create_contact':
             return createContact(args);
+          case 'update_contact':
+            return updateContact(args);
           case 'set_contact_lifecycle':
             return setContactLifecycle(args);
           case 'list_entity_links':

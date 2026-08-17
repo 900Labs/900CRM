@@ -39,6 +39,7 @@ impl CrmCore {
             org_id,
             notes,
             None,
+            None,
         )
     }
 
@@ -58,6 +59,7 @@ impl CrmCore {
         org_id: Option<String>,
         notes: Option<String>,
         lifecycle: Option<String>,
+        owner: Option<String>,
     ) -> CrmResult<Contact> {
         let input = contact_engine::ContactInput {
             contact_type: contact_type.clone(),
@@ -97,6 +99,11 @@ impl CrmCore {
             } else {
                 contact
             }
+        } else {
+            contact
+        };
+        let contact = if owner.as_ref().is_some() {
+            storage::contacts::set_contact_owner(&tx, &contact.id, owner.as_deref())?
         } else {
             contact
         };
@@ -146,6 +153,7 @@ impl CrmCore {
         city: Option<String>,
         country: Option<String>,
         notes: Option<String>,
+        owner: Option<Option<String>>,
     ) -> CrmResult<Contact> {
         if let Some(ct) = contact_type.as_deref() {
             if ct != "person" && ct != "organization" {
@@ -177,6 +185,11 @@ impl CrmCore {
             None,
             notes.as_deref(),
         )?;
+        let contact = if let Some(owner) = owner {
+            storage::contacts::set_contact_owner(&tx, id, owner.as_deref())?
+        } else {
+            contact
+        };
         storage::sync::record_change(&tx, "contact", id, "__update__", None, Some(id), &device_id)?;
         record_audit_json(
             &tx,

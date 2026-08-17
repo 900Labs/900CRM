@@ -83,6 +83,7 @@
   let address = $state('');
   let contactType = $state<'person' | 'org'>('person');
   let notes = $state('');
+  let owner = $state('');
   let tags = $state<string[]>([]);
 
   let isDirty = $state(false);
@@ -342,6 +343,7 @@
     address      = c.address ?? '';
     contactType  = c.type;
     notes        = c.notes ?? '';
+    owner        = c.owner ?? '';
     tags         = [...(c.tags ?? [])];
     isDirty      = false;
   }
@@ -499,6 +501,7 @@
         address:   address.trim()   || null,
         type:      contactType,
         notes:     notes            || null,
+        owner:     owner.trim()     || null,
         tags,
       };
       const updated = await contactStore.updateContact(contact.id, payload);
@@ -914,6 +917,20 @@
                   rows="2"
                   autocomplete="street-address"
                 ></textarea>
+              </div>
+
+              <!-- Owner -->
+              <div class="field-group">
+                <label class="field-label" for="contact-owner">{t('common.owner')}</label>
+                <input
+                  id="contact-owner"
+                  class="input"
+                  type="text"
+                  bind:value={owner}
+                  oninput={markDirty}
+                  placeholder={t('common.optional')}
+                  autocomplete="name"
+                />
               </div>
 
               <!-- Type -->

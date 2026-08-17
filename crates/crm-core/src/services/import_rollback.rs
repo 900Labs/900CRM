@@ -924,6 +924,7 @@ impl CrmCore {
             string_field_update(changed_fields, "city", &before_import.city),
             string_field_update(changed_fields, "country", &before_import.country),
             string_field_update(changed_fields, "notes", &before_import.notes),
+            None,
         ) {
             Ok(_) => match restore_custom_field_changes(
                 self,

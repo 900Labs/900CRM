@@ -43,7 +43,7 @@ use rusqlite::{params, Connection};
 use crate::utils::errors::{CrmError, CrmResult};
 
 /// The current schema version. Increment whenever a new migration is added.
-const CURRENT_SCHEMA_VERSION: u32 = 13;
+const CURRENT_SCHEMA_VERSION: u32 = 14;
 const DATABASE_FILENAME: &str = "900crm.db";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -257,6 +257,10 @@ impl Database {
 
         if current_version < 13 {
             self.migrate_v13_saved_views()?;
+        }
+
+        if current_version < 14 {
+            self.migrate_v14_record_owner()?;
         }
 
         self.conn.execute_batch(&format!(
@@ -1502,6 +1506,36 @@ impl Database {
         )?;
 
         log::info!("Migration v13 saved views complete");
+        Ok(())
+    }
+
+    fn migrate_v14_record_owner(&mut self) -> CrmResult<()> {
+        log::info!("Running database migration v14 record owner");
+
+        self.add_column_if_missing("contacts", "owner", "owner TEXT")?;
+        self.add_column_if_missing("deals", "owner", "owner TEXT")?;
+        self.add_column_if_missing("organizations", "owner", "owner TEXT")?;
+
+        self.conn.execute_batch(
+            r#"
+            CREATE INDEX IF NOT EXISTS idx_contacts_owner
+                ON contacts (owner)
+                WHERE deleted_at IS NULL AND owner IS NOT NULL AND TRIM(owner) <> '';
+
+            CREATE INDEX IF NOT EXISTS idx_deals_owner
+                ON deals (owner)
+                WHERE deleted_at IS NULL AND owner IS NOT NULL AND TRIM(owner) <> '';
+
+            CREATE INDEX IF NOT EXISTS idx_organizations_owner
+                ON organizations (owner)
+                WHERE deleted_at IS NULL AND owner IS NOT NULL AND TRIM(owner) <> '';
+
+            INSERT OR IGNORE INTO settings (key, value, updated_at)
+            VALUES ('default_owner', '', '');
+            "#,
+        )?;
+
+        log::info!("Migration v14 record owner complete");
         Ok(())
     }
 

@@ -37,6 +37,7 @@
   let contactOrganization = $state('');
   let contactType = $state<'person' | 'org'>('person');
   let contactLifecycle = $state<ContactLifecycle>('lead');
+  let contactOwner = $state('');
 
   let isSavingDeal = $state(false);
   let dealName = $state('');
@@ -48,6 +49,7 @@
   let dealContactId = $state('');
   let dealOrganizationId = $state('');
   let dealDescription = $state('');
+  let dealOwner = $state('');
   let dealRelationshipContacts = $state<Contact[]>([]);
   let dealRelationshipOrganizations = $state<Organization[]>([]);
   let loadingDealRelationships = $state(false);
@@ -183,6 +185,7 @@
     contactOrganization = '';
     contactType = 'person';
     contactLifecycle = modalDataString('lifecycle') === 'lead' ? 'lead' : 'customer';
+    contactOwner = '';
   }
 
   function resetDealForm() {
@@ -195,6 +198,7 @@
     dealContactId = modalDataString('contactId');
     dealOrganizationId = modalDataString('organizationId');
     dealDescription = '';
+    dealOwner = '';
   }
 
   function handleDealCurrencyInput(event: Event) {
@@ -370,6 +374,7 @@
         notes: null,
         website: null,
         address: null,
+        owner: contactOwner.trim() || null,
       });
       uiStore.closeModal();
       try {
@@ -405,6 +410,7 @@
         organizationId: dealOrganizationId || null,
         description: dealDescription.trim() || null,
         tags: [],
+        owner: dealOwner.trim() || null,
       });
       uiStore.closeModal();
       try {
@@ -499,6 +505,10 @@
             </select>
           </div>
         {/if}
+        <div class="form-group form-group--full">
+          <label class="form-label" for="modal-contact-owner">{t('common.owner')}</label>
+          <input id="modal-contact-owner" class="input" bind:value={contactOwner} />
+        </div>
       </div>
       {#if loadingContactCustomFields}
         <p class="custom-field-loading">{t('common.loading')}</p>
@@ -559,6 +569,10 @@
         <div class="form-group form-group--full">
           <label class="form-label" for="modal-deal-close-date">{t('deals.expectedClose')}</label>
           <input id="modal-deal-close-date" class="input" type="date" bind:value={dealExpectedCloseDate} />
+        </div>
+        <div class="form-group form-group--full">
+          <label class="form-label" for="modal-deal-owner">{t('common.owner')}</label>
+          <input id="modal-deal-owner" class="input" bind:value={dealOwner} />
         </div>
         <div class="form-group">
           <label class="form-label" for="modal-deal-organization">{t('contacts.organization')}</label>

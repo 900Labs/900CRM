@@ -678,6 +678,8 @@
     "none": "Hakuna",
     "required": "Inahitajika",
     "optional": "Si lazima",
+    "owner": "Mmiliki",
+    "filterOwner": "Chuja kwa mmiliki",
     "error": "Hitilafu",
     "success": "Mafanikio",
     "warning": "Onyo",

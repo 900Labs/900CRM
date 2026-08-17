@@ -81,7 +81,42 @@ describe('deal API', () => {
       contact_id: 'contact-1',
       organization_id: 'org-1',
       notes: 'Regional rollout',
+      owner: null,
     });
+  });
+
+  it('maps deal owner on create and update', async () => {
+    invokeMock.mockResolvedValueOnce({ ...backendDeal, owner: 'Samira' });
+
+    await expect(
+      createDeal({
+        name: 'Clinic expansion',
+        value: 12000,
+        currency: 'USD',
+        stage: 'proposal',
+        probability: 50,
+        expectedCloseDate: '2026-07-15',
+        contactId: 'contact-1',
+        organizationId: 'org-1',
+        description: 'Regional rollout',
+        tags: [],
+        owner: 'Samira',
+      }),
+    ).resolves.toMatchObject({ owner: 'Samira' });
+    expect(invokeMock).toHaveBeenCalledWith(
+      'create_deal',
+      expect.objectContaining({ owner: 'Samira' }),
+    );
+
+    invokeMock.mockResolvedValueOnce({ ...backendDeal, owner: null });
+    await updateDeal('deal-1', { owner: '' });
+    expect(invokeMock).toHaveBeenCalledWith(
+      'update_deal',
+      expect.objectContaining({
+        id: 'deal-1',
+        reset_owner: true,
+      }),
+    );
   });
 
   it('maps updateDeal organization_id only when supplied', async () => {

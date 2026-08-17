@@ -9,6 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-17
+- Contacts, deals, and organizations can store an optional local owner
+  name. Create and edit forms include the field. Contacts and
+  Organizations can filter by owner. This is a free-text name, not a
+  user account or team.
 - The Pipeline deal drawer uses the same Next step strip as the deal
   page, so the primary button matches overdue work, a missing
   follow-up, or a missing close date.

@@ -34,6 +34,7 @@ export interface Deal {
   organizationId: string | null;
   contactName: string | null;
   description: string | null;
+  owner?: string | null;
   tags: string[];
   createdAt: string;
   updatedAt: string;
@@ -92,6 +93,7 @@ interface BackendDeal {
   contact_id: string | null;
   organization_id?: string | null;
   notes: string;
+  owner?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -193,6 +195,7 @@ function mapDeal(deal: BackendDeal): Deal {
     organizationId: deal.organization_id ?? null,
     contactName: null,
     description: deal.notes?.trim() ? deal.notes : null,
+    owner: deal.owner?.trim() ? deal.owner.trim() : null,
     tags: [],
     createdAt: deal.created_at,
     updatedAt: deal.updated_at,
@@ -248,6 +251,7 @@ export async function createDeal(data: CreateDealPayload): Promise<Deal> {
     contact_id: data.contactId,
     organization_id: normalizeNullable(data.organizationId),
     notes: data.description ?? '',
+    owner: data.owner ?? null,
   });
 
   return mapDeal(deal);
@@ -316,6 +320,11 @@ export async function updateDeal(id: string, data: UpdateDealPayload): Promise<D
     probability: data.probability,
     notes: data.description,
   };
+
+  if (hasOwn(data, 'owner')) {
+    args.owner = data.owner;
+    args.reset_owner = !data.owner?.trim();
+  }
 
   if (hasOwn(data, 'expectedCloseDate') && data.expectedCloseDate !== undefined) {
     assignNullableUpdate(

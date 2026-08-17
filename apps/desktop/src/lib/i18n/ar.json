@@ -678,6 +678,8 @@
     "none": "لا شيء",
     "required": "مطلوب",
     "optional": "اختياري",
+    "owner": "المالك",
+    "filterOwner": "تصفية حسب المالك",
     "error": "خطأ",
     "success": "نجاح",
     "warning": "تحذير",

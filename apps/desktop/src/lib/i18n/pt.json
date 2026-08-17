@@ -678,6 +678,8 @@
     "none": "Nenhum",
     "required": "Obrigatório",
     "optional": "Opcional",
+    "owner": "Responsável",
+    "filterOwner": "Filtrar por responsável",
     "error": "Erro",
     "success": "Sucesso",
     "warning": "Aviso",

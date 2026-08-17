@@ -1,7 +1,7 @@
 # Data Model
 
 Date: 2026-06-25
-Last updated: 2026-08-16
+Last updated: 2026-08-17
 
 This document describes the current 900CRM local data model as implemented in
 `crates/crm-core` and exposed through the desktop app. It is a public baseline
@@ -16,7 +16,7 @@ future data access.
 - The desktop shell opens `900crm.db` in the platform app data directory.
 - SQLite runs in WAL mode with foreign keys enabled.
 - Schema state is tracked with `PRAGMA user_version`; the current schema version
-  is `13`.
+  is `14`.
 - Migrations are idempotent and run at startup through
   `crates/crm-core/src/storage/db.rs`.
 - Tauri command handlers and future optional integrations should call typed
@@ -42,7 +42,10 @@ Important fields include:
 - person lifecycle: `lifecycle`, either `lead` or `customer`. Existing rows
   default to `customer`. Organizations keep `customer` and cannot be leads.
   The Leads workspace list is the same `contacts` table filtered to people
-  with `lifecycle = lead`. Converted people stay in Contacts as customers.
+  with `lifecycle = lead`. Converted people stay in Contacts as customers;
+- optional local owner name: `owner`. This is trimmed free text, not a
+  user id. Empty values are stored as NULL. Contact lists can filter by
+  owner, including when a search query is also set.
 
 Contacts are soft-deleted by setting `deleted_at`. Active list and search paths
 exclude soft-deleted contacts. Contact search uses the `contacts_fts` FTS5
@@ -59,6 +62,7 @@ added after the legacy contact-as-organization model and currently contains:
 - address fields: `address_line1`, `address_line2`, `city`, `region`,
   `country`, `postal_code`;
 - `source`, `description`;
+- optional local owner name: `owner`;
 - `created_at`, `updated_at`, `deleted_at`, `device_id`.
 
 Organization creates currently set `source` to `desktop`. Migration v6 bridges
@@ -73,7 +77,8 @@ Deals are stored in `deals` and represent sales opportunities. Core fields are:
 - `value`, `currency`, `stage`, `probability`, `expected_close`;
 - legacy primary contact mirror: `contact_id`;
 - normalized organization link: `organization_id`;
-- `notes`, `created_at`, `updated_at`, `deleted_at`, `device_id`.
+- `notes`, optional local owner name `owner`, `created_at`, `updated_at`,
+  `deleted_at`, `device_id`.
 
 Deal rows are soft-deleted. The current pipeline model stores the stage name
 directly on each deal rather than using a separate pipeline-stage table.

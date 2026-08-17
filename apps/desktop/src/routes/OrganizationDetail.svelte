@@ -513,6 +513,10 @@
                 <dd>{accountLocation}</dd>
               </div>
               <div>
+                <dt>{t('common.owner')}</dt>
+                <dd>{organization.owner ?? t('common.none')}</dd>
+              </div>
+              <div>
                 <dt>{t('organizations.created')}</dt>
                 <dd>{formatDate(organization.createdAt, settingsStore.dateFormat as 'MMM D, YYYY', settingsStore.language)}</dd>
               </div>

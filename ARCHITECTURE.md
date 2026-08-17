@@ -454,7 +454,7 @@ At a high level, current local storage includes contacts, organizations, deals,
 activities, notes, tags, custom fields, settings, sync changelog entries, audit
 entries, external-client readiness records, external-client permissions, and
 proposed actions. Schema versioning uses SQLite `PRAGMA user_version`, currently
-version `10`.
+version `14`.
 
 ## Public Baseline Docs
 

@@ -678,6 +678,8 @@
     "none": "Aucun",
     "required": "Requis",
     "optional": "Facultatif",
+    "owner": "Propriétaire",
+    "filterOwner": "Filtrer par propriétaire",
     "error": "Erreur",
     "success": "Succès",
     "warning": "Avertissement",

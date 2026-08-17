@@ -24,6 +24,7 @@ export interface Contact {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+  owner?: string | null;
 }
 
 export type CreateContactPayload = Omit<
@@ -32,6 +33,7 @@ export type CreateContactPayload = Omit<
 > & {
   organizationId?: string | null;
   lifecycle?: ContactLifecycle;
+  owner?: string | null;
 };
 export type UpdateContactPayload = Partial<CreateContactPayload>;
 
@@ -39,6 +41,7 @@ export interface ListContactsParams {
   search?: string;
   type?: ContactType;
   lifecycle?: ContactLifecycle;
+  owner?: string;
   tags?: string[];
   customFieldDefId?: string;
   customFieldQuery?: string;
@@ -82,6 +85,7 @@ interface BackendContact {
   organization_id?: string | null;
   notes: string;
   lifecycle?: string | null;
+  owner?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -134,6 +138,7 @@ function mapContact(contact: BackendContact): Contact {
     createdAt: contact.created_at,
     updatedAt: contact.updated_at,
     deletedAt: contact.deleted_at,
+    owner: toNullable(contact.owner),
   };
 }
 
@@ -184,6 +189,7 @@ export async function createContact(data: CreateContactPayload): Promise<Contact
     org_id: data.organizationId ?? null,
     notes: data.notes ?? '',
     lifecycle: data.type === 'person' ? (data.lifecycle ?? 'customer') : 'customer',
+    owner: data.owner ?? null,
   });
 
   return mapContact(contact);
@@ -203,6 +209,7 @@ export async function listContacts(params: ListContactsParams = {}): Promise<Con
       sort_dir: params.sortDir ?? 'asc',
       filter_type: toBackendContactType(params.type),
       filter_lifecycle: params.lifecycle,
+      filter_owner: params.owner?.trim() ? params.owner.trim() : undefined,
       search_query: params.search?.trim() ? params.search.trim() : undefined,
       custom_field_def_id: params.customFieldDefId?.trim() || undefined,
       custom_field_query: params.customFieldQuery?.trim() || undefined,
@@ -230,6 +237,8 @@ export async function updateContact(id: string, data: UpdateContactPayload): Pro
     city: undefined,
     country: undefined,
     notes: data.notes ?? undefined,
+    owner: data.owner ?? undefined,
+    reset_owner: Object.prototype.hasOwnProperty.call(data, 'owner') && !data.owner?.trim(),
   });
 
   return mapContact(contact);

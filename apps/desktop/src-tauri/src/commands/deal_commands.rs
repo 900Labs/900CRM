@@ -17,20 +17,32 @@ pub async fn create_deal(
     contact_id: Option<String>,
     organization_id: Option<String>,
     notes: Option<String>,
+    owner: Option<String>,
 ) -> Result<Deal, String> {
     let mut core = super::lock_core(&state)?;
-    core.create_deal(
-        title,
-        value,
-        currency,
-        stage,
-        probability,
-        expected_close,
-        contact_id,
-        organization_id,
-        notes,
-    )
-    .map_err(|e| e.to_string())
+    let deal = core
+        .create_deal(
+            title,
+            value,
+            currency,
+            stage,
+            probability,
+            expected_close,
+            contact_id,
+            organization_id,
+            notes,
+        )
+        .map_err(|e| e.to_string())?;
+    if owner
+        .as_ref()
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+    {
+        return core
+            .set_deal_owner(&deal.id, owner.as_deref())
+            .map_err(|e| e.to_string());
+    }
+    Ok(deal)
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -87,21 +99,35 @@ pub async fn update_deal(
     organization_id: Option<String>,
     reset_organization_id: Option<bool>,
     notes: Option<String>,
+    owner: Option<String>,
+    reset_owner: Option<bool>,
 ) -> Result<Deal, String> {
     let mut core = super::lock_core(&state)?;
-    core.update_deal(
-        &id,
-        title,
-        value,
-        currency,
-        stage,
-        probability,
-        nullable_update_from_args(expected_close, reset_expected_close),
-        nullable_update_from_args(contact_id, reset_contact_id),
-        nullable_update_from_args(organization_id, reset_organization_id),
-        notes,
-    )
-    .map_err(|e| e.to_string())
+    let deal = core
+        .update_deal(
+            &id,
+            title,
+            value,
+            currency,
+            stage,
+            probability,
+            nullable_update_from_args(expected_close, reset_expected_close),
+            nullable_update_from_args(contact_id, reset_contact_id),
+            nullable_update_from_args(organization_id, reset_organization_id),
+            notes,
+        )
+        .map_err(|e| e.to_string())?;
+    if reset_owner.unwrap_or(false) {
+        return core
+            .set_deal_owner(&deal.id, None)
+            .map_err(|e| e.to_string());
+    }
+    if let Some(owner) = owner {
+        return core
+            .set_deal_owner(&deal.id, Some(owner.as_str()))
+            .map_err(|e| e.to_string());
+    }
+    Ok(deal)
 }
 
 pub(crate) fn nullable_update_from_args(

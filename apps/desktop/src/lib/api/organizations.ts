@@ -18,6 +18,7 @@ export interface Organization {
   postalCode: string | null;
   source: string | null;
   description: string | null;
+  owner?: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -36,6 +37,7 @@ export interface CreateOrganizationPayload {
   country?: string | null;
   postalCode?: string | null;
   description?: string | null;
+  owner?: string | null;
 }
 
 export type UpdateOrganizationPayload = Partial<CreateOrganizationPayload>;
@@ -63,6 +65,7 @@ interface BackendOrganization {
   postal_code: string | null;
   source: string | null;
   description: string | null;
+  owner?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -78,7 +81,7 @@ interface BackendLinkedContact {
   updated_at: string;
 }
 
-type NullableOrganizationField = Exclude<keyof UpdateOrganizationPayload, 'name'>;
+type NullableOrganizationField = Exclude<keyof UpdateOrganizationPayload, 'name' | 'owner'>;
 
 const nullableUpdateFieldMap: Record<NullableOrganizationField, string> = {
   email: 'email',
@@ -128,6 +131,7 @@ function mapOrganization(organization: BackendOrganization): Organization {
     postalCode: organization.postal_code ?? null,
     source: organization.source ?? null,
     description: organization.description ?? null,
+    owner: organization.owner?.trim() ? organization.owner.trim() : null,
     createdAt: organization.created_at,
     updatedAt: organization.updated_at,
     deletedAt: organization.deleted_at ?? null,
@@ -161,6 +165,7 @@ function createOrganizationArgs(data: CreateOrganizationPayload) {
     country: normalizeNullable(data.country),
     postal_code: normalizeNullable(data.postalCode),
     description: normalizeNullable(data.description),
+    owner: normalizeNullable(data.owner),
   };
 }
 
@@ -177,6 +182,13 @@ function updateOrganizationArgs(id: string, data: UpdateOrganizationPayload) {
   ][]) {
     if (hasOwn(data, frontendKey)) {
       args[backendKey] = normalizeNullable(data[frontendKey]);
+    }
+  }
+
+  if (hasOwn(data, 'owner')) {
+    args.owner = normalizeNullable(data.owner);
+    if (!args.owner) {
+      (args as Record<string, string | null | boolean>).reset_owner = true;
     }
   }
 

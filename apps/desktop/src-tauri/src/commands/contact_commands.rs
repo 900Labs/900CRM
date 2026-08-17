@@ -22,6 +22,7 @@ pub async fn create_contact(
     org_id: Option<String>,
     notes: Option<String>,
     lifecycle: Option<String>,
+    owner: Option<String>,
 ) -> Result<Contact, String> {
     let mut core = lock_core(&state)?;
     core.create_contact_with_lifecycle(
@@ -37,6 +38,7 @@ pub async fn create_contact(
         org_id,
         notes,
         lifecycle,
+        owner,
     )
     .map_err(|e| e.to_string())
 }
@@ -72,8 +74,15 @@ pub async fn update_contact(
     city: Option<String>,
     country: Option<String>,
     notes: Option<String>,
+    owner: Option<String>,
+    reset_owner: Option<bool>,
 ) -> Result<Contact, String> {
     let mut core = lock_core(&state)?;
+    let owner = if reset_owner.unwrap_or(false) {
+        Some(None)
+    } else {
+        owner.map(Some)
+    };
     core.update_contact(
         &id,
         contact_type,
@@ -86,6 +95,7 @@ pub async fn update_contact(
         city,
         country,
         notes,
+        owner,
     )
     .map_err(|e| e.to_string())
 }

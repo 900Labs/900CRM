@@ -49,10 +49,12 @@
     country: string;
     postalCode: string;
     description: string;
+    owner: string;
   }
 
   let searchQuery = $state('');
   let countryFilter = $state('');
+  let ownerFilter = $state('');
   let formOpen = $state(false);
   let linkOpen = $state(false);
   let notesTagsOpen = $state(false);
@@ -85,13 +87,21 @@
     )].sort((left, right) => left.localeCompare(right)),
   );
 
+  const ownerOptions = $derived(
+    [...new Set(
+      organizationStore.organizations
+        .map((organization) => organization.owner?.trim())
+        .filter((owner): owner is string => Boolean(owner)),
+    )].sort((left, right) => left.localeCompare(right)),
+  );
+
   const currentViewFilters = $derived(collectCurrentFilters());
   const selectedView = $derived(savedViews.find((view) => view.id === selectedViewId) ?? null);
   const canSaveView = $derived(viewName.trim().length > 0 && !viewsSaving);
 
   const filteredOrganizations = $derived(
     organizationStore.organizations.filter((organization) =>
-      organizationMatches(organization, searchQuery, countryFilter),
+      organizationMatches(organization, searchQuery, countryFilter, ownerFilter),
     ),
   );
 
@@ -156,6 +166,7 @@
       country: '',
       postalCode: '',
       description: '',
+      owner: '',
     };
   }
 
@@ -163,9 +174,15 @@
     organization: Organization,
     query: string,
     country: string,
+    owner: string,
   ): boolean {
     const normalizedCountry = country.trim().toLowerCase();
     if (normalizedCountry && (organization.country ?? '').trim().toLowerCase() !== normalizedCountry) {
+      return false;
+    }
+
+    const normalizedOwner = owner.trim().toLowerCase();
+    if (normalizedOwner && (organization.owner ?? '').trim().toLowerCase() !== normalizedOwner) {
       return false;
     }
 
@@ -181,6 +198,7 @@
       organization.region,
       organization.country,
       organization.description,
+      organization.owner,
     ]
       .filter((value): value is string => Boolean(value))
       .some((value) => value.toLowerCase().includes(normalized));
@@ -190,6 +208,7 @@
     return {
       search: searchQuery.trim() || undefined,
       country: countryFilter.trim() || undefined,
+      owner: ownerFilter.trim() || undefined,
     };
   }
 
@@ -212,6 +231,7 @@
     selectedViewId = view.id;
     searchQuery = view.filters.search ?? '';
     countryFilter = view.filters.country ?? '';
+    ownerFilter = view.filters.owner ?? '';
   }
 
   function syncSelectedView(): void {
@@ -278,6 +298,11 @@
     syncSelectedView();
   }
 
+  function handleOwnerFilter(event: Event): void {
+    ownerFilter = (event.target as HTMLSelectElement).value;
+    syncSelectedView();
+  }
+
   function organizationLocation(organization: Organization): string {
     const parts = [organization.city, organization.region, organization.country]
       .map((part) => part?.trim())
@@ -312,6 +337,7 @@
       country: organization.country ?? '',
       postalCode: organization.postalCode ?? '',
       description: organization.description ?? '',
+      owner: organization.owner ?? '',
     };
     void loadOrganizationCustomFieldValues(organization.id);
     formOpen = true;
@@ -415,6 +441,7 @@
       country: blankToNull(form.country),
       postalCode: blankToNull(form.postalCode),
       description: blankToNull(form.description),
+      owner: blankToNull(form.owner),
     };
 
     try {
@@ -577,6 +604,20 @@
         <option value={country}>{country}</option>
       {/each}
     </select>
+    <select
+      class="input owner-filter"
+      value={ownerFilter}
+      onchange={handleOwnerFilter}
+      aria-label={t('common.filterOwner')}
+    >
+      <option value="">{t('common.all')}</option>
+      {#if ownerFilter && !ownerOptions.includes(ownerFilter)}
+        <option value={ownerFilter}>{ownerFilter}</option>
+      {/if}
+      {#each ownerOptions as owner (owner)}
+        <option value={owner}>{owner}</option>
+      {/each}
+    </select>
   </div>
 
   <div class="organizations-table card">
@@ -589,6 +630,7 @@
             <th>{t('organizations.phone')}</th>
             <th>{t('organizations.website')}</th>
             <th>{t('organizations.location')}</th>
+            <th>{t('common.owner')}</th>
             <th>{t('organizations.health')}</th>
             <th>{t('organizations.nextFollowUp')}</th>
             <th>{t('common.actions')}</th>
@@ -598,12 +640,12 @@
           {#if organizationStore.isLoading}
             {#each Array(6) as _, index (index)}
               <tr class="skeleton-row">
-                <td colspan="8"><div class="skeleton table-skeleton-cell"></div></td>
+                <td colspan="9"><div class="skeleton table-skeleton-cell"></div></td>
               </tr>
             {/each}
           {:else if filteredOrganizations.length === 0}
             <tr>
-              <td colspan="8" class="empty-cell">
+              <td colspan="9" class="empty-cell">
                 <div class="empty-state">
                   <h2>{t('organizations.noOrganizations')}</h2>
                   <p>{t('organizations.noOrganizationsDesc')}</p>
@@ -647,6 +689,7 @@
                   {/if}
                 </td>
                 <td>{organizationLocation(organization)}</td>
+                <td>{organization.owner ?? '—'}</td>
                 <td>
                   <span class="health-badge health-{insight?.health.tone ?? 'neutral'}">
                     {t(`organizations.workspace.health.${insight?.health.state ?? 'loading'}`)}
@@ -741,6 +784,10 @@
       <label class="form-group">
         <span class="form-label">{t('organizations.postalCode')}</span>
         <input class="input selectable" bind:value={form.postalCode} />
+      </label>
+      <label class="form-group">
+        <span class="form-label">{t('common.owner')}</span>
+        <input class="input selectable" bind:value={form.owner} placeholder={t('common.optional')} />
       </label>
       <label class="form-group form-group-full">
         <span class="form-label">{t('organizations.description')}</span>
@@ -861,7 +908,8 @@
 
   .saved-views-select,
   .saved-views-name,
-  .country-filter {
+  .country-filter,
+  .owner-filter {
     min-width: 160px;
   }
 

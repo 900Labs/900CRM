@@ -59,6 +59,9 @@ pub struct Deal {
     /// Freeform notes about the deal.
     pub notes: String,
 
+    /// Optional local owner name. This is not a user account.
+    pub owner: Option<String>,
+
     /// ISO 8601 creation timestamp.
     pub created_at: String,
 
@@ -182,7 +185,7 @@ pub fn get_deal(conn: &Connection, id: &str) -> CrmResult<Deal> {
     conn.query_row(
         r#"
         SELECT id, title, value, currency, stage, probability, expected_close,
-               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id
+               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id, owner
         FROM deals
         WHERE id = ?1 AND deleted_at IS NULL
         "#,
@@ -215,7 +218,7 @@ pub fn list_deals_windowed(
     let sql = if limit.is_some() {
         r#"
         SELECT id, title, value, currency, stage, probability, expected_close,
-               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id
+               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id, owner
         FROM deals
         WHERE deleted_at IS NULL
         ORDER BY created_at DESC
@@ -224,7 +227,7 @@ pub fn list_deals_windowed(
     } else {
         r#"
         SELECT id, title, value, currency, stage, probability, expected_close,
-               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id
+               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id, owner
         FROM deals
         WHERE deleted_at IS NULL
         ORDER BY created_at DESC
@@ -253,7 +256,7 @@ pub fn list_deals_by_stage(conn: &Connection, stage: &str) -> CrmResult<Vec<Deal
     let mut stmt = conn.prepare(
         r#"
         SELECT id, title, value, currency, stage, probability, expected_close,
-               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id
+               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id, owner
         FROM deals
         WHERE stage = ?1 AND deleted_at IS NULL
         ORDER BY updated_at DESC
@@ -276,7 +279,7 @@ pub fn find_active_deals_by_title(conn: &Connection, title: &str) -> CrmResult<V
     let mut stmt = conn.prepare(
         r#"
         SELECT id, title, value, currency, stage, probability, expected_close,
-               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id
+               contact_id, organization_id, notes, created_at, updated_at, deleted_at, device_id, owner
         FROM deals
         WHERE LOWER(TRIM(title)) = LOWER(TRIM(?1)) AND deleted_at IS NULL
         ORDER BY created_at ASC, id ASC
@@ -617,7 +620,30 @@ fn row_to_deal(row: &rusqlite::Row<'_>) -> rusqlite::Result<Deal> {
         updated_at: row.get(11)?,
         deleted_at: row.get(12)?,
         device_id: row.get(13)?,
+        owner: row.get::<_, Option<String>>(14)?.and_then(|value| {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }),
     })
+}
+
+/// Sets or clears a deal's local owner name.
+pub fn set_deal_owner(conn: &Connection, id: &str, owner: Option<&str>) -> CrmResult<Deal> {
+    let _current = get_deal(conn, id)?;
+    let now = now_iso8601();
+    let normalized = owner
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string());
+    conn.execute(
+        "UPDATE deals SET owner = ?1, updated_at = ?2 WHERE id = ?3 AND deleted_at IS NULL",
+        params![normalized, now, id],
+    )?;
+    get_deal(conn, id)
 }
 
 fn row_to_deal_contact(row: &rusqlite::Row<'_>) -> rusqlite::Result<DealContact> {
