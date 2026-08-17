@@ -370,6 +370,12 @@
     "contact": "جهة الاتصال",
     "noDeals": "لا توجد صفقات في هذه المرحلة",
     "noDealsDesc": "اسحب الصفقات هنا أو أضف صفقة جديدة.",
+    "board": {
+      "dropToStage": "أفلت للنقل إلى {stage}",
+      "alreadyInStage": "موجود بالفعل في {stage}",
+      "moved": "تم نقل {deal} إلى {stage}",
+      "liveRegion": "نقل مراحل المسار"
+    },
     "emptyBoardTitle": "لا توجد صفقات بعد",
     "emptyBoardDesc": "أضف صفقة لبدء اللوحة. تبقى المراحل فارغة حتى يكون لديك ما تنقله.",
     "stages": {

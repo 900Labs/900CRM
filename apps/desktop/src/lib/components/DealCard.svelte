@@ -18,6 +18,7 @@
     draggable = true,
     onclick,
     ondragstart,
+    ondragend,
     primaryContactName = deal.contactName,
     organizationName = null,
     guidanceLabel = null,
@@ -27,6 +28,7 @@
     draggable?: boolean;
     onclick?: (deal: Deal) => void;
     ondragstart?: (e: DragEvent, deal: Deal) => void;
+    ondragend?: () => void;
     primaryContactName?: string | null;
     organizationName?: string | null;
     guidanceLabel?: string | null;
@@ -63,6 +65,7 @@
 
   function handleDragEnd() {
     isDragging = false;
+    ondragend?.();
   }
 </script>
 
@@ -153,7 +156,7 @@
   }
 
   .deal-card.clickable {
-    cursor: pointer;
+    cursor: grab;
   }
 
   .deal-card:hover {

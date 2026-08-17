@@ -370,6 +370,12 @@
     "contact": "Contact",
     "noDeals": "Aucune affaire à cette étape",
     "noDealsDesc": "Faites glisser des affaires ici ou ajoutez-en une nouvelle.",
+    "board": {
+      "dropToStage": "Déposez pour déplacer vers {stage}",
+      "alreadyInStage": "Déjà dans {stage}",
+      "moved": "{deal} déplacée vers {stage}",
+      "liveRegion": "Déplacements d’étape du pipeline"
+    },
     "emptyBoardTitle": "Aucune affaire pour le moment",
     "emptyBoardDesc": "Ajoutez une affaire pour démarrer le tableau. Les étapes restent vides tant que vous n’avez rien à déplacer.",
     "stages": {

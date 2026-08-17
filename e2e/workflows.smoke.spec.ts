@@ -1016,6 +1016,50 @@ test('creates a deal through the visible UI and shows it in Pipeline', async ({
   await assertNoConsoleErrors();
 });
 
+test('drags a pipeline deal into another stage', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/pipeline');
+  await expect(page.getByRole('heading', { name: 'Pipeline' })).toBeVisible();
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Deal' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add Deal' });
+  await dialog.getByLabel('Deal Name').fill('Dragged clinic kit');
+  await dialog.getByLabel('Value').fill('4100');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden();
+
+  const card = page.getByRole('button', { name: /Dragged clinic kit/ });
+  const qualified = page.getByTestId('pipeline-column-qualified');
+  await expect(card).toBeVisible();
+
+  await card.evaluate((from) => {
+    const transfer = new DataTransfer();
+    (window as unknown as { __pipelineDrag?: DataTransfer }).__pipelineDrag = transfer;
+    from.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+  });
+  await qualified.evaluate((to) => {
+    const transfer = (window as unknown as { __pipelineDrag?: DataTransfer }).__pipelineDrag;
+    to.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+  });
+  await expect(page.getByTestId('pipeline-drop-hint-qualified')).toBeVisible();
+  await qualified.evaluate((to) => {
+    const transfer = (window as unknown as { __pipelineDrag?: DataTransfer }).__pipelineDrag;
+    to.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+  });
+  await card.evaluate((from) => {
+    const transfer = (window as unknown as { __pipelineDrag?: DataTransfer }).__pipelineDrag;
+    from.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    delete (window as unknown as { __pipelineDrag?: DataTransfer }).__pipelineDrag;
+  });
+
+  await expect(qualified.getByRole('button', { name: /Dragged clinic kit/ })).toBeVisible();
+  await expect(page.getByLabel('Pipeline stage moves')).toHaveText('Moved Dragged clinic kit to Qualified');
+
+  await assertNoConsoleErrors();
+});
+
 test('opens a pipeline deal guidance drawer and refreshes follow-up state', async ({
   page,
   assertNoConsoleErrors,
@@ -1049,7 +1093,11 @@ test('opens a pipeline deal guidance drawer and refreshes follow-up state', asyn
 
   const needsFollowUpCard = page.getByRole('button', { name: /Guided pipeline rollout/ });
   await expect(needsFollowUpCard).toContainText('Needs Follow-Up');
-  await needsFollowUpCard.click();
+  await needsFollowUpCard.evaluate((element) => {
+    if (element instanceof HTMLButtonElement) {
+      element.click();
+    }
+  });
 
   let drawer = page.getByRole('dialog', { name: 'Guided pipeline rollout' });
   await expect(drawer).toBeVisible();

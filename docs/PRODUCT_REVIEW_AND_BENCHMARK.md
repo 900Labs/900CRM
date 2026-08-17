@@ -49,7 +49,7 @@ real small business owner.
 | Contacts | Search, type/lifecycle filters, saved views, health and next follow-up, duplicate review, import/export, custom-field filtering, contact detail Customer 360 summary with a Next step strip, relationship-aware activity timeline | The people list now shows health and the next follow-up. The person page primary action matches overdue, convert, or schedule. Daily lead work now lives on Leads. |
 | Leads | Dedicated Workspace list of people with lifecycle lead, health, next follow-up, and lead-only saved views | Convert stays on the person page and is the Next step when nothing is overdue. Customers stay on Contacts. |
 | Organizations | List with saved views, health, and next follow-up; create/edit, notes/tags, contact linking, account detail workspace with a Next step strip, linked people/deals/activity and relationship-aware account timeline | Account list now shows health and the next follow-up. Still no owner field. |
-| Pipeline | Kanban by stage, search, attention filters, custom-field filter, saved views, deal cards, deal guidance drawer with weighted forecast, stale/overdue/follow-up status, linked activities, a board-level forecast/stage-health overview, and deal workspace `#/deals/:id` with a Next step strip | Stronger daily sales surface. Still needs true historical stage conversion summaries and stronger drag/drop confidence cues. |
+| Pipeline | Kanban by stage, search, attention filters, custom-field filter, saved views, deal cards, deal guidance drawer with weighted forecast, stale/overdue/follow-up status, linked activities, a board-level forecast/stage-health overview, deal workspace `#/deals/:id` with a Next step strip, and clearer stage-move drop targets | Stronger daily sales surface. Still needs true historical stage conversion summaries. |
 | Activities | Task/call/meeting/email follow-up workbench with due buckets, week and month calendars, summary counts, quick snooze/reschedule, completion, filters, saved views, relationship breadcrumbs, and in-app reminder notifications | Week and month views are calendars of existing follow-ups. Still no due times, recurrence, or external calendar sync. |
 | Reports | Dedicated Workspace route for current pipeline and activity health, current-stage funnel ratios, due buckets, activity type mix, a clickable stale-deal list, and saved focus views | Usable alpha reporting with a stale-deal list and named focus views. Still needs source/owner dimensions, exportable snapshots, and true historical conversion after stage history exists. |
 | Audit Log | Read-only table grouped under Review | Good trust feature, now visually separated from daily work. Later, it may still move deeper into Admin once Review counts are more prominent. |
@@ -141,9 +141,9 @@ historical stage-conversion analytics. Deal workspace `#/deals/:id`
 (`DealDetail.svelte`) shipped 2026-08-13, so deeper deal editing and detail
 routing are no longer remaining work.
 
-Recommended outcome: stronger drag/drop confidence cues, and true
-stage-conversion summaries only after the data model stores stage-transition
-history.
+Recommended outcome: true stage-conversion summaries only after the data
+model stores stage-transition history. Board drag now highlights valid
+drop columns, ignores the current stage, and confirms the move.
 
 ### 4. Activities now have a follow-up workbench, but not a full calendar
 
@@ -233,8 +233,9 @@ These are ordered to improve perceived product value fastest.
    - Added board-level open pipeline value, weighted forecast, next-30-day close
      forecast, close-date health, win-rate context, and per-stage current health
      metrics derived from the current filtered board.
-   - Remaining work: stronger drag/drop confidence cues, and true conversion
-     summaries after stage history exists.
+   - Remaining work: true conversion summaries after stage history exists.
+     Board drag now highlights valid drop columns, ignores the current
+     stage, and confirms the move.
 
 5. **Activities Calendar and Follow-up Center** - follow-up workbench completed
    - Added due buckets for Overdue, Today, This Week, Later, Unscheduled, and

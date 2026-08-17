@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-17
+- Pipeline columns show a drop target while a deal is dragged, skip
+  same-stage drops, and confirm the new stage after a move.
 - Contact, deal, and account workspaces show a Next step strip. The
   primary button matches the real next action: complete an overdue
   follow-up, convert a lead, add a follow-up, or set a deal close date.
