@@ -70,6 +70,11 @@ test('loads the dashboard sample workspace and shows the follow-up on the dashbo
   await expect(page).toHaveURL(new RegExp(`#/deals/${sampleDealId}$`));
   await expect(page.getByRole('heading', { name: 'Solar inventory rollout' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Deal Summary' })).toBeVisible();
+  await expect(page.getByTestId('next-step')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'This deal has gone quiet' })).toBeVisible();
+  await expect(
+    page.getByText('Next follow-up is still Call Amara about rollout timeline.'),
+  ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Amara Okafor', exact: true })).toBeVisible();
 
   await assertNoConsoleErrors();
@@ -236,6 +241,69 @@ test('shows contact list health and the next follow-up', async ({
   await assertNoConsoleErrors();
 });
 
+test('contact workspace next step completes an overdue follow-up', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/contacts');
+  const seed = await page.evaluate(async () => {
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (!invoke) {
+      throw new Error('Tauri smoke shim is not installed.');
+    }
+
+    const contact = await invoke('create_contact', {
+      contact_type: 'person',
+      first_name: 'Imani',
+      last_name: 'Diallo',
+      org_name: '',
+      email: 'imani.next@example.test',
+      phone: '',
+      address: '',
+      city: '',
+      country: '',
+      org_id: '',
+      notes: '',
+      lifecycle: 'customer',
+    }) as { id: string };
+
+    await invoke('create_deal', {
+      title: 'Imani clinic kit',
+      value: 2800,
+      currency: 'USD',
+      stage: 'Proposal',
+      probability: 40,
+      expected_close: '',
+      contact_id: contact.id,
+      organization_id: '',
+      notes: '',
+    });
+
+    await invoke('create_activity', {
+      activity_type: 'task',
+      title: 'Past due Imani check-in',
+      description: '',
+      due_date: '2020-01-15',
+      contact_id: contact.id,
+      deal_id: '',
+    });
+
+    return { contactId: contact.id };
+  });
+
+  await loadHashRoute(page, `/contacts/${seed.contactId}`);
+  const workspace = page.locator('.customer-workspace');
+  await expect(workspace.getByRole('heading', { name: 'Complete Past due Imani check-in' })).toBeVisible();
+  await workspace.getByTestId('next-step').getByRole('button', { name: 'Mark Complete' }).click();
+  await expect(workspace.getByRole('heading', { name: 'Schedule a follow-up' })).toBeVisible();
+  await workspace.getByTestId('next-step').getByRole('button', { name: 'Add Follow-Up' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add Activity' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+
+  await assertNoConsoleErrors();
+});
+
 test('creates a lead, filters the lead list, and converts it to a customer', async ({
   page,
   assertNoConsoleErrors,
@@ -260,7 +328,8 @@ test('creates a lead, filters the lead list, and converts it to a customer', asy
   await page.getByText('Kofi Mensah').click();
   await expect(page.getByRole('heading', { name: 'Kofi Mensah' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Lead Summary' })).toBeVisible();
-  await page.getByRole('button', { name: 'Convert to customer' }).click();
+  await expect(page.getByRole('heading', { name: 'Convert this lead' })).toBeVisible();
+  await page.getByTestId('next-step').getByRole('button', { name: 'Convert to customer' }).click();
   await expect(page.getByText('Customer').first()).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Customer 360 Summary' })).toBeVisible();
 
@@ -302,7 +371,7 @@ test('shows only leads on the Leads list and drops them after convert', async ({
 
   await page.getByText('Amina Leadstone').click();
   await expect(page.getByRole('heading', { name: 'Amina Leadstone' })).toBeVisible();
-  await page.getByRole('button', { name: 'Convert to customer' }).click();
+  await page.getByTestId('next-step').getByRole('button', { name: 'Convert to customer' }).click();
 
   await loadHashRoute(page, '/leads');
   await expect(page.getByText('Amina Leadstone')).toHaveCount(0);
@@ -459,6 +528,9 @@ test('shows a customer 360 summary for a contact with linked sales work', async 
   const workspace = page.locator('.customer-workspace');
   await expect(workspace.getByRole('heading', { name: 'Customer 360 Summary' })).toBeVisible();
   await expect(workspace.getByText('On Track')).toBeVisible();
+  await expect(
+    workspace.getByRole('heading', { name: 'Call Maya about implementation timeline is scheduled' }),
+  ).toBeVisible();
   await expect(workspace.locator('.workspace-metric').filter({ hasText: 'Open Deals' }).getByText('1')).toBeVisible();
   await expect(workspace.getByText('$42,000')).toBeVisible();
   await expect(
@@ -809,6 +881,9 @@ test('shows an account 360 workspace for an organization with linked work', asyn
   const workspace = page.locator('.account-workspace');
   await expect(workspace.getByRole('heading', { name: 'Account 360 Summary' })).toBeVisible();
   await expect(workspace.getByText('On Track')).toBeVisible();
+  await expect(
+    workspace.getByRole('heading', { name: 'Review Helios implementation plan is scheduled' }),
+  ).toBeVisible();
   await expect(workspace.locator('.workspace-metric').filter({ hasText: 'People' }).getByText('1')).toBeVisible();
   await expect(workspace.locator('.workspace-metric').filter({ hasText: 'Open Deals' }).getByText('1')).toBeVisible();
   await expect(workspace.getByText('$73,000')).toBeVisible();
