@@ -1516,24 +1516,44 @@ impl Database {
         self.add_column_if_missing("deals", "owner", "owner TEXT")?;
         self.add_column_if_missing("organizations", "owner", "owner TEXT")?;
 
-        self.conn.execute_batch(
-            r#"
-            CREATE INDEX IF NOT EXISTS idx_contacts_owner
-                ON contacts (owner)
-                WHERE deleted_at IS NULL AND owner IS NOT NULL AND TRIM(owner) <> '';
+        if self.table_exists("contacts")? {
+            self.conn.execute_batch(
+                r#"
+                CREATE INDEX IF NOT EXISTS idx_contacts_owner
+                    ON contacts (owner)
+                    WHERE deleted_at IS NULL AND owner IS NOT NULL AND TRIM(owner) <> '';
+                "#,
+            )?;
+        }
 
-            CREATE INDEX IF NOT EXISTS idx_deals_owner
-                ON deals (owner)
-                WHERE deleted_at IS NULL AND owner IS NOT NULL AND TRIM(owner) <> '';
+        if self.table_exists("deals")? {
+            self.conn.execute_batch(
+                r#"
+                CREATE INDEX IF NOT EXISTS idx_deals_owner
+                    ON deals (owner)
+                    WHERE deleted_at IS NULL AND owner IS NOT NULL AND TRIM(owner) <> '';
+                "#,
+            )?;
+        }
 
-            CREATE INDEX IF NOT EXISTS idx_organizations_owner
-                ON organizations (owner)
-                WHERE deleted_at IS NULL AND owner IS NOT NULL AND TRIM(owner) <> '';
+        if self.table_exists("organizations")? {
+            self.conn.execute_batch(
+                r#"
+                CREATE INDEX IF NOT EXISTS idx_organizations_owner
+                    ON organizations (owner)
+                    WHERE deleted_at IS NULL AND owner IS NOT NULL AND TRIM(owner) <> '';
+                "#,
+            )?;
+        }
 
-            INSERT OR IGNORE INTO settings (key, value, updated_at)
-            VALUES ('default_owner', '', '');
-            "#,
-        )?;
+        if self.table_exists("settings")? {
+            self.conn.execute_batch(
+                r#"
+                INSERT OR IGNORE INTO settings (key, value, updated_at)
+                VALUES ('default_owner', '', '');
+                "#,
+            )?;
+        }
 
         log::info!("Migration v14 record owner complete");
         Ok(())
