@@ -11,7 +11,13 @@
   import { formatCurrency, formatDate, formatPercent, formatRelativeTime } from '$lib/utils/formatters';
   import { settingsStore } from '$lib/stores/settings';
   import { navigateHash } from '$lib/utils/hashRouter';
+  import { activityStore } from '$lib/stores/activities';
+  import {
+    deriveRecordNextStep,
+    shouldShowSecondaryFollowUp,
+  } from '$lib/utils/recordNextStep';
   import ActivityFeed from './ActivityFeed.svelte';
+  import NextStepCard from './NextStepCard.svelte';
 
   let {
     deal,
@@ -24,6 +30,7 @@
     organizationName = null,
     onclose,
     onaddfollowup,
+    onrefresh,
   }: {
     deal: Deal;
     guidance: PipelineGuidance | null;
@@ -35,6 +42,7 @@
     organizationName?: string | null;
     onclose?: () => void;
     onaddfollowup?: () => void;
+    onrefresh?: () => void;
   } = $props();
 
   let drawerEl = $state<HTMLDivElement | undefined>(undefined);
@@ -68,8 +76,23 @@
 
   const guidanceTone = $derived(guidance?.tone ?? 'neutral');
 
-  const showPrimaryFollowUp = $derived(
-    deal.stage !== 'closedWon' && deal.stage !== 'closedLost'
+  let completing = $state(false);
+
+  const nextStep = $derived(
+    deriveRecordNextStep({
+      recordKind: 'deal',
+      isLoading: activitiesLoading,
+      unavailable: Boolean(activityContextError),
+      isClosedWon: deal.stage === 'closedWon',
+      isClosedLost: deal.stage === 'closedLost',
+      overdueActivities:
+        guidance?.state === 'overdue' && guidance.nextActivity
+          ? [guidance.nextActivity]
+          : [],
+      nextActivity: guidance?.nextActivity ?? null,
+      expectedCloseDate: deal.expectedCloseDate ?? null,
+      isStale: guidance?.state === 'stale',
+    }),
   );
 
   function guidanceLabel(): string {
@@ -112,6 +135,28 @@
 
   function openDealPage() {
     navigateHash(`/deals/${deal.id}`);
+  }
+
+  async function handleNextStep() {
+    if (nextStep.action === 'complete' && nextStep.activityId) {
+      completing = true;
+      try {
+        await activityStore.markComplete(nextStep.activityId);
+        onrefresh?.();
+      } finally {
+        completing = false;
+      }
+      return;
+    }
+
+    if (nextStep.action === 'addFollowUp') {
+      addFollowUp();
+      return;
+    }
+
+    if (nextStep.action === 'setExpectedClose') {
+      openDealPage();
+    }
   }
 
   function focusFirstElement() {
@@ -204,8 +249,9 @@
         <span>{t(`deals.stages.${deal.stage}`)}</span>
       </div>
       <p>{guidanceDetail()}</p>
-      {#if showPrimaryFollowUp}
-        <button class="btn btn-primary btn-sm" type="button" onclick={addFollowUp}>
+      <NextStepCard step={nextStep} busy={completing} onaction={handleNextStep} />
+      {#if shouldShowSecondaryFollowUp(nextStep)}
+        <button class="btn btn-secondary btn-sm" type="button" onclick={addFollowUp}>
           {t('deals.guidance.addFollowUp')}
         </button>
       {/if}

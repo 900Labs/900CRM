@@ -49,7 +49,7 @@ real small business owner.
 | Contacts | Search, type/lifecycle filters, saved views, health and next follow-up, duplicate review, import/export, custom-field filtering, contact detail Customer 360 summary with a Next step strip, relationship-aware activity timeline | The people list now shows health and the next follow-up. The person page primary action matches overdue, convert, or schedule. Daily lead work now lives on Leads. |
 | Leads | Dedicated Workspace list of people with lifecycle lead, health, next follow-up, and lead-only saved views | Convert stays on the person page and is the Next step when nothing is overdue. Customers stay on Contacts. |
 | Organizations | List with saved views, health, and next follow-up; create/edit, notes/tags, contact linking, account detail workspace with a Next step strip, linked people/deals/activity and relationship-aware account timeline | Account list now shows health and the next follow-up. Still no owner field. |
-| Pipeline | Kanban by stage, search, attention filters, custom-field filter, saved views, deal cards, deal guidance drawer with weighted forecast, stale/overdue/follow-up status, linked activities, a board-level forecast/stage-health overview, deal workspace `#/deals/:id` with a Next step strip, and clearer stage-move drop targets | Stronger daily sales surface. Still needs true historical stage conversion summaries. |
+| Pipeline | Kanban by stage, search, attention filters, custom-field filter, saved views, deal cards, deal guidance drawer with a Next step strip, weighted forecast, stale/overdue/follow-up status, linked activities, a board-level forecast/stage-health overview, deal workspace `#/deals/:id` with a Next step strip, and clearer stage-move drop targets | Stronger daily sales surface. Still needs true historical stage conversion summaries. |
 | Activities | Task/call/meeting/email follow-up workbench with due buckets, week and month calendars, summary counts, quick snooze/reschedule, completion, filters, saved views, relationship breadcrumbs, and in-app reminder notifications | Week and month views are calendars of existing follow-ups. Still no due times, recurrence, or external calendar sync. |
 | Reports | Dedicated Workspace route for current pipeline and activity health, current-stage funnel ratios, due buckets, activity type mix, a clickable stale-deal list, saved focus views, and a current-dataset CSV snapshot | Usable alpha reporting with a stale-deal list, named focus views, and an unencrypted snapshot download. Still needs source/owner dimensions and true historical conversion after stage history exists. |
 | Audit Log | Read-only table grouped under Review | Good trust feature, now visually separated from daily work. Later, it may still move deeper into Admin once Review counts are more prominent. |
@@ -132,8 +132,8 @@ a missing follow-up, or a missing expected close date.
 
 The Kanban board exists, and Sprint 105 added a deal guidance drawer with
 weighted forecast, next activity context, stale/overdue/follow-up states, and
-an Add Follow-Up path. A salesperson can now inspect a deal without leaving the
-board. Sprint 106 added a board-level forecast and stage-health overview that
+a Next step path that matches the deal page. A salesperson can now inspect a
+deal without leaving the board. Sprint 106 added a board-level forecast and stage-health overview that
 groups open value and weighted forecast by currency, summarizes close-date
 health, shows current Closed Won/Lost win-rate context, and distributes
 guidance risk by stage. This is current-stage operational guidance, not true
@@ -228,7 +228,7 @@ These are ordered to improve perceived product value fastest.
 4. **Pipeline Depth** - deal guidance and current-stage metrics completed
    - Added deal drawer from Pipeline cards with existing stage, value,
      probability, weighted forecast, expected close, description, created/updated
-     dates, linked activities, and Add Follow-Up action.
+     dates, linked activities, and a Next step strip that matches the deal page.
    - Added guidance badges for Needs Follow-Up, Overdue, Stale, On Track, Closed
      Won, and Closed Lost.
    - Added board-level open pipeline value, weighted forecast, next-30-day close

@@ -3,6 +3,18 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 
+vi.mock('$lib/i18n', () => ({
+  t: (key: string, params?: Record<string, string | number>) => {
+    if (key === 'nextStep.completeTitle') return `Complete ${params?.subject}`;
+    if (key === 'nextStep.onTrackTitle') return `${params?.subject} is scheduled`;
+    if (key === 'nextStep.completeAction') return 'Mark Complete';
+    if (key === 'nextStep.eyebrow') return 'Next step';
+    if (key === 'nextStep.completeDetail') return 'This follow-up is overdue.';
+    if (key === 'nextStep.onTrackDetail') return 'The next follow-up is already on the calendar.';
+    return key;
+  },
+}));
+
 import NextStepCard from './NextStepCard.svelte';
 import type { RecordNextStep } from '$lib/utils/recordNextStep';
 
