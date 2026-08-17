@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-17
+- Activities Month shows the same follow-ups on a Monday-aligned month
+  grid. Days outside the month stay visible but dimmed. A crowded day
+  shows the first three cards and a leftover count.
 - Activities can switch from the due-bucket list to a Monday–Sunday week
   grid. The same follow-ups appear on their due day. Drag a card to
   another day to reschedule. A day + button opens Add Activity for that
