@@ -46,6 +46,26 @@ pub async fn validate_open_path(file_path: String) -> Result<String, String> {
 }
 
 #[tauri::command(rename_all = "snake_case")]
+pub async fn write_export_text(file_path: String, contents: String) -> Result<u32, String> {
+    let file_path = match super::path_guard::validate_export_path(&file_path) {
+        Ok(path) => path,
+        Err(msg) => return Err(msg),
+    };
+    if contents.len() > MAX_IMPORT_FILE_BYTES as usize {
+        return Err("Export is too large to write".to_string());
+    }
+    if let Some(parent) = file_path.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            std::fs::create_dir_all(parent)
+                .map_err(|err| format!("Unable to create export folder: {err}"))?;
+        }
+    }
+    std::fs::write(&file_path, contents.as_bytes())
+        .map_err(|err| format!("Unable to write export file: {err}"))?;
+    Ok(1)
+}
+
+#[tauri::command(rename_all = "snake_case")]
 pub async fn rollback_completed_import(
     state: State<'_, AppState>,
     rollback_plan: ImportRollbackPlan,
@@ -1716,6 +1736,24 @@ mod tests {
 
     fn write_csv(path: &Path, contents: &str) {
         fs::write(path, contents).expect("test CSV should be writable");
+    }
+
+    #[test]
+    fn write_export_text_writes_a_validated_file() {
+        let dir = unique_test_dir("write-export-text");
+        fs::create_dir_all(&dir).expect("temp dir");
+        let path = dir.join("snapshot.csv");
+        let contents = "section,name,field,value\nmeta,snapshot,note,ok\n";
+
+        let written = tauri::async_runtime::block_on(write_export_text(
+            path.to_string_lossy().to_string(),
+            contents.to_string(),
+        ))
+        .expect("write export text");
+
+        assert_eq!(written, 1);
+        assert_eq!(fs::read_to_string(&path).expect("read export"), contents);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

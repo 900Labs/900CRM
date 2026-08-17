@@ -1204,6 +1204,29 @@ test('saves the current report focus as a named view and applies it later', asyn
   await assertNoConsoleErrors();
 });
 
+test('downloads the current reports snapshot', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/reports');
+  const exportButton = page.getByRole('button', { name: 'Download snapshot' });
+  await expect(exportButton).toBeEnabled();
+
+  const downloadPromise = page.waitForEvent('download');
+  await exportButton.click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^900crm-reports-\d{4}-\d{2}-\d{2}\.csv$/);
+
+  const downloadPath = await download.path();
+  expect(downloadPath).toBeTruthy();
+  const text = await import('node:fs/promises').then((fs) => fs.readFile(downloadPath!, 'utf8'));
+  expect(text).toContain('Current dataset snapshot');
+  expect(text).toContain('win_rate');
+  await expect(page.getByText('Downloaded the current report snapshot. The file is unencrypted.')).toBeVisible();
+
+  await assertNoConsoleErrors();
+});
+
 test('creates an activity through the visible UI and shows it in Activities', async ({
   page,
   assertNoConsoleErrors,

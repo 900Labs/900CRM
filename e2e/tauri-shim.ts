@@ -980,6 +980,8 @@ async function installTauriShim(page: Page) {
             return '';
           case 'validate_open_path':
             return stringArg(args, 'file_path');
+          case 'write_export_text':
+            return 1;
           default:
             if (Object.prototype.hasOwnProperty.call(staticResponses, cmd)) {
               return staticResponses[cmd];
