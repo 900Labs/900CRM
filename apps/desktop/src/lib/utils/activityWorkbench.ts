@@ -39,7 +39,7 @@ export const ACTIVITY_DUE_BUCKETS: ActivityDueBucket[] = [
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-function localDayKey(date: Date): string {
+export function localDayKey(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -50,7 +50,7 @@ function localDayStart(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
-function parseLocalDueDay(value: string | null | undefined): number | null {
+export function parseLocalDueDay(value: string | null | undefined): number | null {
   if (!value) {
     return null;
   }

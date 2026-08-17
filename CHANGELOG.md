@@ -9,6 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-17
+- Activities can switch from the due-bucket list to a Monday–Sunday week
+  grid. The same follow-ups appear on their due day. Drag a card to
+  another day to reschedule. A day + button opens Add Activity for that
+  date. There are still no times, recurrence, or external calendars.
 - An empty Dashboard now asks if you already have customers. Import data
   opens the import wizard. Make a backup opens Settings → Data. Both
   stay local and unencrypted.

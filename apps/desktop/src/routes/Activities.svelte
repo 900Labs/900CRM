@@ -30,12 +30,18 @@
     type SavedView,
   } from '$lib/api/savedViews';
   import { formatDate, formatRelativeTime } from '$lib/utils/formatters';
+  import { currentHashPath, navigateHash } from '$lib/utils/hashRouter';
   import {
     ACTIVITY_DUE_BUCKETS,
     addLocalDays,
     buildActivityWorkbench,
     type ActivityDueBucket,
   } from '$lib/utils/activityWorkbench';
+  import {
+    buildActivityWeek,
+    shiftWeek,
+    startOfWeek,
+  } from '$lib/utils/activityWeek';
   import {
     addSelectedActivityLinks,
     deriveActivityRelationshipLabels,
@@ -75,6 +81,11 @@
   let viewsSaving = $state(false);
   let viewsError = $state<string | null>(null);
   let activitiesBootstrapped = false;
+  let activitiesHashBound = false;
+  type ActivityLayout = 'list' | 'week';
+  let viewMode = $state<ActivityLayout>('list');
+  let weekStart = $state<Date>(startOfWeek(new Date()));
+  let weekDragOverDate = $state<string | null>(null);
 
   // Quick-add form
   let showQuickAdd  = $state(false);
@@ -120,7 +131,75 @@
     void loadActivityLinksForCurrentActivities();
   });
 
+  $effect(() => {
+    if (activitiesHashBound || typeof window === 'undefined') {
+      return;
+    }
+
+    activitiesHashBound = true;
+    applyActivitiesHash(currentHashPath());
+    window.addEventListener('hashchange', () => applyActivitiesHash(currentHashPath()));
+  });
+
   // ── Handlers ─────────────────────────────────────────────────────────────────
+
+  function applyActivitiesHash(path: string) {
+    const clean = path.replace(/^#/, '').replace(/\/+$/, '') || '/';
+    viewMode = clean === '/activities/week' ? 'week' : 'list';
+  }
+
+  function selectViewMode(mode: ActivityLayout) {
+    viewMode = mode;
+    if (mode === 'week') {
+      weekStart = startOfWeek(new Date());
+    }
+    const nextPath = mode === 'week' ? '/activities/week' : '/activities';
+    if (currentHashPath().replace(/\/+$/, '') !== nextPath) {
+      navigateHash(nextPath);
+    }
+  }
+
+  function moveWeek(weeks: number) {
+    weekStart = weeks === 0 ? startOfWeek(new Date()) : shiftWeek(weekStart, weeks);
+  }
+
+  function addFollowUpOnDay(date: string) {
+    uiStore.openModal('addActivity', { dueDate: date });
+  }
+
+  function handleWeekDragStart(activityId: string, event: DragEvent) {
+    event.dataTransfer?.setData('text/plain', activityId);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+    }
+  }
+
+  function handleWeekDragOver(date: string, event: DragEvent) {
+    event.preventDefault();
+    weekDragOverDate = date;
+  }
+
+  function handleWeekDragLeave(date: string) {
+    if (weekDragOverDate === date) {
+      weekDragOverDate = null;
+    }
+  }
+
+  async function handleWeekDrop(date: string, event: DragEvent) {
+    event.preventDefault();
+    weekDragOverDate = null;
+    const activityId = event.dataTransfer?.getData('text/plain')?.trim();
+    if (!activityId) {
+      return;
+    }
+
+    reschedulingActivityId = activityId;
+    try {
+      await activityStore.updateActivity(activityId, { dueDate: date });
+    } finally {
+      reschedulingActivityId = null;
+    }
+  }
 
   async function handleTypeFilter(type: ActivityType | '') {
     typeFilter = type;
@@ -485,6 +564,21 @@
   );
 
   const workbench = $derived(buildActivityWorkbench(filteredActivities));
+  const week = $derived(buildActivityWeek(filteredActivities, weekStart));
+
+  function formatWeekday(dateKey: string): string {
+    const [year, month, day] = dateKey.split('-').map(Number);
+    return new Intl.DateTimeFormat(settingsStore.language, { weekday: 'short' }).format(
+      new Date(year, month - 1, day),
+    );
+  }
+
+  function formatWeekDayLabel(dateKey: string): string {
+    const [year, month, day] = dateKey.split('-').map(Number);
+    return new Intl.DateTimeFormat(settingsStore.language, { day: 'numeric', month: 'short' }).format(
+      new Date(year, month - 1, day),
+    );
+  }
 
   const visibleBuckets = $derived(
     workbench.buckets.filter((bucket) => !bucketFilter || bucket.bucket === bucketFilter)
@@ -523,6 +617,28 @@
   <div class="page-header">
     <h1 class="page-title">{t('activities.title')}</h1>
     <div class="toolbar">
+      <div class="layout-toggle" role="tablist" aria-label={t('activities.viewLabel')}>
+        <button
+          class="layout-toggle-button"
+          class:layout-toggle-button--active={viewMode === 'list'}
+          type="button"
+          role="tab"
+          aria-selected={viewMode === 'list'}
+          onclick={() => selectViewMode('list')}
+        >
+          {t('activities.viewList')}
+        </button>
+        <button
+          class="layout-toggle-button"
+          class:layout-toggle-button--active={viewMode === 'week'}
+          type="button"
+          role="tab"
+          aria-selected={viewMode === 'week'}
+          onclick={() => selectViewMode('week')}
+        >
+          {t('activities.viewWeek')}
+        </button>
+      </div>
       <button
         class="btn btn-secondary btn-sm"
         onclick={() => showQuickAdd = !showQuickAdd}
@@ -870,6 +986,25 @@
     {/if}
   </div>
 
+  {#if viewMode === 'week'}
+    <section class="week-toolbar" aria-label={t('activities.weekNav')}>
+      <button class="btn btn-ghost btn-sm" type="button" onclick={() => moveWeek(-1)}>
+        {t('activities.previousWeek')}
+      </button>
+      <button class="btn btn-secondary btn-sm" type="button" onclick={() => moveWeek(0)}>
+        {t('activities.thisWeekNav')}
+      </button>
+      <button class="btn btn-ghost btn-sm" type="button" onclick={() => moveWeek(1)}>
+        {t('activities.nextWeek')}
+      </button>
+      <strong class="week-range">
+        {formatDate(week.weekStart, settingsStore.dateFormat as 'MMM D, YYYY')}
+        –
+        {formatDate(week.weekEnd, settingsStore.dateFormat as 'MMM D, YYYY')}
+      </strong>
+    </section>
+  {/if}
+
   <!-- Activity workbench list -->
   <div class="activities-list-card">
     {#if activityStore.isLoading}
@@ -886,7 +1021,7 @@
         {/each}
       </ul>
 
-    {:else if visibleActivityCount === 0}
+    {:else if (viewMode === 'list' && visibleActivityCount === 0) || (viewMode === 'week' && filteredActivities.length === 0 && hasActiveActivityFilters)}
       <EmptyState
         icon="activities"
         title={isFirstRunEmpty ? t('activities.noActivities') : t('activities.noMatchingTitle')}
@@ -894,6 +1029,114 @@
         actionLabel={t('activities.addActivity')}
         onaction={() => uiStore.openModal('addActivity')}
       />
+
+    {:else if viewMode === 'week'}
+      <div class="week-layout" data-testid="activity-week">
+        <div class="week-grid" aria-label={t('activities.viewWeek')}>
+          {#each week.days as day (day.date)}
+            <div
+              class="week-day"
+              class:week-day--today={day.isToday}
+              class:week-day--drop={weekDragOverDate === day.date}
+              role="group"
+              aria-label={formatWeekDayLabel(day.date)}
+              ondragover={(event) => handleWeekDragOver(day.date, event)}
+              ondragleave={() => handleWeekDragLeave(day.date)}
+              ondrop={(event) => void handleWeekDrop(day.date, event)}
+            >
+              <header class="week-day-header">
+                <div>
+                  <span class="week-day-name">{formatWeekday(day.date)}</span>
+                  <span class="week-day-date">{formatWeekDayLabel(day.date)}</span>
+                  {#if day.isToday}
+                    <span class="week-today-badge">{t('activities.todayLabel')}</span>
+                  {/if}
+                </div>
+                <button
+                  class="btn btn-ghost btn-sm"
+                  type="button"
+                  onclick={() => addFollowUpOnDay(day.date)}
+                  aria-label={t('activities.addOnDay', { date: formatWeekDayLabel(day.date) })}
+                >
+                  +
+                </button>
+              </header>
+              {#if day.activities.length === 0}
+                <p class="week-day-empty">{t('activities.weekEmpty')}</p>
+              {:else}
+                <ul class="week-day-list">
+                  {#each day.activities as activity (activity.id)}
+                    <li>
+                      <article
+                        class="week-card"
+                        class:week-card--completed={activity.status === 'completed'}
+                        class:week-card--overdue={activity.status === 'overdue'}
+                        draggable={activity.status !== 'completed'}
+                        ondragstart={(event) => handleWeekDragStart(activity.id, event)}
+                      >
+                        <span class="week-card-type">{t(`activities.${activity.type}`)}</span>
+                        <strong class="week-card-subject">{activity.subject}</strong>
+                        <button
+                          class="btn-complete"
+                          class:btn-complete--done={activity.status === 'completed'}
+                          onclick={() => handleToggleComplete(activity)}
+                          type="button"
+                          aria-label={activity.status === 'completed'
+                            ? t('activities.markIncomplete')
+                            : t('activities.markComplete')}
+                        >
+                          {#if activity.status === 'completed'}
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          {:else}
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                              <circle cx="12" cy="12" r="9"/>
+                            </svg>
+                          {/if}
+                        </button>
+                      </article>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </div>
+          {/each}
+        </div>
+
+        <aside class="week-unscheduled" aria-labelledby="week-unscheduled-heading">
+          <h2 id="week-unscheduled-heading">{t('activities.buckets.unscheduled')}</h2>
+          <p>{t('activities.unscheduledHelp')}</p>
+          {#if week.unscheduled.length === 0}
+            <p class="week-day-empty">{t('activities.noDueDate')}</p>
+          {:else}
+            <ul class="week-day-list">
+              {#each week.unscheduled as activity (activity.id)}
+                <li>
+                  <article
+                    class="week-card"
+                    draggable={true}
+                    ondragstart={(event) => handleWeekDragStart(activity.id, event)}
+                  >
+                    <span class="week-card-type">{t(`activities.${activity.type}`)}</span>
+                    <strong class="week-card-subject">{activity.subject}</strong>
+                    <button
+                      class="btn-complete"
+                      onclick={() => handleToggleComplete(activity)}
+                      type="button"
+                      aria-label={t('activities.markComplete')}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9"/>
+                      </svg>
+                    </button>
+                  </article>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </aside>
+      </div>
 
     {:else}
       <div class="activity-buckets">
@@ -1038,6 +1281,184 @@
     display: flex;
     gap: var(--space-3);
     align-items: center;
+  }
+
+  .layout-toggle {
+    display: inline-flex;
+    gap: var(--space-1);
+    padding: 2px;
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--surface-default);
+  }
+
+  .layout-toggle-button {
+    min-height: 28px;
+    padding: var(--space-1) var(--space-3);
+    border: none;
+    border-radius: calc(var(--radius-md) - 2px);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    cursor: pointer;
+  }
+
+  .layout-toggle-button--active {
+    background: var(--surface-active);
+    color: var(--text-accent);
+  }
+
+  .week-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .week-range {
+    margin-inline-start: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+  }
+
+  .week-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .week-day,
+  .week-unscheduled {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-height: 220px;
+    padding: var(--space-2);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--surface-default);
+  }
+
+  .week-day--today {
+    border-color: var(--color-primary);
+    background: var(--surface-active);
+  }
+
+  .week-day--drop {
+    border-color: var(--color-primary);
+    box-shadow: inset 0 0 0 1px var(--color-primary);
+  }
+
+  .week-day-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-1);
+  }
+
+  .week-day-name,
+  .week-day-date {
+    display: block;
+    font-size: var(--text-xs);
+  }
+
+  .week-day-name {
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    text-transform: capitalize;
+  }
+
+  .week-day-date,
+  .week-today-badge,
+  .week-day-empty,
+  .week-unscheduled p {
+    color: var(--text-secondary);
+  }
+
+  .week-today-badge {
+    display: inline-block;
+    margin-top: 2px;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--text-accent);
+  }
+
+  .week-unscheduled h2 {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .week-unscheduled p,
+  .week-day-empty {
+    margin: 0;
+    font-size: var(--text-xs);
+    line-height: 1.4;
+  }
+
+  .week-day-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .week-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px var(--space-2);
+    padding: var(--space-2);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-sm);
+    background: var(--surface-raised);
+    cursor: grab;
+  }
+
+  .week-card--completed {
+    opacity: 0.65;
+    cursor: default;
+  }
+
+  .week-card--overdue {
+    border-color: var(--color-danger-200);
+  }
+
+  .week-card-type {
+    grid-column: 1;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+  }
+
+  .week-card-subject {
+    grid-column: 1;
+    font-size: var(--text-xs);
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+  }
+
+  .week-card .btn-complete {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+    align-self: center;
+  }
+
+  @media (max-width: 900px) {
+    .week-layout,
+    .week-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   .saved-views,
