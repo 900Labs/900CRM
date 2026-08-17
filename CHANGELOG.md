@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-17
+- The Pipeline deal drawer uses the same Next step strip as the deal
+  page, so the primary button matches overdue work, a missing
+  follow-up, or a missing close date.
 - Reports can download the current snapshot as an unencrypted CSV.
   The file is the numbers on the page, including the current-stage
   honesty note. It is not historical conversion.

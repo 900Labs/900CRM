@@ -1193,6 +1193,7 @@
       organizationName={selectedDealRelationshipNames.organizationName}
       onclose={closeDealDrawer}
       onaddfollowup={openSelectedDealFollowUp}
+      onrefresh={() => void loadPipelineActivityContext()}
     />
   {/if}
 </div>

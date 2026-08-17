@@ -1102,10 +1102,11 @@ test('opens a pipeline deal guidance drawer and refreshes follow-up state', asyn
   let drawer = page.getByRole('dialog', { name: 'Guided pipeline rollout' });
   await expect(drawer).toBeVisible();
   await expect(drawer.getByText('Needs Follow-Up')).toBeVisible();
+  await expect(drawer.getByRole('heading', { name: 'Schedule a follow-up' })).toBeVisible();
   await expect(drawer.getByText('$50,000')).toBeVisible();
   await expect(drawer.getByText('$25,000')).toBeVisible();
 
-  await drawer.getByRole('button', { name: 'Add Follow-Up' }).click();
+  await drawer.getByTestId('next-step').getByRole('button', { name: 'Add Follow-Up' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add Activity' });
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('#modal-activity-deal')).not.toHaveValue('');
@@ -1116,10 +1117,68 @@ test('opens a pipeline deal guidance drawer and refreshes follow-up state', asyn
 
   drawer = page.getByRole('dialog', { name: 'Guided pipeline rollout' });
   await expect(drawer.getByText('Stale')).toBeVisible();
-  await expect(drawer.getByText('Schedule guided rollout call')).toBeVisible();
+  await expect(drawer.getByRole('heading', { name: 'This deal has gone quiet' })).toBeVisible();
+  await expect(drawer.getByText('Schedule guided rollout call', { exact: true })).toBeVisible();
 
   await drawer.getByRole('button', { name: 'Close' }).click();
   await expect(drawer).toBeHidden();
+
+  await assertNoConsoleErrors();
+});
+
+test('pipeline drawer next step opens the deal page to set a close date', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/pipeline');
+  const followUpDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+
+  const seed = await page.evaluate(async (dueDate) => {
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (!invoke) {
+      throw new Error('Tauri smoke shim is not installed.');
+    }
+
+    const deal = await invoke('create_deal', {
+      title: 'Close-date clinic kit',
+      value: 9000,
+      currency: 'USD',
+      stage: 'Proposal',
+      probability: 40,
+      expected_close: '',
+      contact_id: '',
+      organization_id: '',
+      notes: '',
+    }) as { id: string };
+
+    await invoke('create_activity', {
+      activity_type: 'task',
+      title: 'Confirm clinic install window',
+      description: '',
+      due_date: dueDate,
+      contact_id: '',
+      deal_id: deal.id,
+    });
+
+    return { dealId: deal.id };
+  }, followUpDate);
+
+  await loadHashRoute(page, '/pipeline');
+  const card = page.getByRole('button', { name: /Close-date clinic kit/ });
+  await expect(card).toBeVisible();
+  await card.evaluate((element) => {
+    if (element instanceof HTMLButtonElement) {
+      element.click();
+    }
+  });
+
+  const drawer = page.getByRole('dialog', { name: 'Close-date clinic kit' });
+  await expect(drawer.getByRole('heading', { name: 'Set an expected close date' })).toBeVisible();
+  await drawer.getByTestId('next-step').getByRole('button', { name: 'Set close date' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/deals/${seed.dealId}$`));
+  await expect(page.getByRole('heading', { name: 'Set an expected close date' })).toBeVisible();
 
   await assertNoConsoleErrors();
 });
