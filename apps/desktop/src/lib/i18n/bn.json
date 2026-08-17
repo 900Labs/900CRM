@@ -20,6 +20,7 @@
     "organizations": "সংস্থা",
     "auditLog": "অডিট লগ",
     "pendingActions": "অপেক্ষমাণ কাজ",
+    "pendingActionsCount": "অপেক্ষমাণ কাজ ({count})",
     "collapse": "সংকুচিত করুন",
     "expandSidebar": "সাইডবার প্রসারিত করুন",
     "collapseSidebar": "সাইডবার সংকুচিত করুন",

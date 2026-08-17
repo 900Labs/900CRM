@@ -13,6 +13,7 @@
   } from '$lib/api/proposedActions';
   import { settingsStore } from '$lib/stores/settings';
   import { uiStore } from '$lib/stores/ui.svelte';
+  import { reviewCountsStore } from '$lib/stores/reviewCounts';
 
   let actions = $state<ProposedAction[]>([]);
   let isLoading = $state(true);
@@ -38,6 +39,7 @@
       const pendingActions = await listPendingProposedActions();
       if (requestSeq === loadRequestSeq && decisionSeqAtStart === decisionSeq) {
         actions = pendingActions.filter((action) => !decidedActionIds.has(action.id));
+        reviewCountsStore.pendingCount = actions.length;
       }
     } catch (err) {
       if (requestSeq === loadRequestSeq && decisionSeqAtStart === decisionSeq) {
@@ -95,6 +97,7 @@
       decisionSeq += 1;
       decidedActionIds.add(action.id);
       actions = actions.filter((pendingAction) => pendingAction.id !== action.id);
+      reviewCountsStore.pendingCount = actions.length;
       error = null;
 
       const message = decision === 'approve'

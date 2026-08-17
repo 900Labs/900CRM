@@ -3,6 +3,7 @@ import { contactStore } from './contacts';
 import { dealStore } from './deals';
 import { organizationStore } from './organizations';
 import { settingsStore } from './settings';
+import { reviewCountsStore } from './reviewCounts';
 
 /**
  * Reload in-memory stores after the SQLite file is replaced (backup restore
@@ -22,5 +23,6 @@ export async function reloadWorkspaceAfterDataReplace(): Promise<void> {
     activityStore.loadActivities(),
     activityStore.loadUpcoming(),
     organizationStore.loadOrganizations(),
+    reviewCountsStore.refresh(),
   ]);
 }

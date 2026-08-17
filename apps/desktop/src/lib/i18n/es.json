@@ -20,6 +20,7 @@
     "organizations": "Organizaciones",
     "auditLog": "Registro de auditoría",
     "pendingActions": "Acciones pendientes",
+    "pendingActionsCount": "Acciones pendientes ({count})",
     "collapse": "Contraer",
     "expandSidebar": "Expandir barra lateral",
     "collapseSidebar": "Contraer barra lateral",
