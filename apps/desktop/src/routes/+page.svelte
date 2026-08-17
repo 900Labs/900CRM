@@ -73,7 +73,7 @@
       return { route: '/pipeline/:id', contactId: null, organizationId: null, dealId: id || null };
     }
 
-    if (normalized === '/activities') {
+    if (normalized === '/activities' || normalized.startsWith('/activities/')) {
       return emptyRoute('/activities');
     }
 

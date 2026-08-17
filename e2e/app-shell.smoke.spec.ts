@@ -37,8 +37,14 @@ test('renders key hash routes without native Tauri dialogs', async ({ page, asse
 
   await loadHashRoute(page, '/activities');
   await expect(page.getByRole('heading', { name: 'Activities' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'List' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Week' })).toBeVisible();
   await expect(page.getByText('No activities yet')).toBeVisible();
   await expect(page.getByText('Add a task, call, meeting, or email')).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Week' }).click();
+  await expect(page.getByTestId('activity-week')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'This week', exact: true })).toBeVisible();
 
   await loadHashRoute(page, '/reports');
   await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
