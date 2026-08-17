@@ -51,7 +51,7 @@ real small business owner.
 | Organizations | List with saved views, health, and next follow-up; create/edit, notes/tags, contact linking, account detail workspace with a Next step strip, linked people/deals/activity and relationship-aware account timeline | Account list now shows health and the next follow-up. Still no owner field. |
 | Pipeline | Kanban by stage, search, attention filters, custom-field filter, saved views, deal cards, deal guidance drawer with weighted forecast, stale/overdue/follow-up status, linked activities, a board-level forecast/stage-health overview, deal workspace `#/deals/:id` with a Next step strip, and clearer stage-move drop targets | Stronger daily sales surface. Still needs true historical stage conversion summaries. |
 | Activities | Task/call/meeting/email follow-up workbench with due buckets, week and month calendars, summary counts, quick snooze/reschedule, completion, filters, saved views, relationship breadcrumbs, and in-app reminder notifications | Week and month views are calendars of existing follow-ups. Still no due times, recurrence, or external calendar sync. |
-| Reports | Dedicated Workspace route for current pipeline and activity health, current-stage funnel ratios, due buckets, activity type mix, a clickable stale-deal list, and saved focus views | Usable alpha reporting with a stale-deal list and named focus views. Still needs source/owner dimensions, exportable snapshots, and true historical conversion after stage history exists. |
+| Reports | Dedicated Workspace route for current pipeline and activity health, current-stage funnel ratios, due buckets, activity type mix, a clickable stale-deal list, saved focus views, and a current-dataset CSV snapshot | Usable alpha reporting with a stale-deal list, named focus views, and an unencrypted snapshot download. Still needs source/owner dimensions and true historical conversion after stage history exists. |
 | Audit Log | Read-only table grouped under Review | Good trust feature, now visually separated from daily work. Later, it may still move deeper into Admin once Review counts are more prominent. |
 | Pending Actions | Review queue for proposed actions grouped under Review, with a sidebar count when items are waiting | Safety queue is visible when it needs a decision, without becoming daily work. |
 | Settings | Appearance, Data, and Integrations panes for locale/theme, backup/import, and email/clients | Split into three panes. Email stays a reachability probe; sync stays honestly unavailable. |
@@ -170,8 +170,9 @@ stage-transition analytics.
 
 Recommended outcome: keep Reports focused on current operational health until
 the data model stores stage-transition history and richer report dimensions
-such as owner/source are available. Named focus views are in place. Then add
-exportable snapshots and historical conversion reporting.
+such as owner/source are available. Named focus views and a current-dataset
+snapshot download are in place. Historical conversion still waits on stage
+history.
 
 ### 6. Admin/safety items crowd primary navigation
 
@@ -254,9 +255,10 @@ These are ordered to improve perceived product value fastest.
      rate, due buckets, and activity type mix.
    - Added named saved views for report focus: Pipeline, Activities, or
      Stale Deals.
-   - Remaining work: source/owner breakdown where supported, exportable
-     report snapshots, and true historical conversion only after stage
-     history exists.
+   - Added a current-dataset CSV snapshot download. The file includes
+     the honesty note that ratios are not historical conversion.
+   - Remaining work: source/owner breakdown where supported, and true
+     historical conversion only after stage history exists.
 
 7. **Local Automation Lite** - explicit local suggestions completed
    - Added a Pipeline stage-move prompt that drafts a follow-up only after a

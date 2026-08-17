@@ -156,6 +156,7 @@ pub fn run() {
             commands::backup_commands::restore_local_backup_to_app_data,
             commands::import_export::read_import_text,
             commands::import_export::validate_open_path,
+            commands::import_export::write_export_text,
             commands::import_export::rollback_completed_import,
             commands::import_export::import_contacts_csv,
             commands::import_export::import_contacts_csv_with_mapping,

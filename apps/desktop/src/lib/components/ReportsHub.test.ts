@@ -114,6 +114,7 @@ describe('Reports route', () => {
     expect((await screen.findAllByText('50.0%')).length).toBeGreaterThan(0);
     expect(screen.getByText('reports.pipeline.title')).toBeTruthy();
     expect(screen.getByText('reports.activity.title')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'reports.exportSnapshot' })).toBeTruthy();
     expect(screen.getByText('deals.stages.lead')).toBeTruthy();
     expect(screen.getByText('deals.stages.lead -> deals.stages.qualified')).toBeTruthy();
     expect(screen.getByText('reports.activity.dueBuckets.title')).toBeTruthy();

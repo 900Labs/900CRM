@@ -37,6 +37,13 @@
     buildStaleDealReport,
     type StaleDealReport,
   } from '$lib/utils/staleDealReport';
+  import {
+    buildReportSnapshotRows,
+    defaultReportSnapshotFilename,
+    reportSnapshotToCsv,
+    type ReportFocus,
+  } from '$lib/utils/reportSnapshot';
+  import { saveTextFile } from '$lib/utils/saveTextFile';
 
   let pipelineReport = $state<PipelineConversionReport | null>(null);
   let activityReport = $state<ActivityFunnelReport | null>(null);
@@ -48,7 +55,7 @@
   let staleLoading = $state(true);
   let staleError = $state<string | null>(null);
   let reportsBootstrapped = false;
-  type ReportFocus = '' | 'pipeline' | 'activity' | 'stale';
+  let exporting = $state(false);
   let reportFocus = $state<ReportFocus>('');
   let savedViews = $state<SavedView[]>([]);
   let selectedViewId = $state('');
@@ -348,6 +355,44 @@
     syncSelectedView();
   }
 
+  async function handleExportSnapshot(): Promise<void> {
+    if (reportsLoading) {
+      return;
+    }
+
+    const includePipeline = showPipelineSection && pipelineReport !== null;
+    const includeActivity = showActivitySection && activityReport !== null;
+    const includeStale = showStaleSection && staleReport !== null;
+    if (!includePipeline && !includeActivity && !includeStale) {
+      uiStore.toastError(t('reports.exportEmpty'));
+      return;
+    }
+
+    exporting = true;
+    try {
+      const csv = reportSnapshotToCsv(
+        buildReportSnapshotRows({
+          focus: reportFocus,
+          pipeline: includePipeline ? pipelineReport : null,
+          activity: includeActivity ? activityReport : null,
+          stale: includeStale ? staleReport : null,
+        }),
+      );
+      const result = await saveTextFile(defaultReportSnapshotFilename(), csv);
+      if (result === 'cancelled') {
+        return;
+      }
+      uiStore.toastSuccess(
+        result === 'saved' ? t('reports.exportSaved') : t('reports.exportDownloaded'),
+      );
+    } catch (err) {
+      console.error('[Reports] Snapshot export failed:', err);
+      uiStore.toastError(t('reports.exportFailed'));
+    } finally {
+      exporting = false;
+    }
+  }
+
   $effect(() => {
     if (reportsBootstrapped) {
       return;
@@ -364,9 +409,19 @@
       <h1 class="page-title">{t('reports.title')}</h1>
       <p class="page-subtitle">{t('reports.subtitle')}</p>
     </div>
-    <button class="btn btn-secondary btn-sm" disabled={reportsLoading} onclick={loadReports} type="button">
-      {reportsLoading ? t('reports.refreshing') : t('reports.refresh')}
-    </button>
+    <div class="header-actions">
+      <button class="btn btn-secondary btn-sm" disabled={reportsLoading} onclick={loadReports} type="button">
+        {reportsLoading ? t('reports.refreshing') : t('reports.refresh')}
+      </button>
+      <button
+        class="btn btn-primary btn-sm"
+        type="button"
+        disabled={reportsLoading || exporting}
+        onclick={() => void handleExportSnapshot()}
+      >
+        {exporting ? t('reports.exporting') : t('reports.exportSnapshot')}
+      </button>
+    </div>
   </div>
 
   <section class="saved-views" aria-labelledby="reports-saved-views-heading">
@@ -706,8 +761,16 @@
   }
 
   .page-header {
+    display: flex;
+    justify-content: space-between;
     align-items: flex-start;
     gap: var(--space-4);
+  }
+
+  .header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
 
   .page-subtitle {
