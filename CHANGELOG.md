@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-17
+- The Review sidebar shows how many proposed actions are waiting, so
+  Pending Actions is visible only when there is something to decide.
 - Activities Month shows the same follow-ups on a Monday-aligned month
   grid. Days outside the month stay visible but dimmed. A crowded day
   shows the first three cards and a leftover count.

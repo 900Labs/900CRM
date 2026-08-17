@@ -20,6 +20,7 @@
     "organizations": "المؤسسات",
     "auditLog": "سجل التدقيق",
     "pendingActions": "الإجراءات المعلقة",
+    "pendingActionsCount": "الإجراءات المعلقة ({count})",
     "collapse": "طي",
     "expandSidebar": "توسيع الشريط الجانبي",
     "collapseSidebar": "طي الشريط الجانبي",

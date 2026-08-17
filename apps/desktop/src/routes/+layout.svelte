@@ -22,6 +22,7 @@
   import GlobalModalHost from '$lib/components/GlobalModalHost.svelte';
   import { startActivityReminderService } from '$lib/services/activityReminders';
   import { currentHashPath, navigateHash, routeHash } from '$lib/utils/hashRouter';
+  import { reviewCountsStore } from '$lib/stores/reviewCounts';
 
   // ── Child route ──────────────────────────────────────────────────────────────
 
@@ -38,6 +39,7 @@
     label: () => string;
     href: string;
     icon: string;
+    badge?: () => number;
   }
 
   interface NavSection {
@@ -97,6 +99,7 @@
       label: () => t('nav.pendingActions'),
       href: '/pending-actions',
       icon: 'M12 6v6l4 2M21 12a9 9 0 11-9-9M19 3v5h-5',
+      badge: () => reviewCountsStore.pendingCount,
     },
     {
       id: 'audit-log',
@@ -145,6 +148,14 @@
     return currentRoute.startsWith(href);
   }
 
+  function itemTitle(section: NavSection, item: NavItem): string | undefined {
+    const count = item.badge?.() ?? 0;
+    const label = count > 0
+      ? t('nav.pendingActionsCount', { count: reviewCountsStore.formatCount() })
+      : item.label();
+    return uiStore.sidebarCollapsed ? `${section.label()}: ${label}` : undefined;
+  }
+
   function handleSearchResult(result: SearchResult) {
     if (result.type === 'contact') {
       navigate(`/contacts/${result.id}`);
@@ -185,6 +196,7 @@
       // Load settings (applies theme + locale)
       await settingsStore.loadSettings();
       if (!isActive) return;
+      void reviewCountsStore.refresh();
       stopReminderService = startActivityReminderService();
     })();
 
@@ -229,26 +241,37 @@
               class:active={isActive(item.href)}
               href={routeHash(item.href)}
               onclick={(e) => { e.preventDefault(); navigate(item.href); }}
-              title={uiStore.sidebarCollapsed ? `${section.label()}: ${item.label()}` : undefined}
+              title={itemTitle(section, item)}
               aria-current={isActive(item.href) ? 'page' : undefined}
+              aria-label={item.badge?.()
+                ? t('nav.pendingActionsCount', { count: reviewCountsStore.formatCount() })
+                : undefined}
             >
-              <svg
-                class="nav-icon"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.75"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-                style="flex-shrink: 0;"
-              >
-                <path d={item.icon} />
-              </svg>
+              <span class="nav-icon-wrap">
+                <svg
+                  class="nav-icon"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                  style="flex-shrink: 0;"
+                >
+                  <path d={item.icon} />
+                </svg>
+                {#if uiStore.sidebarCollapsed && (item.badge?.() ?? 0) > 0}
+                  <span class="nav-badge-dot" data-testid="nav-pending-dot"></span>
+                {/if}
+              </span>
               {#if !uiStore.sidebarCollapsed}
                 <span class="nav-label">{item.label()}</span>
+                {#if (item.badge?.() ?? 0) > 0}
+                  <span class="nav-badge" data-testid="nav-pending-count">{reviewCountsStore.formatCount()}</span>
+                {/if}
               {/if}
             </a>
           {/each}

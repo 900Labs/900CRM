@@ -53,7 +53,7 @@ real small business owner.
 | Activities | Task/call/meeting/email follow-up workbench with due buckets, week and month calendars, summary counts, quick snooze/reschedule, completion, filters, saved views, relationship breadcrumbs, and in-app reminder notifications | Week and month views are calendars of existing follow-ups. Still no due times, recurrence, or external calendar sync. |
 | Reports | Dedicated Workspace route for current pipeline and activity health, current-stage funnel ratios, due buckets, activity type mix, a clickable stale-deal list, and saved focus views | Usable alpha reporting with a stale-deal list and named focus views. Still needs source/owner dimensions, exportable snapshots, and true historical conversion after stage history exists. |
 | Audit Log | Read-only table grouped under Review | Good trust feature, now visually separated from daily work. Later, it may still move deeper into Admin once Review counts are more prominent. |
-| Pending Actions | Review queue for proposed actions grouped under Review | Important for MCP/external-client safety. The next improvement is to show high-priority pending counts without making this a daily-work screen. |
+| Pending Actions | Review queue for proposed actions grouped under Review, with a sidebar count when items are waiting | Safety queue is visible when it needs a decision, without becoming daily work. |
 | Settings | Appearance, Data, and Integrations panes for locale/theme, backup/import, and email/clients | Split into three panes. Email stays a reachability probe; sync stays honestly unavailable. |
 
 ## What Comparable CRMs Emphasize

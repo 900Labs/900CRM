@@ -20,6 +20,7 @@
     "organizations": "Kungiyoyi",
     "auditLog": "Rajistan bita",
     "pendingActions": "Ayyukan da ke jira",
+    "pendingActionsCount": "Ayyukan da ke jira ({count})",
     "collapse": "Tata",
     "expandSidebar": "Faɗaɗa mashigin gefe",
     "collapseSidebar": "Tata mashigin gefe",

@@ -20,6 +20,7 @@
     "organizations": "Mashirika",
     "auditLog": "Kumbukumbu za Ukaguzi",
     "pendingActions": "Vitendo Vinavyosubiri",
+    "pendingActionsCount": "Vitendo Vinavyosubiri ({count})",
     "collapse": "Kunja",
     "expandSidebar": "Panua upau wa kando",
     "collapseSidebar": "Kunja upau wa kando",

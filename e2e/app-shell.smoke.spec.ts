@@ -8,6 +8,8 @@ test('renders the browser app shell and dashboard route', async ({ page, assertN
   await expect(navigation).toBeVisible();
   await expect(navigation.getByText('Workspace')).toBeVisible();
   await expect(navigation.getByText('Review')).toBeVisible();
+  await expect(navigation.getByRole('link', { name: 'Pending Actions' })).toBeVisible();
+  await expect(page.getByTestId('nav-pending-count')).toHaveCount(0);
   await expect(navigation.getByText('Admin')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   await expect(page.getByText('Total Contacts')).toBeVisible();

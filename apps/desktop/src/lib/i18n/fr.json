@@ -20,6 +20,7 @@
     "organizations": "Organisations",
     "auditLog": "Journal d'audit",
     "pendingActions": "Actions en attente",
+    "pendingActionsCount": "Actions en attente ({count})",
     "collapse": "Réduire",
     "expandSidebar": "Développer la barre latérale",
     "collapseSidebar": "Réduire la barre latérale",

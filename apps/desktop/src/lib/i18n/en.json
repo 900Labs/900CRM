@@ -20,6 +20,7 @@
     "organizations": "Organizations",
     "auditLog": "Audit Log",
     "pendingActions": "Pending Actions",
+    "pendingActionsCount": "Pending Actions ({count})",
     "collapse": "Collapse",
     "expandSidebar": "Expand sidebar",
     "collapseSidebar": "Collapse sidebar",
