@@ -986,6 +986,43 @@ test('routes global contact search results into direct contact detail outside th
   await assertNoConsoleErrors();
 });
 
+test('filters Pipeline and the Dashboard queue by deal owner', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/pipeline');
+  await expect(page.getByRole('heading', { name: 'Pipeline' })).toBeVisible();
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Deal' }).click();
+  const ownedDialog = page.getByRole('dialog', { name: 'Add Deal' });
+  await ownedDialog.getByLabel('Deal Name').fill('Owned clinic kit');
+  await ownedDialog.getByLabel('Owner').fill('Samira');
+  await ownedDialog.getByRole('button', { name: 'Save' }).click();
+  await expect(ownedDialog).toBeHidden();
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Deal' }).click();
+  const otherDialog = page.getByRole('dialog', { name: 'Add Deal' });
+  await otherDialog.getByLabel('Deal Name').fill('Unowned clinic kit');
+  await otherDialog.getByRole('button', { name: 'Save' }).click();
+  await expect(otherDialog).toBeHidden();
+
+  await expect(page.getByText('Owned clinic kit', { exact: true })).toBeVisible();
+  await expect(page.getByText('Unowned clinic kit', { exact: true })).toBeVisible();
+
+  await page.getByLabel('Filter by owner').fill('samira');
+  await expect(page.getByText('Owned clinic kit', { exact: true })).toBeVisible();
+  await expect(page.getByText('Unowned clinic kit', { exact: true })).toHaveCount(0);
+
+  await loadHashRoute(page, '/');
+  const queue = page.getByTestId('dashboard-attention-strip');
+  await expect(queue.getByRole('heading', { name: 'Needs Attention' })).toBeVisible();
+  await queue.getByLabel('Filter by owner').fill('samira');
+  await expect(queue.getByRole('button', { name: /Owned clinic kit/ })).toBeVisible();
+  await expect(queue.getByRole('button', { name: /Unowned clinic kit/ })).toHaveCount(0);
+
+  await assertNoConsoleErrors();
+});
+
 test('creates a deal through the visible UI and shows it in Pipeline', async ({
   page,
   assertNoConsoleErrors,

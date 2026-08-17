@@ -84,10 +84,13 @@
   const sampleDataAvailable = $derived(
     !sampleLoaded && !hasFirstRunContacts && !hasFirstRunDeals && !hasFirstRunActivities
   );
+  let ownerFilter = $state('');
+
   const attentionQueue = $derived(buildDashboardAttentionQueue({
     activities: attentionActivities,
     deals: attentionDeals,
     leads: attentionLeads,
+    owner: ownerFilter,
   }));
   const hasWorkspaceRecords = $derived(
     sampleLoaded || hasFirstRunContacts || hasFirstRunDeals || hasFirstRunActivities,
@@ -395,6 +398,13 @@
               })}
             </p>
           {/if}
+          <input
+            class="input attention-owner-filter"
+            type="search"
+            bind:value={ownerFilter}
+            placeholder={t('common.filterOwner')}
+            aria-label={t('common.filterOwner')}
+          />
         </div>
 
         {#if !attentionLoading && !attentionError && attentionQueue.items.length > 0}
@@ -680,6 +690,11 @@
   .attention-strip h2,
   .attention-strip p {
     margin: 0;
+  }
+
+  .attention-owner-filter {
+    max-width: 220px;
+    height: 34px;
   }
 
   .attention-strip h2 {

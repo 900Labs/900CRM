@@ -13,6 +13,7 @@ export interface StaleDealReportRow {
   dealId: string;
   name: string;
   stage: DealStage;
+  owner: string | null;
   stageAgeDays: number;
   nextActivitySubject: string | null;
   href: string;
@@ -57,6 +58,7 @@ export function buildStaleDealReport({
         dealId: deal.id,
         name: deal.name,
         stage: deal.stage,
+        owner: deal.owner?.trim() || null,
         stageAgeDays: guidance.stageAgeDays,
         nextActivitySubject: guidance.nextActivity?.subject ?? null,
         href: `/deals/${deal.id}`,

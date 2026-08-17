@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added — 2026-08-17
+- Dashboard, Pipeline, and Reports can filter the current queue by
+  owner. Pipeline cards and the stale-deal list show the name when it
+  is set.
 - Contacts, deals, and organizations can store an optional local owner
   name. Create and edit forms include the field. Contacts and
   Organizations can filter by owner. This is a free-text name, not a

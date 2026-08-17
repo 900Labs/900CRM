@@ -249,4 +249,44 @@ describe('local automation helpers', () => {
     ]);
     expect(queue.items[0]?.href).toBe('/activities');
   });
+
+  it('filters the dashboard queue by owner name', () => {
+    const ownedLead = contact({ owner: 'Samira' });
+    const otherLead = contact({
+      id: 'contact-2',
+      firstName: 'Amina',
+      lastName: 'Diallo',
+      owner: 'Kofi',
+    });
+    const ownedDeal = deal({ id: 'deal-owned', name: 'Owned kit', owner: 'Samira' });
+    const otherDeal = deal({ id: 'deal-other', name: 'Other kit', owner: 'Kofi' });
+
+    const queue = buildDashboardAttentionQueue({
+      activities: [
+        activity({
+          id: 'owned-call',
+          subject: 'Call Samira clinic',
+          contactId: ownedLead.id,
+          dealId: null,
+          dueDate: '2026-07-07',
+        }),
+        activity({
+          id: 'other-call',
+          subject: 'Call Kofi clinic',
+          contactId: otherLead.id,
+          dealId: null,
+          dueDate: '2026-07-07',
+        }),
+      ],
+      deals: [ownedDeal, otherDeal],
+      leads: [ownedLead, otherLead],
+      owner: 'samira',
+      now: NOW,
+    });
+
+    expect(queue.items.map((item) => item.title)).toEqual([
+      'Call Samira clinic',
+      'Owned kit',
+    ]);
+  });
 });

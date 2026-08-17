@@ -60,6 +60,7 @@
   import DealDetailDrawer from '$lib/components/DealDetailDrawer.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
   import { navigateHash } from '$lib/utils/hashRouter';
+  import { matchesRecordOwner } from '$lib/utils/recordOwner';
   import {
     createSavedView,
     deleteSavedView,
@@ -108,6 +109,7 @@
   let pipelineBootstrapComplete = $state(false);
   let suppressNextCardClick = false;
   let searchQuery = $state('');
+  let ownerFilter = $state('');
   let attentionFilter = $state<'' | 'needsFollowUp' | 'stale' | 'overdue'>('');
   let savedViews = $state<SavedView[]>([]);
   let selectedViewId = $state('');
@@ -339,6 +341,7 @@
   function collectCurrentFilters(): ContactSavedViewFilters {
     return {
       search: searchQuery.trim() || undefined,
+      owner: ownerFilter.trim() || undefined,
       customFieldDefId: selectedCustomFieldDefId || undefined,
       customFieldQuery: customFieldQuery.trim() || undefined,
       attention: attentionFilter || undefined,
@@ -367,6 +370,7 @@
   async function applyView(view: SavedView): Promise<void> {
     selectedViewId = view.id;
     searchQuery = view.filters.search ?? '';
+    ownerFilter = view.filters.owner ?? '';
     selectedCustomFieldDefId = view.filters.customFieldDefId ?? '';
     customFieldQuery = view.filters.customFieldQuery ?? '';
     attentionFilter = view.filters.attention ?? '';
@@ -439,6 +443,11 @@
     syncSelectedView();
   }
 
+  function handleOwnerFilterInput(event: Event): void {
+    ownerFilter = (event.target as HTMLInputElement).value;
+    syncSelectedView();
+  }
+
   function handleAttentionFilter(next: '' | 'needsFollowUp' | 'stale' | 'overdue'): void {
     attentionFilter = next;
     syncSelectedView();
@@ -450,6 +459,10 @@
       return true;
     }
     return deal.name.toLowerCase().includes(query);
+  }
+
+  function matchesOwner(deal: Deal): boolean {
+    return matchesRecordOwner(deal.owner, ownerFilter);
   }
 
   function matchesCustomField(dealId: string): boolean {
@@ -551,7 +564,7 @@
   const columns = $derived(
     DEAL_STAGES.map((stage) => {
       const deals = (dealStore.dealsByStage[stage] ?? []).filter(
-        (deal) => matchesSearch(deal) && matchesCustomField(deal.id) && matchesAttention(deal),
+        (deal) => matchesSearch(deal) && matchesOwner(deal) && matchesCustomField(deal.id) && matchesAttention(deal),
       );
       const currencyTotals = sumByCurrency(
         deals.map((deal) => ({ currency: deal.currency, value: deal.value }))
@@ -959,6 +972,14 @@
       oninput={handleSearchInput}
       placeholder={t('deals.search')}
       aria-label={t('deals.search')}
+    />
+    <input
+      class="input pipeline-filter-input selectable"
+      type="search"
+      value={ownerFilter}
+      oninput={handleOwnerFilterInput}
+      placeholder={t('common.filterOwner')}
+      aria-label={t('common.filterOwner')}
     />
     <div class="attention-filters" role="group" aria-label={t('deals.attentionFilter')}>
       {#each [

@@ -4,6 +4,7 @@ import type { Deal, DealStage } from '$lib/api/deals';
 import { addLocalDays, buildActivityWorkbench } from '$lib/utils/activityWorkbench';
 import { contactDisplayName } from '$lib/utils/dealRelationships';
 import { isDealClosed, nextDealActivity } from '$lib/utils/pipelineGuidance';
+import { matchesRecordOwner } from '$lib/utils/recordOwner';
 
 export interface SuggestedActivityDraft {
   subject: string;
@@ -129,16 +130,34 @@ export function buildDashboardAttentionQueue({
   activities,
   deals = [],
   leads = [],
+  owner = '',
   now = new Date(),
   limit = 8,
 }: {
   activities: Activity[];
   deals?: Deal[];
   leads?: Contact[];
+  owner?: string;
   now?: Date;
   limit?: number;
 }): DashboardAttentionQueue {
-  const workbench = buildActivityWorkbench(activities, now);
+  const dealById = new Map(deals.map((deal) => [deal.id, deal]));
+  const leadById = new Map(leads.map((lead) => [lead.id, lead]));
+  const visibleDeals = deals.filter((deal) => matchesRecordOwner(deal.owner, owner));
+  const visibleLeads = leads.filter((lead) => matchesRecordOwner(lead.owner, owner));
+  const visibleActivities = activities.filter((activity) => {
+    if (!owner.trim()) {
+      return true;
+    }
+    const linkedDeal = activity.dealId ? dealById.get(activity.dealId) : undefined;
+    if (linkedDeal && matchesRecordOwner(linkedDeal.owner, owner)) {
+      return true;
+    }
+    const linkedLead = activity.contactId ? leadById.get(activity.contactId) : undefined;
+    return Boolean(linkedLead && matchesRecordOwner(linkedLead.owner, owner));
+  });
+
+  const workbench = buildActivityWorkbench(visibleActivities, now);
   const overdue = workbench.buckets.find((bucket) => bucket.bucket === 'overdue')?.activities ?? [];
   const today = workbench.buckets.find((bucket) => bucket.bucket === 'today')?.activities ?? [];
   const overdueIds = new Set(overdue.map((activity) => activity.id));
@@ -156,7 +175,7 @@ export function buildDashboardAttentionQueue({
     };
   });
 
-  const dealItems = deals
+  const dealItems = visibleDeals
     .filter((deal) => !isDealClosed(deal))
     .filter((deal) => !nextDealActivity(
       activities.filter((activity) => activity.dealId === deal.id),
@@ -170,7 +189,7 @@ export function buildDashboardAttentionQueue({
       href: `/deals/${deal.id}`,
     }));
 
-  const leadItems = leads
+  const leadItems = visibleLeads
     .filter((lead) => lead.type === 'person' && lead.lifecycle === 'lead')
     .filter((lead) => !hasPendingContactActivity(activities, lead.id))
     .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt))

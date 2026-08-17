@@ -4,8 +4,8 @@
    */
 
   import { t } from '$lib/i18n';
-  import { listActivities } from '$lib/api/activities';
-  import { listDeals } from '$lib/api/deals';
+  import { listActivities, type Activity } from '$lib/api/activities';
+  import { listDeals, type Deal } from '$lib/api/deals';
   import {
     getActivityFunnelReport,
     getPipelineConversionReport,
@@ -35,7 +35,6 @@
   import { formatCompactNumber, formatPercent } from '$lib/utils/formatters';
   import {
     buildStaleDealReport,
-    type StaleDealReport,
   } from '$lib/utils/staleDealReport';
   import {
     buildReportSnapshotRows,
@@ -44,6 +43,7 @@
     type ReportFocus,
   } from '$lib/utils/reportSnapshot';
   import { saveTextFile } from '$lib/utils/saveTextFile';
+  import { matchesRecordOwner } from '$lib/utils/recordOwner';
 
   let pipelineReport = $state<PipelineConversionReport | null>(null);
   let activityReport = $state<ActivityFunnelReport | null>(null);
@@ -51,9 +51,14 @@
   let activityLoading = $state(true);
   let pipelineError = $state<string | null>(null);
   let activityError = $state<string | null>(null);
-  let staleReport = $state<StaleDealReport | null>(null);
+  let staleSource = $state<{
+    deals: Deal[];
+    activities: Activity[];
+    linkIndex: ActivityLinkIndex;
+  } | null>(null);
   let staleLoading = $state(true);
   let staleError = $state<string | null>(null);
+  let ownerFilter = $state('');
   let reportsBootstrapped = false;
   let exporting = $state(false);
   let reportFocus = $state<ReportFocus>('');
@@ -89,6 +94,16 @@
 
   const dueBucketRows = $derived(
     activityReport ? buildDueBucketRows(activityReport.due_buckets) : []
+  );
+
+  const staleReport = $derived(
+    staleSource
+      ? buildStaleDealReport({
+          deals: staleSource.deals.filter((deal) => matchesRecordOwner(deal.owner, ownerFilter)),
+          activities: staleSource.activities,
+          linkIndex: staleSource.linkIndex,
+        })
+      : null
   );
 
   const reportsLoading = $derived(pipelineLoading || activityLoading || staleLoading);
@@ -243,9 +258,9 @@
       const linkIndex: ActivityLinkIndex = await loadActivityLinkIndex(
         activities.map((activity) => activity.id),
       );
-      staleReport = buildStaleDealReport({ deals, activities, linkIndex });
+      staleSource = { deals, activities, linkIndex };
     } catch (err) {
-      staleReport = null;
+      staleSource = null;
       staleError = t('reports.stale.loadFailed');
       console.error('[Reports] Stale deal report load error:', err);
     } finally {
@@ -268,6 +283,7 @@
   function collectCurrentFilters(): ContactSavedViewFilters {
     return {
       focus: reportFocus || undefined,
+      owner: ownerFilter.trim() || undefined,
     };
   }
 
@@ -289,6 +305,7 @@
   function applyView(view: SavedView): void {
     selectedViewId = view.id;
     reportFocus = asReportFocus(view.filters.focus);
+    ownerFilter = view.filters.owner ?? '';
   }
 
   function syncSelectedView(): void {
@@ -348,6 +365,11 @@
     if (view) {
       applyView(view);
     }
+  }
+
+  function handleOwnerFilterInput(event: Event): void {
+    ownerFilter = (event.target as HTMLInputElement).value;
+    syncSelectedView();
   }
 
   function handleReportFocus(next: ReportFocus): void {
@@ -473,6 +495,14 @@
   </section>
 
   <div class="report-focus" role="group" aria-label={t('reports.focus')}>
+    <input
+      class="input report-owner-filter"
+      type="search"
+      value={ownerFilter}
+      oninput={handleOwnerFilterInput}
+      placeholder={t('common.filterOwner')}
+      aria-label={t('common.filterOwner')}
+    />
     <span class="report-focus-label">{t('reports.focus')}:</span>
     <button
       class="filter-chip"
@@ -724,6 +754,7 @@
             <tr>
               <th>{t('reports.stale.deal')}</th>
               <th>{t('reports.stale.stage')}</th>
+              <th>{t('common.owner')}</th>
               <th>{t('reports.stale.quietFor')}</th>
               <th>{t('reports.stale.nextStep')}</th>
             </tr>
@@ -741,6 +772,7 @@
                   </button>
                 </td>
                 <td>{t(`deals.stages.${row.stage}`)}</td>
+                <td>{row.owner ?? t('common.none')}</td>
                 <td>{t('reports.stale.days', { count: row.stageAgeDays })}</td>
                 <td>{row.nextActivitySubject ?? t('common.none')}</td>
               </tr>
@@ -799,6 +831,11 @@
     margin: 0;
     font-size: var(--text-sm);
     font-weight: var(--weight-semibold);
+  }
+
+  .report-owner-filter {
+    min-width: 160px;
+    height: 34px;
   }
 
   .saved-views-help,

@@ -51,6 +51,7 @@ const stale: StaleDealReport = {
       dealId: 'deal-1',
       name: 'Quiet Clinic Rollout',
       stage: 'proposal',
+      owner: 'Samira',
       stageAgeDays: 21,
       nextActivitySubject: 'Site visit',
       href: '/deals/deal-1',
