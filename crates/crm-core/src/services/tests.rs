@@ -11967,6 +11967,92 @@ fn contact_lifecycle_defaults_to_customer_and_can_convert_a_lead() {
 }
 
 #[test]
+fn record_owner_can_be_set_and_used_to_filter_contacts() {
+    let (mut core, _path) = open_test_core();
+
+    let owned = core
+        .create_contact_with_lifecycle(
+            Some("person".to_string()),
+            Some("Maya".to_string()),
+            Some("Owner".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("Samira".to_string()),
+        )
+        .expect("owned contact");
+    assert_eq!(owned.owner.as_deref(), Some("Samira"));
+
+    core.create_contact(
+        Some("person".to_string()),
+        Some("No".to_string()),
+        Some("Owner".to_string()),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("unowned contact");
+
+    let listed = core
+        .list_contacts(Some(crate::storage::contacts::ContactListParams {
+            filter_owner: Some("samira".to_string()),
+            ..Default::default()
+        }))
+        .expect("owner filter");
+    assert_eq!(listed.total, 1);
+    assert_eq!(listed.contacts[0].id, owned.id);
+
+    let deal = core
+        .create_deal(
+            "Owned rollout".to_string(),
+            Some(1000.0),
+            Some("USD".to_string()),
+            Some("Lead".to_string()),
+            Some(10),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("deal");
+    let deal = core
+        .set_deal_owner(&deal.id, Some("Samira"))
+        .expect("deal owner");
+    assert_eq!(deal.owner.as_deref(), Some("Samira"));
+
+    let organization = core
+        .create_organization(
+            "Owned Account".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("organization");
+    let organization = core
+        .set_organization_owner(&organization.id, Some("Samira"))
+        .expect("organization owner");
+    assert_eq!(organization.owner.as_deref(), Some("Samira"));
+}
+
+#[test]
 fn create_contact_with_lifecycle_writes_lead_in_one_step() {
     let (mut core, path) = open_test_core();
 
@@ -11984,6 +12070,7 @@ fn create_contact_with_lifecycle_writes_lead_in_one_step() {
             None,
             None,
             Some("lead".to_string()),
+            None,
         )
         .expect("lead should be created in one transaction");
     assert_eq!(lead.lifecycle, "lead");

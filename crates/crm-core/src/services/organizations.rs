@@ -85,6 +85,14 @@ impl CrmCore {
         storage::organizations::list_organizations(&self.db.conn)
     }
 
+    pub fn set_organization_owner(
+        &mut self,
+        id: &str,
+        owner: Option<&str>,
+    ) -> CrmResult<Organization> {
+        storage::organizations::set_organization_owner(&self.db.conn, id, owner)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn update_organization(
         &mut self,

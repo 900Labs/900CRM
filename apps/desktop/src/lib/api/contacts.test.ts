@@ -9,11 +9,13 @@ vi.mock('@tauri-apps/api/core', () => ({
 }));
 
 import {
+  createContact,
   listContacts,
   listContactDuplicateCandidates,
   mergeContacts,
   restoreContact,
   setContactLifecycle,
+  updateContact,
 } from './contacts';
 
 const backendContact = {
@@ -146,6 +148,67 @@ describe('contacts API', () => {
     expect(invokeMock).toHaveBeenCalledWith('restore_contact', {
       id: 'contact-target',
     });
+  });
+
+  it('maps owner on create, list filter, and clear', async () => {
+    invokeMock.mockResolvedValueOnce({
+      ...backendContact,
+      id: 'contact-owned',
+      owner: 'Samira',
+    });
+
+    await expect(
+      createContact({
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: 'ada@example.com',
+        phone: '+15550100',
+        organization: null,
+        type: 'person',
+        tags: [],
+        notes: null,
+        website: null,
+        address: null,
+        owner: 'Samira',
+      }),
+    ).resolves.toMatchObject({
+      id: 'contact-owned',
+      owner: 'Samira',
+    });
+    expect(invokeMock).toHaveBeenCalledWith(
+      'create_contact',
+      expect.objectContaining({ owner: 'Samira' }),
+    );
+
+    invokeMock.mockResolvedValueOnce({
+      contacts: [{ ...backendContact, id: 'contact-owned', owner: 'Samira' }],
+      total: 1,
+      page: 1,
+      per_page: 50,
+    });
+
+    await expect(listContacts({ owner: ' samira ' })).resolves.toMatchObject({
+      contacts: [{ id: 'contact-owned', owner: 'Samira' }],
+    });
+    expect(invokeMock).toHaveBeenCalledWith('list_contacts', {
+      params: expect.objectContaining({
+        filter_owner: 'samira',
+      }),
+    });
+
+    invokeMock.mockResolvedValueOnce({
+      ...backendContact,
+      owner: null,
+    });
+
+    await updateContact('contact-owned', { owner: '' });
+    expect(invokeMock).toHaveBeenCalledWith(
+      'update_contact',
+      expect.objectContaining({
+        id: 'contact-owned',
+        reset_owner: true,
+      }),
+    );
   });
 
   it('maps setContactLifecycle to the dedicated command', async () => {

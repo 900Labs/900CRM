@@ -85,6 +85,28 @@ describe('saved views API', () => {
     expect(filtersMatch({ lifecycle: 'lead' }, { lifecycle: 'customer' })).toBe(false);
   });
 
+  it('maps owner filters', async () => {
+    invokeMock.mockResolvedValueOnce({
+      id: 'view-owner',
+      entity_type: 'contact',
+      name: 'Samira queue',
+      filters_json: '{"owner":"Samira"}',
+      created_at: '2026-08-17T10:00:00Z',
+      updated_at: '2026-08-17T10:00:00Z',
+    });
+
+    await expect(
+      createSavedView('contact', 'Samira queue', { owner: ' Samira ' }),
+    ).resolves.toMatchObject({
+      filters: { owner: 'Samira' },
+    });
+    expect(invokeMock).toHaveBeenCalledWith('create_saved_view', {
+      entity_type: 'contact',
+      name: 'Samira queue',
+      filters_json: JSON.stringify({ owner: 'Samira' }),
+    });
+  });
+
   it('maps organization country filters', async () => {
     invokeMock.mockResolvedValueOnce({
       id: 'view-org',

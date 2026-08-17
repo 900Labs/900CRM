@@ -22,6 +22,7 @@ pub struct Organization {
     pub postal_code: Option<String>,
     pub source: Option<String>,
     pub description: Option<String>,
+    pub owner: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     pub deleted_at: Option<String>,
@@ -84,7 +85,7 @@ pub fn get_organization(conn: &Connection, id: &str) -> CrmResult<Organization> 
         r#"
         SELECT id, name, email, phone, website, address_line1, address_line2,
                city, region, country, postal_code, source, description,
-               created_at, updated_at, deleted_at, device_id
+               created_at, updated_at, deleted_at, device_id, owner
         FROM organizations
         WHERE id = ?1 AND deleted_at IS NULL
         "#,
@@ -104,7 +105,7 @@ pub fn list_organizations(conn: &Connection) -> CrmResult<Vec<Organization>> {
         r#"
         SELECT id, name, email, phone, website, address_line1, address_line2,
                city, region, country, postal_code, source, description,
-               created_at, updated_at, deleted_at, device_id
+               created_at, updated_at, deleted_at, device_id, owner
         FROM organizations
         WHERE deleted_at IS NULL
         ORDER BY LOWER(name) ASC, created_at ASC
@@ -124,7 +125,7 @@ pub fn find_active_organizations_by_name(
         r#"
         SELECT id, name, email, phone, website, address_line1, address_line2,
                city, region, country, postal_code, source, description,
-               created_at, updated_at, deleted_at, device_id
+               created_at, updated_at, deleted_at, device_id, owner
         FROM organizations
         WHERE LOWER(name) = LOWER(?1) AND deleted_at IS NULL
         "#,
@@ -143,7 +144,7 @@ pub fn find_active_organizations_by_email(
         r#"
         SELECT id, name, email, phone, website, address_line1, address_line2,
                city, region, country, postal_code, source, description,
-               created_at, updated_at, deleted_at, device_id
+               created_at, updated_at, deleted_at, device_id, owner
         FROM organizations
         WHERE LOWER(email) = LOWER(?1) AND deleted_at IS NULL
         "#,
@@ -162,7 +163,7 @@ pub fn find_active_organizations_by_phone(
         r#"
         SELECT id, name, email, phone, website, address_line1, address_line2,
                city, region, country, postal_code, source, description,
-               created_at, updated_at, deleted_at, device_id
+               created_at, updated_at, deleted_at, device_id, owner
         FROM organizations
         WHERE TRIM(phone) = TRIM(?1) AND deleted_at IS NULL
         "#,
@@ -284,5 +285,32 @@ fn row_to_organization(row: &rusqlite::Row<'_>) -> rusqlite::Result<Organization
         updated_at: row.get(14)?,
         deleted_at: row.get(15)?,
         device_id: row.get(16)?,
+        owner: row.get::<_, Option<String>>(17)?.and_then(|value| {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }),
     })
+}
+
+/// Sets or clears an organization's local owner name.
+pub fn set_organization_owner(
+    conn: &Connection,
+    id: &str,
+    owner: Option<&str>,
+) -> CrmResult<Organization> {
+    let _current = get_organization(conn, id)?;
+    let now = now_iso8601();
+    let normalized = owner
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string());
+    conn.execute(
+        "UPDATE organizations SET owner = ?1, updated_at = ?2 WHERE id = ?3 AND deleted_at IS NULL",
+        params![normalized, now, id],
+    )?;
+    get_organization(conn, id)
 }

@@ -13,6 +13,7 @@ export interface ContactSavedViewFilters {
   country?: string;
   customFieldDefId?: string;
   customFieldQuery?: string;
+  owner?: string;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   attention?: 'needsFollowUp' | 'stale' | 'overdue';
@@ -46,6 +47,7 @@ interface BackendFilters {
   country?: string;
   custom_field_def_id?: string;
   custom_field_query?: string;
+  owner?: string;
   sort_by?: string;
   sort_dir?: 'asc' | 'desc';
   attention?: 'needsFollowUp' | 'stale' | 'overdue';
@@ -62,6 +64,7 @@ function toBackendFilters(filters: ContactSavedViewFilters): BackendFilters {
     country: filters.country?.trim() || undefined,
     custom_field_def_id: filters.customFieldDefId?.trim() || undefined,
     custom_field_query: filters.customFieldQuery?.trim() || undefined,
+    owner: filters.owner?.trim() || undefined,
     sort_by: filters.sortBy,
     sort_dir: filters.sortDir,
     attention: filters.attention,
@@ -80,6 +83,7 @@ function fromBackendFilters(raw: string): ContactSavedViewFilters {
     country: parsed.country,
     customFieldDefId: parsed.custom_field_def_id,
     customFieldQuery: parsed.custom_field_query,
+    owner: parsed.owner,
     sortBy: parsed.sort_by,
     sortDir: parsed.sort_dir,
     attention: parsed.attention,

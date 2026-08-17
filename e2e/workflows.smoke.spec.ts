@@ -1060,6 +1060,44 @@ test('drags a pipeline deal into another stage', async ({
   await assertNoConsoleErrors();
 });
 
+test('creates a contact with an owner and filters the Contacts list by that name', async ({
+  page,
+  assertNoConsoleErrors,
+}) => {
+  await loadHashRoute(page, '/contacts');
+  await expect(page.getByRole('heading', { name: 'Contacts' })).toBeVisible();
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Contact' }).click();
+  const unownedDialog = page.getByRole('dialog', { name: 'Add Contact' });
+  await unownedDialog.getByLabel('First Name').fill('Kofi');
+  await unownedDialog.getByLabel('Last Name').fill('Mensah');
+  await unownedDialog.getByRole('button', { name: 'Save' }).click();
+  await expect(unownedDialog).toBeHidden();
+
+  await page.locator('.page-header').getByRole('button', { name: 'Add Contact' }).click();
+  const ownedDialog = page.getByRole('dialog', { name: 'Add Contact' });
+  await ownedDialog.getByLabel('First Name').fill('Amina');
+  await ownedDialog.getByLabel('Last Name').fill('Diallo');
+  await ownedDialog.getByLabel('Owner').fill('Samira');
+  await ownedDialog.getByRole('button', { name: 'Save' }).click();
+  await expect(ownedDialog).toBeHidden();
+
+  await expect(page.getByText('Kofi Mensah')).toBeVisible();
+  await expect(page.getByText('Amina Diallo')).toBeVisible();
+  await expect(page.getByText('Samira').first()).toBeVisible();
+
+  await page.getByLabel('Filter by owner').fill('samira');
+  await expect(page.getByText('Amina Diallo')).toBeVisible();
+  await expect(page.getByText('Kofi Mensah')).toHaveCount(0);
+
+  await page.getByText('Amina Diallo').click();
+  await expect(page).toHaveURL(/#\/contacts\//);
+  await expect(page.getByRole('heading', { name: 'Amina Diallo' })).toBeVisible();
+  await expect(page.locator('#contact-owner')).toHaveValue('Samira');
+
+  await assertNoConsoleErrors();
+});
+
 test('opens a pipeline deal guidance drawer and refreshes follow-up state', async ({
   page,
   assertNoConsoleErrors,

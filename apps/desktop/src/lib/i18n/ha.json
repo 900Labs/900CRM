@@ -678,6 +678,8 @@
     "none": "Babu",
     "required": "Wajibi",
     "optional": "Na zabi",
+    "owner": "Mai kula",
+    "filterOwner": "Tace ta mai kula",
     "error": "Kuskure",
     "success": "Nasara",
     "warning": "Gargadi",

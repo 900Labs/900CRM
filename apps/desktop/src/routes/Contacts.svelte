@@ -12,7 +12,7 @@
   import { listDeals, type Deal } from '$lib/api/deals';
   import { contactStore } from '$lib/stores/contacts';
   import { uiStore } from '$lib/stores/ui';
-  import type { Contact, ContactDuplicateCandidate, ContactLifecycle } from '$lib/api/contacts';
+  import type { Contact, ContactDuplicateCandidate, ContactLifecycle, ListContactsParams } from '$lib/api/contacts';
   import type { Column } from '$lib/components/DataTable.svelte';
   import { formatFullName, formatDate } from '$lib/utils/formatters';
   import { settingsStore } from '$lib/stores/settings';
@@ -48,9 +48,11 @@
   let searchQuery = $state('');
   let typeFilter = $state<'' | 'person' | 'org'>('');
   let lifecycleFilter = $state<'' | ContactLifecycle>('');
+  let ownerFilter = $state('');
   let showImportExport = $state(false);
   let selectedContact = $state<Contact | null>(null);
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  let ownerFilterTimer: ReturnType<typeof setTimeout> | undefined;
   let customFieldFilterTimer: ReturnType<typeof setTimeout> | undefined;
   let customFieldDefinitions = $state<CustomFieldDefinition[]>([]);
   let selectedCustomFieldDefId = $state('');
@@ -190,6 +192,11 @@
             : '—',
         }]),
     {
+      key: 'owner',
+      label: t('common.owner'),
+      render: (c) => (c as Contact).owner?.trim() || '—',
+    },
+    {
       key: 'health',
       label: t('contacts.health'),
     },
@@ -211,14 +218,7 @@
       lifecycleFilter = 'lead';
     }
     void (async () => {
-      await contactStore.setFilters({
-        search: searchQuery,
-        type: typeFilter || undefined,
-        lifecycle: mode === 'leads' ? 'lead' : lifecycleFilter || undefined,
-        customFieldDefId: selectedCustomFieldDefId || undefined,
-        customFieldQuery: customFieldQuery.trim() || undefined,
-        page: 1,
-      });
+      await contactStore.setFilters(contactListFilters());
       await Promise.all([
         mode === 'leads'
           ? Promise.resolve()
@@ -262,11 +262,25 @@
     return '';
   }
 
+  function contactListFilters(overrides: Partial<ListContactsParams> = {}): ListContactsParams {
+    return {
+      search: searchQuery,
+      type: typeFilter || undefined,
+      lifecycle: isLeadsMode ? 'lead' : lifecycleFilter || undefined,
+      owner: ownerFilter.trim() || undefined,
+      customFieldDefId: selectedCustomFieldDefId || undefined,
+      customFieldQuery: customFieldQuery.trim() || undefined,
+      page: 1,
+      ...overrides,
+    };
+  }
+
   function collectCurrentFilters(): ContactSavedViewFilters {
     return {
       search: searchQuery.trim() || undefined,
       type: toSavedType(typeFilter),
       lifecycle: isLeadsMode ? 'lead' : lifecycleFilter || undefined,
+      owner: ownerFilter.trim() || undefined,
       customFieldDefId: selectedCustomFieldDefId || undefined,
       customFieldQuery: customFieldQuery.trim() || undefined,
     };
@@ -294,14 +308,8 @@
     lifecycleFilter = isLeadsMode ? 'lead' : view.filters.lifecycle ?? '';
     selectedCustomFieldDefId = view.filters.customFieldDefId ?? '';
     customFieldQuery = view.filters.customFieldQuery ?? '';
-    await contactStore.setFilters({
-      search: searchQuery,
-      type: typeFilter || undefined,
-      lifecycle: lifecycleFilter || undefined,
-      customFieldDefId: selectedCustomFieldDefId || undefined,
-      customFieldQuery: customFieldQuery.trim() || undefined,
-      page: 1,
-    });
+    ownerFilter = view.filters.owner ?? '';
+    await contactStore.setFilters(contactListFilters());
   }
 
   function syncSelectedView(): void {
@@ -369,40 +377,30 @@
     searchQuery = (e.target as HTMLInputElement).value;
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-      contactStore.setFilters({
-        search: searchQuery,
-        type: typeFilter || undefined,
-        lifecycle: lifecycleFilter || undefined,
-        customFieldDefId: selectedCustomFieldDefId || undefined,
-        customFieldQuery: customFieldQuery.trim() || undefined,
-        page: 1,
-      });
+      contactStore.setFilters(contactListFilters());
       syncSelectedView();
     }, 300);
   }
 
   async function handleTypeFilter(type: '' | 'person' | 'org') {
     typeFilter = type;
-    await contactStore.setFilters({
-      type: type || undefined,
-      lifecycle: lifecycleFilter || undefined,
-      customFieldDefId: selectedCustomFieldDefId || undefined,
-      customFieldQuery: customFieldQuery.trim() || undefined,
-      page: 1,
-    });
+    await contactStore.setFilters(contactListFilters());
     syncSelectedView();
   }
 
   async function handleLifecycleFilter(lifecycle: '' | ContactLifecycle) {
     lifecycleFilter = lifecycle;
-    await contactStore.setFilters({
-      type: typeFilter || undefined,
-      lifecycle: lifecycle || undefined,
-      customFieldDefId: selectedCustomFieldDefId || undefined,
-      customFieldQuery: customFieldQuery.trim() || undefined,
-      page: 1,
-    });
+    await contactStore.setFilters(contactListFilters());
     syncSelectedView();
+  }
+
+  function handleOwnerFilterInput(e: Event) {
+    ownerFilter = (e.target as HTMLInputElement).value;
+    clearTimeout(ownerFilterTimer);
+    ownerFilterTimer = setTimeout(() => {
+      contactStore.setFilters(contactListFilters());
+      syncSelectedView();
+    }, 300);
   }
 
   function handleRowClick(row: unknown) {
@@ -432,14 +430,7 @@
   }
 
   async function applyCustomFieldFilter() {
-    await contactStore.setFilters({
-      search: searchQuery,
-      type: typeFilter || undefined,
-      lifecycle: lifecycleFilter || undefined,
-      customFieldDefId: selectedCustomFieldDefId || undefined,
-      customFieldQuery: customFieldQuery.trim() || undefined,
-      page: 1,
-    });
+    await contactStore.setFilters(contactListFilters());
     syncSelectedView();
   }
 
@@ -668,6 +659,17 @@
         {/each}
       </div>
     {/if}
+
+    <div class="search-wrap owner-filter-wrap">
+      <input
+        class="input filter-search selectable"
+        type="search"
+        placeholder={t('common.filterOwner')}
+        value={ownerFilter}
+        oninput={handleOwnerFilterInput}
+        aria-label={t('common.filterOwner')}
+      />
+    </div>
 
     <div class="custom-field-filter" role="group" aria-label={t('common.customFieldFilter')}>
       <select

@@ -51,6 +51,7 @@ const organization: Organization = {
   postalCode: '100001',
   source: 'desktop',
   description: 'Regional distributor',
+  owner: null,
   createdAt: '2026-06-24T08:00:00Z',
   updatedAt: '2026-06-24T08:00:00Z',
   deletedAt: null,
@@ -89,6 +90,7 @@ describe('organization API', () => {
       country: 'Nigeria',
       postal_code: null,
       description: null,
+      owner: null,
     });
   });
 

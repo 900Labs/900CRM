@@ -67,6 +67,7 @@
   let dealProbability = $state(0);
   let dealExpectedClose = $state('');
   let dealDescription = $state('');
+  let dealOwner = $state('');
   let isDirty = $state(false);
 
   let activities = $state<Activity[]>([]);
@@ -165,6 +166,7 @@
     dealProbability = next.probability;
     dealExpectedClose = next.expectedCloseDate ?? '';
     dealDescription = next.description ?? '';
+    dealOwner = next.owner ?? '';
     isDirty = false;
   }
 
@@ -266,6 +268,7 @@
         probability: Number.isFinite(dealProbability) ? dealProbability : 0,
         expectedCloseDate: dealExpectedClose || null,
         description: dealDescription.trim() || null,
+        owner: dealOwner.trim() || null,
       });
       deal = updated;
       populateForm(updated);
@@ -483,6 +486,10 @@
             <div class="field-group">
               <label class="field-label" for="deal-close">{t('deals.expectedClose')}</label>
               <input id="deal-close" class="input" type="date" bind:value={dealExpectedClose} oninput={markDirty} />
+            </div>
+            <div class="field-group">
+              <label class="field-label" for="deal-owner">{t('common.owner')}</label>
+              <input id="deal-owner" class="input" bind:value={dealOwner} oninput={markDirty} placeholder={t('common.optional')} />
             </div>
             <div class="field-group field-group--full">
               <label class="field-label" for="deal-description">{t('deals.description')}</label>
