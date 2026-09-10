@@ -70,7 +70,11 @@ const DEFAULT_LIST_DEALS_LIMIT: u32 = 200;
 const MAX_LIST_DEALS_LIMIT: u32 = 500;
 
 fn list_deals_limit(limit: Option<u32>) -> Option<u32> {
-    Some(limit.unwrap_or(DEFAULT_LIST_DEALS_LIMIT).clamp(1, MAX_LIST_DEALS_LIMIT))
+    Some(
+        limit
+            .unwrap_or(DEFAULT_LIST_DEALS_LIMIT)
+            .clamp(1, MAX_LIST_DEALS_LIMIT),
+    )
 }
 
 #[tauri::command(rename_all = "snake_case")]
