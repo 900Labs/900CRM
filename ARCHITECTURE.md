@@ -61,7 +61,7 @@ The two processes communicate via **Tauri IPC**: the frontend calls named comman
 │    ┌─────────▼──────────┐        │                            │  │
 │    │   SQLite Database   │        │  ┌──────────────────────┐  │  │
 │    │  (~/.local/share/   │        │  │   API layer           │  │  │
-│    │   900CRM/data.db)   │        │  │  (invoke wrappers)   │  │  │
+│    │   900CRM/900crm.db) │        │  │  (invoke wrappers)   │  │  │
 │    └────────────────────┘        └──┴──────────────────────┴──┘  │
 │                                                                  │
 │                    Tauri IPC bridge (JSON over stdin/stdout)      │
@@ -367,7 +367,7 @@ crates/crm-core/src/storage/contacts.rs → insert_contact(&conn, contact)
          │
          ▼
 [SQLite database]
-data.db → record persisted
+900crm.db → record persisted
          │
          ▼
 [Result bubbles back up]
@@ -476,9 +476,10 @@ Required public baselines live under `docs/`:
 
 ## Extension Points
 
-### Custom Fields (v1.1+)
+### Custom Fields
 
-Custom fields will be stored in a `custom_field_definitions` table and a `custom_field_values` EAV table:
+Custom fields are implemented. Use [Data Model](docs/DATA_MODEL.md) for the
+current table names and columns. The original sketch used an EAV pair:
 
 ```sql
 CREATE TABLE custom_field_definitions (
@@ -497,8 +498,6 @@ CREATE TABLE custom_field_values (
     PRIMARY KEY (entity_id, field_id)
 );
 ```
-
-The CRM engine and storage layer are designed with hooks for custom fields — they pass through an optional `custom_fields: HashMap<String, Value>` on all entity structs.
 
 ### Plugin SDK (v2.0+)
 
@@ -527,27 +526,27 @@ See [MCP Readiness Baseline](docs/MCP_READINESS.md) for the current status, non-
 
 ### Why Tauri Instead of Electron?
 
-Electron bundles Chromium (~120 MB) into every installer. Tauri uses the system's built-in WebView, resulting in a ~3 MB binary. For users downloading over slow or metered connections — the primary audience for 900CRM — this difference is significant. Electron also uses 150–300 MB RAM at idle vs. 30–40 MB for Tauri. See [ADR-002](docs/adr/002-tauri-over-electron.md).
+Electron bundles Chromium (~120 MB) into every installer. Tauri uses the system's built-in WebView, resulting in a ~3 MB binary. For users downloading over slow or metered connections — the primary audience for 900CRM — this difference is significant. Electron also uses 150–300 MB RAM at idle vs. 30–40 MB for Tauri.
 
 ### Why Not a Web App or PWA?
 
-PWAs have unreliable offline write capabilities, especially on iOS. Service Workers do not handle complex relational data operations (joins, aggregates, full-text search) well. A native desktop app gives full filesystem access for CSV import/export, works on older systems without browser configuration, and avoids the PWA fragmentation across browsers. See the research findings in [900crm-research.md](docs/research/900crm-research.md).
+PWAs have unreliable offline write capabilities, especially on iOS. Service Workers do not handle complex relational data operations (joins, aggregates, full-text search) well. A native desktop app gives full filesystem access for CSV import/export, works on older systems without browser configuration, and avoids the PWA fragmentation across browsers.
 
 ### Why SQLite Instead of a Managed Database?
 
-SQLite is zero-configuration, embedded, and produces a single portable file. There is no server to run, no connection string to configure, no port to open. For a single-user desktop app in an offline context, it is the obvious choice. It handles millions of CRM records comfortably. See [ADR-001](docs/adr/001-sqlite-changelog-sync.md).
+SQLite is zero-configuration, embedded, and produces a single portable file. There is no server to run, no connection string to configure, no port to open. For a single-user desktop app in an offline context, it is the obvious choice. It handles millions of CRM records comfortably.
 
 ### Why Custom Changelog Sync Instead of CRDTs?
 
-CRDTs (Conflict-free Replicated Data Types) are elegant for collaborative documents but add significant complexity for structured relational data. CRM records have clear ownership semantics (one user updates one record), making last-write-wins at the field level correct in practice. The custom changelog approach gives full control with no external dependencies. See [ADR-001](docs/adr/001-sqlite-changelog-sync.md).
+CRDTs (Conflict-free Replicated Data Types) are elegant for collaborative documents but add significant complexity for structured relational data. CRM records have clear ownership semantics (one user updates one record), making last-write-wins at the field level correct in practice. The custom changelog approach gives full control with no external dependencies.
 
 ### Why Svelte 5 Instead of React or Vue?
 
-Svelte 5 with runes has the smallest runtime of any major frontend framework. It compiles to vanilla JavaScript with no virtual DOM overhead. This directly translates to faster startup and lower memory usage on constrained hardware. The 900 Labs team also uses Svelte in 900PDF, giving consistency across the ecosystem. See [ADR-003](docs/adr/003-svelte5-frontend.md).
+Svelte 5 with runes has the smallest runtime of any major frontend framework. It compiles to vanilla JavaScript with no virtual DOM overhead. This directly translates to faster startup and lower memory usage on constrained hardware. The 900 Labs team also uses Svelte in 900PDF, giving consistency across the ecosystem.
 
 ### Why Rust for the Backend?
 
-Rust provides memory safety without a garbage collector, native performance, and excellent SQLite bindings (`rusqlite`). It compiles to native code on all platforms, ensuring consistent performance regardless of OS. The Tauri ecosystem is Rust-native, making integration straightforward. See [ADR-002](docs/adr/002-tauri-over-electron.md).
+Rust provides memory safety without a garbage collector, native performance, and excellent SQLite bindings (`rusqlite`). It compiles to native code on all platforms, ensuring consistent performance regardless of OS. The Tauri ecosystem is Rust-native, making integration straightforward.
 
 ### Why No Encryption by Default?
 

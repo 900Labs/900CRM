@@ -1,7 +1,7 @@
 # Alpha Release Readiness Audit
 
 Date: 2026-06-27
-Last updated: 2026-08-16
+Last updated: 2026-09-10
 Branch: `codex/alpha-release-readiness-audit`
 Baseline: canonical `main` before this branch was `c912f669baf7bfdaac9dab163a15e1e0fe08c6ab`.
 
@@ -79,16 +79,16 @@ Status: `Currently accepted` / materially complete.
 
 Current evidence:
 
-- `README.md` documents Contacts, Pipeline, Activities, Dashboard, Search,
-  Import/Export, Backup/Restore, i18n, and offline-first behavior as current
-  user-facing surfaces.
+- `README.md` documents Contacts, Leads, Organizations, Pipeline, Activities,
+  Dashboard, Reports, Review, Search, Import/Export, Backup/Restore, Settings
+  panes, i18n, and offline-first behavior as current user-facing surfaces.
 - `ARCHITECTURE.md` maps the desktop shell, Tauri IPC command layer,
   `crm-core`, storage, stores, routes, and frontend API wrappers.
-- `docs/DATA_MODEL.md` states the current schema is version 13 and documents
-  contacts (including person lifecycle), organizations, deals, activities,
-  notes, tags, custom fields, entity links, saved views, settings, search,
-  reports, audit, sync metadata, proposed actions, backups, and migration
-  history.
+- `docs/DATA_MODEL.md` states the current schema is version 14 and documents
+  contacts (including person lifecycle and optional owner), organizations,
+  deals, activities, notes, tags, custom fields, entity links, saved views,
+  settings, search, reports, audit, sync metadata, proposed actions, backups,
+  and migration history.
 - `docs/sprint_ledger.md` records completed feature and hardening sprints for
   core CRM workflows through Sprint 092.
 

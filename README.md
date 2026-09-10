@@ -64,25 +64,37 @@ they are not the best source for current product truth.
 ## Features
 
 ### Contacts
-Manage your full network of people and organizations. Add custom fields, tag contacts, write notes, and store a website URL. Search across your entire contact database instantly.
+Manage people in the Contacts list. Add custom fields, tags, notes, website or local-file bookmarks, and an optional owner name. Owner is free text on the record, not a user account or team. Contact pages show a Next step strip for the next local action: complete an overdue follow-up, convert a lead, or add a follow-up.
 
 ![900CRM contacts management screen](docs/assets/readme/900crm-contacts.png)
 
+### Leads
+Leads is a Workspace list of people whose lifecycle is `lead`. Converted people stay on Contacts as customers. This is the same `contacts` table, not a second database.
+
+### Organizations
+Organizations (accounts) have their own list and workspace page. They can store an optional owner name. Account pages use the same Next step strip as contacts and deals.
+
 ### Pipeline
-Visual kanban-style deal pipeline with drag-and-drop stages. Track every deal from first contact to close. See the total value of your pipeline at a glance. Customize stages to match your sales process.
+Visual kanban-style deal pipeline with drag-and-drop stages. Track every deal from first contact to close. See the total value of your pipeline at a glance. Deals can store an optional owner name. The deal page and the pipeline deal drawer show the Next step strip so the primary button matches overdue work, a missing follow-up, or a missing close date.
 
 ![900CRM pipeline kanban screen](docs/assets/readme/900crm-pipeline.png)
 
 ### Activities
-Link tasks, calls, meetings, and follow-ups to any contact or deal. Set due dates and receive desktop notifications. Never miss a follow-up again. Activity history gives you a complete timeline of every interaction.
+Link tasks, calls, meetings, and follow-ups to any contact or deal. Set due dates and receive desktop notifications. Switch from the due-bucket list to a Monday-Sunday week grid or a Monday-aligned month grid. Drag a week-grid card to another day to reschedule. There are still no times, recurrence, or external calendars.
 
 ![900CRM activities screen](docs/assets/readme/900crm-activities.png)
 
 ### Dashboard
-At-a-glance business metrics on every launch: pipeline value, deals by stage, upcoming tasks, recently modified contacts, and activity completion rates. No configuration needed — it works out of the box.
+At-a-glance counts on every launch: contacts, active deals, pipeline value, and upcoming tasks. A recent-activity list shows upcoming follow-ups. The morning attention queue can be filtered by owner.
+
+### Reports
+Reports shows current pipeline and activity health, plus stale open deals. You can download the numbers on the page as an unencrypted CSV snapshot. That file is the current dataset, including the honesty note that the ratios are not historical stage conversion.
+
+### Review
+The Review sidebar lists Pending Actions and the Audit Log. Pending Actions shows a count when proposed actions are waiting.
 
 ### Search
-Full-text search across contacts, deals, and activities. Instant results as you type. Filter by entity type, date range, or tag. Works 100% offline — every search query stays on your machine.
+Full-text search across contacts, deals, and activities. Instant results as you type in the query box. Works 100% offline; every search query stays on your machine.
 
 ### Import / Export
 Bring your existing data in with local CSV or JSON import for contacts, deals, activities, organizations, generic notes, tags, and custom field definitions, including supported custom field values for flat CRM records. Export supported data sets, including audit logs, to CSV or JSON for use in spreadsheets, accountability review, accounting tools, or data migration. See [Import and Export](docs/IMPORT_EXPORT.md) for the current formats, export-only audit log semantics, local-ID note/tag semantics, duplicate preflight behavior, rollback options, and known gaps.
@@ -91,6 +103,9 @@ Bring your existing data in with local CSV or JSON import for contacts, deals, a
 Create local SQLite backups from Settings, validate backup integrity before restore, and restore only after explicit confirmation. See [Backup and Restore](docs/BACKUP_RESTORE.md) for the safety workflow.
 
 ![900CRM settings data management surface](docs/assets/readme/900crm-data-management.png)
+
+### Settings
+Settings is three panes: Appearance (language, theme, dates, currency, desktop reminders), Data (import/export and local backup/restore), and Integrations (sync honesty, optional email TCP probe, and external-client placeholders). Full email send and receive is not implemented.
 
 ### Internationalization (i18n)
 The entire interface is localized. Switch languages in settings instantly. Arabic enables right-to-left (`dir=rtl`) with some logical CSS; layout polish is still in progress and is not full RTL. Community translations welcome.
@@ -295,11 +310,11 @@ To add a new language or improve an existing translation, see the [Translation G
 │  │ crates/crm-core          │  │  Svelte 5 / TS         │  │
 │  │                         │  │                        │  │
 │  │  • CRM Engine            │  │  • Dashboard           │  │
-│  │  • Storage (SQLite)      │  │  • Contacts view       │  │
-│  │  • Sync changelog        │  │  • Pipeline kanban     │  │
-│  │  • IPC command server    │  │  • Activities feed     │  │
-│  │  • Import/Export         │  │  • Search              │  │
-│  │  • Backup/Restore        │  │  • Settings            │  │
+│  │  • Storage (SQLite)      │  │  • Leads / Contacts    │  │
+│  │  • Sync changelog        │  │  • Organizations       │  │
+│  │  • IPC command server    │  │  • Pipeline / Reports  │  │
+│  │  • Import/Export         │  │  • Activities          │  │
+│  │  • Backup/Restore        │  │  • Search / Settings   │  │
 │  └─────────────────────────┘  └────────────────────────┘  │
 │            ▲                            │                   │
 │            └──── Tauri IPC bridge ──────┘                   │
@@ -360,13 +375,17 @@ Current implementation baselines are documented in [Data Model](docs/DATA_MODEL.
 ├── scripts/                      # Root verification and release metadata helpers
 ├── plugins/                      # Community plugin directory
 │   └── README.md                 # Plugin development guide
-├── docs/                         # Required public docs and sprint notes
+├── docs/                         # Public documentation (no GitHub wiki)
+│   ├── README.md                 # Documentation index
 │   ├── DATA_MODEL.md             # Current local schema/model baseline
 │   ├── IMPORT_EXPORT.md          # Current CSV import/export behavior
 │   ├── PRIVACY.md                # Offline-first privacy and caveats
 │   ├── MCP_READINESS.md          # Current optional-MCP readiness boundary
 │   ├── RELEASE.md                # Current release status and future artifact checklist
-│   └── BACKUP_RESTORE.md         # Local backup and restore workflow
+│   ├── ROADMAP.md                # v1.0 release and signing checklist
+│   ├── ALPHA_READINESS.md        # Alpha source vs distribution audit
+│   ├── BACKUP_RESTORE.md         # Local backup and restore workflow
+│   └── sprint_*.md               # Historical sprint audit notes
 ├── samples/                      # Synthetic CSV data for manual import smoke tests
 ├── .github/
 │   ├── workflows/
@@ -401,10 +420,16 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for full details on how to get st
 ## Roadmap
 
 ### Current Implementation Baseline
-- [x] Contacts management with custom fields and tags
+- [x] Contacts management with custom fields, tags, and optional owner name
+- [x] Leads list (contacts with lifecycle `lead`)
+- [x] Organizations (accounts) with optional owner name
 - [x] Visual kanban pipeline with drag-and-drop
-- [x] Activities: tasks, calls, meetings
-- [x] Dashboard with at-a-glance metrics
+- [x] Next step strip on contact, deal, and account pages (and the pipeline deal drawer)
+- [x] Activities: tasks, calls, meetings, plus week and month grids
+- [x] Dashboard with at-a-glance metrics and an owner-filterable morning queue
+- [x] Reports snapshot with unencrypted CSV download
+- [x] Review sidebar Pending Actions count
+- [x] Settings split into Appearance, Data, and Integrations
 - [x] Full-text search across all entities
 - [x] CSV import and export
 - [x] 10 languages (EN, FR, ES, AR, SW, HI, PT, VI, HA, BN)

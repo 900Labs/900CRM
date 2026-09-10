@@ -3,6 +3,9 @@
 Date: 2026-08-13
 Status: Source-evaluable alpha (public), version `0.9.0`. Binary release in progress.
 
+The speed/UX/older-machine plan lives in [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md).
+This file stays the v1.0 release and signing checklist.
+
 This document is the single source of truth for what remains before 900CRM
 ships a real, distributable release. It replaces ad-hoc checklist notes and
 is kept in sync with the current codebase state.

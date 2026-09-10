@@ -707,33 +707,13 @@ Leave a comment on the issue saying you would like to work on it. A maintainer w
 
 ## Architecture Decision Records
 
-When we make a significant technical decision, we document the rationale in an Architecture Decision Record (ADR). These live in `docs/adr/` and follow the format:
+There is no `docs/adr/` directory and no ADR process in this repository.
+Design rationale for the current stack lives in
+[ARCHITECTURE.md](ARCHITECTURE.md#key-design-decisions).
 
-```markdown
-# ADR-001: Use SQLite with custom changelog sync
-
-## Status
-Accepted
-
-## Context
-[What was the situation that required a decision?]
-
-## Decision
-[What did we decide?]
-
-## Consequences
-[What are the results of this decision — positive and negative?]
-
-## Alternatives considered
-[What other options were evaluated?]
-```
-
-If you propose a significant technical change (new dependency, architectural shift, change to the data model), please include a draft ADR in your PR. This helps reviewers understand the reasoning and makes the decision durable for future contributors.
-
-Current ADRs:
-- [ADR-001: SQLite with changelog sync over CRDTs or external sync services](docs/adr/001-sqlite-changelog-sync.md)
-- [ADR-002: Tauri v2 over Electron for desktop runtime](docs/adr/002-tauri-over-electron.md)
-- [ADR-003: Svelte 5 with runes over React or Vue](docs/adr/003-svelte5-frontend.md)
+If you propose a significant technical change (new dependency, architectural
+shift, or data-model change), explain the options and the tradeoff in the PR
+so reviewers can see the reasoning.
 
 ---
 
