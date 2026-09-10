@@ -1,7 +1,7 @@
 # Release Readiness
 
 Date: 2026-06-24
-Last updated: 2026-08-13
+Last updated: 2026-09-10
 
 This document records the current release status for 900CRM and the manual
 checks required before publishing a public release. For a phase-by-phase
@@ -16,9 +16,18 @@ Application manifests currently identify the source tree as `0.9.0`
 
 A draft GitHub prerelease `v0.9.0` now holds unsigned Windows and Linux
 packages from workflow run 31685003675. They are not public until a
-maintainer publishes the draft. The current Linux binaries require
-**glibc 2.39+** (Ubuntu 24.04 / Debian 13). They do not run on Ubuntu 22.04.
+maintainer publishes the draft. Those published draft Linux binaries still
+require **glibc 2.39+** (Ubuntu 24.04 / Debian 13). New Linux packages from
+this tree are compiled and linked inside an `ubuntu:22.04` container
+(glibc 2.35, webkit2gtk-4.1) even though the GitHub job stays on a current
+hosted runner. Debian 12 remains a supported runtime, not the link image.
 macOS remains deferred.
+
+Local Linux link check (requires Docker; does not install a .deb):
+
+```
+bash scripts/ci/linux-ubuntu-22.04-verify.sh
+```
 
 Current CI is verification-only, and release packaging is intentionally
 separate. Manual release packaging now has an automated Ubuntu preflight gate

@@ -5,6 +5,7 @@ use crate::AppState;
 
 const DEFAULT_UPCOMING_ACTIVITIES_LIMIT: u32 = 10;
 const MAX_UPCOMING_ACTIVITIES_LIMIT: u32 = 200;
+const DEFAULT_LIST_ACTIVITIES_LIMIT: u32 = 200;
 const MAX_LIST_ACTIVITIES_LIMIT: u32 = 500;
 
 #[tauri::command(rename_all = "snake_case")]
@@ -35,9 +36,8 @@ pub async fn get_activity(state: State<'_, AppState>, id: String) -> Result<Acti
     core.get_activity(&id).map_err(|e| e.to_string())
 }
 
-/// List activities. When `limit` is `None`, all activities are returned (legacy
-/// callers). When `Some`, the result is windowed by `offset`/`limit` (clamped to
-/// `MAX_LIST_ACTIVITIES_LIMIT`) to bound the IPC payload.
+/// List activities. The IPC payload is always windowed. When `limit` is `None`,
+/// a default page of `DEFAULT_LIST_ACTIVITIES_LIMIT` is used.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn list_activities(
     state: State<'_, AppState>,
@@ -61,7 +61,11 @@ pub async fn list_activities_for_deals(
 }
 
 fn list_activities_limit(limit: Option<u32>) -> Option<u32> {
-    limit.map(|value| value.clamp(1, MAX_LIST_ACTIVITIES_LIMIT))
+    Some(
+        limit
+            .unwrap_or(DEFAULT_LIST_ACTIVITIES_LIMIT)
+            .clamp(1, MAX_LIST_ACTIVITIES_LIMIT),
+    )
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -221,8 +225,8 @@ pub async fn remove_activity_link(
 mod tests {
     use super::{
         list_activities_limit, nullable_update_from_args, upcoming_activities_limit,
-        DEFAULT_UPCOMING_ACTIVITIES_LIMIT, MAX_LIST_ACTIVITIES_LIMIT,
-        MAX_UPCOMING_ACTIVITIES_LIMIT,
+        DEFAULT_LIST_ACTIVITIES_LIMIT, DEFAULT_UPCOMING_ACTIVITIES_LIMIT,
+        MAX_LIST_ACTIVITIES_LIMIT, MAX_UPCOMING_ACTIVITIES_LIMIT,
     };
 
     #[test]
@@ -263,8 +267,11 @@ mod tests {
     }
 
     #[test]
-    fn list_activities_limit_preserves_none_and_clamps_some_to_max() {
-        assert_eq!(list_activities_limit(None), None);
+    fn list_activities_limit_defaults_none_and_clamps_some_to_max() {
+        assert_eq!(
+            list_activities_limit(None),
+            Some(DEFAULT_LIST_ACTIVITIES_LIMIT)
+        );
         assert_eq!(list_activities_limit(Some(0)), Some(1));
         assert_eq!(list_activities_limit(Some(25)), Some(25));
         assert_eq!(

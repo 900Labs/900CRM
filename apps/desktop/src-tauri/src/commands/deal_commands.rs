@@ -51,9 +51,9 @@ pub async fn get_deal(state: State<'_, AppState>, id: String) -> Result<Deal, St
     core.get_deal(&id).map_err(|e| e.to_string())
 }
 
-/// List deals. When `limit` is `None`, all deals are returned (legacy callers
-/// like the pipeline board). When `Some`, the result is windowed by
-/// `offset`/`limit` (clamped to `MAX_LIST_DEALS_LIMIT`) to bound the IPC payload.
+/// List deals. The IPC payload is always windowed. When `limit` is `None`,
+/// a default page of `DEFAULT_LIST_DEALS_LIMIT` is used. `limit` is clamped
+/// to `MAX_LIST_DEALS_LIMIT`.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn list_deals(
     state: State<'_, AppState>,
@@ -66,10 +66,11 @@ pub async fn list_deals(
         .map_err(|e| e.to_string())
 }
 
+const DEFAULT_LIST_DEALS_LIMIT: u32 = 200;
 const MAX_LIST_DEALS_LIMIT: u32 = 500;
 
 fn list_deals_limit(limit: Option<u32>) -> Option<u32> {
-    limit.map(|value| value.clamp(1, MAX_LIST_DEALS_LIMIT))
+    Some(limit.unwrap_or(DEFAULT_LIST_DEALS_LIMIT).clamp(1, MAX_LIST_DEALS_LIMIT))
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -219,7 +220,9 @@ pub async fn get_pipeline_summary(
 
 #[cfg(test)]
 mod tests {
-    use super::{list_deals_limit, nullable_update_from_args, MAX_LIST_DEALS_LIMIT};
+    use super::{
+        list_deals_limit, nullable_update_from_args, DEFAULT_LIST_DEALS_LIMIT, MAX_LIST_DEALS_LIMIT,
+    };
 
     #[test]
     fn nullable_update_from_args_distinguishes_no_change_reset_blank_and_set() {
@@ -249,8 +252,8 @@ mod tests {
     }
 
     #[test]
-    fn list_deals_limit_preserves_none_and_clamps_some_to_max() {
-        assert_eq!(list_deals_limit(None), None);
+    fn list_deals_limit_defaults_none_and_clamps_some_to_max() {
+        assert_eq!(list_deals_limit(None), Some(DEFAULT_LIST_DEALS_LIMIT));
         assert_eq!(list_deals_limit(Some(0)), Some(1));
         assert_eq!(list_deals_limit(Some(25)), Some(25));
         assert_eq!(list_deals_limit(Some(5_000)), Some(MAX_LIST_DEALS_LIMIT));

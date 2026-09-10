@@ -249,6 +249,17 @@ describe('deal API', () => {
     });
   });
 
+  it('always sends a windowed list_deals limit', async () => {
+    invokeMock.mockResolvedValueOnce([]);
+
+    await listDeals();
+
+    expect(invokeMock).toHaveBeenCalledWith('list_deals', {
+      limit: 200,
+      offset: 0,
+    });
+  });
+
   it('filters listDeals by organization id on the frontend', async () => {
     invokeMock.mockResolvedValueOnce([
       { ...backendDeal, id: 'deal-1', organization_id: 'org-1' },
