@@ -17,7 +17,8 @@
   import { settingsStore } from '$lib/stores/settings';
   import { listActivitiesForDeals, type Activity } from '$lib/api/activities';
   import type { Contact } from '$lib/api/contacts';
-  import { DEAL_STAGES, listDeals, type Deal, type DealStage } from '$lib/api/deals';
+  import { DEAL_STAGES, type Deal, type DealStage } from '$lib/api/deals';
+  import VirtualList from '$lib/components/VirtualList.svelte';
   import type { Organization } from '$lib/api/organizations';
   import {
     filterActivitiesByRelationship,
@@ -128,8 +129,8 @@
     pipelineBootstrapped = true;
     void (async () => {
       lastActivityRefreshVersion = activityStore.relationshipRefreshVersion;
+      await dealStore.loadPipelineBoard();
       await Promise.all([
-        dealStore.loadPipelineBoard(),
         ensureRelationshipLookups(),
         loadCustomFieldDefinitions(),
         loadPipelineActivityContext(),
@@ -260,7 +261,7 @@
     activityContextReady = false;
     activityContextError = null;
     try {
-      const deals = await listDeals();
+      const deals = Object.values(dealStore.dealsByStage).flat();
       const activities = await listActivitiesForDeals(deals.map((deal) => deal.id));
       const linkIndex = await loadActivityLinkIndex(activities.map((activity) => activity.id));
 
@@ -1171,30 +1172,32 @@
                 </p>
               </div>
             {:else}
-              {#each col.deals as deal (deal.id)}
-                {@const relationships = deriveDealRelationshipLabels(
-                  deal,
-                  relationshipContacts,
-                  relationshipOrganizations,
-                )}
-                {@const guidanceBadge = guidanceBadgeByDealId[deal.id]}
-                <div
-                  class="card-wrapper"
-                  class:card-wrapper--dragging={draggingId === deal.id}
-                  role="listitem"
-                >
-                  <DealCard
-                    {deal}
-                    primaryContactName={relationships.primaryContactName}
-                    organizationName={relationships.organizationName}
-                    guidanceLabel={guidanceBadge?.label ?? t('deals.guidance.loading')}
-                    guidanceTone={guidanceBadge?.tone ?? 'neutral'}
-                    onclick={openDealDrawer}
-                    ondragstart={(event) => handleDragStart(deal.id, col.stage, event)}
-                    ondragend={handleDragEnd}
-                  />
-                </div>
-              {/each}
+              <VirtualList items={col.deals} itemHeight={108}>
+                {#snippet children(deal)}
+                  {@const relationships = deriveDealRelationshipLabels(
+                    deal,
+                    relationshipContacts,
+                    relationshipOrganizations,
+                  )}
+                  {@const guidanceBadge = guidanceBadgeByDealId[deal.id]}
+                  <div
+                    class="card-wrapper"
+                    class:card-wrapper--dragging={draggingId === deal.id}
+                    role="listitem"
+                  >
+                    <DealCard
+                      {deal}
+                      primaryContactName={relationships.primaryContactName}
+                      organizationName={relationships.organizationName}
+                      guidanceLabel={guidanceBadge?.label ?? t('deals.guidance.loading')}
+                      guidanceTone={guidanceBadge?.tone ?? 'neutral'}
+                      onclick={openDealDrawer}
+                      ondragstart={(event) => handleDragStart(deal.id, col.stage, event)}
+                      ondragend={handleDragEnd}
+                    />
+                  </div>
+                {/snippet}
+              </VirtualList>
             {/if}
           </div>
         </div>
@@ -1630,7 +1633,8 @@
     background-color: var(--surface-raised);
     border-radius: var(--radius-lg);
     padding: var(--space-4);
-    min-height: 300px;
+    min-height: 0;
+    max-height: 100%;
     border: 2px solid transparent;
     transition: border-color var(--duration-fast) var(--ease-out),
                 background-color var(--duration-fast) var(--ease-out);
@@ -1761,7 +1765,8 @@
     flex-direction: column;
     gap: var(--space-3);
     flex: 1;
-    min-height: 80px;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .col-drop-hint {

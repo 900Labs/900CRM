@@ -262,14 +262,16 @@ export async function getDeal(id: string): Promise<Deal> {
   return mapDeal(deal);
 }
 
+export const DEFAULT_LIST_DEALS_PAGE_SIZE = 200;
+export const PIPELINE_BOARD_PAGE_SIZE = 500;
+
 export async function listDeals(params: ListDealsParams = {}): Promise<Deal[]> {
-  const invokeArgs: Record<string, unknown> = {};
-  if (params.pageSize != null || params.page != null) {
-    const pageSize = params.pageSize ?? 50;
-    const page = params.page ?? 1;
-    invokeArgs.limit = pageSize;
-    invokeArgs.offset = Math.max(0, (page - 1) * pageSize);
-  }
+  const pageSize = params.pageSize ?? DEFAULT_LIST_DEALS_PAGE_SIZE;
+  const page = params.page ?? 1;
+  const invokeArgs: Record<string, unknown> = {
+    limit: pageSize,
+    offset: Math.max(0, (page - 1) * pageSize),
+  };
 
   const deals = await invoke<BackendDeal[]>('list_deals', invokeArgs);
   let mapped = deals.map(mapDeal);
@@ -292,7 +294,7 @@ export async function listDeals(params: ListDealsParams = {}): Promise<Deal[]> {
 }
 
 export async function listDealsByStage(): Promise<DealsByStage> {
-  const allDeals = await listDeals();
+  const allDeals = await listDeals({ pageSize: PIPELINE_BOARD_PAGE_SIZE, page: 1 });
 
   const grouped: DealsByStage = {
     lead: [],

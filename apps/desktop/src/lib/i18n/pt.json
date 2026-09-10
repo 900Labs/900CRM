@@ -28,7 +28,22 @@
       "workspace": "Espaço de trabalho",
       "review": "Revisão",
       "admin": "Administrador"
-    }
+    },
+    "skipToContent": "Skip to main content"
+  },
+  "commandPalette": {
+    "title": "Jump to",
+    "placeholder": "Go to a page or search records",
+    "routes": "Pages",
+    "records": "Records",
+    "noResults": "No matching records"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "openPalette": "Open jump list",
+    "focusSearch": "Focus search",
+    "switchNav": "Switch workspace page",
+    "shortcutSheet": "Show this list"
   },
   "dashboard": {
     "title": "Painel",
@@ -243,7 +258,7 @@
     "tags": "Tags",
     "notes": "Notas",
     "linkedDeals": "Negócios vinculados",
-    "activityTimeline": "Linha do tempo de atividades",
+    "activityTimeline": "Activity history",
     "firstName": "Nome",
     "lastName": "Sobrenome",
     "website": "Site",
@@ -471,7 +486,7 @@
     "overdue": "Atrasada",
     "upcoming": "Próxima",
     "noActivities": "Ainda não há atividades",
-    "noActivitiesDesc": "Adicione uma tarefa, ligação, reunião ou e-mail para o trabalho atrasado e de hoje ter um lugar.",
+    "noActivitiesDesc": "Add a task, call, meeting, email, visit, WhatsApp ping, or SMS so overdue and due-today work has a place.",
     "noMatchingTitle": "Nenhuma atividade correspondente",
     "noMatchingDesc": "Limpe o filtro de tipo, estado, prazo ou campo personalizado para ver mais trabalho.",
     "workbenchEyebrow": "Central de acompanhamento",
@@ -526,7 +541,16 @@
     "relationshipContact": "Contato",
     "relationshipOrganization": "Organização",
     "relationshipDeal": "Negócio",
-    "openRelationship": "Abrir {type} {label}"
+    "openRelationship": "Abrir {type} {label}",
+    "visit": "Visit",
+    "whatsapp": "WhatsApp",
+    "sms": "SMS",
+    "dueTime": "Due time",
+    "logJustHappened": "Log what just happened",
+    "logVisit": "Visit",
+    "logWhatsapp": "WhatsApp",
+    "logSms": "SMS",
+    "historyTitle": "What happened"
   },
   "settings": {
     "title": "Configurações",
@@ -534,7 +558,7 @@
     "sectionPreferences": "Preferências",
     "sectionAppearance": "Aparência",
     "sectionSync": "Sincronização",
-    "sectionEmail": "E-mail",
+    "sectionEmail": "Email probe",
     "sectionNotifications": "Notificações",
     "sectionIntegrations": "Integrações",
     "sectionData": "Dados",
@@ -558,16 +582,16 @@
     "notificationsEnabled": "Ativar lembretes na área de trabalho",
     "reminderLeadMinutes": "Antecedência do lembrete (minutos)",
     "reminderLeadHint": "Notifique-me este número de minutos antes do vencimento de uma atividade.",
-    "emailIntegration": "Integração de e-mail",
-    "emailIntegrationEnabled": "Ativar integração opcional IMAP/SMTP",
+    "emailIntegration": "Email reachability probe",
+    "emailIntegrationEnabled": "Enable TCP reachability probe",
     "emailComposeHint": "Configure servidores opcionais e use ações locais de composição via mailto.",
     "emailProbeOnly": "Apenas teste de alcance. O 900CRM não envia nem recebe e-mail e não armazena senhas de caixa de correio.",
-    "smtpHost": "Host SMTP",
+    "smtpHost": "SMTP probe host",
     "smtpPort": "Porta SMTP",
     "smtpUsername": "Usuário SMTP",
     "smtpPassword": "Senha SMTP",
     "smtpFrom": "Endereço remetente padrão",
-    "imapHost": "Host IMAP",
+    "imapHost": "IMAP probe host",
     "imapPort": "Porta IMAP",
     "imapUsername": "Usuário IMAP",
     "imapPassword": "Senha IMAP",
@@ -652,7 +676,8 @@
     "externalClientPermissionNoConfirmation": "Sem confirmação",
     "externalClientPermissionWriteRequiresConfirmation": "Linhas de permissão de escrita exigem confirmação; o backend rejeita linhas de escrita que não exijam confirmação.",
     "syncUnavailable": "Ainda não disponível",
-    "syncUnavailableHint": "A sincronização entre dispositivos não está implementada. Seus dados ficam neste dispositivo. Nada aqui se conecta a um servidor."
+    "syncUnavailableHint": "A sincronização entre dispositivos não está implementada. Seus dados ficam neste dispositivo. Nada aqui se conecta a um servidor.",
+    "emailProbeBadge": "TCP probe"
   },
   "common": {
     "save": "Salvar",

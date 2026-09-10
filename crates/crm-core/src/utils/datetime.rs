@@ -11,7 +11,7 @@
 //! Using string timestamps (rather than Unix integers) makes the SQLite
 //! records human-readable and simplifies cross-platform sync comparison.
 
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, Utc};
 
 use crate::utils::errors::{CrmError, CrmResult};
 
@@ -37,6 +37,25 @@ use crate::utils::errors::{CrmError, CrmResult};
 /// ```
 pub fn now_iso8601() -> String {
     Utc::now().to_rfc3339()
+}
+
+/// Machine-local calendar day (`YYYY-MM-DD`).
+///
+/// Date-only activity dues are entered as a local calendar date. Compare them
+/// to this value, not `now_iso8601()[..10]`, or a UTC+ clinic after midnight
+/// (and a UTC- clinic in the evening) will disagree with the desktop UI.
+pub fn local_today() -> NaiveDate {
+    Local::now().date_naive()
+}
+
+pub fn local_today_ymd() -> String {
+    local_today().format("%Y-%m-%d").to_string()
+}
+
+pub fn local_days_from_now_ymd(days: i64) -> String {
+    (local_today() + chrono::Duration::days(days))
+        .format("%Y-%m-%d")
+        .to_string()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,6 +129,40 @@ pub fn format_date(iso8601: &str, format: &str) -> String {
 pub fn parse_date_only(s: &str) -> CrmResult<NaiveDate> {
     NaiveDate::parse_from_str(s, "%Y-%m-%d")
         .map_err(|e| CrmError::InvalidInput(format!("Invalid date '{}': {}", s, e)))
+}
+
+/// Parses an activity due value that may be date-only or a datetime.
+///
+/// Accepts:
+/// - `YYYY-MM-DD` (treated as the start of that UTC day for parsing only)
+/// - RFC 3339 / ISO 8601 timestamps
+/// - naive `YYYY-MM-DDTHH:MM` or `YYYY-MM-DDTHH:MM:SS`
+pub fn parse_due_datetime(s: &str) -> CrmResult<DateTime<Utc>> {
+    let trimmed = s.trim();
+    if trimmed.len() == 10 {
+        let date = parse_date_only(trimmed)?;
+        return date
+            .and_hms_opt(0, 0, 0)
+            .map(|naive| naive.and_utc())
+            .ok_or_else(|| CrmError::InvalidInput(format!("Invalid date '{}'", trimmed)));
+    }
+
+    if let Ok(dt) = parse_iso8601(trimmed) {
+        return Ok(dt);
+    }
+
+    if let Ok(naive) = NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M:%S") {
+        return Ok(naive.and_utc());
+    }
+
+    if let Ok(naive) = NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M") {
+        return Ok(naive.and_utc());
+    }
+
+    Err(CrmError::InvalidInput(format!(
+        "Invalid due datetime '{}'",
+        trimmed
+    )))
 }
 
 /// Generates a human-readable relative time string from an ISO 8601 timestamp.
@@ -218,4 +271,27 @@ pub fn format_relative(iso8601: &str) -> String {
 pub fn days_from_now(days: i64) -> String {
     let dt = Utc::now() + chrono::Duration::days(days);
     dt.to_rfc3339()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{local_today_ymd, parse_date_only, parse_due_datetime, parse_iso8601};
+
+    #[test]
+    fn parse_due_datetime_accepts_date_only_rfc3339_and_naive_local() {
+        assert!(parse_date_only("2026-07-08").is_ok());
+        assert!(parse_due_datetime("2026-07-08").is_ok());
+        assert!(parse_iso8601("2026-07-08T15:00:00Z").is_ok());
+        assert!(parse_due_datetime("2026-07-08T15:00:00Z").is_ok());
+        assert!(parse_due_datetime("2026-07-08T15:00").is_ok());
+        assert!(parse_due_datetime("not-a-date").is_err());
+    }
+
+    #[test]
+    fn local_today_ymd_is_a_date_only_calendar_key() {
+        let today = local_today_ymd();
+        assert!(parse_date_only(&today).is_ok());
+        assert_eq!(today.len(), 10);
+        assert!(!today.contains('T'));
+    }
 }

@@ -119,6 +119,13 @@ vi.mock('$lib/api/customFields', () => ({
   listCustomFieldValuesForEntityType: listCustomFieldValuesForEntityTypeMock,
 }));
 
+vi.mock('$lib/api/savedViews', () => ({
+  listSavedViews: vi.fn().mockResolvedValue([]),
+  createSavedView: vi.fn(),
+  deleteSavedView: vi.fn(),
+  filtersMatch: () => false,
+}));
+
 vi.mock('$lib/stores/deals', () => ({
   dealStore: dealStoreMock,
 }));
@@ -212,7 +219,6 @@ describe('Pipeline local automation prompt', () => {
 
     await screen.findByRole('button', { name: /Automation rollout/ });
     await waitFor(() => {
-      expect(listDealsMock).toHaveBeenCalled();
       expect(listActivitiesForDealsMock).toHaveBeenCalledWith(['deal-automation']);
     });
 
@@ -242,7 +248,7 @@ describe('Pipeline local automation prompt', () => {
 
     await screen.findByRole('button', { name: /Automation rollout/ });
     await waitFor(() => {
-      expect(listDealsMock).toHaveBeenCalled();
+      expect(listActivitiesForDealsMock).toHaveBeenCalledWith(['deal-automation']);
     });
 
     const card = screen.getByRole('button', { name: /Automation rollout/ });

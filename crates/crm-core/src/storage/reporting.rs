@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::storage::deals::{self, PipelineSummary};
 use crate::utils::{
-    datetime::{days_from_now, now_iso8601},
+    datetime::{local_days_from_now_ymd, local_today_ymd, now_iso8601},
     errors::CrmResult,
 };
 
@@ -197,23 +197,24 @@ pub fn get_pipeline_conversion_report(conn: &Connection) -> CrmResult<PipelineCo
 
 pub fn get_activity_funnel_report(conn: &Connection) -> CrmResult<ActivityFunnelReport> {
     let now = now_iso8601();
-    let today = now[..10].to_string();
-    let day_7 = days_from_now(7)[..10].to_string();
+    let local_today = local_today_ymd();
+    let local_day_7 = local_days_from_now_ymd(7);
+    let utc_today_prefix = format!("{}%", &now[..10.min(now.len())]);
 
     let row = conn.query_row(
         r#"
         SELECT
             COUNT(*) AS total,
             SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS completed,
-            SUM(CASE WHEN completed = 0 AND due_date IS NOT NULL AND due_date < ?1 THEN 1 ELSE 0 END) AS overdue,
-            SUM(CASE WHEN completed = 0 AND due_date LIKE ?2 THEN 1 ELSE 0 END) AS due_today,
+            SUM(CASE WHEN completed = 0 AND due_date IS NOT NULL AND ((length(due_date) = 10 AND due_date < ?3) OR (length(due_date) > 10 AND due_date < ?1)) THEN 1 ELSE 0 END) AS overdue,
+            SUM(CASE WHEN completed = 0 AND ((length(due_date) = 10 AND due_date = ?3) OR (length(due_date) > 10 AND due_date LIKE ?2)) THEN 1 ELSE 0 END) AS due_today,
             SUM(CASE WHEN completed = 0 AND due_date IS NOT NULL AND substr(due_date, 1, 10) > ?3 AND substr(due_date, 1, 10) <= ?4 THEN 1 ELSE 0 END) AS due_next_7_days,
             SUM(CASE WHEN completed = 0 AND due_date IS NOT NULL AND substr(due_date, 1, 10) > ?4 THEN 1 ELSE 0 END) AS due_later,
             SUM(CASE WHEN completed = 0 AND due_date IS NULL THEN 1 ELSE 0 END) AS no_due_date
         FROM activities
         WHERE deleted_at IS NULL
         "#,
-        params![now, format!("{}%", today), today, day_7],
+        params![now, utc_today_prefix, local_today, local_day_7],
         |row| {
             Ok((
                 row.get::<_, Option<i64>>(0)?.unwrap_or(0),
@@ -258,7 +259,7 @@ pub fn get_activity_funnel_report(conn: &Connection) -> CrmResult<ActivityFunnel
             activity_type,
             COUNT(*) AS total,
             SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS completed,
-            SUM(CASE WHEN completed = 0 AND due_date IS NOT NULL AND due_date < ?1 THEN 1 ELSE 0 END) AS overdue
+            SUM(CASE WHEN completed = 0 AND due_date IS NOT NULL AND ((length(due_date) = 10 AND due_date < ?2) OR (length(due_date) > 10 AND due_date < ?1)) THEN 1 ELSE 0 END) AS overdue
         FROM activities
         WHERE deleted_at IS NULL
         GROUP BY activity_type
@@ -266,7 +267,7 @@ pub fn get_activity_funnel_report(conn: &Connection) -> CrmResult<ActivityFunnel
         "#,
     )?;
 
-    let rows = stmt.query_map(params![now], |row| {
+    let rows = stmt.query_map(params![now, local_today], |row| {
         let total = row.get::<_, Option<i64>>(1)?.unwrap_or(0);
         let completed = row.get::<_, Option<i64>>(2)?.unwrap_or(0);
         let overdue = row.get::<_, Option<i64>>(3)?.unwrap_or(0);

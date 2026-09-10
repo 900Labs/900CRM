@@ -28,7 +28,22 @@
       "workspace": "Espacio de trabajo",
       "review": "Revisión",
       "admin": "Administración"
-    }
+    },
+    "skipToContent": "Skip to main content"
+  },
+  "commandPalette": {
+    "title": "Jump to",
+    "placeholder": "Go to a page or search records",
+    "routes": "Pages",
+    "records": "Records",
+    "noResults": "No matching records"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "openPalette": "Open jump list",
+    "focusSearch": "Focus search",
+    "switchNav": "Switch workspace page",
+    "shortcutSheet": "Show this list"
   },
   "dashboard": {
     "title": "Panel",
@@ -243,7 +258,7 @@
     "tags": "Etiquetas",
     "notes": "Notas",
     "linkedDeals": "Negocios vinculados",
-    "activityTimeline": "Historial de actividades",
+    "activityTimeline": "Activity history",
     "firstName": "Nombre",
     "lastName": "Apellido",
     "website": "Sitio web",
@@ -471,7 +486,7 @@
     "overdue": "Vencido",
     "upcoming": "Próximo",
     "noActivities": "Aún no hay actividades",
-    "noActivitiesDesc": "Añade una tarea, llamada, reunión o email para que el trabajo vencido y de hoy tenga un sitio.",
+    "noActivitiesDesc": "Add a task, call, meeting, email, visit, WhatsApp ping, or SMS so overdue and due-today work has a place.",
     "noMatchingTitle": "No hay actividades coincidentes",
     "noMatchingDesc": "Limpia el filtro de tipo, estado, vencimiento o campo personalizado para ver más trabajo.",
     "workbenchEyebrow": "Centro de seguimiento",
@@ -526,7 +541,16 @@
     "relationshipContact": "Contacto",
     "relationshipOrganization": "Organización",
     "relationshipDeal": "Negocio",
-    "openRelationship": "Abrir {type} {label}"
+    "openRelationship": "Abrir {type} {label}",
+    "visit": "Visit",
+    "whatsapp": "WhatsApp",
+    "sms": "SMS",
+    "dueTime": "Due time",
+    "logJustHappened": "Log what just happened",
+    "logVisit": "Visit",
+    "logWhatsapp": "WhatsApp",
+    "logSms": "SMS",
+    "historyTitle": "What happened"
   },
   "settings": {
     "title": "Configuración",
@@ -534,7 +558,7 @@
     "sectionPreferences": "Preferencias",
     "sectionAppearance": "Apariencia",
     "sectionSync": "Sincronización",
-    "sectionEmail": "Correo",
+    "sectionEmail": "Email probe",
     "sectionNotifications": "Notificaciones",
     "sectionIntegrations": "Integraciones",
     "sectionData": "Datos",
@@ -558,16 +582,16 @@
     "notificationsEnabled": "Habilitar recordatorios de escritorio",
     "reminderLeadMinutes": "Anticipación del recordatorio (minutos)",
     "reminderLeadHint": "Notificarme esta cantidad de minutos antes del vencimiento de una actividad.",
-    "emailIntegration": "Integración de correo",
-    "emailIntegrationEnabled": "Habilitar integración opcional IMAP/SMTP",
+    "emailIntegration": "Email reachability probe",
+    "emailIntegrationEnabled": "Enable TCP reachability probe",
     "emailComposeHint": "Configura servidores opcionales y usa acciones locales de composición con mailto.",
     "emailProbeOnly": "Solo comprueba si el servidor es accesible. 900CRM no envía ni recibe correo y no guarda contraseñas de buzón.",
-    "smtpHost": "Host SMTP",
+    "smtpHost": "SMTP probe host",
     "smtpPort": "Puerto SMTP",
     "smtpUsername": "Usuario SMTP",
     "smtpPassword": "Contraseña SMTP",
     "smtpFrom": "Dirección remitente predeterminada",
-    "imapHost": "Host IMAP",
+    "imapHost": "IMAP probe host",
     "imapPort": "Puerto IMAP",
     "imapUsername": "Usuario IMAP",
     "imapPassword": "Contraseña IMAP",
@@ -652,7 +676,8 @@
     "externalClientPermissionNoConfirmation": "Sin confirmación",
     "externalClientPermissionWriteRequiresConfirmation": "Las filas de permisos de escritura requieren confirmación; el backend rechaza las filas de escritura que no requieren confirmación.",
     "syncUnavailable": "Aún no disponible",
-    "syncUnavailableHint": "La sincronización entre dispositivos no está implementada. Sus datos permanecen en este dispositivo. Nada aquí se conecta a un servidor."
+    "syncUnavailableHint": "La sincronización entre dispositivos no está implementada. Sus datos permanecen en este dispositivo. Nada aquí se conecta a un servidor.",
+    "emailProbeBadge": "TCP probe"
   },
   "common": {
     "save": "Guardar",

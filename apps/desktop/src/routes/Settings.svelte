@@ -977,13 +977,14 @@
       </section>
 
       <!-- Email integration -->
-      <section class="card settings-section" aria-labelledby="email-heading">
+      <section class="card settings-section email-probe-pane" aria-labelledby="email-heading">
         <div class="card-header">
           <h2 class="section-title" id="email-heading">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-              <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="m22 6-10 7L2 6"/>
+              <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>
             </svg>
             {t('settings.emailIntegration')}
+            <span class="probe-badge">{t('settings.emailProbeBadge')}</span>
           </h2>
           {#if savingKey === 'emailIntegrationEnabled'
             || savingKey === 'smtpHost'
@@ -1856,6 +1857,24 @@
 
   .sync-url-input-wrap {
     width: 100%;
+  }
+
+  .email-probe-pane {
+    border-style: dashed;
+  }
+
+  .probe-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-inline-start: var(--space-2);
+    padding: 0 var(--space-2);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: 9999px;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 
   .email-grid {

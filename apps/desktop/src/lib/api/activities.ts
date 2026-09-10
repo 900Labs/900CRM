@@ -3,8 +3,20 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { activityDueTimestamp, isActivityOverdue } from '$lib/utils/activityDue';
 
-export type ActivityType = 'task' | 'call' | 'meeting' | 'email';
+export const ACTIVITY_TYPES = [
+  'task',
+  'call',
+  'meeting',
+  'email',
+  'visit',
+  'whatsapp',
+  'sms',
+] as const;
+
+export type ActivityType = (typeof ACTIVITY_TYPES)[number];
+export const DEFAULT_LIST_ACTIVITIES_PAGE_SIZE = 200;
 export type ActivityStatus = 'pending' | 'completed' | 'overdue';
 export type ActivityLinkEntityType = 'contact' | 'organization' | 'deal';
 
@@ -110,33 +122,10 @@ function assignNullableUpdate(
 }
 
 function toActivityType(value: string): ActivityType {
-  if (value === 'call' || value === 'meeting' || value === 'email') {
-    return value;
+  if ((ACTIVITY_TYPES as readonly string[]).includes(value)) {
+    return value as ActivityType;
   }
   return 'task';
-}
-
-function localDayStart(date: Date): number {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-}
-
-function parseLocalDueDay(value: string | null): number | null {
-  if (!value) {
-    return null;
-  }
-
-  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  if (dateOnly) {
-    const [, year, month, day] = dateOnly;
-    return new Date(Number(year), Number(month) - 1, Number(day)).getTime();
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return localDayStart(parsed);
 }
 
 function toActivityStatus(completed: boolean, dueDate: string | null): ActivityStatus {
@@ -144,8 +133,7 @@ function toActivityStatus(completed: boolean, dueDate: string | null): ActivityS
     return 'completed';
   }
 
-  const dueDay = parseLocalDueDay(dueDate);
-  if (dueDay !== null && dueDay < localDayStart(new Date())) {
+  if (isActivityOverdue(dueDate, completed)) {
     return 'overdue';
   }
 
@@ -200,7 +188,7 @@ function sortActivities(items: Activity[], params: ListActivitiesParams): Activi
         return a.subject.localeCompare(b.subject) * direction;
       case 'dueDate':
       default:
-        return ((Date.parse(a.dueDate ?? '') || 0) - (Date.parse(b.dueDate ?? '') || 0)) * direction;
+        return ((activityDueTimestamp(a.dueDate) ?? 0) - (activityDueTimestamp(b.dueDate) ?? 0)) * direction;
     }
   });
 
@@ -226,13 +214,12 @@ export async function getActivity(id: string): Promise<Activity> {
 }
 
 export async function listActivities(params: ListActivitiesParams = {}): Promise<Activity[]> {
-  const invokeArgs: Record<string, unknown> = {};
-  if (params.pageSize != null || params.page != null) {
-    const pageSize = params.pageSize ?? 50;
-    const page = params.page ?? 1;
-    invokeArgs.limit = pageSize;
-    invokeArgs.offset = Math.max(0, (page - 1) * pageSize);
-  }
+  const pageSize = params.pageSize ?? DEFAULT_LIST_ACTIVITIES_PAGE_SIZE;
+  const page = params.page ?? 1;
+  const invokeArgs: Record<string, unknown> = {
+    limit: pageSize,
+    offset: Math.max(0, (page - 1) * pageSize),
+  };
 
   const activities = await invoke<BackendActivity[]>('list_activities', invokeArgs);
 
@@ -316,6 +303,23 @@ export async function updateActivity(id: string, data: UpdateActivityPayload): P
 
 export async function deleteActivity(id: string): Promise<void> {
   await invoke<void>('delete_activity', { id });
+}
+
+export async function logJustHappened(input: {
+  type: ActivityType;
+  subject: string;
+  contactId?: string | null;
+  dealId?: string | null;
+}): Promise<Activity> {
+  const created = await createActivity({
+    type: input.type,
+    subject: input.subject,
+    notes: null,
+    dueDate: new Date().toISOString(),
+    contactId: input.contactId ?? null,
+    dealId: input.dealId ?? null,
+  });
+  return markComplete(created.id);
 }
 
 export async function listActivityLinks(activityId: string): Promise<ActivityLink[]> {

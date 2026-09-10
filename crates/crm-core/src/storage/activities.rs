@@ -1,12 +1,12 @@
 //! Activity CRUD operations and scheduling queries for 900CRM.
 //!
-//! Activities represent tasks, calls, meetings, and emails. They can be
-//! attached to a contact, a deal, or both.
+//! Activities represent tasks, calls, meetings, emails, visits, WhatsApp, and SMS.
+//! They can be attached to a contact, a deal, or both.
 //!
 //! # Activity Types
 //!
 //! The `activity_type` field is a freeform string. Standard values are:
-//! `"task"`, `"call"`, `"meeting"`, `"email"`, `"note"`.
+//! `"task"`, `"call"`, `"meeting"`, `"email"`, `"note"`, `"visit"`, `"whatsapp"`, `"sms"`.
 //!
 //! # Soft Delete
 //!
@@ -16,7 +16,7 @@ use rusqlite::{params, params_from_iter, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 use crate::utils::{
-    datetime::now_iso8601,
+    datetime::{local_today_ymd, now_iso8601},
     errors::{CrmError, CrmResult},
     uuid::new_uuid,
 };
@@ -125,7 +125,7 @@ pub struct ActivityLink {
 pub fn get_activity_stats_counts(
     conn: &Connection,
     now: &str,
-    today_prefix: &str,
+    local_today: &str,
 ) -> CrmResult<ActivityStatsCounts> {
     let total: i64 = conn
         .query_row(
@@ -150,22 +150,29 @@ pub fn get_activity_stats_counts(
             WHERE deleted_at IS NULL
               AND completed = 0
               AND due_date IS NOT NULL
-              AND due_date < ?1
+              AND (
+                (length(due_date) = 10 AND due_date < ?2)
+                OR (length(due_date) > 10 AND due_date < ?1)
+              )
             "#,
-            params![now],
+            params![now, local_today],
             |r| r.get(0),
         )
         .unwrap_or(0);
 
+    let utc_today_prefix = format!("{}%", &now[..10.min(now.len())]);
     let due_today: i64 = conn
         .query_row(
             r#"
             SELECT COUNT(*) FROM activities
             WHERE deleted_at IS NULL
               AND completed = 0
-              AND due_date LIKE ?1
+              AND (
+                (length(due_date) = 10 AND due_date = ?1)
+                OR (length(due_date) > 10 AND due_date LIKE ?2)
+              )
             "#,
-            params![format!("{today_prefix}%")],
+            params![local_today, utc_today_prefix],
             |r| r.get(0),
         )
         .unwrap_or(0);
@@ -433,6 +440,7 @@ pub fn list_activity_links_for_activities(
 /// Returns [`CrmError::Database`] on SQL failure.
 pub fn list_upcoming_activities(conn: &Connection, limit: u32) -> CrmResult<Vec<Activity>> {
     let now = now_iso8601();
+    let local_today = local_today_ymd();
     let mut stmt = conn.prepare(
         r#"
         SELECT id, activity_type, title, description, due_date, completed,
@@ -440,13 +448,17 @@ pub fn list_upcoming_activities(conn: &Connection, limit: u32) -> CrmResult<Vec<
         FROM activities
         WHERE deleted_at IS NULL
           AND completed = 0
-          AND due_date >= ?1
+          AND due_date IS NOT NULL
+          AND (
+            (length(due_date) = 10 AND due_date >= ?2)
+            OR (length(due_date) > 10 AND due_date >= ?1)
+          )
         ORDER BY due_date ASC
-        LIMIT ?2
+        LIMIT ?3
         "#,
     )?;
 
-    let rows = stmt.query_map(params![now, limit as i64], row_to_activity)?;
+    let rows = stmt.query_map(params![now, local_today, limit as i64], row_to_activity)?;
     let activities = rows.collect::<Result<Vec<_>, _>>()?;
 
     log::debug!("list_upcoming_activities: {} results", activities.len());
@@ -462,6 +474,7 @@ pub fn list_upcoming_activities(conn: &Connection, limit: u32) -> CrmResult<Vec<
 /// Returns [`CrmError::Database`] on SQL failure.
 pub fn list_overdue_activities(conn: &Connection) -> CrmResult<Vec<Activity>> {
     let now = now_iso8601();
+    let local_today = local_today_ymd();
     let mut stmt = conn.prepare(
         r#"
         SELECT id, activity_type, title, description, due_date, completed,
@@ -469,13 +482,16 @@ pub fn list_overdue_activities(conn: &Connection) -> CrmResult<Vec<Activity>> {
         FROM activities
         WHERE deleted_at IS NULL
           AND completed = 0
-          AND due_date < ?1
           AND due_date IS NOT NULL
+          AND (
+            (length(due_date) = 10 AND due_date < ?2)
+            OR (length(due_date) > 10 AND due_date < ?1)
+          )
         ORDER BY due_date ASC
         "#,
     )?;
 
-    let rows = stmt.query_map(params![now], row_to_activity)?;
+    let rows = stmt.query_map(params![now, local_today], row_to_activity)?;
     let activities = rows.collect::<Result<Vec<_>, _>>()?;
 
     log::debug!("list_overdue_activities: {} results", activities.len());

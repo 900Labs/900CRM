@@ -28,7 +28,22 @@
       "workspace": "Không gian làm việc",
       "review": "Duyệt",
       "admin": "Quản trị"
-    }
+    },
+    "skipToContent": "Skip to main content"
+  },
+  "commandPalette": {
+    "title": "Jump to",
+    "placeholder": "Go to a page or search records",
+    "routes": "Pages",
+    "records": "Records",
+    "noResults": "No matching records"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "openPalette": "Open jump list",
+    "focusSearch": "Focus search",
+    "switchNav": "Switch workspace page",
+    "shortcutSheet": "Show this list"
   },
   "dashboard": {
     "title": "Bảng điều khiển",
@@ -243,7 +258,7 @@
     "tags": "Thẻ",
     "notes": "Ghi chú",
     "linkedDeals": "Cơ hội liên kết",
-    "activityTimeline": "Dòng thời gian hoạt động",
+    "activityTimeline": "Activity history",
     "firstName": "Tên",
     "lastName": "Họ",
     "website": "Website",
@@ -471,7 +486,7 @@
     "overdue": "Quá hạn",
     "upcoming": "Sắp tới",
     "noActivities": "Chưa có hoạt động",
-    "noActivitiesDesc": "Thêm việc, cuộc gọi, cuộc họp hoặc email để công việc quá hạn và đến hạn hôm nay có chỗ.",
+    "noActivitiesDesc": "Add a task, call, meeting, email, visit, WhatsApp ping, or SMS so overdue and due-today work has a place.",
     "noMatchingTitle": "Không có hoạt động khớp",
     "noMatchingDesc": "Xóa bộ lọc loại, trạng thái, hạn hoặc trường tùy chỉnh để xem thêm việc.",
     "workbenchEyebrow": "Trung tâm theo dõi",
@@ -526,7 +541,16 @@
     "relationshipContact": "Liên hệ",
     "relationshipOrganization": "Tổ chức",
     "relationshipDeal": "Cơ hội",
-    "openRelationship": "Mở {type} {label}"
+    "openRelationship": "Mở {type} {label}",
+    "visit": "Visit",
+    "whatsapp": "WhatsApp",
+    "sms": "SMS",
+    "dueTime": "Due time",
+    "logJustHappened": "Log what just happened",
+    "logVisit": "Visit",
+    "logWhatsapp": "WhatsApp",
+    "logSms": "SMS",
+    "historyTitle": "What happened"
   },
   "settings": {
     "title": "Cài đặt",
@@ -534,7 +558,7 @@
     "sectionPreferences": "Tùy chọn",
     "sectionAppearance": "Giao diện",
     "sectionSync": "Đồng bộ",
-    "sectionEmail": "Email",
+    "sectionEmail": "Email probe",
     "sectionNotifications": "Thông báo",
     "sectionIntegrations": "Tích hợp",
     "sectionData": "Dữ liệu",
@@ -558,16 +582,16 @@
     "notificationsEnabled": "Bật nhắc việc trên desktop",
     "reminderLeadMinutes": "Thời gian nhắc trước (phút)",
     "reminderLeadHint": "Nhắc tôi trước thời hạn hoạt động số phút này.",
-    "emailIntegration": "Tích hợp email",
-    "emailIntegrationEnabled": "Bật tích hợp IMAP/SMTP tùy chọn",
+    "emailIntegration": "Email reachability probe",
+    "emailIntegrationEnabled": "Enable TCP reachability probe",
     "emailComposeHint": "Cấu hình máy chủ tùy chọn và dùng thao tác soạn thư cục bộ qua mailto.",
     "emailProbeOnly": "Chỉ kiểm tra khả năng kết nối. 900CRM không gửi hoặc nhận email và không lưu mật khẩu hộp thư.",
-    "smtpHost": "Máy chủ SMTP",
+    "smtpHost": "SMTP probe host",
     "smtpPort": "Cổng SMTP",
     "smtpUsername": "Tên đăng nhập SMTP",
     "smtpPassword": "Mật khẩu SMTP",
     "smtpFrom": "Địa chỉ gửi mặc định",
-    "imapHost": "Máy chủ IMAP",
+    "imapHost": "IMAP probe host",
     "imapPort": "Cổng IMAP",
     "imapUsername": "Tên đăng nhập IMAP",
     "imapPassword": "Mật khẩu IMAP",
@@ -652,7 +676,8 @@
     "externalClientPermissionNoConfirmation": "Không xác nhận",
     "externalClientPermissionWriteRequiresConfirmation": "Hàng quyền hạn ghi cần xác nhận; backend từ chối hàng ghi không yêu cầu xác nhận.",
     "syncUnavailable": "Chưa có",
-    "syncUnavailableHint": "Đồng bộ nhiều thiết bị chưa được triển khai. Dữ liệu của bạn ở lại trên thiết bị này. Không có gì ở đây kết nối tới máy chủ."
+    "syncUnavailableHint": "Đồng bộ nhiều thiết bị chưa được triển khai. Dữ liệu của bạn ở lại trên thiết bị này. Không có gì ở đây kết nối tới máy chủ.",
+    "emailProbeBadge": "TCP probe"
   },
   "common": {
     "save": "Lưu",

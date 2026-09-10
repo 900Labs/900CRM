@@ -49,6 +49,7 @@
   import EntityLinksPanel from '$lib/components/EntityLinksPanel.svelte';
   import EntityTagsPanel from '$lib/components/EntityTagsPanel.svelte';
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
+  import LogJustHappened from '$lib/components/LogJustHappened.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
   import NextStepCard from '$lib/components/NextStepCard.svelte';
   import Modal from '$lib/components/Modal.svelte';
@@ -1110,6 +1111,10 @@
             </button>
           </div>
           <div class="card-body">
+            <LogJustHappened
+              contactId={contactId}
+              onlogged={() => void loadContactTimeline(contactId)}
+            />
             <ActivityFeed
               activities={contactActivities}
               loading={activitiesLoading}

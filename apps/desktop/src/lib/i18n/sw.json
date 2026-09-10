@@ -28,7 +28,22 @@
       "workspace": "Nafasi ya Kazi",
       "review": "Kagua",
       "admin": "Msimamizi"
-    }
+    },
+    "skipToContent": "Skip to main content"
+  },
+  "commandPalette": {
+    "title": "Jump to",
+    "placeholder": "Go to a page or search records",
+    "routes": "Pages",
+    "records": "Records",
+    "noResults": "No matching records"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "openPalette": "Open jump list",
+    "focusSearch": "Focus search",
+    "switchNav": "Switch workspace page",
+    "shortcutSheet": "Show this list"
   },
   "dashboard": {
     "title": "Dashibodi",
@@ -243,7 +258,7 @@
     "tags": "Lebo",
     "notes": "Maelezo",
     "linkedDeals": "Mikataba Inayohusiana",
-    "activityTimeline": "Historia ya Shughuli",
+    "activityTimeline": "Activity history",
     "firstName": "Jina la Kwanza",
     "lastName": "Jina la Ukoo",
     "website": "Tovuti",
@@ -471,7 +486,7 @@
     "overdue": "Imechelewa",
     "upcoming": "Inakuja",
     "noActivities": "Hakuna shughuli bado",
-    "noActivitiesDesc": "Ongeza kazi, simu, mkutano au barua pepe ili kazi iliyochelewa na ya leo iwe na mahali.",
+    "noActivitiesDesc": "Add a task, call, meeting, email, visit, WhatsApp ping, or SMS so overdue and due-today work has a place.",
     "noMatchingTitle": "Hakuna shughuli zinazolingana",
     "noMatchingDesc": "Futa kichujio cha aina, hali, muda au uga maalum ili kuona kazi zaidi.",
     "workbenchEyebrow": "Kituo cha Ufuatiliaji",
@@ -526,7 +541,16 @@
     "relationshipContact": "Anwani",
     "relationshipOrganization": "Shirika",
     "relationshipDeal": "Mkataba",
-    "openRelationship": "Fungua {type} {label}"
+    "openRelationship": "Fungua {type} {label}",
+    "visit": "Visit",
+    "whatsapp": "WhatsApp",
+    "sms": "SMS",
+    "dueTime": "Due time",
+    "logJustHappened": "Log what just happened",
+    "logVisit": "Visit",
+    "logWhatsapp": "WhatsApp",
+    "logSms": "SMS",
+    "historyTitle": "What happened"
   },
   "settings": {
     "title": "Mipangilio",
@@ -534,7 +558,7 @@
     "sectionPreferences": "Mapendeleo",
     "sectionAppearance": "Mwonekano",
     "sectionSync": "Usawazishaji",
-    "sectionEmail": "Barua Pepe",
+    "sectionEmail": "Email probe",
     "sectionNotifications": "Arifa",
     "sectionIntegrations": "Ujumuishaji",
     "sectionData": "Data",
@@ -558,16 +582,16 @@
     "notificationsEnabled": "Wezesha vikumbusho vya kompyuta",
     "reminderLeadMinutes": "Muda wa kukumbusha kabla (dakika)",
     "reminderLeadHint": "Nijulishe dakika hizi kabla shughuli haijafika muda wake.",
-    "emailIntegration": "Ujumuishaji wa barua pepe",
-    "emailIntegrationEnabled": "Washa ujumuishaji wa hiari wa IMAP/SMTP",
+    "emailIntegration": "Email reachability probe",
+    "emailIntegrationEnabled": "Enable TCP reachability probe",
     "emailComposeHint": "Sanidi seva za hiari na tumia kutunga barua pepe kwa mailto kwenye kifaa hiki.",
     "emailProbeOnly": "Jaribio la kufikiwa tu. 900CRM haitumi wala kupokea barua pepe na haihifadhi nywila za barua pepe.",
-    "smtpHost": "Mwenyeji wa SMTP",
+    "smtpHost": "SMTP probe host",
     "smtpPort": "Bandari ya SMTP",
     "smtpUsername": "Jina la mtumiaji la SMTP",
     "smtpPassword": "Nenosiri la SMTP",
     "smtpFrom": "Anwani chaguo-msingi ya mtumaji",
-    "imapHost": "Mwenyeji wa IMAP",
+    "imapHost": "IMAP probe host",
     "imapPort": "Bandari ya IMAP",
     "imapUsername": "Jina la mtumiaji la IMAP",
     "imapPassword": "Nenosiri la IMAP",
@@ -652,7 +676,8 @@
     "externalClientPermissionNoConfirmation": "Hakuna Uthibitisho",
     "externalClientPermissionWriteRequiresConfirmation": "Safu za ruhusa za kuandika zinahitaji uthibitisho; seva ya nyuma inakataa safu za kuandika zisizohitaji uthibitisho.",
     "syncUnavailable": "Bado haipatikani",
-    "syncUnavailableHint": "Usawazishaji wa vifaa vingi haujatekelezwa. Data yako inabaki kwenye kifaa hiki. Hakuna kilicho hapa kinachounganisha na seva."
+    "syncUnavailableHint": "Usawazishaji wa vifaa vingi haujatekelezwa. Data yako inabaki kwenye kifaa hiki. Hakuna kilicho hapa kinachounganisha na seva.",
+    "emailProbeBadge": "TCP probe"
   },
   "common": {
     "save": "Hifadhi",

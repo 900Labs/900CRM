@@ -12,10 +12,12 @@ import {
   markComplete,
   markIncomplete,
   deleteActivity,
+  logJustHappened,
 } from '$lib/api/activities';
 import { t } from '$lib/i18n';
 import type {
   Activity,
+  ActivityType,
   CreateActivityPayload,
   UpdateActivityPayload,
   ListActivitiesParams,
@@ -44,6 +46,8 @@ class ActivityStore {
   filters = $state<ListActivitiesParams>({
     sortBy: 'dueDate',
     sortDir: 'asc',
+    pageSize: 200,
+    page: 1,
   });
 
   /** Whether the list is loading. */
@@ -185,6 +189,44 @@ class ActivityStore {
   async setFilters(updates: Partial<ListActivitiesParams>): Promise<void> {
     this.filters = { ...this.filters, ...updates };
     await this.loadActivities();
+  }
+
+  async logJustHappened(input: {
+    type: ActivityType;
+    contactId?: string | null;
+    dealId?: string | null;
+  }): Promise<Activity> {
+    this.isSaving = true;
+    try {
+      const subject = logJustHappenedSubject(input.type);
+      const activity = await logJustHappened({
+        type: input.type,
+        subject,
+        contactId: input.contactId,
+        dealId: input.dealId,
+      });
+      this.activities = [activity, ...this.activities.filter((item) => item.id !== activity.id)];
+      uiStore.toastSuccess(t('toasts.created', { name: t('entities.activity') }));
+      return activity;
+    } catch (err) {
+      uiStore.toastError(t('errors.createNamed', { name: t('entities.activity') }));
+      throw err;
+    } finally {
+      this.isSaving = false;
+    }
+  }
+}
+
+function logJustHappenedSubject(type: ActivityType): string {
+  switch (type) {
+    case 'visit':
+      return t('activities.logVisit');
+    case 'whatsapp':
+      return t('activities.logWhatsapp');
+    case 'sms':
+      return t('activities.logSms');
+    default:
+      return t(`activities.${type}`);
   }
 }
 

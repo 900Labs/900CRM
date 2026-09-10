@@ -23,6 +23,14 @@
   import { startActivityReminderService } from '$lib/services/activityReminders';
   import { currentHashPath, navigateHash, routeHash } from '$lib/utils/hashRouter';
   import { reviewCountsStore } from '$lib/stores/reviewCounts';
+  import CommandPalette from '$lib/components/CommandPalette.svelte';
+  import ShortcutSheet from '$lib/components/ShortcutSheet.svelte';
+  import {
+    focusGlobalSearch,
+    isModKey,
+    isTypingTarget,
+    workspaceHrefForDigit,
+  } from '$lib/utils/keyboard';
 
   // ── Child route ──────────────────────────────────────────────────────────────
 
@@ -31,6 +39,8 @@
   // ── State ───────────────────────────────────────────────────────────────────
 
   let currentRoute = $state('/');
+  let commandPaletteOpen = $state(false);
+  let shortcutSheetOpen = $state(false);
 
   // ── Navigation ─────────────────────────────────────────────────────────────
 
@@ -156,6 +166,37 @@
     return uiStore.sidebarCollapsed ? `${section.label()}: ${label}` : undefined;
   }
 
+  function handleWorkspaceKeydown(event: KeyboardEvent) {
+    if (isModKey(event) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      commandPaletteOpen = true;
+      shortcutSheetOpen = false;
+      return;
+    }
+
+    if (isTypingTarget(event.target)) {
+      return;
+    }
+
+    if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      focusGlobalSearch();
+      return;
+    }
+
+    if (event.key === '?' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      shortcutSheetOpen = true;
+      return;
+    }
+
+    const href = workspaceHrefForDigit(event.key);
+    if (href) {
+      event.preventDefault();
+      navigate(href);
+    }
+  }
+
   function handleSearchResult(result: SearchResult) {
     if (result.type === 'contact') {
       navigate(`/contacts/${result.id}`);
@@ -188,6 +229,7 @@
       currentRoute = currentHashPath();
     };
     window.addEventListener('hashchange', handleHashChange);
+    window.addEventListener('keydown', handleWorkspaceKeydown);
 
     let isActive = true;
     let stopReminderService = () => {};
@@ -203,10 +245,22 @@
     return () => {
       isActive = false;
       window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('keydown', handleWorkspaceKeydown);
       stopReminderService();
     };
   });
 </script>
+
+<a
+  class="skip-link"
+  href="#main-content"
+  onclick={(event) => {
+    event.preventDefault();
+    document.getElementById('main-content')?.focus();
+  }}
+>
+  {t('nav.skipToContent')}
+</a>
 
 <div class="app-shell">
   <!-- Sidebar -->
@@ -310,7 +364,7 @@
   </aside>
 
   <!-- Main content -->
-  <main class="app-main" id="main-content" aria-label="Main content">
+  <main class="app-main" id="main-content" tabindex="-1" aria-label="Main content">
     <!-- Top bar with search -->
     {#if !uiStore.sidebarCollapsed || true}
       <div class="top-bar">
@@ -332,10 +386,37 @@
 </div>
 
 <!-- Toast overlay (outside app-shell so it always floats above everything) -->
+<CommandPalette
+  open={commandPaletteOpen}
+  onclose={() => { commandPaletteOpen = false; }}
+  onnavigate={(href) => navigate(href)}
+/>
+<ShortcutSheet
+  open={shortcutSheetOpen}
+  onclose={() => { shortcutSheetOpen = false; }}
+/>
 <GlobalModalHost />
 <Toast />
 
 <style>
+  .skip-link {
+    position: absolute;
+    inset-inline-start: var(--space-3);
+    top: var(--space-3);
+    z-index: 90;
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface-app);
+    border: var(--border-width) solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    text-decoration: none;
+    transform: translateY(-160%);
+  }
+
+  .skip-link:focus {
+    transform: none;
+  }
+
   .top-bar {
     display: flex;
     align-items: center;

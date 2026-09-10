@@ -220,7 +220,7 @@ export async function loadActivityRelationshipLookups(): Promise<ActivityRelatio
   const [contacts, organizations, deals] = await Promise.all([
     loadActivityRelationshipContacts(),
     listOrganizations(),
-    listDeals({ sortBy: 'name', sortDir: 'asc' }),
+    listDeals({ sortBy: 'name', sortDir: 'asc', pageSize: 500 }),
   ]);
 
   return { contacts, organizations, deals };

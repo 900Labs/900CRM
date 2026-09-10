@@ -10,6 +10,7 @@ import { isPermissionGranted, requestPermission, sendNotification } from '@tauri
 import { listUpcoming, type Activity } from '$lib/api/activities';
 import { t } from '$lib/i18n';
 import { settingsStore } from '$lib/stores/settings';
+import { activityDueTimestamp } from '$lib/utils/activityDue';
 
 const POLL_INTERVAL_MS = 60_000;
 const MAX_UPCOMING_RESULTS = 100;
@@ -30,9 +31,7 @@ function clampLeadMinutes(value: number): number {
 }
 
 function dueTimestamp(activity: Activity): number | null {
-  if (!activity.dueDate) return null;
-  const ts = Date.parse(activity.dueDate);
-  return Number.isFinite(ts) ? ts : null;
+  return activityDueTimestamp(activity.dueDate);
 }
 
 function reminderKey(activity: Activity): string | null {
