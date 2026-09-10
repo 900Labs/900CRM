@@ -344,6 +344,7 @@ Current migration history:
 | 11 | Person contact lifecycle (`lead` or `customer`) on `contacts`. |
 | 12 | `entity_links` for website and local-file bookmarks on contacts, organizations, and deals. |
 | 13 | `saved_views` for named list filters on contacts, organizations, deals, activities, and reports. |
+| 14 | Optional local owner name on `contacts`, `deals`, and `organizations`, plus owner indexes. |
 
 ## Legacy And Compatibility Caveats
 
