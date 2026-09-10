@@ -28,7 +28,22 @@
       "workspace": "العمل",
       "review": "المراجعة",
       "admin": "الإدارة"
-    }
+    },
+    "skipToContent": "Skip to main content"
+  },
+  "commandPalette": {
+    "title": "Jump to",
+    "placeholder": "Go to a page or search records",
+    "routes": "Pages",
+    "records": "Records",
+    "noResults": "No matching records"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "openPalette": "Open jump list",
+    "focusSearch": "Focus search",
+    "switchNav": "Switch workspace page",
+    "shortcutSheet": "Show this list"
   },
   "dashboard": {
     "title": "لوحة التحكم",
@@ -243,7 +258,7 @@
     "tags": "الوسوم",
     "notes": "الملاحظات",
     "linkedDeals": "الصفقات المرتبطة",
-    "activityTimeline": "سجل الأنشطة",
+    "activityTimeline": "Activity history",
     "firstName": "الاسم الأول",
     "lastName": "اسم العائلة",
     "website": "الموقع الإلكتروني",
@@ -471,7 +486,7 @@
     "overdue": "متأخر",
     "upcoming": "قادم",
     "noActivities": "لا توجد أنشطة بعد",
-    "noActivitiesDesc": "أضف مهمة أو مكالمة أو اجتماعًا أو بريدًا حتى يكون للعمل المتأخر والمستحق اليوم مكان.",
+    "noActivitiesDesc": "Add a task, call, meeting, email, visit, WhatsApp ping, or SMS so overdue and due-today work has a place.",
     "noMatchingTitle": "لا توجد أنشطة مطابقة",
     "noMatchingDesc": "امسح فلتر النوع أو الحالة أو الفترة أو الحقل المخصص لرؤية المزيد.",
     "workbenchEyebrow": "مركز المتابعة",
@@ -526,7 +541,16 @@
     "relationshipContact": "جهة الاتصال",
     "relationshipOrganization": "المؤسسة",
     "relationshipDeal": "الصفقة",
-    "openRelationship": "فتح {type} {label}"
+    "openRelationship": "فتح {type} {label}",
+    "visit": "Visit",
+    "whatsapp": "WhatsApp",
+    "sms": "SMS",
+    "dueTime": "Due time",
+    "logJustHappened": "Log what just happened",
+    "logVisit": "Visit",
+    "logWhatsapp": "WhatsApp",
+    "logSms": "SMS",
+    "historyTitle": "What happened"
   },
   "settings": {
     "title": "الإعدادات",
@@ -534,7 +558,7 @@
     "sectionPreferences": "التفضيلات",
     "sectionAppearance": "المظهر",
     "sectionSync": "المزامنة",
-    "sectionEmail": "البريد",
+    "sectionEmail": "Email probe",
     "sectionNotifications": "الإشعارات",
     "sectionIntegrations": "التكاملات",
     "sectionData": "البيانات",
@@ -558,16 +582,16 @@
     "notificationsEnabled": "تفعيل تذكيرات سطح المكتب",
     "reminderLeadMinutes": "مدة التذكير المسبق (بالدقائق)",
     "reminderLeadHint": "أرسل إشعارًا قبل موعد النشاط بهذا العدد من الدقائق.",
-    "emailIntegration": "تكامل البريد الإلكتروني",
-    "emailIntegrationEnabled": "تفعيل تكامل IMAP/SMTP الاختياري",
+    "emailIntegration": "Email reachability probe",
+    "emailIntegrationEnabled": "Enable TCP reachability probe",
     "emailComposeHint": "قم بإعداد خوادم اختيارية واستخدم إنشاء الرسائل محليًا عبر mailto.",
     "emailProbeOnly": "للتحقق من الوصول فقط. لا يرسل 900CRM البريد ولا يستقبله ولا يخزن كلمات مرور صندوق البريد.",
-    "smtpHost": "مضيف SMTP",
+    "smtpHost": "SMTP probe host",
     "smtpPort": "منفذ SMTP",
     "smtpUsername": "اسم مستخدم SMTP",
     "smtpPassword": "كلمة مرور SMTP",
     "smtpFrom": "عنوان المرسل الافتراضي",
-    "imapHost": "مضيف IMAP",
+    "imapHost": "IMAP probe host",
     "imapPort": "منفذ IMAP",
     "imapUsername": "اسم مستخدم IMAP",
     "imapPassword": "كلمة مرور IMAP",
@@ -652,7 +676,8 @@
     "externalClientPermissionNoConfirmation": "بدون تأكيد",
     "externalClientPermissionWriteRequiresConfirmation": "تتطلب صفوف أذونات الكتابة تأكيدًا؛ يرفض الخادم صفوف الكتابة التي لا تتطلب تأكيدًا.",
     "syncUnavailable": "غير متاح بعد",
-    "syncUnavailableHint": "المزامنة بين الأجهزة غير منفذة. تبقى بياناتك على هذا الجهاز. لا يتصل أي شيء هنا بخادم."
+    "syncUnavailableHint": "المزامنة بين الأجهزة غير منفذة. تبقى بياناتك على هذا الجهاز. لا يتصل أي شيء هنا بخادم.",
+    "emailProbeBadge": "TCP probe"
   },
   "common": {
     "save": "حفظ",

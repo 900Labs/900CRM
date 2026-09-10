@@ -28,7 +28,22 @@
       "workspace": "वर्कस्पेस",
       "review": "समीक्षा",
       "admin": "व्यवस्थापक"
-    }
+    },
+    "skipToContent": "Skip to main content"
+  },
+  "commandPalette": {
+    "title": "Jump to",
+    "placeholder": "Go to a page or search records",
+    "routes": "Pages",
+    "records": "Records",
+    "noResults": "No matching records"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "openPalette": "Open jump list",
+    "focusSearch": "Focus search",
+    "switchNav": "Switch workspace page",
+    "shortcutSheet": "Show this list"
   },
   "dashboard": {
     "title": "डैशबोर्ड",
@@ -243,7 +258,7 @@
     "tags": "टैग",
     "notes": "नोट्स",
     "linkedDeals": "जुड़े सौदे",
-    "activityTimeline": "गतिविधि टाइमलाइन",
+    "activityTimeline": "Activity history",
     "firstName": "पहला नाम",
     "lastName": "उपनाम",
     "website": "वेबसाइट",
@@ -471,7 +486,7 @@
     "overdue": "विलंबित",
     "upcoming": "आगामी",
     "noActivities": "अभी कोई गतिविधि नहीं",
-    "noActivitiesDesc": "एक कार्य, कॉल, मीटिंग या ईमेल जोड़ें ताकि विलंबित और आज का काम एक जगह हो।",
+    "noActivitiesDesc": "Add a task, call, meeting, email, visit, WhatsApp ping, or SMS so overdue and due-today work has a place.",
     "noMatchingTitle": "कोई मेल खाती गतिविधि नहीं",
     "noMatchingDesc": "और काम देखने के लिए प्रकार, स्थिति, समय-सीमा या कस्टम फ़ील्ड फ़िल्टर साफ़ करें।",
     "workbenchEyebrow": "फॉलो-अप केंद्र",
@@ -526,7 +541,16 @@
     "relationshipContact": "संपर्क",
     "relationshipOrganization": "संगठन",
     "relationshipDeal": "सौदा",
-    "openRelationship": "{type} {label} खोलें"
+    "openRelationship": "{type} {label} खोलें",
+    "visit": "Visit",
+    "whatsapp": "WhatsApp",
+    "sms": "SMS",
+    "dueTime": "Due time",
+    "logJustHappened": "Log what just happened",
+    "logVisit": "Visit",
+    "logWhatsapp": "WhatsApp",
+    "logSms": "SMS",
+    "historyTitle": "What happened"
   },
   "settings": {
     "title": "सेटिंग्स",
@@ -534,7 +558,7 @@
     "sectionPreferences": "प्राथमिकताएँ",
     "sectionAppearance": "रूप",
     "sectionSync": "सिंक",
-    "sectionEmail": "ईमेल",
+    "sectionEmail": "Email probe",
     "sectionNotifications": "सूचनाएँ",
     "sectionIntegrations": "एकीकरण",
     "sectionData": "डेटा",
@@ -558,16 +582,16 @@
     "notificationsEnabled": "डेस्कटॉप रिमाइंडर सक्षम करें",
     "reminderLeadMinutes": "रिमाइंडर अग्रिम समय (मिनट)",
     "reminderLeadHint": "गतिविधि की नियत समय से इतने मिनट पहले मुझे सूचित करें।",
-    "emailIntegration": "ईमेल एकीकरण",
-    "emailIntegrationEnabled": "वैकल्पिक IMAP/SMTP एकीकरण सक्षम करें",
+    "emailIntegration": "Email reachability probe",
+    "emailIntegrationEnabled": "Enable TCP reachability probe",
     "emailComposeHint": "वैकल्पिक मेल सर्वर कॉन्फ़िगर करें और स्थानीय mailto कंपोज़ क्रियाओं का उपयोग करें।",
     "emailProbeOnly": "केवल पहुँच जाँच। 900CRM ईमेल भेजता या प्राप्त नहीं करता और मेलबॉक्स पासवर्ड नहीं रखता।",
-    "smtpHost": "SMTP होस्ट",
+    "smtpHost": "SMTP probe host",
     "smtpPort": "SMTP पोर्ट",
     "smtpUsername": "SMTP उपयोगकर्ता नाम",
     "smtpPassword": "SMTP पासवर्ड",
     "smtpFrom": "डिफ़ॉल्ट प्रेषक पता",
-    "imapHost": "IMAP होस्ट",
+    "imapHost": "IMAP probe host",
     "imapPort": "IMAP पोर्ट",
     "imapUsername": "IMAP उपयोगकर्ता नाम",
     "imapPassword": "IMAP पासवर्ड",
@@ -652,7 +676,8 @@
     "externalClientPermissionNoConfirmation": "कोई पुष्टि नहीं",
     "externalClientPermissionWriteRequiresConfirmation": "लेखन अनुमति पंक्तियों के लिए पुष्टि आवश्यक है; बैकएंड उन लेखन पंक्तियों को अस्वीकार करता है जिनके लिए पुष्टि आवश्यक नहीं है।",
     "syncUnavailable": "अभी उपलब्ध नहीं",
-    "syncUnavailableHint": "मल्टी-डिवाइस सिंक लागू नहीं है। आपका डेटा इस डिवाइस पर रहता है। यहाँ कुछ भी सर्वर से नहीं जुड़ता।"
+    "syncUnavailableHint": "मल्टी-डिवाइस सिंक लागू नहीं है। आपका डेटा इस डिवाइस पर रहता है। यहाँ कुछ भी सर्वर से नहीं जुड़ता।",
+    "emailProbeBadge": "TCP probe"
   },
   "common": {
     "save": "सहेजें",

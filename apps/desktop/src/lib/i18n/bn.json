@@ -28,7 +28,22 @@
       "workspace": "ওয়ার্কস্পেস",
       "review": "পর্যালোচনা",
       "admin": "প্রশাসন"
-    }
+    },
+    "skipToContent": "Skip to main content"
+  },
+  "commandPalette": {
+    "title": "Jump to",
+    "placeholder": "Go to a page or search records",
+    "routes": "Pages",
+    "records": "Records",
+    "noResults": "No matching records"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "openPalette": "Open jump list",
+    "focusSearch": "Focus search",
+    "switchNav": "Switch workspace page",
+    "shortcutSheet": "Show this list"
   },
   "dashboard": {
     "title": "ড্যাশবোর্ড",
@@ -243,7 +258,7 @@
     "tags": "ট্যাগ",
     "notes": "নোট",
     "linkedDeals": "যুক্ত ডিল",
-    "activityTimeline": "কার্যক্রম টাইমলাইন",
+    "activityTimeline": "Activity history",
     "firstName": "প্রথম নাম",
     "lastName": "শেষ নাম",
     "website": "ওয়েবসাইট",
@@ -471,7 +486,7 @@
     "overdue": "বিলম্বিত",
     "upcoming": "আসন্ন",
     "noActivities": "এখনও কোনো কার্যক্রম নেই",
-    "noActivitiesDesc": "একটি কাজ, কল, মিটিং বা ইমেল যোগ করুন যাতে বিলম্বিত ও আজকের কাজের একটি জায়গা থাকে।",
+    "noActivitiesDesc": "Add a task, call, meeting, email, visit, WhatsApp ping, or SMS so overdue and due-today work has a place.",
     "noMatchingTitle": "কোনো মিলযুক্ত কার্যক্রম নেই",
     "noMatchingDesc": "আরও কাজ দেখতে ধরন, অবস্থা, সময়সীমা বা কাস্টম ফিল্ড ফিল্টার মুছুন।",
     "workbenchEyebrow": "ফলো-আপ কেন্দ্র",
@@ -526,7 +541,16 @@
     "relationshipContact": "যোগাযোগ",
     "relationshipOrganization": "প্রতিষ্ঠান",
     "relationshipDeal": "ডিল",
-    "openRelationship": "খুলুন {type} {label}"
+    "openRelationship": "খুলুন {type} {label}",
+    "visit": "Visit",
+    "whatsapp": "WhatsApp",
+    "sms": "SMS",
+    "dueTime": "Due time",
+    "logJustHappened": "Log what just happened",
+    "logVisit": "Visit",
+    "logWhatsapp": "WhatsApp",
+    "logSms": "SMS",
+    "historyTitle": "What happened"
   },
   "settings": {
     "title": "সেটিংস",
@@ -534,7 +558,7 @@
     "sectionPreferences": "পছন্দ",
     "sectionAppearance": "চেহারা",
     "sectionSync": "সিঙ্ক",
-    "sectionEmail": "ইমেইল",
+    "sectionEmail": "Email probe",
     "sectionNotifications": "নোটিফিকেশন",
     "sectionIntegrations": "ইন্টিগ্রেশন",
     "sectionData": "ডেটা",
@@ -558,16 +582,16 @@
     "notificationsEnabled": "ডেস্কটপ রিমাইন্ডার চালু করুন",
     "reminderLeadMinutes": "রিমাইন্ডার আগাম সময় (মিনিট)",
     "reminderLeadHint": "কোনো কার্যক্রমের সময়সীমার এত মিনিট আগে আমাকে জানান।",
-    "emailIntegration": "ইমেইল ইন্টিগ্রেশন",
-    "emailIntegrationEnabled": "ঐচ্ছিক IMAP/SMTP ইন্টিগ্রেশন চালু করুন",
+    "emailIntegration": "Email reachability probe",
+    "emailIntegrationEnabled": "Enable TCP reachability probe",
     "emailComposeHint": "ঐচ্ছিক মেইল সার্ভার কনফিগার করুন এবং লোকাল mailto কম্পোজ ব্যবহার করুন।",
     "emailProbeOnly": "শুধু পৌঁছানো যায় কি না দেখা হয়। 900CRM ইমেইল পাঠায় বা গ্রহণ করে না এবং মেইলবক্স পাসওয়ার্ড রাখে না।",
-    "smtpHost": "SMTP হোস্ট",
+    "smtpHost": "SMTP probe host",
     "smtpPort": "SMTP পোর্ট",
     "smtpUsername": "SMTP ব্যবহারকারীর নাম",
     "smtpPassword": "SMTP পাসওয়ার্ড",
     "smtpFrom": "ডিফল্ট প্রেরক ঠিকানা",
-    "imapHost": "IMAP হোস্ট",
+    "imapHost": "IMAP probe host",
     "imapPort": "IMAP পোর্ট",
     "imapUsername": "IMAP ব্যবহারকারীর নাম",
     "imapPassword": "IMAP পাসওয়ার্ড",
@@ -652,7 +676,8 @@
     "externalClientPermissionNoConfirmation": "নিশ্চিতকরণ প্রয়োজন নেই",
     "externalClientPermissionWriteRequiresConfirmation": "লেখার অনুমতি সারিতে নিশ্চিতকরণ প্রয়োজন; নিশ্চিতকরণ না চাওয়া লেখার সারি ব্যাকএন্ড প্রত্যাখ্যান করে।",
     "syncUnavailable": "এখনও উপলব্ধ নয়",
-    "syncUnavailableHint": "মাল্টি-ডিভাইস সিঙ্ক বাস্তবায়িত হয়নি। আপনার তথ্য এই ডিভাইসেই থাকে। এখানে কিছুই সার্ভারের সাথে সংযুক্ত হয় না।"
+    "syncUnavailableHint": "মাল্টি-ডিভাইস সিঙ্ক বাস্তবায়িত হয়নি। আপনার তথ্য এই ডিভাইসেই থাকে। এখানে কিছুই সার্ভারের সাথে সংযুক্ত হয় না।",
+    "emailProbeBadge": "TCP probe"
   },
   "common": {
     "save": "সংরক্ষণ",

@@ -28,7 +28,22 @@
       "workspace": "Aiki",
       "review": "Bita",
       "admin": "Gudanarwa"
-    }
+    },
+    "skipToContent": "Skip to main content"
+  },
+  "commandPalette": {
+    "title": "Jump to",
+    "placeholder": "Go to a page or search records",
+    "routes": "Pages",
+    "records": "Records",
+    "noResults": "No matching records"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "openPalette": "Open jump list",
+    "focusSearch": "Focus search",
+    "switchNav": "Switch workspace page",
+    "shortcutSheet": "Show this list"
   },
   "dashboard": {
     "title": "Allon Dubawa",
@@ -243,7 +258,7 @@
     "tags": "Alamu",
     "notes": "Bayanan kula",
     "linkedDeals": "Yarjejeniyoyin da Aka Hada",
-    "activityTimeline": "Jerin Lokacin Ayyuka",
+    "activityTimeline": "Activity history",
     "firstName": "Sunan Farko",
     "lastName": "Sunan Karshe",
     "website": "Yanar Gizo",
@@ -471,7 +486,7 @@
     "overdue": "An Wuce Lokaci",
     "upcoming": "Masu Zuwa",
     "noActivities": "Babu ayyuka tukuna",
-    "noActivitiesDesc": "Kara aiki, kira, taro ko imel don aikin da ya makara da na yau ya sami wuri.",
+    "noActivitiesDesc": "Add a task, call, meeting, email, visit, WhatsApp ping, or SMS so overdue and due-today work has a place.",
     "noMatchingTitle": "Babu ayyukan da suka dace",
     "noMatchingDesc": "Share tacewar nau'i, hali, lokaci ko filin al'ada don ganin ƙarin aiki.",
     "workbenchEyebrow": "Cibiyar Bibiya",
@@ -526,7 +541,16 @@
     "relationshipContact": "Lamba",
     "relationshipOrganization": "Kungiya",
     "relationshipDeal": "Yarjejeniya",
-    "openRelationship": "Bude {type} {label}"
+    "openRelationship": "Bude {type} {label}",
+    "visit": "Visit",
+    "whatsapp": "WhatsApp",
+    "sms": "SMS",
+    "dueTime": "Due time",
+    "logJustHappened": "Log what just happened",
+    "logVisit": "Visit",
+    "logWhatsapp": "WhatsApp",
+    "logSms": "SMS",
+    "historyTitle": "What happened"
   },
   "settings": {
     "title": "Saituna",
@@ -534,7 +558,7 @@
     "sectionPreferences": "Zabi",
     "sectionAppearance": "Bayyanar",
     "sectionSync": "Daidaitawa",
-    "sectionEmail": "Imel",
+    "sectionEmail": "Email probe",
     "sectionNotifications": "Sanarwa",
     "sectionIntegrations": "Haɗin kai",
     "sectionData": "Bayanai",
@@ -558,16 +582,16 @@
     "notificationsEnabled": "Kunna Tunatarwar Tebur",
     "reminderLeadMinutes": "Lokacin Tunatarwa Kafin Lokaci (minti)",
     "reminderLeadHint": "Tunatar da ni mintuna haka kafin aikin ya cika.",
-    "emailIntegration": "Hadin Imel",
-    "emailIntegrationEnabled": "Kunna Zabin Hadin IMAP/SMTP",
+    "emailIntegration": "Email reachability probe",
+    "emailIntegrationEnabled": "Enable TCP reachability probe",
     "emailComposeHint": "Saita uwar garken imel na zabi kuma yi amfani da mailto na gida.",
     "emailProbeOnly": "Gwaji na isa kawai. 900CRM ba ya aika ko karɓar imel kuma ba ya adana kalmomin shiga na akwatin imel.",
-    "smtpHost": "Mai Masaukin SMTP",
+    "smtpHost": "SMTP probe host",
     "smtpPort": "Tashar SMTP",
     "smtpUsername": "Sunan Mai Amfani na SMTP",
     "smtpPassword": "Kalmar Sirri ta SMTP",
     "smtpFrom": "Adireshin Aikawa na Tsoho",
-    "imapHost": "Mai Masaukin IMAP",
+    "imapHost": "IMAP probe host",
     "imapPort": "Tashar IMAP",
     "imapUsername": "Sunan Mai Amfani na IMAP",
     "imapPassword": "Kalmar Sirri ta IMAP",
@@ -652,7 +676,8 @@
     "externalClientPermissionNoConfirmation": "Ba Tabbatarwa",
     "externalClientPermissionWriteRequiresConfirmation": "Layukan izinin rubutu suna bukatar tabbatarwa; baya na gaba yana ki layukan rubutu da ba su bukaci tabbatarwa.",
     "syncUnavailable": "Har yanzu babu",
-    "syncUnavailableHint": "Daidaitawar na’urori da yawa ba a aiwatar da ita ba. Bayananku suna nan a wannan na’ura. Babu abin da ke nan da ke haɗawa da uwar garke."
+    "syncUnavailableHint": "Daidaitawar na’urori da yawa ba a aiwatar da ita ba. Bayananku suna nan a wannan na’ura. Babu abin da ke nan da ke haɗawa da uwar garke.",
+    "emailProbeBadge": "TCP probe"
   },
   "common": {
     "save": "Ajiye",

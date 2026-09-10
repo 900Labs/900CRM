@@ -117,6 +117,7 @@
     </svg>
 
     <input
+      id="global-search"
       class="input search-input selectable"
       bind:this={inputEl}
       type="search"

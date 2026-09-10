@@ -28,7 +28,22 @@
       "workspace": "Espace de travail",
       "review": "Révision",
       "admin": "Administration"
-    }
+    },
+    "skipToContent": "Skip to main content"
+  },
+  "commandPalette": {
+    "title": "Jump to",
+    "placeholder": "Go to a page or search records",
+    "routes": "Pages",
+    "records": "Records",
+    "noResults": "No matching records"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "openPalette": "Open jump list",
+    "focusSearch": "Focus search",
+    "switchNav": "Switch workspace page",
+    "shortcutSheet": "Show this list"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -243,7 +258,7 @@
     "tags": "Étiquettes",
     "notes": "Notes",
     "linkedDeals": "Affaires liées",
-    "activityTimeline": "Historique des activités",
+    "activityTimeline": "Activity history",
     "firstName": "Prénom",
     "lastName": "Nom de famille",
     "website": "Site web",
@@ -471,7 +486,7 @@
     "overdue": "En retard",
     "upcoming": "À venir",
     "noActivities": "Aucune activité pour l'instant",
-    "noActivitiesDesc": "Ajoutez une tâche, un appel, une réunion ou un e-mail pour que le travail en retard et dû aujourd’hui ait une place.",
+    "noActivitiesDesc": "Add a task, call, meeting, email, visit, WhatsApp ping, or SMS so overdue and due-today work has a place.",
     "noMatchingTitle": "Aucune activité correspondante",
     "noMatchingDesc": "Effacez le filtre de type, de statut, d’échéance ou de champ personnalisé pour voir plus de travail.",
     "workbenchEyebrow": "Centre de relance",
@@ -526,7 +541,16 @@
     "relationshipContact": "Contact",
     "relationshipOrganization": "Organisation",
     "relationshipDeal": "Affaire",
-    "openRelationship": "Ouvrir {type} {label}"
+    "openRelationship": "Ouvrir {type} {label}",
+    "visit": "Visit",
+    "whatsapp": "WhatsApp",
+    "sms": "SMS",
+    "dueTime": "Due time",
+    "logJustHappened": "Log what just happened",
+    "logVisit": "Visit",
+    "logWhatsapp": "WhatsApp",
+    "logSms": "SMS",
+    "historyTitle": "What happened"
   },
   "settings": {
     "title": "Paramètres",
@@ -534,7 +558,7 @@
     "sectionPreferences": "Préférences",
     "sectionAppearance": "Apparence",
     "sectionSync": "Synchronisation",
-    "sectionEmail": "E-mail",
+    "sectionEmail": "Email probe",
     "sectionNotifications": "Notifications",
     "sectionIntegrations": "Intégrations",
     "sectionData": "Données",
@@ -558,16 +582,16 @@
     "notificationsEnabled": "Activer les rappels bureau",
     "reminderLeadMinutes": "Anticipation du rappel (minutes)",
     "reminderLeadHint": "Me notifier ce nombre de minutes avant l'échéance d'une activité.",
-    "emailIntegration": "Intégration e-mail",
-    "emailIntegrationEnabled": "Activer l'intégration IMAP/SMTP optionnelle",
+    "emailIntegration": "Email reachability probe",
+    "emailIntegrationEnabled": "Enable TCP reachability probe",
     "emailComposeHint": "Configurez des serveurs optionnels et utilisez la composition locale via mailto.",
     "emailProbeOnly": "Test de joignabilité uniquement. 900CRM n’envoie ni ne reçoit d’e-mails et ne stocke pas les mots de passe de messagerie.",
-    "smtpHost": "Hôte SMTP",
+    "smtpHost": "SMTP probe host",
     "smtpPort": "Port SMTP",
     "smtpUsername": "Nom d'utilisateur SMTP",
     "smtpPassword": "Mot de passe SMTP",
     "smtpFrom": "Adresse d'envoi par défaut",
-    "imapHost": "Hôte IMAP",
+    "imapHost": "IMAP probe host",
     "imapPort": "Port IMAP",
     "imapUsername": "Nom d'utilisateur IMAP",
     "imapPassword": "Mot de passe IMAP",
@@ -652,7 +676,8 @@
     "externalClientPermissionNoConfirmation": "Sans confirmation",
     "externalClientPermissionWriteRequiresConfirmation": "Les lignes de permission en écriture nécessitent une confirmation ; le backend rejette les lignes en écriture qui ne nécessitent pas de confirmation.",
     "syncUnavailable": "Pas encore disponible",
-    "syncUnavailableHint": "La synchronisation multi-appareils n’est pas implémentée. Vos données restent sur cet appareil. Rien ici ne se connecte à un serveur."
+    "syncUnavailableHint": "La synchronisation multi-appareils n’est pas implémentée. Vos données restent sur cet appareil. Rien ici ne se connecte à un serveur.",
+    "emailProbeBadge": "TCP probe"
   },
   "common": {
     "save": "Enregistrer",
