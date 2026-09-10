@@ -11,7 +11,7 @@
 //! Using string timestamps (rather than Unix integers) makes the SQLite
 //! records human-readable and simplifies cross-platform sync comparison.
 
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, Utc};
 
 use crate::utils::errors::{CrmError, CrmResult};
 
@@ -37,6 +37,25 @@ use crate::utils::errors::{CrmError, CrmResult};
 /// ```
 pub fn now_iso8601() -> String {
     Utc::now().to_rfc3339()
+}
+
+/// Machine-local calendar day (`YYYY-MM-DD`).
+///
+/// Date-only activity dues are entered as a local calendar date. Compare them
+/// to this value, not `now_iso8601()[..10]`, or a UTC+ clinic after midnight
+/// (and a UTC- clinic in the evening) will disagree with the desktop UI.
+pub fn local_today() -> NaiveDate {
+    Local::now().date_naive()
+}
+
+pub fn local_today_ymd() -> String {
+    local_today().format("%Y-%m-%d").to_string()
+}
+
+pub fn local_days_from_now_ymd(days: i64) -> String {
+    (local_today() + chrono::Duration::days(days))
+        .format("%Y-%m-%d")
+        .to_string()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -256,7 +275,7 @@ pub fn days_from_now(days: i64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_date_only, parse_due_datetime, parse_iso8601};
+    use super::{local_today_ymd, parse_date_only, parse_due_datetime, parse_iso8601};
 
     #[test]
     fn parse_due_datetime_accepts_date_only_rfc3339_and_naive_local() {
@@ -266,5 +285,13 @@ mod tests {
         assert!(parse_due_datetime("2026-07-08T15:00:00Z").is_ok());
         assert!(parse_due_datetime("2026-07-08T15:00").is_ok());
         assert!(parse_due_datetime("not-a-date").is_err());
+    }
+
+    #[test]
+    fn local_today_ymd_is_a_date_only_calendar_key() {
+        let today = local_today_ymd();
+        assert!(parse_date_only(&today).is_ok());
+        assert_eq!(today.len(), 10);
+        assert!(!today.contains('T'));
     }
 }

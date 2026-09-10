@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::storage::activities as activity_storage;
 use crate::utils::{
-    datetime::{now_iso8601, parse_date_only, parse_due_datetime},
+    datetime::{local_today, local_today_ymd, now_iso8601, parse_date_only, parse_due_datetime},
     errors::{CrmError, CrmResult},
 };
 
@@ -74,7 +74,10 @@ pub fn validate_activity_for_create(title: &str, activity_type: &str) -> CrmResu
 // Overdue detection
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Returns `true` if `due_date` is in the past (compared to the current UTC time).
+/// Returns `true` if `due_date` is in the past.
+///
+/// Date-only values stay pending through the machine-local calendar day.
+/// Date-times are compared as instants (UTC).
 ///
 /// Returns `false` if `due_date` is `None` (no deadline set).
 ///
@@ -101,7 +104,7 @@ pub fn is_overdue(due_date: Option<&str>, completed: bool) -> bool {
     let trimmed = due.trim();
     if trimmed.len() == 10 {
         if let Ok(due_day) = parse_date_only(trimmed) {
-            return due_day < chrono::Utc::now().date_naive();
+            return due_day < local_today();
         }
     }
 
@@ -143,8 +146,8 @@ pub struct ActivityStats {
 /// Returns [`CrmError::Database`] on storage failure.
 pub fn get_activity_stats(conn: &Connection) -> CrmResult<ActivityStats> {
     let now = now_iso8601();
-    let today_prefix = &now[..10];
-    let counts = activity_storage::get_activity_stats_counts(conn, &now, today_prefix)?;
+    let local_today = local_today_ymd();
+    let counts = activity_storage::get_activity_stats_counts(conn, &now, &local_today)?;
     let pending = counts.total - counts.completed - counts.overdue;
 
     Ok(ActivityStats {
@@ -159,12 +162,15 @@ pub fn get_activity_stats(conn: &Connection) -> CrmResult<ActivityStats> {
 #[cfg(test)]
 mod tests {
     use super::is_overdue;
-    use chrono::{Duration, Utc};
+    use chrono::{Duration, Local, Utc};
 
     #[test]
-    fn date_only_due_is_not_overdue_on_the_same_utc_day() {
-        let today = Utc::now().date_naive().to_string();
+    fn date_only_due_is_not_overdue_on_the_same_local_day() {
+        let today = Local::now().date_naive();
+        let yesterday = (today - Duration::days(1)).to_string();
+        let today = today.to_string();
         assert!(!is_overdue(Some(&today), false));
+        assert!(is_overdue(Some(&yesterday), false));
         assert!(is_overdue(Some("2020-01-01"), false));
         assert!(!is_overdue(Some(&today), true));
     }

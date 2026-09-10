@@ -572,6 +572,44 @@ fn activity_stats_query_counts_completed_overdue_and_due_today() {
 }
 
 #[test]
+fn date_only_activity_stats_follow_the_local_calendar_day() {
+    let (mut core, path) = open_test_core();
+    let today = chrono::Local::now().date_naive();
+    let yesterday = (today - chrono::Duration::days(1)).to_string();
+    let today = today.to_string();
+
+    core.create_activity(
+        "visit".to_string(),
+        "Due today date-only".to_string(),
+        None,
+        Some(today),
+        None,
+        None,
+    )
+    .expect("date-only today activity should be created");
+    core.create_activity(
+        "sms".to_string(),
+        "Yesterday date-only".to_string(),
+        None,
+        Some(yesterday),
+        None,
+        None,
+    )
+    .expect("date-only yesterday activity should be created");
+
+    let stats = crate::crm_engine::activities::get_activity_stats(&core.db.conn)
+        .expect("activity stats should query");
+    assert_eq!(stats.total, 2);
+    assert_eq!(stats.completed, 0);
+    assert_eq!(stats.overdue, 1);
+    assert_eq!(stats.due_today, 1);
+    assert_eq!(stats.pending, 1);
+
+    drop(core);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn duplicate_detection_uses_contact_repository_queries() {
     let (mut core, path) = open_test_core();
 
