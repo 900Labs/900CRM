@@ -1388,24 +1388,6 @@
     background-color: var(--surface-raised);
   }
 
-  .health-success {
-    color: #2D8659;
-    background-color: #E8F5EC;
-    border-color: #BFE4CC;
-  }
-
-  .health-warning {
-    color: #A84B2F;
-    background-color: #FEF3E2;
-    border-color: #F4D1A1;
-  }
-
-  .health-danger {
-    color: #C0392B;
-    background-color: #FFF0F0;
-    border-color: #F0B8B2;
-  }
-
   @media (max-width: 900px) {
     .workspace-metrics {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1535,7 +1517,7 @@
     padding: var(--space-3) var(--space-4);
     border: 0;
     background: transparent;
-    text-align: left;
+    text-align: start;
     cursor: pointer;
     color: inherit;
   }

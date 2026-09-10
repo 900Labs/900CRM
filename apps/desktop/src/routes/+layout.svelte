@@ -25,6 +25,7 @@
   import { reviewCountsStore } from '$lib/stores/reviewCounts';
   import CommandPalette from '$lib/components/CommandPalette.svelte';
   import ShortcutSheet from '$lib/components/ShortcutSheet.svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
   import {
     focusGlobalSearch,
     isModKey,
@@ -271,11 +272,7 @@
   >
     <!-- Logo -->
     <div class="sidebar-logo">
-      <!-- SVG Logo mark -->
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-        <rect width="28" height="28" rx="6" fill="var(--color-primary)"/>
-        <text x="14" y="19" text-anchor="middle" font-size="13" font-weight="700" fill="white" font-family="system-ui, sans-serif">9C</text>
-      </svg>
+      <BrandMark size={28} />
       {#if !uiStore.sidebarCollapsed}
         <span class="sidebar-logo-text">900CRM</span>
       {/if}

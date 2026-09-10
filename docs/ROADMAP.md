@@ -59,7 +59,7 @@ These must ALL be satisfied before a public `v1.0.0` tag is cut.
       and need community review before they are considered production-quality.
 - [ ] **Product-depth pass.** See `docs/PRODUCT_REVIEW_AND_BENCHMARK.md` for
       the competitive gap analysis and recommended depth sprints.
-- [ ] **Replace provisional app icon** with official 900 Labs branding.
+- [x] **Replace provisional app icon** with the 900 Labs 9-mark (sidebar and platform icons).
 
 ### Nice to Have (post-v1.0)
 

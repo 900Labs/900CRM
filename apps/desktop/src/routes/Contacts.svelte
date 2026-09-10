@@ -851,7 +851,7 @@
   .contacts-page {
     display: flex;
     flex-direction: column;
-    gap: var(--space-6);
+    gap: var(--space-4);
     height: 100%;
   }
 
@@ -916,24 +916,6 @@
   .health-neutral {
     color: var(--text-secondary);
     background-color: var(--surface-raised);
-  }
-
-  .health-success {
-    color: #2d8659;
-    border-color: #bfe4cc;
-    background-color: #e8f5ec;
-  }
-
-  .health-warning {
-    color: #a84b2f;
-    border-color: #f4d1a1;
-    background-color: #fef3e2;
-  }
-
-  .health-danger {
-    color: #c0392b;
-    border-color: #f0b8b2;
-    background-color: #fff0f0;
   }
 
   .next-follow-up {
