@@ -205,7 +205,7 @@ pub fn get_activity_funnel_report(conn: &Connection) -> CrmResult<ActivityFunnel
         SELECT
             COUNT(*) AS total,
             SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS completed,
-            SUM(CASE WHEN completed = 0 AND due_date IS NOT NULL AND due_date < ?1 THEN 1 ELSE 0 END) AS overdue,
+            SUM(CASE WHEN completed = 0 AND due_date IS NOT NULL AND ((length(due_date) = 10 AND due_date < date(?1)) OR (length(due_date) > 10 AND due_date < ?1)) THEN 1 ELSE 0 END) AS overdue,
             SUM(CASE WHEN completed = 0 AND due_date LIKE ?2 THEN 1 ELSE 0 END) AS due_today,
             SUM(CASE WHEN completed = 0 AND due_date IS NOT NULL AND substr(due_date, 1, 10) > ?3 AND substr(due_date, 1, 10) <= ?4 THEN 1 ELSE 0 END) AS due_next_7_days,
             SUM(CASE WHEN completed = 0 AND due_date IS NOT NULL AND substr(due_date, 1, 10) > ?4 THEN 1 ELSE 0 END) AS due_later,
@@ -258,7 +258,7 @@ pub fn get_activity_funnel_report(conn: &Connection) -> CrmResult<ActivityFunnel
             activity_type,
             COUNT(*) AS total,
             SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS completed,
-            SUM(CASE WHEN completed = 0 AND due_date IS NOT NULL AND due_date < ?1 THEN 1 ELSE 0 END) AS overdue
+            SUM(CASE WHEN completed = 0 AND due_date IS NOT NULL AND ((length(due_date) = 10 AND due_date < date(?1)) OR (length(due_date) > 10 AND due_date < ?1)) THEN 1 ELSE 0 END) AS overdue
         FROM activities
         WHERE deleted_at IS NULL
         GROUP BY activity_type

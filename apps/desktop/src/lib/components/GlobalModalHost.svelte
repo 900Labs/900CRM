@@ -10,7 +10,8 @@
   import { DEAL_STAGES } from '$lib/api/deals';
   import type { Deal, DealStage } from '$lib/api/deals';
   import type { Contact, ContactLifecycle } from '$lib/api/contacts';
-  import type { ActivityType } from '$lib/api/activities';
+  import { ACTIVITY_TYPES, type ActivityType } from '$lib/api/activities';
+  import { combineDueDateAndTime, splitDueDateAndTime } from '$lib/utils/activityDue';
   import type { Organization } from '$lib/api/organizations';
   import { normalizeCurrencyCode } from '$lib/utils/currency';
   import {
@@ -58,6 +59,7 @@
   let activitySubject = $state('');
   let activityType = $state<ActivityType>('task');
   let activityDueDate = $state('');
+  let activityDueTime = $state('');
   let activityNotes = $state('');
   let activityContactId = $state('');
   let activityOrganizationId = $state('');
@@ -143,10 +145,9 @@
 
   function modalDataActivityType(key: string): ActivityType {
     const value = modalDataString(key);
-    if (value === 'call' || value === 'meeting' || value === 'email') {
-      return value;
-    }
-    return 'task';
+    return (ACTIVITY_TYPES as readonly string[]).includes(value)
+      ? (value as ActivityType)
+      : 'task';
   }
 
   function normalizeStage(stage: string): DealStage {
@@ -209,7 +210,9 @@
   function resetActivityForm() {
     activitySubject = modalDataString('subject');
     activityType = modalDataActivityType('type');
-    activityDueDate = modalDataString('dueDate');
+    const dueParts = splitDueDateAndTime(modalDataString('dueDate'));
+    activityDueDate = dueParts.date;
+    activityDueTime = dueParts.time;
     activityNotes = modalDataString('notes');
     activityContactId = modalDataString('contactId');
     activityOrganizationId = modalDataString('organizationId');
@@ -438,7 +441,7 @@
       const activity = await activityStore.createActivity({
         subject: activitySubject.trim(),
         type: activityType,
-        dueDate: activityDueDate || null,
+        dueDate: combineDueDateAndTime(activityDueDate, activityDueTime),
         notes: activityNotes.trim() || null,
         contactId: activityContactId || null,
         dealId: activityDealId || null,
@@ -646,15 +649,18 @@
         <div class="form-group">
           <label class="form-label" for="modal-activity-type">{t('activities.type')}</label>
           <select id="modal-activity-type" class="select" bind:value={activityType}>
-            <option value="task">{t('activities.task')}</option>
-            <option value="call">{t('activities.call')}</option>
-            <option value="meeting">{t('activities.meeting')}</option>
-            <option value="email">{t('activities.email')}</option>
+            {#each ACTIVITY_TYPES as type (type)}
+              <option value={type}>{t(`activities.${type}`)}</option>
+            {/each}
           </select>
         </div>
         <div class="form-group">
           <label class="form-label" for="modal-activity-due-date">{t('activities.dueDate')}</label>
           <input id="modal-activity-due-date" class="input" type="date" bind:value={activityDueDate} />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="modal-activity-due-time">{t('activities.dueTime')}</label>
+          <input id="modal-activity-due-time" class="input" type="time" bind:value={activityDueTime} />
         </div>
         <div class="form-group">
           <label class="form-label" for="modal-activity-contact">{t('deals.contact')}</label>

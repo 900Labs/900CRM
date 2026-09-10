@@ -3,9 +3,9 @@
    * Activities.svelte — Activity list view for 900CRM.
    *
    * Features:
-   *   - Filter by type (task/call/meeting/email) and status (pending/completed/overdue)
+   *   - Filter by type (task/call/meeting/email/visit/whatsapp/sms) and status
    *   - Sorted by due date ascending
-   *   - Quick-add activity form (subject, type, due date)
+   *   - Quick-add activity form (subject, type, due date and optional time)
    *   - Mark complete / mark incomplete toggle
    *   - Empty state, loading state, error state
    */
@@ -14,7 +14,9 @@
   import { activityStore } from '$lib/stores/activities';
   import { uiStore } from '$lib/stores/ui';
   import { settingsStore } from '$lib/stores/settings';
-  import type { ActivityType, ActivityStatus, CreateActivityPayload } from '$lib/api/activities';
+  import { ACTIVITY_TYPES, type ActivityType, type ActivityStatus, type CreateActivityPayload } from '$lib/api/activities';
+  import LogJustHappened from '$lib/components/LogJustHappened.svelte';
+  import { combineDueDateAndTime, formatActivityDue } from '$lib/utils/activityDue';
   import {
     listCustomFieldDefinitions,
     listCustomFieldValuesForEntityType,
@@ -98,6 +100,7 @@
   let qaSubject     = $state('');
   let qaType        = $state<ActivityType>('task');
   let qaDueDate     = $state('');
+  let qaDueTime     = $state('');
   let qaContactId   = $state('');
   let qaOrganizationId = $state('');
   let qaDealId      = $state('');
@@ -343,8 +346,8 @@
   }
 
   function asActivityType(value: string | undefined): ActivityType | '' {
-    return value === 'task' || value === 'call' || value === 'meeting' || value === 'email'
-      ? value
+    return (ACTIVITY_TYPES as readonly string[]).includes(value ?? '')
+      ? (value as ActivityType)
       : '';
   }
 
@@ -509,7 +512,7 @@
         type:      qaType,
         subject:   qaSubject.trim(),
         notes:     null,
-        dueDate:   qaDueDate || null,
+        dueDate:   combineDueDateAndTime(qaDueDate, qaDueTime),
         contactId: qaContactId || null,
         dealId:    qaDealId || null,
       };
@@ -542,6 +545,7 @@
     qaSubject     = '';
     qaType        = 'task';
     qaDueDate     = '';
+    qaDueTime     = '';
     qaContactId   = '';
     qaOrganizationId = '';
     qaDealId      = '';
@@ -554,8 +558,11 @@
       case 'task':    return 'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11';
       case 'call':    return 'M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z';
       case 'meeting': return 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75';
-      case 'email':   return 'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2M22 6l-10 7L2 6';
-      default:        return 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5';
+      case 'email':     return 'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2M22 6l-10 7L2 6';
+      case 'visit':     return 'M12 21s7-4.5 7-11a7 7 0 10-14 0c0 6.5 7 11 7 11zM12 11a2 2 0 110-4 2 2 0 010 4z';
+      case 'whatsapp':  return 'M20 4a10 10 0 00-16.4 11.4L2 22l6.8-1.6A10 10 0 1020 4z';
+      case 'sms':       return 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z';
+      default:          return 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5';
     }
   }
 
@@ -705,6 +712,7 @@
       </button>
     </div>
   </div>
+  <LogJustHappened onlogged={() => void activityStore.loadActivities()} />
 
   <section class="saved-views" aria-labelledby="activities-saved-views-heading">
     <div class="saved-views-copy">
@@ -770,7 +778,7 @@
             class="input select-input"
             bind:value={qaType}
           >
-            {#each (['task', 'call', 'meeting', 'email'] as ActivityType[]) as type (type)}
+            {#each ACTIVITY_TYPES as type (type)}
               <option value={type}>{t(`activities.${type}`)}</option>
             {/each}
           </select>
@@ -799,6 +807,16 @@
             type="date"
             bind:value={qaDueDate}
             aria-label={t('activities.dueDate')}
+          />
+        </div>
+        <div class="qa-field qa-field--time">
+          <label class="sr-only" for="qa-due-time">{t('activities.dueTime')}</label>
+          <input
+            id="qa-due-time"
+            class="input"
+            type="time"
+            bind:value={qaDueTime}
+            aria-label={t('activities.dueTime')}
           />
         </div>
 
@@ -958,6 +976,9 @@
         { value: 'call', label: t('activities.call') },
         { value: 'meeting', label: t('activities.meeting') },
         { value: 'email', label: t('activities.email') },
+        { value: 'visit', label: t('activities.visit') },
+        { value: 'whatsapp', label: t('activities.whatsapp') },
+        { value: 'sms', label: t('activities.sms') },
       ] as opt (opt.value)}
         <button
           class="filter-chip"
@@ -1349,7 +1370,7 @@
                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                               <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                             </svg>
-                            {formatDate(activity.dueDate, settingsStore.dateFormat as 'MMM D, YYYY')}
+                            {formatActivityDue(activity.dueDate, settingsStore.language)}
                           </span>
                         {:else}
                           <span class="activity-due">{t('activities.noDueDate')}</span>

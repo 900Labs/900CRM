@@ -38,6 +38,7 @@
   } from '$lib/utils/formatters';
   import { navigateHash } from '$lib/utils/hashRouter';
   import ActivityFeed from '$lib/components/ActivityFeed.svelte';
+  import LogJustHappened from '$lib/components/LogJustHappened.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
   import NextStepCard from '$lib/components/NextStepCard.svelte';
   import EntityNotesPanel from '$lib/components/EntityNotesPanel.svelte';
@@ -650,6 +651,9 @@
             </button>
           </div>
           <div class="card-body">
+            <LogJustHappened
+              onlogged={() => void loadOrganizationActivities(organizationId)}
+            />
             {#if organizationActivities.length === 0 && !activitiesLoading}
               <EmptyState
                 icon="activities"

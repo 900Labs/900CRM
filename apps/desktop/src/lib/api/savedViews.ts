@@ -8,7 +8,7 @@ export type SavedViewEntityType = 'contact' | 'organization' | 'deal' | 'activit
 
 export interface ContactSavedViewFilters {
   search?: string;
-  type?: 'person' | 'organization' | 'task' | 'call' | 'meeting' | 'email';
+  type?: 'person' | 'organization' | 'task' | 'call' | 'meeting' | 'email' | 'visit' | 'whatsapp' | 'sms';
   lifecycle?: 'lead' | 'customer';
   country?: string;
   customFieldDefId?: string;
@@ -42,7 +42,7 @@ interface BackendSavedView {
 
 interface BackendFilters {
   search?: string;
-  type?: 'person' | 'organization' | 'task' | 'call' | 'meeting' | 'email';
+  type?: 'person' | 'organization' | 'task' | 'call' | 'meeting' | 'email' | 'visit' | 'whatsapp' | 'sms';
   lifecycle?: 'lead' | 'customer';
   country?: string;
   custom_field_def_id?: string;

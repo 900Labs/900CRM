@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::storage::activities as activity_storage;
 use crate::utils::{
-    datetime::{now_iso8601, parse_iso8601},
+    datetime::{now_iso8601, parse_date_only, parse_due_datetime},
     errors::{CrmError, CrmResult},
 };
 
@@ -25,7 +25,17 @@ use crate::utils::{
 ///
 /// Custom types are allowed by the storage layer; these are the canonical values
 /// that the frontend uses for icon and label selection.
-pub const ACTIVITY_TYPES: &[&str] = &["task", "call", "meeting", "email", "note", "follow_up"];
+pub const ACTIVITY_TYPES: &[&str] = &[
+    "task",
+    "call",
+    "meeting",
+    "email",
+    "note",
+    "follow_up",
+    "visit",
+    "whatsapp",
+    "sms",
+];
 
 /// Returns `true` if `activity_type` is one of the standard activity types.
 pub fn is_standard_type(activity_type: &str) -> bool {
@@ -88,10 +98,16 @@ pub fn is_overdue(due_date: Option<&str>, completed: bool) -> bool {
         return false;
     }
     let Some(due) = due_date else { return false };
-    let now = now_iso8601();
-    match (parse_iso8601(due).ok(), parse_iso8601(&now).ok()) {
-        (Some(due_dt), Some(now_dt)) => due_dt < now_dt,
-        _ => due < now.as_str(),
+    let trimmed = due.trim();
+    if trimmed.len() == 10 {
+        if let Ok(due_day) = parse_date_only(trimmed) {
+            return due_day < chrono::Utc::now().date_naive();
+        }
+    }
+
+    match parse_due_datetime(trimmed) {
+        Ok(due_dt) => due_dt < chrono::Utc::now(),
+        Err(_) => trimmed < now_iso8601().as_str(),
     }
 }
 
@@ -138,4 +154,27 @@ pub fn get_activity_stats(conn: &Connection) -> CrmResult<ActivityStats> {
         overdue: counts.overdue,
         due_today: counts.due_today,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_overdue;
+    use chrono::{Duration, Utc};
+
+    #[test]
+    fn date_only_due_is_not_overdue_on_the_same_utc_day() {
+        let today = Utc::now().date_naive().to_string();
+        assert!(!is_overdue(Some(&today), false));
+        assert!(is_overdue(Some("2020-01-01"), false));
+        assert!(!is_overdue(Some(&today), true));
+    }
+
+    #[test]
+    fn timed_due_is_overdue_after_that_instant() {
+        let past = (Utc::now() - Duration::hours(1)).to_rfc3339();
+        let future = (Utc::now() + Duration::hours(1)).to_rfc3339();
+        assert!(is_overdue(Some(&past), false));
+        assert!(!is_overdue(Some(&future), false));
+        assert!(!is_overdue(None, false));
+    }
 }

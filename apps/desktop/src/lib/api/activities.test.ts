@@ -17,6 +17,7 @@ import {
   removeActivityLink,
   updateActivity,
 } from './activities';
+import { combineDueDateAndTime } from '../utils/activityDue';
 
 const backendActivity = {
   id: 'activity-1',
@@ -71,6 +72,29 @@ describe('activity API', () => {
     await expect(listActivities({ sortBy: 'dueDate', sortDir: 'asc' })).resolves.toMatchObject([
       { id: 'yesterday', status: 'overdue' },
       { id: 'today', status: 'pending' },
+    ]);
+
+    expect(invokeMock).toHaveBeenCalledWith('list_activities', {
+      limit: 200,
+      offset: 0,
+    });
+  });
+
+  it('marks a timed due date overdue after that clock time', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-08T16:30:00'));
+    invokeMock.mockResolvedValueOnce([
+      {
+        ...backendActivity,
+        id: 'afternoon',
+        activity_type: 'visit',
+        due_date: combineDueDateAndTime('2026-07-08', '15:00'),
+        completed: false,
+      },
+    ]);
+
+    await expect(listActivities()).resolves.toMatchObject([
+      { id: 'afternoon', type: 'visit', status: 'overdue' },
     ]);
   });
 

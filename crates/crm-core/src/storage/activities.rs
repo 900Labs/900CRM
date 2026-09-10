@@ -1,12 +1,12 @@
 //! Activity CRUD operations and scheduling queries for 900CRM.
 //!
-//! Activities represent tasks, calls, meetings, and emails. They can be
-//! attached to a contact, a deal, or both.
+//! Activities represent tasks, calls, meetings, emails, visits, WhatsApp, and SMS.
+//! They can be attached to a contact, a deal, or both.
 //!
 //! # Activity Types
 //!
 //! The `activity_type` field is a freeform string. Standard values are:
-//! `"task"`, `"call"`, `"meeting"`, `"email"`, `"note"`.
+//! `"task"`, `"call"`, `"meeting"`, `"email"`, `"note"`, `"visit"`, `"whatsapp"`, `"sms"`.
 //!
 //! # Soft Delete
 //!
@@ -150,7 +150,10 @@ pub fn get_activity_stats_counts(
             WHERE deleted_at IS NULL
               AND completed = 0
               AND due_date IS NOT NULL
-              AND due_date < ?1
+              AND (
+                (length(due_date) = 10 AND due_date < date(?1))
+                OR (length(due_date) > 10 AND due_date < ?1)
+              )
             "#,
             params![now],
             |r| r.get(0),
@@ -440,7 +443,11 @@ pub fn list_upcoming_activities(conn: &Connection, limit: u32) -> CrmResult<Vec<
         FROM activities
         WHERE deleted_at IS NULL
           AND completed = 0
-          AND due_date >= ?1
+          AND due_date IS NOT NULL
+          AND (
+            (length(due_date) = 10 AND due_date >= date(?1))
+            OR (length(due_date) > 10 AND due_date >= ?1)
+          )
         ORDER BY due_date ASC
         LIMIT ?2
         "#,
@@ -469,8 +476,11 @@ pub fn list_overdue_activities(conn: &Connection) -> CrmResult<Vec<Activity>> {
         FROM activities
         WHERE deleted_at IS NULL
           AND completed = 0
-          AND due_date < ?1
           AND due_date IS NOT NULL
+          AND (
+            (length(due_date) = 10 AND due_date < date(?1))
+            OR (length(due_date) > 10 AND due_date < ?1)
+          )
         ORDER BY due_date ASC
         "#,
     )?;

@@ -43,7 +43,7 @@ use rusqlite::{params, Connection};
 use crate::utils::errors::{CrmError, CrmResult};
 
 /// The current schema version. Increment whenever a new migration is added.
-const CURRENT_SCHEMA_VERSION: u32 = 14;
+const CURRENT_SCHEMA_VERSION: u32 = 15;
 const DATABASE_FILENAME: &str = "900crm.db";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -261,6 +261,10 @@ impl Database {
 
         if current_version < 14 {
             self.migrate_v14_record_owner()?;
+        }
+
+        if current_version < 15 {
+            self.migrate_v15_activity_due_time()?;
         }
 
         self.conn.execute_batch(&format!(
@@ -1556,6 +1560,22 @@ impl Database {
         }
 
         log::info!("Migration v14 record owner complete");
+        Ok(())
+    }
+
+    fn migrate_v15_activity_due_time(&mut self) -> CrmResult<()> {
+        log::info!("Running database migration v15 activity due time");
+
+        if self.table_exists("settings")? {
+            self.conn.execute_batch(
+                r#"
+                INSERT OR IGNORE INTO settings (key, value, updated_at)
+                VALUES ('activity_due_time', '1', '');
+                "#,
+            )?;
+        }
+
+        log::info!("Migration v15 activity due time complete");
         Ok(())
     }
 

@@ -12,7 +12,7 @@
     ActivityRelationshipItem,
     ActivityRelationshipLabels,
   } from '$lib/utils/activityRelationships';
-  import { formatRelativeTime } from '$lib/utils/formatters';
+  import { formatActivityDue } from '$lib/utils/activityDue';
   import EmptyState from './EmptyState.svelte';
 
   type ActivityRelationshipEntityType = 'contact' | 'organization' | 'deal';
@@ -59,7 +59,10 @@
       task:    'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
       call:    'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.1 19.79 19.79 0 0 1 1.61 4.5 2 2 0 0 1 3.6 2.32h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.76-.76a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z',
       meeting: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm8 4a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm4 2v-2a4 4 0 0 0-3-3.87',
-      email:   'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm0 0l8 8 8-8',
+      email:     'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm0 0l8 8 8-8',
+      visit:     'M12 21s7-4.5 7-11a7 7 0 10-14 0c0 6.5 7 11 7 11zM12 11a2 2 0 110-4 2 2 0 010 4z',
+      whatsapp:  'M20 4a10 10 0 00-16.4 11.4L2 22l6.8-1.6A10 10 0 1020 4z',
+      sms:       'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z',
     };
     return icons[type] ?? icons.task;
   }
@@ -75,7 +78,10 @@
       task:    t('activities.task'),
       call:    t('activities.call'),
       meeting: t('activities.meeting'),
-      email:   t('activities.email'),
+      email:     t('activities.email'),
+      visit:     t('activities.visit'),
+      whatsapp:  t('activities.whatsapp'),
+      sms:       t('activities.sms'),
     };
     return map[type] ?? type;
   }
@@ -177,7 +183,7 @@
                   class="activity-time"
                   class:overdue={activity.status === 'overdue'}
                 >
-                  {formatRelativeTime(activity.dueDate)}
+                  {formatActivityDue(activity.dueDate)}
                 </span>
               {/if}
             </div>
