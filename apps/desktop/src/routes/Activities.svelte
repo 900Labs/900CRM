@@ -1465,7 +1465,7 @@
   .activities-page {
     display: flex;
     flex-direction: column;
-    gap: var(--space-6);
+    gap: var(--space-4);
   }
 
   .toolbar {

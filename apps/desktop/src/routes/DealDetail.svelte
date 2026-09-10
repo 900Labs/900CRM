@@ -675,9 +675,6 @@
     font-weight: var(--weight-semibold);
   }
 
-  .health-success { background: #E8F5EC; color: #2D8659; }
-  .health-warning { background: #FFF8E1; color: #D4A017; }
-  .health-danger { background: #FFF0F0; color: #C0392B; }
   .health-neutral { background: var(--surface-raised); color: var(--text-secondary); }
 
   .detail-grid {
@@ -717,7 +714,7 @@
     color: var(--text-accent);
     cursor: pointer;
     padding: 0;
-    text-align: left;
+    text-align: start;
   }
 
   .meta-line,

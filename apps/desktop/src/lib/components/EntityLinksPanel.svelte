@@ -275,7 +275,7 @@
     padding: 0;
     background: transparent;
     color: var(--text-accent);
-    text-align: left;
+    text-align: start;
     cursor: pointer;
     font-weight: var(--weight-medium);
   }

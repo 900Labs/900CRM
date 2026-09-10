@@ -108,7 +108,7 @@ Create local SQLite backups from Settings, validate backup integrity before rest
 Settings is three panes: Appearance (language, theme, dates, currency, desktop reminders), Data (import/export and local backup/restore), and Integrations (sync honesty, optional email TCP probe, and external-client placeholders). Full email send and receive is not implemented.
 
 ### Internationalization (i18n)
-The entire interface is localized. Switch languages in settings instantly. Arabic enables right-to-left (`dir=rtl`) with some logical CSS; layout polish is still in progress and is not full RTL. Community translations welcome.
+The entire interface is localized. Switch languages in settings instantly. Arabic enables right-to-left (`dir=rtl`) on nav, lists, pipeline, activities, and record pages. Community translations welcome.
 
 ### Offline-First by Design
 Every core CRM feature works without an internet connection. There is no "offline mode" to enable because offline is the default. Sync configuration and changelog foundations exist for future team workflows, but real multi-device sync transport is not implemented today: `trigger_sync` explicitly reports a `not_implemented` state rather than claiming a successful sync.
@@ -277,7 +277,7 @@ current-vs-remaining phase map.
 | Language | Code | Coverage | Status |
 |---|---|---|---|
 | English | `en` | 100% | Complete — base language |
-| Arabic | `ar` | 100% | Machine-assisted — native review welcome (RTL direction enabled; layout polish in progress) |
+| Arabic | `ar` | 100% | Machine-assisted — native review welcome (RTL on primary routes) |
 | Hausa | `ha` | 100% | Machine-assisted — native review welcome |
 | Bengali | `bn` | 100% | Machine-assisted — native review welcome |
 | French | `fr` | 100% | Machine-assisted — native review welcome |

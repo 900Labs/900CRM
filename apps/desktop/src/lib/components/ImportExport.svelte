@@ -1424,7 +1424,7 @@
   .backup-summary {
     align-items: flex-start;
     background-color: var(--surface-hover);
-    border-left: 3px solid var(--color-primary);
+    border-inline-start: 3px solid var(--color-primary);
     color: var(--text-secondary);
     display: flex;
     gap: var(--space-3);
@@ -1450,7 +1450,7 @@
   .rollback-summary {
     align-items: flex-start;
     background-color: var(--surface-hover);
-    border-left: 3px solid var(--text-success);
+    border-inline-start: 3px solid var(--text-success);
     color: var(--text-secondary);
     display: flex;
     gap: var(--space-3);
@@ -1467,7 +1467,7 @@
   }
 
   .backup-restore-status {
-    border-left: 3px solid currentColor;
+    border-inline-start: 3px solid currentColor;
     font-size: var(--text-sm);
     margin: 0;
     padding: var(--space-3);
@@ -1585,7 +1585,7 @@
 
   .validation-list {
     background-color: var(--surface-hover);
-    border-left: 3px solid var(--text-danger);
+    border-inline-start: 3px solid var(--text-danger);
     color: var(--text-danger);
     display: flex;
     flex-direction: column;

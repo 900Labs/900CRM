@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed — 2026-09-11
+- App and sidebar icons use the 900 Labs 9-mark instead of the bar-chart placeholder.
+- Dark theme raises muted text, icons, and health badges so cards stay readable.
+- Arabic RTL now covers nav, lists, pipeline, activities, and record pages.
+- Contacts, Organizations, and Activities use tighter page and table spacing.
+
 ### Added — 2026-08-17
 - Dashboard, Pipeline, and Reports can filter the current queue by
   owner. Pipeline cards and the stale-deal list show the name when it
